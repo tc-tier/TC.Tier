@@ -81,7 +81,7 @@ SortedIndex 主存储（2026-08-24 同构落地：固定锚点帧 32B 几何（B
   25ns 差构成：两段组合的二次地址解码/就绪检查（Find→GetValue 分两次）+ 桶 128B 双 cache line
   （FASTER 桶 64B 恰一行）+ 接口分派（IKeyComparer/IKeyResolver vs 泛型特化）。代价=构造期必注入
   IKeyResolver（判等闭环）。
-- **★ 地址一等公民教义（2026-08-22 用户裁定）**：16B LogicalAddress（seg/offset/ext）不可拆、不做
+- **★ 地址一等公民教义（设计决策）**：16B LogicalAddress（seg/offset/ext）不可拆、不做
   8B 紧凑编码——第一性理由：<b>8B 永远无法正确解决无限地址空间的语义</b>（打包把几何烙进地址：
   段号占 N 位 ⇒ 段数 ≤2^N 且段大小 ≤2^(64−N)——要么现在锁死段数量+单段大小，要么段几何一改编码直接挂）；
   16B 是无限空间的正交表达（2^31 段 × 每段 2^63B，编码与几何解耦）。次级：判等忽略 ext、
@@ -96,7 +96,7 @@ SortedIndex 主存储（2026-08-24 同构落地：固定锚点帧 32B 几何（B
   span 生命周期契约=scope 内消费，页驱逐经 epoch 排水恒稳）。
   批口径 94.67 反超来源：零拷贝（FASTER SimpleFunctions Read 付 64B 出参拷贝）+ 无逐 op session 机器 +
   epoch 摊薄。残差项：双次地址解码（Find 内 key 回读+GetValueSpan 各一次，~10ns，需 IKeyResolver
-  三方法定稿扩法——接口裁定，未动，已非必要）。
+  三方法定稿扩法——接口未动，已非必要）。
 - **hash 发现路径的残差可再省 ~20ns**（非必须）：①零拷贝值交付（GetSpan/ref 直访热页，省 64B 拷贝
   ~10-15ns）②Find 一体化取值（省二次地址解码 ~10ns）——合计可望 ~135-140ns 追平 FASTER 同形。
   **①已落地**（GetValueSpan+ReadScope+IndexScope.Find，2026-08-22）：批口径 **94.67ns 反超 FASTER 1.34×
@@ -173,7 +173,7 @@ SortedIndex 主存储（2026-08-24 同构落地：固定锚点帧 32B 几何（B
 
 - **恢复共同底盘**（主存储零增量口径的 45-60ms 构成）：帧校验+物化合并读（Hash 16.8MB 读 2 遍→1 遍，
   ~5-8ms，中成本）；帧 CRC64 软件（~10ms）分块并行（PCLMULQDQ 折叠复杂，暂缓）。
-  ★ 双引擎并行（ring/index 引擎恢复重叠）**已裁定不做（2026-08-24）**：收益虚（引擎重开 mem/本地盘
+  ★ 双引擎并行（ring/index 引擎恢复重叠）**已决定不做（2026-08-24）**：收益虚（引擎重开 mem/本地盘
   仅几 ms，且 index 恢复核心依赖 ring 恢复完成——hints 需 Begin/Tail，并行只重叠引擎启动一小段），
   成本高（生命周期骨架 API 拆分——信任边界改动），恢复是一次性冷启动非热路径。
 - **Ring 写路径分解**（906ns 构成：CRC/页池/水位 CAS）——**批量写已落地（2026-08-24，`BeginWriteBatch`）**：

@@ -254,7 +254,7 @@ lease.Commit();   // 完整性绊线：有 chunk 漏填 SetReplacement/MarkInval
 | 并发 | 2 线程近线性（三环境复现）；零 Monitor 争用；分配不随并发膨胀 |
 | IO 占比 | Buffered ~7%、WriteThrough ~0.4%——lease 不是写路径瓶颈 |
 
-**池化裁定**：`LeaseFactory.Default` = 每次 new（**默认不池化**——对象小，池化成本更高）；
+**池化决策**：`LeaseFactory.Default` = 每次 new（**默认不池化**——对象小，池化成本更高）；
 `LeaseFactory.Pooled` 仅诊断/对比用。`WithDiagnostics` 仅测试用（+开销）。
 
 ## 9. 决策速查

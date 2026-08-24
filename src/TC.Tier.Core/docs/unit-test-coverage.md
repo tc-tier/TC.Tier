@@ -3,7 +3,7 @@
 > **标准（强制）**：`TC.Tier.Core` 的每一个组件都必须有完整的单元测试，**测试文件与源文件目录一一对应**
 > （`src/TC.Tier.Core/Collections/X.cs` ↔ `tests/TC.Tier.Core.Tests/Collections/XTests.cs`）。
 >
-> 为什么（2026-08-14 事故教训）：**只要留给集成测试，问题就会被隐藏**——`LockWord`（SpinRWLock 前身）的 OR 置位 bug
+> 为什么：**只要留给集成测试，问题就会被隐藏**——`LockWord`（SpinRWLock 前身）的 OR 置位 bug
 > 单线程两次获取+两次释放即可捕获，却因为原语零单测被推到集成层，表现为"楔死/flaky"，
 > 被误读为"压测不稳定"数月。原语 = 最高杠杆的测试投资点：一行实现的错误 × 所有上层依赖 = 系统性灾难。
 >
@@ -44,7 +44,7 @@
 | 源文件 | 测试 | 状态 |
 |---|---|---|
 | Atomic128.cs | Primitives/Atomic128Tests.cs | ✅ |
-| **SpinRWLock.cs** | **Primitives/SpinRWLockTests.cs** | ✅（2026-08-20 自 LockWord 重构承接，v2 扩至 11 契约测试——OR 置位事故回归族 + 写偏向三契约【后到读者让位序号断言/pending 释放卫生】+ Try 变体两契约【TryExclusive 失败不挂闸】+ 无损伤绊线【触发后锁仍可用】） |
+| **SpinRWLock.cs** | **Primitives/SpinRWLockTests.cs** | ✅（2026-08-20 自 LockWord 重构承接，v2 扩至 11 契约测试——OR 置位回归族 + 写偏向三契约【后到读者让位序号断言/pending 释放卫生】+ Try 变体两契约【TryExclusive 失败不挂闸】+ 无损伤绊线【触发后锁仍可用】） |
 | **FairGate.cs** | **Primitives/FairGateTests.cs** | ✅（2026-08-20 下沉：4 契约测试——计数配对/唤醒活性/8 线程单槽长持窗口无饿死压测） |
 | SpinLockScope.cs | Primitives/SpinLockScopeTests.cs | ✅（2026-08-14 补：互斥/异常释放/并发） |
 | MicroTimer.cs | Primitives/MicroTimerTests.cs | ✅ |

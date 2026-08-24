@@ -74,7 +74,7 @@ ConfigureBackgroundWorker(new SegmentBuilderWorker(scheduler: _workerScheduler, 
 | InstanceTracker | 不注册（进程意图资源） | 注册（泄漏/扩散可见） |
 | 适用 | 单引擎 / 纯异步轻量 | **引擎默认**；多引擎；同步/异步分池 |
 
-> ⚠️ **2026-08-14 实测教训**：compact 等同步 worker 与异步建段 worker 共用 `Shared` 的 M 线程时，同步 worker
+> ⚠️ **实测**：compact 等同步 worker 与异步建段 worker 共用 `Shared` 的 M 线程时，同步 worker
 > 霸占线程 → 饿死异步建段（43+ 测试失败）。**同步 worker 必须 own 独立实例（甚至单线程）与异步 worker 分池**。
 
 > ⚠️ 防扩散护栏：进程内 `Create` 实例数 > 4 → WARN「疑似滥用——考虑用 Shared」。

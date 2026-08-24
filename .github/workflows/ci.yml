@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-test-pack:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Build
+        run: dotnet build -c Release --nologo
+
+      - name: Test Core
+        run: dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo
+
+      - name: Test Runtime
+        run: dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj -c Release --no-build --nologo
+
+      - name: Pack
+        run: dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --no-build --nologo -o artifacts
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*.nupkg

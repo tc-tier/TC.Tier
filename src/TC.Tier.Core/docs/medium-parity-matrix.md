@@ -14,7 +14,7 @@
 | 空间根卷记录 | ✓ | ✓ | ✓ | ✓（参考实现） | Open 一次装载 / New 一次写入（G1） |
 | 文件级范围锁 | ✓ LockFileEx/OFD | ✓ 进程内区间表 | ✓ 进程内 advisory（G8 翻案） | ✓ 进程内逻辑锁 | advisory 契约同族 |
 | 映射平面 Map | ✓ 手工 mmap | ✓ 物化/直址 | ✓ 物化形态（G11 翻案：Read 快照/ReadWrite staging 视图） | ✓ 文件载体（设备诚实 ✗） | 映射无只写（三平面一致值域） |
-| 卷级共享获取 AcquireShared | ✗（G9 可选——v1 未拍板，矩阵留行） | ✗（同左） | ✗（同左） | ✗（同左） | 做则四介质同批 |
+| 卷级共享获取 AcquireShared | ✗（G9 可选——矩阵留行） | ✗（同左） | ✗（同左） | ✗（同左） | 做则四介质同批 |
 | `quota` | ✓ 惰性基线+写前拒 | ✓（原 Capacity→QuotaBytes） | ✓ 惰性 opt-in | ✓ 一词制供给（-1 = **按需自动扩容**） | UsedBytes 四介质实时可见（G3/G4） |
 | `access` ro/wo/rw | ✓ | ✓ | ✓ | ✓ | 统一枚举 AccessMode 三平面（G2） |
 | `exclusive` | ✓ 锁文件 | ✓ 真锁 | ✓ fencing 尽力 | ✓ 内建 | 挂载属性统一表达（G5） |

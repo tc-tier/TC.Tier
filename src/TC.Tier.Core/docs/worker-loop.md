@@ -9,7 +9,7 @@
 
 ## 0. 为什么禁止 `new Thread` 自建后台循环
 
-历史教训：旧整理（compact）worker、旧 epoch drain worker 各自 `new Thread`——生命周期分散、`Dispose` 顺序
+历史背景：旧整理（compact）worker、旧 epoch drain worker 各自 `new Thread`——生命周期分散、`Dispose` 顺序
 各自管、testhost 跑完测试不退出、异常一个没接住整条线程静默蒸发。
 
 `BackgroundWorkerLoop` 统一解决：**执行器**（公共池 / 隔离调度器注入）、**幂等启停**、**超时等待退出**、
@@ -319,7 +319,7 @@ if (sampler.ThrottleFactor <= 0.0) return;    // 档 0：正常——放行
 - ❌ **绝不** `new Thread(...)` 自建后台循环——所有后台循环继承 `BackgroundWorkerLoop`（两层之一）。
 - ❌ **绝不**在构造器里 `ConfigureBackgroundWorker` 或 `Start`（构造未完成、`this` 未就绪）——放 `OnInitializeBegin`/`OnInitializeComplete`。
 - ❌ **绝不**高频/关键 worker 打公共池（不传 scheduler）——污染全局池，拖垮全进程异步工作（§2.1）。
-- ❌ **绝不**同步重 IO worker 与异步 worker 共用一个调度器实例——同步任务霸占 M 线程饿死异步（2026-08-14 实测教训，见 dedicated-task-scheduler.md §2）。
+- ❌ **绝不**同步重 IO worker 与异步 worker 共用一个调度器实例——同步任务霸占 M 线程饿死异步（见 dedicated-task-scheduler.md §2）。
 - ❌ **绝不**在异步上下文调 `WaitForExit()`（同步阻塞死锁）——用 `WaitForExitAsync()`。
 - ❌ **绝不**把无界队列裸奔上线——`BackgroundWorkerLoop<T>` 队列**默认无界**，生产者快于消费者 = OOM；背压三招见 §5.2。
 - ❌ **绝不**在 `LightEpoch` drain action 里塞阻塞 IO（协作式，读线程顺手执行）——投给 worker 循环。

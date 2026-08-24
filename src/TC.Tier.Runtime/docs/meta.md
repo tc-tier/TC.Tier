@@ -165,7 +165,7 @@ payload 实长零扩展解读，新字段缺省 Empty = 无回退窗口。
 
 ### 6.2 恢复优先级（谁先谁后）
 
-全部结构统一（用户裁定）：**hints（`Initialize(hints)` 外部主动注入——调用方最强知识，最高优先级）
+全部结构统一（设计决策）：**hints（`Initialize(hints)` 外部主动注入——调用方最强知识，最高优先级）
 → meta（结构自管持久化水位）→ 扫盘兜底**。Log 的 hints 内部再分 TailAddress（精确）→ FileSize（近似，
 DeltaLog 临时文件场景）。meta 无论命中与否都会 Load（O(1)）——供恢复后 ReadOpaqueMeta/水位读取。
 

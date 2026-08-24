@@ -92,7 +92,7 @@
 `AcquireShared` 原实现 `s | ReaderInc`（OR 置位）——`ReaderInc` 是固定单 bit，OR 语义下第 2..N 个并发读者
 "获取成功"却不加计数，而每个读者释放都 `−1` → 第二次释放读计数即下溢 `−1` → 借位到 bit 63 出**假写者位**
 → 全部等待方永久自旋楔死。现实现为 `s + acquireMask`（递增），并有下溢绊线响亮失败（见下）。这是
-"原语零单测被推到集成层、被误读为压测不稳定数月"的教训直接产物（契约测试见 `SpinRWLockTests`）。
+并发原语契约测试的直接产物（契约测试见 `SpinRWLockTests`）。
 
 ### 内建防护（修 bug 的同时装上的仪器，别拆）
 
@@ -258,7 +258,7 @@ sealed class DeferredReclaimer
 
 ### 2.4 协议契约：Debug 绊线全表（违反 = 立即抛 + 示波器）
 
-`LightEpoch` 有**两层防护**（2026-08-14 AsyncPriorityQueue 挂死事故后建立，对齐 `SpinRWLock` 的值示波器范式）：
+`LightEpoch` 有**两层防护**（对齐 `SpinRWLock` 的值示波器范式）：
 
 | # | 违反 | Debug 表现 | Release 表现（为什么不能靠线上撞） |
 |---|------|-----------|----------------------------------|

@@ -29,7 +29,7 @@
 | **② Runtime 屏障** | `LogBase.Write.cs:204,224,296,490`（同步 Flush 等 `_inFlightFlush`）、`BlobBase.WriteSession.cs:261`、`CompactorBase.cs:182`（现 `DefaultCompactor.cs`）、`EntryLog.cs:333`（**名义异步实为锁内 `Monitor.Wait(10)`**） | 同步 flush/compact 轨阻塞等异步页落盘 |
 | **③ 生命周期链** | `Shared/LifecycleBase.cs:145,155`（`WaitForReady` → `_recoverTask.Wait()`）、`:247`（重试守卫 `priorTask.Wait()`）、`:449`（Dispose 等 recover task）；`StorageEngineFactory.cs:50,86`（`engine.WaitForReady()` 兜底）；结构层 `BlobBase.cs:148` 等 5 处 `_engine.WaitForReady()` | 同步等待后台恢复 task |
 
-**事故复盘（本提案的直接动因）**：引擎恢复实质同步、`Task.Factory.StartNew(LongRunning)` 调度延迟，
+**（本提案的直接动因）**：引擎恢复实质同步、`Task.Factory.StartNew(LongRunning)` 调度延迟，
 导致 `Initialize` 已返回而 `RecoveryState` 停在 `NotStarted`——`WaitGuardPreCheck`
 （`LifecycleBase.cs:179-188`）抛"恢复任务尚未启动"。根因归类为
 **「状态转移依赖了被调度」：发起线程返回时，连'已受理'这个事实都观测不到。**
@@ -43,7 +43,7 @@
 1. 提供通用操作句柄 `AsyncOperation`：发起 → 立即返回句柄；三种消费模式（轮询 / 异步等 / 同步兜底等）；
 2. 同步等待一律走**分层策略**（自旋 → park 分片），全程**有界**（强制超时）；
 3. "写路径必须同步转异步"的场景（IO 同步 API 桥）由**桥专用独立池**承载，异步工作的推进**不依赖公共池可用性**；
-4. 状态机**可见性原则**：发起线程在返回前同步完成"受理"状态转移（消灭 NotStarted 窗口类事故）；
+4. 状态机**可见性原则**：发起线程在返回前同步完成"受理"状态转移（消灭 NotStarted 窗口）；
 5. 全链路诊断：等待计数、等待时长、超时现场（对齐 SpinRWLock 值示波器哲学）。
 
 **非目标（明确不做）：**
@@ -161,7 +161,7 @@ public sealed class AsyncOperation<TResult> : AsyncOperationBase
 在完成信号置位（AsyncManualResetEvent.Set）**之前**同步触发（订阅者异常隔离）——`WaitAsync`
 等待者苏醒时事件必已投递；订阅竞态经 `IsCompleted` 兜底（先订阅后查，true = 完成早于订阅）。
 
-**★ 命名纪律（2026-08-24 裁定）**：`Async` 后缀只留给可 await 的方法（返回 Task/ValueTask）；
+**★ 命名纪律**：`Async` 后缀只留给可 await 的方法（返回 Task/ValueTask）；
 启动后台操作并返回句柄的方法用 Start 动词（`StartReclaim`/`StartCompact`），等待走句柄的
 `WaitAsync`。
 
@@ -257,7 +257,7 @@ op.Wait(timeout)   ←—— 最后时刻才等（park，事件唤醒）
 ```
 
 **关键点：work 是协作式异步契约**（`await` 让出、不阻塞）。work 内部禁止同步阻塞——独立池的
-M 很小（§6.2），阻塞任务直接饿死同池操作（对齐 dedicated-task-scheduler.md §7.2 教训）。
+M 很小（§6.2），阻塞任务直接饿死同池操作（对齐 dedicated-task-scheduler.md §7.2）。
 真正无法异步化的同步重 IO，由调用方注入 own 单线程实例（`Scheduler = IsolatedTaskScheduler.Create(ThreadCount=1, ...)`）。
 
 ### 6.2 默认桥池选型
@@ -281,7 +281,7 @@ _bridgeDepth > 0 且 Scheduler == 同一池（默认池或同实例）
   → throw InvalidOperationException("桥工作体内禁止再经同一桥同步等待——注入独立 Scheduler 或改异步")
 ```
 
-显式注入**不同的** Scheduler（分池）即豁免——这是嵌套场景的正解（对齐"compact 同步 worker 与异步建段分池"教训）。
+显式注入**不同的** Scheduler（分池）即豁免——这是嵌套场景的正解（对齐"compact 同步 worker 与异步建段分池"）。
 
 ### 6.4 诊断
 
@@ -293,11 +293,11 @@ _bridgeDepth > 0 且 Scheduler == 同一池（默认池或同实例）
 
 ---
 
-## 7. 状态机可见性原则（事故级教训的抽象）
+## 7. 状态机可见性原则
 
 > **发起线程在把句柄/对象交给调用方之前，必须同步完成"受理"状态转移；完成状态归完成侧线程。**
 
-这是 NotStarted 事故（§1）的根因修法，也是 `AsyncOperation → Running` 同步置位的依据。同样适用
+这是 NotStarted 问题（§1）的根因修法，也是 `AsyncOperation → Running` 同步置位的依据。同样适用
 于生命周期链（P3 落地项）：
 
 **现状**：`LifecycleBase.Initialize`（`Shared/LifecycleBase.cs:278-307`）调度后台 task 后立即返回，

@@ -113,7 +113,7 @@ MinAddress ≤ CommittedTail ≤ AllocatedTail
 | `Flush()` / `Flush(upTo)` | 落盘（fsync 族） | **仅同步**（OS 无异步 fsync）；upTo 版自动对齐段边界 |
 | `GetDistance` | 两址距离（跨段正确） | 与 CalculationAddress 同为地址算术正道 |
 | `ReclaimHead/Tail/Reclaim` | 回收区间释放空间 | 模式 B 日志消费后收头；`StartReclaim` 后台版（0 等待）带事件+进度 |
-| `StartCompact` / `StartRangeCompact` | 碎片整理（整段搬迁） | **一律后台句柄**（2026-08-24 裁定：同步入口废除——强制等待有死锁风险）；超时经 `await op.WaitAsync(ct)` 调用方自控；句柄冲突（rename 撞共享违例）由引擎自动关句柄+marker 续传，不重拷贝 |
+| `StartCompact` / `StartRangeCompact` | 碎片整理（整段搬迁） | **一律后台句柄**（2026-08-24 决策：同步入口废除——强制等待有死锁风险）；超时经 `await op.WaitAsync(ct)` 调用方自控；句柄冲突（rename 撞共享违例）由引擎自动关句柄+marker 续传，不重拷贝 |
 | `GetHoleRatio` | 查区间物理空洞占比 | 0.0 全实 / 1.0 全洞 |
 
 ### 3.3 模式 A 完整范式：预分配 + 复写

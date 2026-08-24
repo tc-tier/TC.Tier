@@ -1,7 +1,7 @@
 # Session（统一协调协议层）使用指南
 
 > 定位：**组合域的统一协调协议**——读写与检查点三 op 的唯一进出（设计稿
-> 2026-08-22 拍板）。每个组合域（一个产品面实例）
+> 2026-08-22 定稿）。每个组合域（一个产品面实例）
 > 一个 `SessionManager`；产品面（TierKv/Queue/TS/Blob/Meta）不自带排序/可见性/提交语义——
 > 消费 Session 协议 + 结构公开面，无第三条自造协调的路。
 
@@ -106,7 +106,7 @@ long watermark = await mgr.EnqueueCheckpoint(seq =>
 
 | 故障 | 行为 |
 |---|---|
-| 回合**物化**抛 | 失败回合回执原异常、同批其余回执批中止 → **管线 Faulted**（域报废重建：悬干无法安全清除，续跑会被后续批"洗白"）；恢复=进程重启/新域（结构恢复语义清尾）。⚠️ 与设计稿 §6"管线续跑"的差异：续跑仅对 Prepare 失败成立——物化失败必须 Faulted，这是实施期裁定的防洗白强化 |
+| 回合**物化**抛 | 失败回合回执原异常、同批其余回执批中止 → **管线 Faulted**（域报废重建：悬干无法安全清除，续跑会被后续批"洗白"）；恢复=进程重启/新域（结构恢复语义清尾）。⚠️ 与设计稿 §6"管线续跑"的差异：续跑仅对 Prepare 失败成立——物化失败必须 Faulted，这是实施期决策的防洗白强化 |
 | 回合 **Prepare** 抛 | 协调器自动 Abort 已 Prepare 者（吞次级异常）→ 批回执异常、会话 Faulted → **管线续跑**。已知边界：未轮到 Prepare 的参与者本轮物化残留尾部——由窗口契约在下一轮 Abort 或恢复时清除（档 B 物化委托应幂等可重放） |
 | 复制决策 false/超时/异常 | Abort 已 Prepare 者（D2 截断）→ `RollbackException` 回执 |
 | Confirm 在决策后抛 | 管线 Faulted（不可回退点之后水位可能分裂） |
@@ -159,7 +159,7 @@ CommitReplicatedAsync**（seq 真源在 txn 内部无法分段预订）——复
 ## 8. 禁忌
 
 1. **产品面自带排序/可见性/提交语义**——协调语义只在 Session 一处定义（不各自为政）。
-2. **给 Session 加任何自有存储/持久化决策**（record/oracle/独立文件）——纯协调层（用户裁定）。
+2. **给 Session 加任何自有存储/持久化决策**（record/oracle/独立文件）——纯协调层（设计决策）。
 3. **保护区（EnterReadScope/EnterEpoch）内调自带 epoch 的 API**（Ring 写/Index 逐次 Find）——
    同实例重入，Debug 绊线立即抛。
 4. **物化委托里做业务校验/可抛逻辑**——校验放 Stage 前；物化抛 = 域报废。
@@ -168,7 +168,7 @@ CommitReplicatedAsync**（seq 真源在 txn 内部无法分段预订）——复
 
 ## 9. 想深入？指路
 
-- 设计稿（拍板全文）：（内部存档）
+- 设计稿（定稿全文）：（内部存档）
 - 2PC 六件套与 Abort 窗口契约：本文档同目录 `structures.md` §10
 - 契约测试：`tests/TC.Tier.Runtime.Tests/Transactions/`（管线/复制检查点/恢复/读 scope 五文件）
 - 吞吐探针（回合/s 入档口径）：`benchmarks/.../Kv/SessionPipelineProbe.cs`

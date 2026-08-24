@@ -120,7 +120,7 @@ q.TryDequeue(out var x);   // 非阻塞尝试出队
 `BucketPriorityQueue` / `SkipListPriorityQueue` / `AsyncPriorityQueue`（含 V2/V3 实验线）的完整用法、
 选型与 Linux 验证结论见 **[`priority-queues.md`](priority-queues.md)**；实测数字见
 [`perf/priority-queues-performance.md`](perf/priority-queues-performance.md)；
-根因档案 [`lab/async-priority-queue-root-cause.md`](lab/async-priority-queue-root-cause.md)。
+根因档案存内部存档。
 
 ---
 

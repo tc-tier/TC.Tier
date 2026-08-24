@@ -16,7 +16,7 @@
 
 > 契约接口 `ILifecycle<THints>` / `IRecovery<THints>` 定义在 `TC.Tier.Contracts.Lifecycle`；Core 的 `LifecycleBase`/`RecoveryBase` **实现**它们（依赖倒置：Core→Contracts）。
 >
-> ★ **`Initialize` 不在 `ILifecycle` 接口面**（2026-08-24 用户裁定：接口面消除，不允许外部经接口直接调）——接口只保留观测/等待（`IsReady`/`RecoveryState`/事件/`WaitForReady*`/`CancelRecovery`）。启动入口由各持有者自己的装配面提供：引擎 = `StorageEngineBuilder.Start/StartAsync` 一步到位；结构层 = 组合器/生成代码经**具体类型**内部调用。`Initialize` 作为 `LifecycleBase` 的类面方法（模板）继续约束所有派生类。
+> ★ **`Initialize` 不在 `ILifecycle` 接口面**（设计决策：接口面消除，不允许外部经接口直接调）——接口只保留观测/等待（`IsReady`/`RecoveryState`/事件/`WaitForReady*`/`CancelRecovery`）。启动入口由各持有者自己的装配面提供：引擎 = `StorageEngineBuilder.Start/StartAsync` 一步到位；结构层 = 组合器/生成代码经**具体类型**内部调用。`Initialize` 作为 `LifecycleBase` 的类面方法（模板）继续约束所有派生类。
 
 ---
 
