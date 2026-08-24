@@ -1,0 +1,21 @@
+root = true
+
+# ════════════════════════════════════════════════════════════════
+# TC.Tier 代码规范分析器（TC.Tier.CodeGen.Analyzers）
+#   TCSG030：禁止运行时反射（生产代码反射零必要——白盒走 InternalsVisibleTo）
+#   TCSG031：禁止同步强制等待异步（sync-over-async——死锁 + 线程池耗尽）
+# 生产代码（src）严格禁止（Error）；测试豁免（同步测试等 Task 完成 / 反射契约验证是测试惯用法，
+# xunit 无同步上下文无死锁风险）。
+# ════════════════════════════════════════════════════════════════
+
+[src/**/*.cs]
+dotnet_diagnostic.TCSG030.severity = error
+dotnet_diagnostic.TCSG031.severity = error
+
+[tests/**/*.cs]
+dotnet_diagnostic.TCSG030.severity = none
+dotnet_diagnostic.TCSG031.severity = none
+
+[benchmarks/**/*.cs]
+dotnet_diagnostic.TCSG030.severity = none
+dotnet_diagnostic.TCSG031.severity = none

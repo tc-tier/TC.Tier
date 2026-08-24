@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>TC.Tier.Core</PackageId>
+    <Description>TC.Tier 内核——生命周期骨架（LifecycleBase/RecoveryBase）、并发原语、原生内存/IO 基础设施（依赖 TC.Tier.Contracts）。</Description>
+    <PackageTags>storage;kv;wal;concurrency;native-memory;core</PackageTags>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>TC.Tier.Core</RootNamespace>
+    <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
+    <PackageId>TC.Tier.Core</PackageId>
+    <Version>0.1.0-alpha</Version>
+    <Description>TC.Tier 公共基石层——可观测原语、原生互操作、公共契约与核心工具</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="System.IO.Hashing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\TC.Tier.Contracts\TC.Tier.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TC.Tier.Core.Tests" />
+    <InternalsVisibleTo Include="TC.Tier.Core.IO.S3.Tests" />
+    <InternalsVisibleTo Include="TC.Tier.Core.IO.S3" />
+    <InternalsVisibleTo Include="TC.Tier.Runtime.Tests" />
+    <InternalsVisibleTo Include="TC.Tier.Runtime.AdversarialTests" />
+    <InternalsVisibleTo Include="TC.Tier.Core.Benchmarks" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <!-- ★ 过渡例外：TC.Tier.Runtime 自带 Storage/IO 句柄层仍直调 FileNative/DiskNative
+         （未迁 Core.IO），与其性能探针（Runtime.Benchmarks）一并放行 internals。
+         Runtime 迁移到 Core.IO 后删除这两项——NativeInterop 对外恒 internal（见 docs/native-interop.md）。 -->
+    <InternalsVisibleTo Include="TC.Tier.Runtime" />
+    <InternalsVisibleTo Include="TC.Tier.Runtime.Benchmarks" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- ★ native 128-bit CAS 库（atomic128）——NativeAtomic128.cs 的 DllImportResolver 按
+         runtimes/{rid}/native/ 加载。在此声明一次，所有经 ProjectReference 引用本项目的消费方
+         （tests / benchmarks / 产品）自动经 transitive copy 拿到 native 库，无需各自手抄。
+         ★ Link 强制输出到 runtimes/{rid}/native/ 子目录，匹配 resolver 的查找路径。
+         ★ NativeAOT 走 DirectPInvoke 静态链接，此项不影响（native 库不参与 AOT 产物）。 -->
+    <None Include="NativeInterop\lib\win-x64\atomic128.dll"
+          Link="runtimes\win-x64\native\atomic128.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Pack="true" PackagePath="runtimes\win-x64\native\" />
+    <None Include="NativeInterop\lib\win-arm64\atomic128.dll"
+          Link="runtimes\win-arm64\native\atomic128.dll"
+          CopyToOutputDirectory="PreserveNewest"
+          Pack="true" PackagePath="runtimes\win-arm64\native\" />
+    <None Include="NativeInterop\lib\linux-x64\libatomic128.so"
+          Link="runtimes\linux-x64\native\libatomic128.so"
+          CopyToOutputDirectory="PreserveNewest"
+          Pack="true" PackagePath="runtimes\linux-x64\native\" />
+    <None Include="NativeInterop\lib\linux-arm64\libatomic128.so"
+          Link="runtimes\linux-arm64\native\libatomic128.so"
+          CopyToOutputDirectory="PreserveNewest"
+          Pack="true" PackagePath="runtimes\linux-arm64\native\" />
+  </ItemGroup>
+</Project>

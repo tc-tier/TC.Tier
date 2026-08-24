@@ -1,0 +1,49 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <NuGetAudit>false</NuGetAudit>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <Authors>TC.Tier Contributors</Authors>
+    <Company>TC.Tier</Company>
+    <RepositoryUrl>https://github.com/tc-tier/TC.Tier</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionSuffix>alpha</VersionSuffix>
+    <!-- NU1507: multiple package sources (nuget.org + shijizhongyun), intentional -->
+    <!-- NU1701: Roslyn analyzer (CodeGen) targets .NET Framework, expected for source generators -->
+    <!-- NU1604: transitive deps from CodeGen lack inclusive lower bounds -->
+    <NoWarn>NU1507;NU1701;NU1604</NoWarn>
+  </PropertyGroup>
+
+  <!-- ★ NuGet 打包（2026-08-24 开源准备）：默认不打包，核心三包（Contracts/Core/Runtime）显式 IsPackable=true；
+       XML 文档随包（DocFX/API 参考输入）——仅 src 项目开（tests/benchmarks 注释历史形态不强制解析）、
+       MIT license 声明、源链接（pdb 内嵌源码——调试进包） -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <GenerateDocumentationFile Condition="!$(MSBuildProjectDirectory.Contains('tests')) And !$(MSBuildProjectDirectory.Contains('benchmarks'))">true</GenerateDocumentationFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <DebugType>embedded</DebugType>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- ★ 源生成器全局注入（2026-08-24）：TierFs 外部协议注册桥依赖生成器在"引用协议程序集的消费方
+       编译"里运行——全局注入让"引用 S3 即自动注册"成立（消费方零配置）；生成器对无标注项目零输出 -->
+  <ItemGroup Condition="'$(MSBuildProjectName)' != 'TC.Tier.CodeGen' And '$(MSBuildProjectName)' != 'TC.Tier.CodeGen.Analyzers' And '$(MSBuildProjectName)' != 'TC.Tier.CodeGen.Abstractions'">
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src\TC.Tier.CodeGen\TC.Tier.CodeGen.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)src\TC.Tier.CodeGen.Analyzers\TC.Tier.CodeGen.Analyzers.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+</Project>

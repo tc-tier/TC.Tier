@@ -1,0 +1,182 @@
+namespace TC.Tier.Runtime.Structures.Log;
+
+public abstract partial class LogBase
+{
+    // ═══════════════════════════════════════════════════════════════════
+    // ★ AppendMeta — 写元数据公共入口（委托注入的 ILogMetaPolicy）
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// ★ 写元数据（水位提交链统一入口）：水位 + 已登记 opaque 同块原子落盘。
+    /// <para>opaque 来自 SetOpaqueMeta 的 stage（策略缓冲保留——结构化水位写不清除），
+    ///   内部提交链不再有独立 opaque 通道（用户裁定：opaque 跟随水位线，无第二条提交路径）。</para>
+    /// </summary>
+    /// <param name="committedOffset">本次提交边界（写入 Payload 的 CommittedOffset 字段）。</param>
+    private protected void AppendMeta(LogicalAddress committedOffset)
+    {
+        var p = MetaPolicy;
+        lock (p)
+        {
+            p.WriteHeader(BuildMetaHeader());
+            p.WritePayload(BuildMetaPayload(committedOffset));
+            p.Commit();
+            _opaqueDirty = false;   // opaque 已随本块落盘
+        }
+    }
+
+    /// <summary>★ 写元数据（异步轨，对等同步版）。</summary>
+    private protected async ValueTask AppendMetaAsync(LogicalAddress committedOffset, CancellationToken ct = default)
+    {
+        var p = MetaPolicy;
+        lock (p)
+        {
+            p.WriteHeader(BuildMetaHeader());
+            p.WritePayload(BuildMetaPayload(committedOffset));
+        }
+        await p.CommitAsync(ct).ConfigureAwait(false);
+        _opaqueDirty = false;   // opaque 已随本块落盘
+    }
+
+    /// <summary>构造 meta header（纯规范字段 12B，水位不在 Header）。</summary>
+    /// <para>★ P0 修复：必须填正确的 Magic/Version/Flags——返回 default（全零）会导致</para>
+    /// <para>  Managed/Transport 策略 Load 时 MagicValue 校验必然失败（0 ≠ Magic），</para>
+    /// <para>  meta 永久加载失败、崩溃后水位丢失。</para>
+    /// <para>PayloadLength/PaddingLength 由策略 WritePayload 时按实际数据长度填。</para>
+    private static LogMetaHeader BuildMetaHeader() => new()
+    {
+        MagicValue = LogMetaHeader.Magic,
+        Version = LogMetaHeader.CurrentVersion,
+        Flags = LogMetaHeader.DefaultFlags,
+    };
+
+    /// <summary>★ 构造 meta payload（四水位：BeginAddress/TailAddress/CommittedOffset/PreparedTailAddress）。</summary>
+    private LogMetaPayload BuildMetaPayload(LogicalAddress committedOffset) => new()
+    {
+        BeginAddress = BeginAddress,
+        TailAddress = TailAddress,
+        CommittedOffset = committedOffset,
+        LastCommittedSeq = LastCommittedSeq,
+        LastPreparedSeq = LastPreparedSeq,
+        PreparedTailAddress = _txRollbackTail,   // ★ Abort 回退点（Empty = 无待回滚窗口）
+    };
+
+    // ═══════════════════════════════════════════════════════════════════
+    // WriteMetaPayload — 嵌入式 meta 写 log 流原语
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>★ 嵌入式 meta 写 log 流——复用 AppendCore（isMeta=true）。</summary>
+    private protected LogicalAddress WriteMetaPayload(ReadOnlySpan<byte> payload)
+        => AppendCore(payload, isMeta: true);
+
+    private protected async ValueTask<LogicalAddress> WriteMetaPayloadAsync(ReadOnlyMemory<byte> payload, CancellationToken ct = default)
+        => await AppendCoreAsync(payload, isMeta: true, ct).ConfigureAwait(false);
+
+    /// <summary>
+    /// 默认 meta 策略装配（构造期经 ??= 收口——签名即 MetaPolicyFactory"按模式构造"委托：
+    /// 注入工厂与默认实现是同一条 kind → policy 映射，无匿名 lambda）。
+    /// </summary>
+    private IMetaPolicy<LogMetaHeader, LogMetaPayload> CreateMetaPolicyDefault(MetaPolicyKind kind)
+    {
+        var layout = new MetaLayout(_settings.MetaOpaqueBytes);
+        return kind switch
+        {
+            MetaPolicyKind.Managed => _metaEngine is not null
+                ? new ManagedMetaPolicy<LogMetaHeader, LogMetaPayload>(layout, _metaEngine, Logger)
+                : throw new InvalidOperationException("Meta engine is not initialized."),
+            // ★ Transport：上层注入传输实例；未注入回落到 MetaHost——meta entry 嵌入 log 流
+            MetaPolicyKind.Transport => new TransportMetaPolicy<LogMetaHeader, LogMetaPayload>(
+                layout, _metaTransport ?? new MetaHost(this), Logger),
+            _ => new DisabledMetaPolicy<LogMetaHeader, LogMetaPayload>(),
+        };
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  MetaLayout / MetaHost——Log 的 IMetaLayout/IMetaTransport 实现（泛型策略用）
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>Log meta 布局描述（供泛型策略操作 LogMetaHeader/LogMetaPayload codec）。</summary>
+    protected sealed class MetaLayout(int payloadOpaqueSize) : IMetaLayout<LogMetaHeader, LogMetaPayload>
+    {
+        public int HeaderSize => LogMetaHeaderCodec.StructSize;
+        public int PayloadSize => LogMetaPayloadCodec.StructSize + PayloadOpaqueSize;
+        public int PayloadOpaqueSize { get; } = payloadOpaqueSize;
+        public uint Magic => LogMetaHeader.Magic;
+        public ushort CurrentVersion => LogMetaHeader.CurrentVersion;
+        public ushort DefaultFlags => LogMetaHeader.DefaultFlags;
+
+        public void WriteHeader(Span<byte> dst, in LogMetaHeader header, bool validate)
+            => LogMetaHeaderCodec.Write(dst, in header, validate);
+        public LogMetaHeader ReadHeader(ReadOnlySpan<byte> src) => LogMetaHeaderCodec.Read(src);
+        public void WritePayload(Span<byte> dst, in LogMetaPayload payload)
+            => LogMetaPayloadCodec.Write(dst, in payload);
+        public LogMetaPayload ReadPayload(ReadOnlySpan<byte> src)
+        {
+            // ★ 旧块容错：盘上 payload 短于当前布局（字段追加前写入的块）→ 零扩展后解读，
+            //   超出旧布局的新字段（如 PreparedTailAddress）读默认值 Empty——优雅降级不抛。
+            if (src.Length >= LogMetaPayloadCodec.StructSize) return LogMetaPayloadCodec.Read(src);
+            Span<byte> buf = stackalloc byte[LogMetaPayloadCodec.StructSize];
+            src.CopyTo(buf);
+            return LogMetaPayloadCodec.Read(buf);
+        }
+
+        public uint GetMagicValue(in LogMetaHeader h) => h.MagicValue;
+        public ushort GetVersion(in LogMetaHeader h) => h.Version;
+        public ushort GetPayloadLength(in LogMetaHeader h) => h.PayloadLength;
+        public LogMetaHeader WithPayloadLength(in LogMetaHeader h, ushort len)
+        { var x = h; x.PayloadLength = len; return x; }
+        public LogMetaHeader CreateDefaultHeader() => new()
+        {
+            MagicValue = LogMetaHeader.Magic,
+            Version = LogMetaHeader.CurrentVersion,
+            Flags = LogMetaHeader.DefaultFlags,
+        };
+    }
+
+    /// <summary>Log meta 传输宿主（Transport 策略未注入传输时的回落）——WriteBlock 走 AppendCore(isMeta)，ReadLastBlock 走 cursor 找最后 IsMeta。</summary>
+    protected sealed class MetaHost(LogBase owner) : IMetaTransport
+    {
+
+        /// <summary>最近一次扫描结果（字段持有——ReadLastBlock 返回的视图有效至本传输下一次调用）。</summary>
+        private byte[]? _lastBlock;
+
+        public ReadOnlySpan<byte> ReadLastBlock()
+        {
+            _lastBlock = ScanLastBlockCore();
+            return _lastBlock;
+        }
+
+        public async ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct)
+        {
+            _lastBlock = await ScanLastBlockCoreAsync(ct).ConfigureAwait(false);
+            return _lastBlock is null ? default : _lastBlock;
+        }
+
+        public void WriteBlock(ReadOnlySpan<byte> block)
+            => owner.WriteMetaPayload(block);
+
+        public async ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct)
+            => await owner.WriteMetaPayloadAsync(block, ct).ConfigureAwait(false);
+
+        private byte[]? ScanLastBlockCore()
+        {
+            using var cursor = owner.OpenCursor();
+            if (cursor is null) return null;
+            byte[]? last = null;
+            while (cursor.MoveNext())
+                if (cursor.CurrentIsMeta)
+                    last = cursor.CurrentPayload.ToArray();
+            return last;
+        }
+
+        private async ValueTask<byte[]?> ScanLastBlockCoreAsync(CancellationToken ct)
+        {
+            await using var cursor = owner.OpenCursor();
+            if (cursor is null) return null;
+            byte[]? last = null;
+            while (await cursor.MoveNextAsync(ct).ConfigureAwait(false))
+                if (cursor.CurrentIsMeta)
+                    last = cursor.CurrentPayload.ToArray();
+            return last;
+        }
+    }
+}
