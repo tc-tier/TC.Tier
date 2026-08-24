@@ -16,7 +16,7 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
     /// <summary>
     ///  <see cref="LightEpoch"/>——纳秒级 epoch 保护（spec 15 §0.2 确认接近理论极限）。
     /// <para>★ 私有——外部（含测试）需要 epoch 协调时经构造注入实例（Create(..., epoch:)），
-    ///   引擎不暴露内部原语（用户裁定：依赖注入而非内部暴露）。</para>
+    ///   引擎不暴露内部原语（设计决策：依赖注入而非内部暴露）。</para>
     /// </summary>
     private readonly LightEpoch _epoch;
     /// <summary>
@@ -143,7 +143,7 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         Resources.Add(_segmentTable);
         _workerScheduler = IsolatedTaskScheduler.Create(new IsolatedSchedulerOptions { Name = "engine-worker" });
         Resources.Add(_workerScheduler, "EngineWorkerScheduler");
-        // ★ VII-2 收口（2026-08-22）：消费者数读 Optimization.WorkerConsumers（默认 2）——此前硬编码 1
+        // ★ VII-2 收口（）：消费者数读 Optimization.WorkerConsumers（默认 2）——此前硬编码 1
         //   且选项从未接线：N2/N4 压测与 SegmentSingleFlightTests 设的 WorkerConsumers 形同虚设，
         //   所谓"N=2 证据线"实际一直在 N=1 下跑（用户指认）。建段 single-flight / 池协议已多次
         //   收口（§XI/§XIV/§XV），默认上调至配置契约值。

@@ -91,7 +91,7 @@ public sealed partial class Segment
     /// <summary>
     /// 增量刷新投影——热路径用（真正 O(1)）。
     /// <para>★ visibleOffset：End 单调，取 max。</para>
-    /// <para>★ minOutstanding：保守不变量（L11 修复 2026-08-21，对齐 RebuildProjections 的
+    /// <para>★ minOutstanding：保守不变量（L11 修复 ，对齐 RebuildProjections 的
     ///   STORAGE-024 语义）：minOs 单调递减可（新区间更小则取代），但 <b>minOsEnd 只放大不缩小</b>——
     ///   它是"任一非 Committed 区间的最大 End"的保守下界，缩小即出现漏判窗口（在途写被读快路径放行
     ///   → 撕裂读，探针实锤）。becameCommitted 路径扫不到后继非 Committed 时同样保守：minOsEnd

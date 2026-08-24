@@ -12,7 +12,7 @@ namespace TC.Tier.Runtime.Storage;
 /// <para>★ ★ 本类已拆除专用 epoch worker（<c>new Thread</c> + <c>drained.Wait</c>）——改 FASTER 原生「mutator 线程
 ///   持 epoch 协作 drain」模型（<see cref="LightEpoch.DrainThen"/>）：无 worker、无 sync Wait、无死锁。
 ///   对齐 COORDINATION.md §5/§7 反模式 1（禁 new Thread）/2（禁阻塞 IO 进 drain）/4（禁 drain 排序销毁）。
-///   （2026-08-24：IEngineEpoch 包装接口消灭——drain 协议下沉 Core 原语，子系统直接注入 LightEpoch。）</para>
+///   （：IEngineEpoch 包装接口消灭——drain 协议下沉 Core 原语，子系统直接注入 LightEpoch。）</para>
 /// </summary>
 internal sealed partial class StorageEngine
 {

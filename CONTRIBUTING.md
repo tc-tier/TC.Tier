@@ -50,9 +50,7 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 
 ## 文档
 
-- 使用文档在 `src/*/docs/`，随代码维护（改代码必须同步文档）
-- 设计文档在 `docs/design/`，记录重大决策与论证过程
-- API 参考与使用文档站点：https://tc-tier.github.io/（DocFX 自动生成）
+- 使用文档与 API 参考统一在独立文档站：https://docs.mytzz.top/（DocFX 自动生成，本地 docs-deploy.sh 部署）
 
 ## 许可
 

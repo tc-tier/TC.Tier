@@ -11,7 +11,7 @@ namespace TC.Tier.Core.Primitives;
 ///   写者最多等「在途读者」退出，不被持续读者流饿死。读者 fast path 仍是一次 CAS。</para>
 /// <para>★ 临界区约束：排他临界区必须短（纯内存、禁 await——Debug 释放线程校验会抓）；共享可长持/跨 await
 ///   （计数语义无线程亲和，读计划锁跨 IO 持有是合法用法）。跨 await 持有越久，写者与被挡读者等待越久。</para>
-/// <para>★ 演进自 LockWord（2026-08-20 终态替代，读优先→写偏向；Monitor Wait/PulseAll 职责删除——生产零调用）。</para>
+/// <para>★ 演进自 LockWord（终态替代，读优先→写偏向；Monitor Wait/PulseAll 职责删除——生产零调用）。</para>
 /// </summary>
 public sealed class SpinRWLock
 {
@@ -51,7 +51,7 @@ public sealed class SpinRWLock
 
 #if DEBUG
     // ★ 常设 Debug 仪器（Release 零开销）：最近 24 次锁字原子操作环形记录，绊线异常自动携带。
-    //   教训（2026-08-14）：LockWord AcquireShared OR置位 bug 靠临时造的值示波器破案（CAS-R before==after
+    //   教训（）：LockWord AcquireShared OR置位 bug 靠临时造的值示波器破案（CAS-R before==after
     //   铁证）——原语级 Debug 全套跟踪必须是常设设施，否则每次锁异常都要现场考古一下午。
     public SpinRWLock()
     {
@@ -85,7 +85,7 @@ public sealed class SpinRWLock
     /// <summary>获取读锁（共享）——一次 CAS 递增读计数；写持有或写等待（pending）期间退避自旋。
     /// <para>★ 获取必须用 <c>s + ReaderInc</c>（递增），绝不能 <c>s | ReaderInc</c>（置位）——ReaderInc 是
     ///   固定单 bit，OR 语义下第 2..N 个并发读者"获取成功"却不加计数，而每个读者的释放都 −1 → 第二个
-    ///   释放即读计数下溢 → 借位到高位出假"写者位" → 全部等待方永久自旋楔死（2026-08-14 事故根因）。</para></summary>
+    ///   释放即读计数下溢 → 借位到高位出假"写者位" → 全部等待方永久自旋楔死（事故根因）。</para></summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AcquireShared()
     {
@@ -164,7 +164,7 @@ public sealed class SpinRWLock
     public SharedScope EnterShared() => new(this);
 
     /// <summary>释放读锁（共享）——CAS 循环实现，消除破坏性先修改再回滚窗口。
-    /// <para>★ 下溢绊线（Debug+Release 永久保留，演进自 LockWord 2026-08-14）：读计数已为 0 = 存在无配对的
+    /// <para>★ 下溢绊线（Debug+Release 永久保留，演进自 LockWord ）：读计数已为 0 = 存在无配对的
     ///   ReleaseShared（bug）——旧实现 Interlocked.Add 先减再检测再回滚，减完到回滚之间锁字短暂呈现
     ///   "假写者位"（0 - ReaderInc 借位到 bit63）阻塞全部等待方；现改为<b>修改前检测</b>（count==0 直接抛，
     ///   锁字不动）——无损伤窗口，即使异常被吞也不残留破坏态。</para>

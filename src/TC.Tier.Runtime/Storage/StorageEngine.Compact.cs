@@ -24,7 +24,7 @@ internal sealed partial class StorageEngine
     // ★ Compact 排他标志——CAS 0→1，保证同一时刻至多 1 个 Compact（Reclaim 等不排他）
     private int _compacting;
 
-    // ★ L20（2026-08-22）：活跃一致快照读者计数——与 _compacting 双相门：
+    // ★ L20（）：活跃一致快照读者计数——与 _compacting 双相门：
     //   读者构造：等 compacting==0 → ++count → 复查 compacting（仍 0 才生效，否则让位重试）；
     //   Compact 入闸后：等 count==0 再开工。互斥闭环：Compact 期间新一致读者进不来，
     //   在途一致读者读完才换内脏——快照语义从"锁实例"升级为"布局切换前清场"。
@@ -301,7 +301,7 @@ internal sealed partial class StorageEngine
     }
 
     /// <summary>
-    /// Compact 失败分流（2026-08-24 用户裁定：失败决策权归使用方）——句柄冲突（rename 撞共享违例）
+    /// Compact 失败分流（设计决策：失败决策权归使用方）——句柄冲突（rename 撞共享违例）
     /// 由引擎自己处理：关缓存句柄 + ICompact.Retry 从 marker 续传（补执行，不重拷贝）。
     /// <para>★ 挂 op.Failed 事件且<b>先于门闩释放订阅</b>（事件按订阅顺序同步触发）：续传在引擎排他
     ///   （<c>_compacting</c>=1）内执行，无并发 Compact 干扰；续传后门闩正常释放。</para>
@@ -333,7 +333,7 @@ internal sealed partial class StorageEngine
     ///   只在使用方</b>。小记录追赶整理必须由使用方申报活区间，否则全量拷贝零回收。</para>
     /// <para>★ 契约：申报区间必须 ⊆ [from, to)（越界抛）；未申报的已分配区间视为洞不搬迁——
     ///   漏报活数据 = 该数据整理后不可达。范围外（from 前、to 后）仍物理保守保留。</para>
-    /// <para>★ 2026-08-24：同步入口废除（强制等待死锁风险）——后台句柄形态，0 等待返回。</para>
+    /// <para>★ 同步入口废除（强制等待死锁风险）——后台句柄形态，0 等待返回。</para>
     /// </summary>
     public IAsyncOperation<CompactResult> StartRangeCompact(LogicalAddress from, LogicalAddress to,
         IReadOnlyList<(LogicalAddress Start, long Length)> liveRecords)
@@ -370,7 +370,7 @@ internal sealed partial class StorageEngine
         {
             var lastSegId = to.Offset == 0 ? to.SegId - 1 : to.SegId;
             var leaseFrom = new LogicalAddress(from.SegId, 0);
-            // ★ L19（2026-08-22）：lease 覆盖 [from 段@0, 尾段 GrowthLimit] 整段——
+            // ★ L19（）：lease 覆盖 [from 段@0, 尾段 GrowthLimit] 整段——
             //   尾段不再钳到 CommittedTail：追加在尾段 [CommittedTail.Offset, GrowthLimit)
             //   贴边启动，旧钳制下 CanAcquireUnsafe 判无重叠放行 → promote rename 旧 inode
             //   丢写 / 换段后 CompleteAndMerge 静默 no-op（P0）。全 GrowthLimit 覆盖使
@@ -388,10 +388,10 @@ internal sealed partial class StorageEngine
             lease = _segmentTable.CompactLease(leaseFrom, leaseTo);
             // ★ 使用租约的实际范围（非子范围 from→to），确保租约覆盖的整段都被标记为 compact 中
             EnterCompactRange(leaseFrom, leaseTo);
-            // ★ L20（2026-08-22）：一致读者清零门（同 StartCompact 契约）。
+            // ★ L20（）：一致读者清零门（同 StartCompact 契约）。
             WaitForConsistentReadersIdle();
 
-            // ★ 子系统统一异步形态（2026-08-24）：ICompact.RangeCompact 返回句柄（后台执行在子系统内），
+            // ★ 子系统统一异步形态（）：ICompact.RangeCompact 返回句柄（后台执行在子系统内），
             //   引擎直接持有——同 StartCompact 完全同构；lease 生命周期移交子系统（完成后释放）
             var op = _compact.RangeCompact(lease, from, to, addresses, livePlan);
 
@@ -524,7 +524,7 @@ internal sealed partial class StorageEngine
         CompactLease? lease = null;
         try
         {
-            // ★ L19（2026-08-22）：lease 上界扩到尾段 GrowthLimit（同 Compact(timeout) 契约），
+            // ★ L19（）：lease 上界扩到尾段 GrowthLimit（同 Compact(timeout) 契约），
             //   数据窗钳 CommittedTail（lease.DataEnd）。
             var committed = CommittedTail;
             var leaseTo = new LogicalAddress(committed.SegId, _segmentTable.SegmentGrowthLimit(committed.SegId));
@@ -533,10 +533,10 @@ internal sealed partial class StorageEngine
             lease = _segmentTable.CompactLease(MinAddress, leaseTo);
             lease.DataEnd = committed;
             EnterCompactRange(MinAddress, committed);
-            // ★ L20（2026-08-22）：一致读者清零门（同 Compact(timeout)）。
+            // ★ L20（）：一致读者清零门（同 Compact(timeout)）。
             WaitForConsistentReadersIdle();
             var op = _compact.Compact(lease);
-            // ★ 完成时序契约（2026-08-21 修复 flaky——故障注入重试撞"另一个 Compact 正在进行中"）：
+            // ★ 完成时序契约（修复 flaky——故障注入重试撞"另一个 Compact 正在进行中"）：
             //   调用方经 WaitAsync 观察到完成/失败时，排他门闩必须已释放。释放挂在
             //   op 终态事件上（事件同步触发先于 TCS 置位——等待者苏醒即可重新入闸）。
             //   IsCompleted 兜底订阅竞态（op 在订阅前已终止则事件不再投递）。

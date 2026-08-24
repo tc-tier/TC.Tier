@@ -57,7 +57,7 @@ public sealed partial class SegmentTable : IDisposable, ILeaseSource
     /// </summary>
     private readonly long _spinMilliseconds;
 
-    /// <summary>★ 区间公平门（写者公平性）——7a9685aa 根治长持锁窗口写者饿死的协议，2026-08-20
+    /// <summary>★ 区间公平门（写者公平性）——7a9685aa 根治长持锁窗口写者饿死的协议，
     /// 下沉 Core.FairGate：有等待者时新到者不走快路径（防零间隙复占者插队）+ 唤醒让渡 5ms 先手
     /// + 50ms park 兜底防丢失唤醒。AcquireExtent 退化为门内 Monitor 挂起，区间终态转换
     /// （Commit/Rollback）后 Wake（WriteThrough 每写 fsync 拉宽持锁窗口后曾实测单写离群 5-20s）。</summary>

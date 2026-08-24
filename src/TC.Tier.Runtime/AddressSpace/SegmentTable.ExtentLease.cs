@@ -21,9 +21,9 @@ public sealed partial class SegmentTable
             var spinner = new SpinWait();
             var deadline = Environment.TickCount64 + _spinMilliseconds;
             var attempts = 0;
-            // ★ L12 版本哨兵（2026-08-21）：等待/退避期间段被 Compact 原位重整（CompactVersion
+            // ★ L12 版本哨兵（）：等待/退避期间段被 Compact 原位重整（CompactVersion
             //   变化）= 本轮认知基于旧内脏。原位更新后引用恒稳（互斥已闭环），此哨兵为纵深防御。
-            //   ★ 快路径零税（性能税批次 2026-08-21）：入口引用本就新鲜——重取只在重试路径
+            //   ★ 快路径零税（性能税批次 ）：入口引用本就新鲜——重取只在重试路径
             //   （refresh 标记）；版本只在锁内读权威值（返回用）/FairGate 捕获点现读。
             var refresh = false;
             while (true)

@@ -65,7 +65,7 @@ public sealed class CompactChunk(int segId, long oldGrowthLimit)
     internal long NewMinOffset { get; private set; }
 
     /// <summary>
-    /// ★ L19 收口（2026-08-22）：布局保留边界——≥ 此偏移的旧区间记录原样保留（状态/sparse 位照搬）。
+    /// ★ L19 收口（）：布局保留边界——≥ 此偏移的旧区间记录原样保留（状态/sparse 位照搬）。
     /// <para>默认 long.MaxValue = 不保留（[新 MaxOffset, 旧 MaxOffset) blanket sparse——全量 Compact
     /// 与恢复路径的语义）。RangeCompact 对窗口尾段设 to.Offset：写者恰在 lease 获取前提交、
     /// 数据落在窗口外的区间不被洗成读零（旧实现静默丢写实锤）。</para>

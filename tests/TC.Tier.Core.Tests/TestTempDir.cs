@@ -4,7 +4,7 @@ using System.Runtime.CompilerServices;
 namespace TC.Tier.Core.Tests;
 
 /// <summary>
-/// 测试临时目录管理 —— 健壮创建/清理 + 双端兜底清扫（2026-08-20 残留事故复盘后补全）。
+/// 测试临时目录管理 —— 健壮创建/清理 + 双端兜底清扫（残留事故复盘后补全）。
 /// <para>★ 事故：注释承诺的 AssemblyCleanupFixture 兜底<b>从未实现</b>；删除重试仅 3×50ms 且静默放弃；
 ///   TierFsTests 等直接拼 Path.GetTempPath() 完全绕过本类（零清理零重定向）——三层叠加在 C 盘累积
 ///   29G/1691 目录（强杀 run 不走 Dispose 整批残留 + 磁盘满连锁）。</para>

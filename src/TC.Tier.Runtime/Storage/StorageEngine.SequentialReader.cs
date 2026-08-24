@@ -54,7 +54,7 @@ internal sealed partial class StorageEngine
             // Consistent 模式：构造时一次性锁住 [start, end] 所有段（共享锁），读期间不被 Compact/Reclaim 改
             if (snapshotMode == SnapshotMode.Consistent)
             {
-                // ★ L20（2026-08-22）双相门：与 Compact 互斥——compact 入闸后等一致读者清零；
+                // ★ L20（）双相门：与 Compact 互斥——compact 入闸后等一致读者清零；
                 //   构造期见 compacting 让位重试。锁实例对换内脏无效（L12 原位更新锁不失效），
                 //   布局切换前的清场由本门保证（锁仍保留——挡 ReclaimTail/ReclaimHead 物理变更）。
                 var spinner = new SpinWait();
@@ -345,7 +345,7 @@ internal sealed partial class StorageEngine
                 }
                 else
                 {
-                    // ★ L23 防御推进（2026-08-22）：缺失段退到前段段首——旧实现空转死循环
+                    // ★ L23 防御推进（）：缺失段退到前段段首——旧实现空转死循环
                     //   （dstOffset/位置都不变；当前运行期无摘索引路径，潜伏缺陷）。
                     _position = new LogicalAddress(segId - 1, 0);
                     continue;
@@ -429,7 +429,7 @@ internal sealed partial class StorageEngine
                 }
                 else
                 {
-                    // ★ L23 防御推进（2026-08-22）：段缺失时游标前进——旧实现空转死循环
+                    // ★ L23 防御推进（）：段缺失时游标前进——旧实现空转死循环
                     //   （当前运行期无摘索引路径，潜伏缺陷；索引考古曾实锤空洞段窗口）。
                     _position = new LogicalAddress(segId + 1, 0);
                 }

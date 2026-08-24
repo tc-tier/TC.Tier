@@ -840,7 +840,7 @@ public sealed class MemoryFileSystemTests
             h.UnbufferedSupport.Should().Be(UnbufferedIoSupport.NotRequested);
             h.RequiredAlignment.Should().Be(1);
         }
-        // DIO 句柄（行为保真模拟——2026-08-19）：Supported + 对齐强制（Disk 同款）
+        // DIO 句柄（行为保真模拟——）：Supported + 对齐强制（Disk 同款）
         using (var d = fs.Open("f", Opts(hints: FileOpenHints.NoBuffering)))
         {
             d.UnbufferedSupport.Should().Be(UnbufferedIoSupport.Supported,
@@ -931,7 +931,7 @@ public sealed class MemoryFileSystemTests
         act.Should().NotThrow();
     }
 
-    // ══════════════════ Sparse 写路径与预分配（2026-08-19 设计补全）══════════════════
+    // ══════════════════ Sparse 写路径与预分配（设计补全）══════════════════
 
     [Fact]
     public void Sparse_FullPageWriteSkipZeroing_UncoveredSegmentsStillZero()

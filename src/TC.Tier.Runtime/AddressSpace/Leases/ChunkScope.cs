@@ -3,7 +3,7 @@ using System.Runtime.CompilerServices;
 namespace TC.Tier.Runtime.AddressSpace.Leases;
 
 /// <summary>
-/// chunk 视图 + 分段提交控制——完整迭代器模式（foreach / for / while 三态，2026-08-16）。
+/// chunk 视图 + 分段提交控制——完整迭代器模式（foreach / for / while 三态，）。
 /// <para>★ 普通struct（非 ref）——foreach/for 循环体内可 await（CopyChunksAsync 兼容）。</para>
 /// <para>★ 几何属性沿用 RangeChunk 命名（SegId/SegOff/SegEnd/Length）；
 ///   <see cref="Commit"/>/<see cref="Rollback"/> 显式分段终态（doneMask 保 exactly-once，重复调用安全）。</para>

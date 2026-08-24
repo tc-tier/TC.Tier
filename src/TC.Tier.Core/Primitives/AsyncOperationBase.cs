@@ -6,7 +6,7 @@ namespace TC.Tier.Core.Primitives;
 /// <summary>
 /// 一次性后台操作状态句柄的<b>机制基座</b>——<see cref="AsyncOperation"/> / <see cref="AsyncOperation{TResult}"/>
 /// 共用（docs/sync-async-bridge.md §4）。
-/// <para>★ 通用后台操作原语（2026-08-24 升级）：取代 Storage 层 IReclaimOperation/ICompactOperation
+/// <para>★ 通用后台操作原语（升级）：取代 Storage 层 IReclaimOperation/ICompactOperation
 ///   两套同构句柄的手写实现（TCS + 事件 + 时序对齐三层各写一遍）——事件/取消/进度/结果/等待
 ///   一套契约一处实现，后台操作统一 <c>new AsyncOperation(...)</c> + <c>Report*</c>。</para>
 /// <para>★ 实现 <see cref="IAsyncOperation"/>（Contracts）——消费面全集见接口（含
@@ -370,7 +370,7 @@ public abstract class AsyncOperationBase : IAsyncOperation
         _transitions[i & (_transitions.Length - 1)] = (Environment.TickCount64, Environment.CurrentManagedThreadId, to);
     }
 
-    /// <summary>转移历史文本（ oldest→newest，含相对毫秒与线程）。</summary>
+    /// <summary>转移历史文本（oldest→newest，含相对毫秒与线程）。</summary>
     private string DebugHistoryText
     {
         get

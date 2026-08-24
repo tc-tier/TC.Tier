@@ -1,7 +1,7 @@
 namespace TC.Tier.Runtime.Tests.AddressSpace;
 
 /// <summary>
-/// lease chunk 迭代三态模式验证（2026-08-16）：foreach（完整迭代器）/ for（索引器含物理门）/ while（原模式）。
+/// lease chunk 迭代三态模式验证（）：foreach（完整迭代器）/ for（索引器含物理门）/ while（原模式）。
 /// <para>★ ChunkScope：几何（SegId/SegOff/SegEnd/Length）+ 分段 Commit/Rollback（doneMask exactly-once）。</para>
 /// </summary>
 public class LeaseChunkIterationTests

@@ -19,7 +19,7 @@ internal sealed partial class StorageEngine
 
         // 三阶段：lease 占区间 + 释放段句柄 + 删物理段 + Commit（内部自动 ShrinkHead 收缩段表）
         using var lease = _segmentTable.ReclaimHeadLease(address);
-        // ★ L21 修复（2026-08-22）：物理删段/段内打洞前对 [MinSegId, newMinSegId] 全量升序
+        // ★ L21 修复（）：物理删段/段内打洞前对 [MinSegId, newMinSegId] 全量升序
         //   段排他锁清场——一致读者（构造期持共享锁）与异步 DirtyRead（跨 await 持共享锁）
         //   被等待完成后才删文件，新读者被挡在锁外：删段与读互斥闭环（旧实现 ShrinkHead 不取
         //   排他 → 读者持共享照删 → 读 ODE/FileNotFound）。升序获取与 LockRange 构造序一致，
@@ -106,7 +106,7 @@ internal sealed partial class StorageEngine
     /// <inheritdoc/>
     /// <remarks>
     /// ★ 真后台：物理 PunchHole 投递到线程池（经 <see cref="RunBackgroundTask"/> 注册到统一跟踪表），
-    ///   调用方立即返回 <see cref="IAsyncOperation"/> 句柄（0 等待——命名 2026-08-24 裁定：Start 动词
+    ///   调用方立即返回 <see cref="IAsyncOperation"/> 句柄（0 等待——命名 决策：Start 动词
     ///   表达"启动后台操作"，Async 后缀留给可 await 的方法）。
     /// <para>★ 逐段 PunchHole 完成触发 <see cref="IAsyncOperation.Progress"/>；全部完成触发
     ///   <see cref="IAsyncOperation"/> 成功终态（WaitAsync 返回）；异常触发 <see cref="IAsyncOperation.Failed"/>
@@ -184,7 +184,7 @@ internal sealed partial class StorageEngine
     }
 
     /// <summary>
-    /// 物理 PunchHole 与并发读互斥——持<b>段排他锁</b>执行（L18 修复，2026-08-22）。
+    /// 物理 PunchHole 与并发读互斥——持<b>段排他锁</b>执行（L18 修复，）。
     /// <para>★ 同步语义：无并发 reader 持段共享锁时（常见 + 单线程测试），排他锁立即取得，
     ///   打洞当场完成——<see cref="Reclaim"/> 返回时紧随的同步 <see cref="Read"/> 即读到归零数据。</para>
     /// <para>★ 互斥语义：DirtyRead（同步/异步）与 Consistent 读者都持段共享锁跨 IO——
@@ -195,7 +195,7 @@ internal sealed partial class StorageEngine
     private void PunchHoleViaDrain(int segId, long segOff, long length, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
-        // ★ L18 修复（2026-08-22）：打洞与读的互斥从 epoch drain 改<b>段排他锁</b>——
+        // ★ L18 修复（）：打洞与读的互斥从 epoch drain 改<b>段排他锁</b>——
         //   旧 epoch 只覆盖同步 DirtyRead（thread-static 禁跨 await）；异步 DirtyRead
         //   跨 await 持段共享锁却不持 epoch → punch 撕裂读（P0，代码级实锤）。段排他锁
         //   统一覆盖全部读路径：同步/异步 DirtyRead 的段共享锁 + Consistent 读者的构造期

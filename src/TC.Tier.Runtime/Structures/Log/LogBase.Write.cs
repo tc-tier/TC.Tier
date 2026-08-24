@@ -31,7 +31,7 @@ public abstract partial class LogBase
     private int _pageUsedB;                      // 页 B 已用字节
     private int _activePage;                     // 0=A, 1=B（当前写页）
     private Task? _inFlightFlush;                // 在途 FlushPageAsync 任务（限 1 个，背压）
-    /// <summary>★ 写路径锁（2026-08-24 并发安全化——粗锁方案）：Append/Flush/TruncateSuffix 串行化——
+    /// <summary>★ 写路径锁（并发安全化——粗锁方案）：Append/Flush/TruncateSuffix 串行化——
     /// 单写者语义完全保持（水位/TailAddress 零改动），并发调用安全（不损坏）；批持锁（批内零锁）。</summary>
     private readonly object _writeLock = new();
     // ★ frame 缓冲池——DIO 要求 frame buffer 指针扇区对齐（ArrayPool/new byte[] 无保证）。

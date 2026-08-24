@@ -11,7 +11,7 @@ public readonly record struct SegmentSpec
     public long MinOffset { get; }
 
     /// <summary>
-    /// ★ L19 收口（2026-08-22）：布局保留边界——≥ 此偏移的旧终态区间记录原样保留
+    /// ★ L19 收口（）：布局保留边界——≥ 此偏移的旧终态区间记录原样保留
     /// （Compact 原位换内脏时拼接进新布局）。默认 long.MaxValue = 不保留（[MaxOffset, 旧 MaxOffset)
     /// blanket sparse）。RangeCompact 尾段设窗口尾偏移：窗口外已提交数据不洗零。
     /// </summary>

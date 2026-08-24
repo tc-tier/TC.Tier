@@ -5,7 +5,7 @@ namespace TC.Tier.Core.Primitives;
 /// <summary>
 /// <see cref="MonitorScope"/>——using 块自动获取/释放 <see cref="Monitor"/>（与 <see cref="SpinLockScope"/>
 /// 同构的 RAII 面板，锁对象版）。
-/// <para>★ 取代 no-tracking <see cref="SpinLock"/> 的场景（2026-08-20 挂起取证定案）：SpinLock 的
+/// <para>★ 取代 no-tracking <see cref="SpinLock"/> 的场景（挂起取证定案）：SpinLock 的
 ///   复合锁字（持锁位 | 等待计数 | 跟踪禁用位）在 Sleep 型重竞争交错下可被孤立——实测 dump 中
 ///   <c>_owner=0x80000003</c>（持锁+1 登记等待者）而全进程零持有线程，等待者 Sleep(1) 循环永等
 ///   持锁位清零（ConcurrentReadWrite WriteThrough 挂起 60s+，fsync 0.1ms 洗清磁盘延迟）。

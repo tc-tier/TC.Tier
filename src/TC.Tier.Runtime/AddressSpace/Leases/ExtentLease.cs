@@ -12,7 +12,7 @@ public readonly struct ExtentLease : IDisposable
     private readonly long _end;
     private readonly byte _extentState;  // ExtentStateCode 编码（高 4 bit = Src）
     private readonly int _segId;
-    /// <summary>★ L12（2026-08-21）：获取时刻的段 CompactVersion 快照——Commit/Rollback 时校验，
+    /// <summary>★ L12（）：获取时刻的段 CompactVersion 快照——Commit/Rollback 时校验，
     /// 段被 Compact 原位重整（版本变）= 本 lease 的区间记录已随旧表消失，快速失败让上层重试。</summary>
     private readonly int _compactVersion;
 

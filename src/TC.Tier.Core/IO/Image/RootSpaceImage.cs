@@ -123,7 +123,7 @@ public static class RootSpaceImage
         options.Validate();
 
         // 空目标前置：先保根存在（Disk 根目录可能尚未创建——Restore 自保，
-        // 消费方无须先 EnsureRoot——2026-08-19 可用性修复：此前对全新 Disk 根直接枚举抛 DirectoryNotFound）
+        // 消费方无须先 EnsureRoot——可用性修复：此前对全新 Disk 根直接枚举抛 DirectoryNotFound）
         destination.EnsureRoot();
         if (destination.EnumerateEntries(recursive: true).Any())
             throw new FileIOException(IOError.AlreadyExists,

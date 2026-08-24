@@ -13,7 +13,7 @@ namespace TC.Tier.Core.Tests.Shared;
 /// </summary>
 /// <remarks>★ 与 BackgroundWorkerLoopStressTests 共享 InstanceTracker collection：计数断言依赖
 /// 进程级静态跟踪表的绝对计数差，Stress 类并行 Create/Dispose tracked 实例会污染计数
-/// （2026-08-17 全量套件偶发失败根因——单跑永远绿，并行才撞）。同一 collection 串行化根治。</remarks>
+/// （全量套件偶发失败根因——单跑永远绿，并行才撞）。同一 collection 串行化根治。</remarks>
 [Collection("instance-tracker")]
 public class IsolatedTaskSchedulerTests
 {

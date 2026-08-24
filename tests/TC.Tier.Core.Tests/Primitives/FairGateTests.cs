@@ -6,7 +6,7 @@ namespace TC.Tier.Core.Tests.Primitives;
 
 /// <summary>
 /// FairGate（公平门）原语契约测试。
-/// <para>★ 背景（2026-08-18，自 SegmentTable.AcquireExtent 手搓公平门下沉）：双写者长持锁窗口下，
+/// <para>★ 背景（，自 SegmentTable.AcquireExtent 手搓公平门下沉）：双写者长持锁窗口下，
 ///   零间隙复占者永远插队 + 被唤醒者无先手持续失手——8 并发写者 3~4 个超时。根治协议两件套：
 ///   ①有等待者时新到者不走快路径 ②唤醒者让渡 5ms 先手。本测试族锁定这两条契约 + 计数配对。</para>
 /// </summary>
@@ -87,7 +87,7 @@ public class FairGateTests
     }
 
     // ════════════════════════════════════════════════════════════
-    //  无饿死压测（★ 2026-08-18 AcquireExtent 饥饿形态的复刻）
+    //  无饿死压测（★ AcquireExtent 饥饿形态的复刻）
     // ════════════════════════════════════════════════════════════
 
     /// <summary>★ 无饿死契约：8 线程按 AcquireExtent 同形协议（HasWaiters 让位 + TryAcquireSlow +

@@ -24,7 +24,7 @@ internal static class S3Xml
             var key = (string?)LocalElement(contents, "Key");
             var size = (long?)LocalElement(contents, "Size");
             if (key is null || size is null) continue;   // 畸形条目跳过（容错——分页协议继续）
-            // LastModified：ISO 8601（如 2026-08-18T07:21:06.000Z）——解析失败条目跳过时间不跳对象（容错）
+            // LastModified：ISO 8601（如 T07:21:06.000Z）——解析失败条目跳过时间不跳对象（容错）
             DateTimeOffset? lastModified = null;
             var lm = (string?)LocalElement(contents, "LastModified");
             if (lm is not null

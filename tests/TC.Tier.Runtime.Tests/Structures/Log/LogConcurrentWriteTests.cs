@@ -3,7 +3,7 @@ using TC.Tier.Runtime.Structures.Log;
 namespace TC.Tier.Runtime.Tests.Structures.Log;
 
 /// <summary>
-/// Log 并发写契约测试（2026-08-24 单写者铁律解除——页状态机 + 原子段分配）：
+/// Log 并发写契约测试（单写者铁律解除——页状态机 + 原子段分配）：
 /// N 线程并发 Append 数据完整 / 并发批 / 页满竞争（小页）/ 崩溃一致性（并发写 + Prepare 重开）。
 /// </summary>
 public class LogConcurrentWriteTests

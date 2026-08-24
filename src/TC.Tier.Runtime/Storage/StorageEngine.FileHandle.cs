@@ -36,7 +36,7 @@ internal sealed partial class StorageEngine
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private IFileHandle GetWriteHandle(int segId)
     {
-        // ★ L21 修复（2026-08-22）：ReclaimHead 过的段（表内 Invalid 墓碑）——OpenOrCreate 会在
+        // ★ L21 修复（）：ReclaimHead 过的段（表内 Invalid 墓碑）——OpenOrCreate 会在
         //   已删路径上复活幽灵空段文件（重开扫盘装配幽灵段）。表内 Invalid = 地址已死，
         //   快速失败（与"读已删段抛 PartitionInvalidException"同语义）。未注册段（前沿预建窗口）
         //   与在表非 Invalid 段正常放行。

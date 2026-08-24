@@ -11,7 +11,7 @@ namespace TC.Tier.Core.IO.S3.Tests;
 public sealed class TierFsS3BindingTests : IDisposable
 {
     private const string EnvName = "TIERFS_S3_BINDING_TEST";
-    private readonly List<string> _tempDirs = [];   // 2026-08-20 修复：此前零 Dispose——目录全残留
+    private readonly List<string> _tempDirs = [];   // 修复：此前零 Dispose——目录全残留
 
     // 强制加载 S3 程序集 → ModuleInitializer 注册 s3 协议（测试断言均为 Core 类型，不触碰则程序集不加载）
     static TierFsS3BindingTests() => GC.KeepAlive(S3ProtocolBuilder.Instance);

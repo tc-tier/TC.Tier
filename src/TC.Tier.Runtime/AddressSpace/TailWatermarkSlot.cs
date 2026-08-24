@@ -62,7 +62,7 @@ internal sealed class TailWatermarkSlot : IDisposable
     internal bool IsTailWatermarkHeld => Volatile.Read(ref _tailWatermarkHeld) != 0;
 
     /// <summary>
-    /// ★ L13/L10（2026-08-21）：Allocated 是否已低于 <paramref name="v"/>——撕裂/CSE 免疫读。
+    /// ★ L13/L10（）：Allocated 是否已低于 <paramref name="v"/>——撕裂/CSE 免疫读。
     /// <para>★ 快路径：no-op CAS（原子）——当前值恰为 v 即未退（调用方 to 通常就是最新推进值）。</para>
     /// <para>★ 慢路径：MemoryBarrier + 稳定双读（两读一致才采信；16B 裸读可撕裂，JIT 可 CSE——
     ///   屏障阻提升、双读防撕裂；不一致自旋重试）。裸 <see cref="Allocated"/> 单读用于越界判定
@@ -91,7 +91,7 @@ internal sealed class TailWatermarkSlot : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal bool TryUpdateAllocated(LogicalAddress expected, LogicalAddress value)
     {
-        // ★ L13 修复（2026-08-21，双向闭合）：水位独占期间的推进要么被拒绝要么自我撤销——
+        // ★ L13 修复（，双向闭合）：水位独占期间的推进要么被拒绝要么自我撤销——
         //   ① 前检：hold 已置位直接失败（AllocateRaw 既有自旋退避重试）；
         //   ② 后验：CAS 成功瞬间 hold 被置位（检查→CAS 窗口被 ReclaimTail 插入）= 本推进
         //     可能越过后退边界——回退（CAS 回旧值）并报失败，调用方下一轮被 ① 挡住等待。
@@ -113,7 +113,7 @@ internal sealed class TailWatermarkSlot : IDisposable
 
     internal void Retreat(LogicalAddress newTail)
     {
-        // ★ L13（2026-08-21）：先 Committed 后 Allocated——两槽无法原子双退，中间窗必现；
+        // ★ L13（）：先 Committed 后 Allocated——两槽无法原子双退，中间窗必现；
         //   先退 Committed 的瞬态是 C<A（不变量安全侧），先退 Allocated 则瞬态 C>A（探针
         //   稳定双读可捕获的假性破坏）。
         RetreatIfHigher(_committed, newTail);

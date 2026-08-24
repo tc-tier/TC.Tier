@@ -30,7 +30,7 @@ public readonly struct SegmentView
     public long RealSize => MaxOffset - MinOffset;
     /// <summary>
     /// 可见前缀（已提交 extent 推到的最大 End——读门权威）。调用方用 if (seg.VisibleOffset >= 0) 直接判断。
-    /// <para>★ 语义（2026-08-14 读门楔死取证）：CommittedTail/MaxOffset 是<b>游标</b>（Allocate 即推），
+    /// <para>★ 语义（读门楔死取证）：CommittedTail/MaxOffset 是<b>游标</b>（Allocate 即推），
     ///   可读性跟<b>物理提交的 extent</b> 走。Read 计划按本值裁剪尾块——请求超出可见前缀返回可见部分
     ///   （部分读），绝不自旋等待"游标与可见的差值区间"（未写占位永不可见 = 永真自旋楔死）。</para>
     /// </summary>

@@ -229,7 +229,7 @@ public class SegmentTableAddressingTests
             table.GetDistance(new LogicalAddress(0, 100), new LogicalAddress(3, 200)));
     }
 
-    // ── 边界/Hollow 补全覆盖（2026-08-16 审计；2026-08-21 区间统一：恰好填满停驻段末 (seg,limit)，废除 (seg+1,0) 哨兵形态）──
+    // ── 边界/Hollow 补全覆盖（审计；区间统一：恰好填满停驻段末 (seg,limit)，废除 (seg+1,0) 哨兵形态）──
 
     [Fact]
     public void AdvanceAddress_ExactFillFromSegmentHead()

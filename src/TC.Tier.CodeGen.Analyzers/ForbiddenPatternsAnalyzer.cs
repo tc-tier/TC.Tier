@@ -11,7 +11,7 @@ namespace TC.Tier.CodeGen.Analyzers;
 /// <para>★ TCSG030 禁止运行时反射（System.Reflection 调用面）——反射破坏 AOT/裁剪/性能，且本代码库
 ///   IVT + 契约面设计下反射零必要（白盒访问走 InternalsVisibleTo，不用反射绕过）。</para>
 /// <para>★ TCSG031 禁止同步强制等待异步（sync-over-async：<c>.GetAwaiter().GetResult()</c> / <c>.Wait()</c>）——
-///   同步阻塞后台 Task 在同步上下文下经典死锁 + 线程池耗尽风险（2026-08-24 同步 Compact 废除裁定：
+///   同步阻塞后台 Task 在同步上下文下经典死锁 + 线程池耗尽风险（同步 Compact 废除决策：
 ///   一律后台句柄 await WaitAsync）。</para>
 /// </summary>
 [DiagnosticAnalyzer(LanguageNames.CSharp)]

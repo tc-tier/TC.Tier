@@ -6,7 +6,7 @@ using TC.Tier.Core.IO.Raw;
 namespace TC.Tier.Core.Tests.IO.Raw;
 
 /// <summary>
-/// Raw 审查修复回归族（2026-08-19 审查结论）：
+/// Raw 审查修复回归族（审查结论）：
 /// B1 部分块写陈旧字节泄漏 / B1b unwritten 整区间转换泄漏 / B2 成员键滞留 / B3 RAWC 毁卷脚枪 /
 /// D1a 打开句柄拒删 / D1b epoch 延迟回收 / D2 句柄生命周期 / D4 unwritten 保真 / D5 非可寻址流 /
 /// D7 ReadOnlyVolume / D8 单成员 Defrag / D10 游标迁移。

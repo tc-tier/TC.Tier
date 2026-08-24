@@ -848,7 +848,7 @@ internal static unsafe class FileNative
     //  文件元数据 (xattr / ADS) — best-effort
     // ═══════════════════════════════════════════════════════════════
 
-    // ★ fs 元数据平面主键（评审决议 2026-08-18 统一命名 TC_TIER——与 IFileSystem.MetadataName 同值，
+    // ★ fs 元数据平面主键（评审决议 统一命名 TC_TIER——与 IFileSystem.MetadataName 同值，
     //   层级方向不反向引用，契约测试断言防漂移）。fs 级（CreateFile/Stat）与句柄级 xattr 同一逻辑键——两平面互见。
     //   旧值 "TC_METAP" 注：引擎侧仍以字符串字面量消费（EngineMeta 段元数据，经泛型按名通道）——与本主键独立并存，引擎迁移后退役。
     //   ⚠️ Linux/macOS 的 xattr 名必须带命名空间前缀（user.）——裸名被内核拒绝（EOPNOTSUPP），

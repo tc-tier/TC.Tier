@@ -1,9 +1,9 @@
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
-/// 引擎 N=2 专轮压测——2026-08-16 §XI/§XII 修复（single-flight build-gate + EngineMeta 写面串行化 +
+/// 引擎 N=2 专轮压测——§XI/§XII 修复（single-flight build-gate + EngineMeta 写面串行化 +
 /// VII-7 终局兜底 flush + VII-8 索引扩容发布顺序）后的复验线。
-/// <para>★ 断言核心是 2026-08-15 红轮签名「Full meta 未更新（读到 stale 创建值）」：N=2 双消费者
+/// <para>★ 断言核心是 红轮签名「Full meta 未更新（读到 stale 创建值）」：N=2 双消费者
 ///   并发建段/段满后，每个满段的 meta 必须是 state=Full + maxOffset 定格——读到创建值即复发。</para>
 /// <para>★ reopen 完整性：重开恢复尾段必须与 live 尾段一致（VII-8 空洞曾使重开截断、数据不可达）。</para>
 /// <para>★ logger 全程注入（TestConsoleLogger）——异常被吞分支在测试输出直接现形。</para>

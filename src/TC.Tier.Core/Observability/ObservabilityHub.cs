@@ -111,7 +111,7 @@ public sealed partial class ObservabilityHub
 
     /// <summary>
     /// 确定性百分比采样：<c>counter % 100 &lt; rate</c>——每 100 个事件<b>精确</b>采 rate 个，均匀分布。
-    /// <para>★ 修复（2026-08-14）：旧实现 <c>counter % (100/rate) == 0</c> 整数除法截断——
+    /// <para>★ 修复（）：旧实现 <c>counter % (100/rate) == 0</c> 整数除法截断——
     ///   rate=3→实际 3.03%、rate=7→7.14%、rate=34→<b>50%</b>、rate=51→<b>100%</b>，
     ///   绝大多数非整除值大幅偏差（概念计算非精确值）。新式对任意 1..99 精确且零除法。</para>
     /// <para>★ internal——可测性缝，数学契约由单测锁定。</para>
@@ -129,7 +129,7 @@ public sealed partial class ObservabilityHub
 
     /// <summary>
     /// 采样率(0~1) → 整数百分比：四舍五入（AwayFromZero）后 Clamp [0,100]。
-    /// <para>★ 修复（2026-08-14）：旧实现 <c>(int)</c> 截断系统性偏低——0.006→0%（配 ShouldSample 的
+    /// <para>★ 修复（）：旧实现 <c>(int)</c> 截断系统性偏低——0.006→0%（配 ShouldSample 的
     ///   rate≤0→false 即采样全灭）、0.996→99%。internal 可测性缝，边界表由单测锁定。</para>
     /// </summary>
     internal static int ToSamplePercent(double sampleRate)

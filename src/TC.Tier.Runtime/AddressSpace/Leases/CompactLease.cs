@@ -23,7 +23,7 @@ public sealed class CompactLease : IDisposable
     public LeaseState State => (LeaseState)Volatile.Read(ref _state);
 
     /// <summary>
-    /// ★ L19（2026-08-22）：整理<b>数据窗</b>终点（默认 = End）。
+    /// ★ L19（）：整理<b>数据窗</b>终点（默认 = End）。
     /// <para>lease 上界扩到尾段 GrowthLimit 是为了阻断追加（占区间），数据打包仍需钳在
     /// CommittedTail——引擎全量 Compact 造 lease 后设置本值；compactor 拍快照/切分按
     /// DataEnd 裁剪，防 PreallocateFile 预分配幻影区（未提交占位）被当活数据打包。</para>
@@ -114,7 +114,7 @@ public sealed class CompactLease : IDisposable
         if (Interlocked.CompareExchange(ref _state, (int)LeaseState.Committed, (int)LeaseState.Active) !=
             (int)LeaseState.Active) return;
 
-        // ★ L12 修复（2026-08-21）序列重排：先 CompactCommit（原位换内脏，锁内清场等待）
+        // ★ L12 修复（）序列重排：先 CompactCommit（原位换内脏，锁内清场等待）
         //   再释放区间——旧序（先释放后替换）在两步之间开窗，写者钻入已释放区间与新布局冲突。
         //   新序下写者整个被 extent 互斥挡在提交之外，窗口不存在。
         var toInvalidate = new List<int>();

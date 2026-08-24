@@ -80,7 +80,7 @@ public class BackgroundWorkerLoopTests
         var worker = new TestWorker(cycleDelay: TimeSpan.FromMilliseconds(10));
         worker.Start();
 
-        // 轮询对齐至首周期完成（固定 Delay 在并行套压池时假失败——2026-08-18 全量套实测踩中）
+        // 轮询对齐至首周期完成（固定 Delay 在并行套压池时假失败——全量套实测踩中）
         (await TestWait.UntilAsync(() => worker.CycleCount > 0)).Should().BeTrue("worker 应已运行若干周期");
         worker.LoopStartCalled.Should().BeTrue("OnLoopStart 应被调用");
 
@@ -160,7 +160,7 @@ public class BackgroundWorkerLoopTests
         worker.Start();
 
         // 轮询对齐到断言条件（10s 上限）——固定 Delay(200) 是 delay 型同步，
-        // 池忙时 worker 循环慢启（并行测试套压公共池）会假失败（2026-08-18 全量套实测踩中一次）
+        // 池忙时 worker 循环慢启（并行测试套压公共池）会假失败（全量套实测踩中一次）
         var deadline = Environment.TickCount64 + 10_000;
         while (Environment.TickCount64 < deadline
                && (Volatile.Read(ref worker.ErrorCount) < 1 || Volatile.Read(ref worker.CycleCount) <= 1))

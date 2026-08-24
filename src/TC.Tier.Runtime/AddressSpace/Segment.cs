@@ -10,7 +10,7 @@ public sealed partial class Segment
     // ═══ 锁状态 ═══
     /// <summary>
     /// SpinRWLock 写偏向自旋读写锁——读计划共享（可跨 await/IO 长持）+ 水位回退/截断排他（短临界区纯内存）。
-    /// <para>★ 2026-08-20 自 LockWord 换型：写偏向（pending 挡新读者）保证 ShrinkTail 类排他转换
+    /// <para>★ 自 LockWord 换型：写偏向（pending 挡新读者）保证 ShrinkTail 类排他转换
     ///   在持续读者流下有界落地，不再读优先饿死。</para>
     /// </summary>
     private readonly SpinRWLock _lock = new();
@@ -32,14 +32,14 @@ public sealed partial class Segment
     private long _minOffset;
     // ═══ 状态机（StableState 单字段）═══
     /// <summary>
-    /// 段生命周期稳态（崩溃恢复后一致）——int 背板（2026-08-16 §6.1：物理门协调零锁化）。
+    /// 段生命周期稳态（崩溃恢复后一致）——int 背板（§6.1：物理门协调零锁化）。
     /// <para>★ CAS 迁移（Interlocked）+ volatile 发布——可见性由 fence 保证，不靠锁；
     ///   Empty→Ready/Broken/Invalid 单向不可逆（除非删段——删段后引用对象已换）。</para>
     /// </summary>
     private int _stateCode;
 
     /// <summary>
-    /// ★ Compact 原位更新版本号（L12 修复 2026-08-21）——每次 Compact 原位替换内脏时 <c>Volatile</c> 递增。
+    /// ★ Compact 原位更新版本号（L12 修复 ）——每次 Compact 原位替换内脏时 <c>Volatile</c> 递增。
     /// <para>★ 用途：陈旧认知快速失败——<c>AcquireExtent</c> 自旋/FairGate 每轮重取 (seg, version) 对，
     ///   醒来/提交时版本不符 = 该轮认知基于已重整的旧内脏，必须丢弃重查（显式重试/异常，不静默 no-op）。</para>
     /// <para>★ int 足够：Compact 低频（秒级+），2^31 回绕不可达。0 = 从未被 Compact 重整。</para>
@@ -61,10 +61,10 @@ public sealed partial class Segment
     public int SegId { get; }
 
     /// <summary>
-    /// 生长上限——Compact 原位更新可变（L12 修复 2026-08-21：换段从"新建对象换槽"改为
+    /// 生长上限——Compact 原位更新可变（L12 修复 ：换段从"新建对象换槽"改为
     /// "同对象换内脏"，引用恒稳——自旋写者/reader/句柄池持锁天然互斥）。
     /// 变更仅经 <see cref="ApplyCompactReplacement"/>（持 extent lock + SegmentLock 排他）。
-    /// <para>★ L28 收口（2026-08-22）：读改 Volatile——GrowthLimit 是 Compact 可变的跨线程字段，
+    /// <para>★ L28 收口（）：读改 Volatile——GrowthLimit 是 Compact 可变的跨线程字段，
     ///   无屏障裸读（地址算术/IsFull/Remaining 的消费点）可与换段写交错读到旧值（ARM 弱序）。</para>
     /// </summary>
     private long _growthLimit;
@@ -92,7 +92,7 @@ public sealed partial class Segment
     public StableState StableState => (StableState)Volatile.Read(ref _stateCode);
 
     /// <summary>
-    /// ★ 物理状态就绪（物理门开）——<see cref="WaitSegmentReady"/> 的判定谓词（2026-08-16 用户裁定：
+    /// ★ 物理状态就绪（物理门开）——<see cref="WaitSegmentReady"/> 的判定谓词（设计决策：
     /// 物理门正向判定物理就绪，不用逻辑相位反向判定）。
     /// <para>Ready/Full/Compacting 均为物理就绪（Compacting 物理存在、整理排他由区间锁管，不在本门职责）；
     /// Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文件不存在）非就绪。</para>
@@ -162,7 +162,7 @@ public sealed partial class Segment
         if (segId >= 0 && minOffset < 0)
             throw new ArgumentOutOfRangeException(nameof(minOffset), minOffset,
                 $"Segment {segId} 构造 minOffset 必须 >= 0");
-        // ★ 关系不变量（2026-08-14 事故增设：Recovery 元组位序错位把 growthLimit 塞进 minOffset 位，
+        // ★ 关系不变量（事故增设：Recovery 元组位序错位把 growthLimit 塞进 minOffset 位，
         //   minOffset=1048576 > maxOffset=0 静默通过 → RealSize 为负 → reader/水位/容量计数全歪）。
         //   位序/取值错误在构造点当场爆炸，绝不带病入段表。
         if (segId >= 0 && (minOffset > maxOffset || maxOffset > growthLimit))
