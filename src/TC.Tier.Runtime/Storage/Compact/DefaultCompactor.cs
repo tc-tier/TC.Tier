@@ -43,7 +43,7 @@ internal sealed partial class DefaultCompactor(
     /// <summary>
     /// 可选注入的 LightEpoch（引擎的 epoch 保护实例）——RangeCompact 的 promote 原子协议用
     /// （drain 回调内 promote + lease.Commit：reader 全退出后才 rename）。
-    /// <para>★ 2026-08-24：IEngineEpoch 消灭——drain 协议下沉 LightEpoch.DrainThen（Core 原语），
+    /// <para>★ IEngineEpoch 消灭——drain 协议下沉 LightEpoch.DrainThen（Core 原语），
     ///   子系统不再经引擎包装接口（ReleaseSegmentHandles 越权面归零，失败决策权归使用方）。</para>
     /// </summary>
     private readonly LightEpoch? _epoch = epoch;
@@ -62,7 +62,7 @@ internal sealed partial class DefaultCompactor(
     private readonly CancellationTokenSource _cts = new();
 
     /// <summary>
-    /// 在途整理任务（轻量单例后台模式，2026-08-24：替代 BackgroundWorkerLoop + 专用调度器）。
+    /// 在途整理任务（轻量单例后台模式，：替代 BackgroundWorkerLoop + 专用调度器）。
     /// <para>★ Compact 排他（<see cref="_compacting"/> CAS）保证至多 1 个在途——队列/多消费者/优先级
     ///   全无用，与 StartReclaim 同构：<see>
     ///       <cref>Task.Run</cref>
@@ -105,7 +105,7 @@ internal sealed partial class DefaultCompactor(
         string finalPath = GetSegmentPath(segId);
 
         // ★ Compact 契约：调用方（引擎）负责在 Compact 前关闭全部缓存句柄。
-        //   rename 失败允许——失败决策权归使用方（2026-08-24 用户裁定）：抛类型化异常
+        //   rename 失败允许——失败决策权归使用方（设计决策）：抛类型化异常
         //   （FileIOException.SharingViolation），引擎捕获后关自己句柄 + 续传（不重拷贝）。
         //   ★ GC 时机：目标文件被 OpenSourceHandle 只读打开过（using Dispose 后异步句柄的内核释放
         //   可能尚未完成）——首次失败强制 GC 跑 finalizer 让内核放手，再重试。
@@ -168,7 +168,7 @@ internal sealed partial class DefaultCompactor(
             catch (Exception ex) { _logger?.LogWarning(ex, "DeleteAllTemps: 删 {path} 失败", file.Name); }
         }
 
-        // ★ marker tmp 残留清理（L4 取证，2026-08-21）：marker 写失败路径遗留空 .marker.tmp——
+        // ★ marker tmp 残留清理（L4 取证，）：marker 写失败路径遗留空 .marker.tmp——
         //   虽不再砖死后续 Compact（WriteCommitMarker 改 Truncate 覆写），失败路径仍应清理干净。
         if (SupportsMarker)
         {
@@ -214,7 +214,7 @@ internal sealed partial class DefaultCompactor(
         if (Interlocked.CompareExchange(ref _compacting, 1, 0) != 0)
             throw new InvalidOperationException("另一个 Compact 操作正在进行中");
 
-        // ★ 统一后台操作句柄（2026-08-24）：AsyncOperation{TResult}——状态机/事件时序/取消/进度
+        // ★ 统一后台操作句柄（）：AsyncOperation{TResult}——状态机/事件时序/取消/进度
         //   全收口在 Core 原语（旧 CompactOp 手写 TCS+事件+时序包装消亡）；取消链接 _cts
         //   （DefaultCompactor Dispose 时 cancel 在途整理）
         var op = new AsyncOperation<CompactResult>("compact", _logger, _cts.Token);
@@ -234,11 +234,11 @@ internal sealed partial class DefaultCompactor(
     public void Retry(CompactLeaseFactory leaseFactory)
     {
         ThrowIfDisposed();
-        // ★ 运行时失败续传（2026-08-24 语义修正——用户裁定"失败重试调 Retry"）：
+        // ★ 运行时失败续传（语义修正——设计决策"失败重试调 Retry"）：
         //   现场保留契约下失败必有 marker——补执行（RecoverCompactMarker 同核心：临时文件 →
         //   promote → 段表替换 → 删 marker），零重拷贝、零强制等待。
         //   旧实现（_cachedRanges 重造 lease 重拷贝 + GetAwaiter().GetResult()）废除——
-        //   与"一律后台句柄 / 失败不重拷贝"裁定一致；marker 不存在（Phase 1 失败已清理现场）
+        //   与"一律后台句柄 / 失败不重拷贝"决策一致；marker 不存在（Phase 1 失败已清理现场）
         //   = no-op（无续传目标，调用方重新发起 Compact）。
         RecoverCompactMarker(leaseFactory);
     }
@@ -282,7 +282,7 @@ internal sealed partial class DefaultCompactor(
     }
 
     /// <summary>单个 Compact 生命周期（异常隔离 + 收尾 _compacting）——由后台任务（Task.Run）调。
-    /// <para>★ 排他释放 happens-before 完成通知（L2 销案，2026-08-21）：op 完成通知（TrySetResult
+    /// <para>★ 排他释放 happens-before 完成通知（L2 销案，）：op 完成通知（TrySetResult
     ///   唤醒等待者）原在 lifecycle 尾部、复位 <c>_compacting</c> 在本 wrapper finally——两者之间的
     ///   抢占窗口下，等待者苏醒后直奔下一次 Compact 撞 CAS 排他（"另一个 Compact 操作正在进行中"，
     ///   满负载偶发 flaky 根因）。故 lifecycle 只返回结果/抛异常，复位先于通知由本 wrapper 统一收口。</para></summary>
@@ -341,7 +341,7 @@ internal sealed partial class DefaultCompactor(
     }
 
     /// <summary>
-    /// 释放（2026-08-24 审查修复——Dispose 与在途任务的完整处理协议）。
+    /// 释放（审查修复——Dispose 与在途任务的完整处理协议）。
     /// <para>★ 先抢 <see cref="_compacting"/> 排他（与 <see cref="Compact"/> 入闸同一把锁）：
     ///   抢到 = 无在途任务（此后新 Compact 入闸被 CAS 拒绝——不会启动新任务）；
     ///   没抢到 = 有在途——Cancel + 有界等待退出。</para>

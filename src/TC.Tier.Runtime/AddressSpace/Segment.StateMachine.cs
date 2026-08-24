@@ -118,10 +118,10 @@ public sealed partial class Segment
     /// <summary>
     /// 将 [start, end) 区间标记为 Aborted
     /// <para>Reclaim 失败回滚——punch/commit 非原子窗口使数据二态未知（完好/已归零），
-    /// 读保守拒绝（落 Committed = 静默数据错误，比挂死危险——XIX 裁定保留）。</para>
+    /// 读保守拒绝（落 Committed = 静默数据错误，比挂死危险——XIX 决策保留）。</para>
     /// </summary>
     /// <para>1：可以被 Compact 整理</para>
-    /// <para>2：可以被 Reclaim 族（中间/头/尾）幂等重占——再 punch 两分支收敛同终态（L1，2026-08-21），
+    /// <para>2：可以被 Reclaim 族（中间/头/尾）幂等重占——再 punch 两分支收敛同终态（L1，），
     /// <c>Failed.lastPunchedOffset</c> 断点重试由此可达</para>
     /// <para>3：Write/Append 不可占（占用矩阵 §7.2 不变）</para>
     /// <param name="start">区间起始偏移量（包含）。</param>
@@ -179,7 +179,7 @@ public sealed partial class Segment
 
     /// <summary>
     /// CAS 迁移 Empty→Ready + 单向闩 Set——协议幂等回调用（非 Empty 一律 no-op，不 throw）。
-    /// <para>★ 单向不可逆（用户裁定）：Empty→Ready/Broken/Invalid 之后不回头（删段后引用对象已换）。</para>
+    /// <para>★ 单向不可逆（设计决策）：Empty→Ready/Broken/Invalid 之后不回头（删段后引用对象已换）。</para>
     /// </summary>
     /// <returns>true = 本调用完成迁移并开闩；false = 已非 Empty（他方已迁移）。</returns>
     internal bool TryMarkReady()
@@ -250,7 +250,7 @@ public sealed partial class Segment
     /// CAS 迁移 Empty→Broken + 单向闩开（等待者看到 Broken 终态）——协议幂等回调用。
     /// <para>★ 与 <see cref="TryMarkReady"/> 对称：池预建与正式建段的失败回调在高并发下可先后命中
     ///   同一段——重复失败回调不得抛（异常路径里再抛 = worker 毒化），迟到失败回调遇已迁移段
-    ///   （Ready/Invalid/Broken）一律 no-op，不打断健康段（S1 固化 2026-08-16）。</para>
+    ///   （Ready/Invalid/Broken）一律 no-op，不打断健康段（S1 固化 ）。</para>
     /// </summary>
     /// <returns>true = 本调用完成迁移并开闩；false = 已非 Empty（他方已迁移）。</returns>
     internal bool TryMarkBroken()

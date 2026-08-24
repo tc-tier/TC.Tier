@@ -184,7 +184,7 @@ public partial class BTreeIndex<TKey> : SortedIndexBase<TKey> where TKey : unman
 
     private void WriteNodeContent(LogicalAddress addr, BTreeNode node)
     {
-        // ★ 脏节点延迟写回（对齐 SkipList 2026-08-24 销案）：内容变更只记脏标记（地址集），
+        // ★ 脏节点延迟写回（对齐 SkipList 销案）：内容变更只记脏标记（地址集），
         //   dump 时批量写引擎——插入/分裂路径零引擎写。安全论证：节点必在驻留缓存
         //   （RefreshCache/根特例——不变式），读路径不受影响；崩溃窗口（dump 前）由恢复重放 (W, End] 修复。
         _dirtyNodes.Add(addr);

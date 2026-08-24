@@ -299,7 +299,7 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
         });
 
         var cursor = new LogicalAddress(0, 0);
-        // ★ 只统计真正执行整理的轮次（2026-08-20）：发布竞态窗口（CommittedTail 已推进、book.Put 未落）
+        // ★ 只统计真正执行整理的轮次（）：发布竞态窗口（CommittedTail 已推进、book.Put 未落）
         //   下 bookEnd == cursor——LockWord 读优先下整理排他被读者拖慢从未打中；SpinRWLock 写偏向让
         //   排他准时落地、轮次变快后窗口暴露。空区间是调用方视角合法状态（引擎 from&lt;to 前置检查正确），
         //   跳过不计轮——但必须等写者推进再整理（continue 空转会让 3 轮秒过，写者攒不够 160 条）。
@@ -323,7 +323,7 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
             var snapshot = book.Snapshot();
             snapshot.Should().NotBeEmpty();
             var bookEnd = dev.CalculationAddress(snapshot.Max(kv => kv.Addr), RecordSize);
-            // ★ 追赶窗口有界（2026-08-20 mem 介质化修复）：mem 写者吞吐远高于整理（零 syscall 追加），
+            // ★ 追赶窗口有界（mem 介质化修复）：mem 写者吞吐远高于整理（零 syscall 追加），
             //   无界窗口下每轮整理范围随写者无限膨胀——3 轮永不收敛（活锁螺旋，~2 核持续燃烧）。
             //   每轮只整理 [cursor, min(bookEnd, cursor+ChaseWindowBytes))，窗口内 live 记录全量申报——
             //   并发交织契约不变（写者照常无界追加），轮次工作量有界可收敛。

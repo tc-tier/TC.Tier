@@ -423,7 +423,7 @@ public class MetaPolicyTests
     private static TestMetaLayout Layout { get; } = new();
 
     // ════════════════════════════════════════════════════════════
-    //  ★ 自描述块契约（用户裁定 2026-08-21）：容量（MetaOpaqueBytes）零参与盘上几何——
+    //  ★ 自描述块契约（设计决策 ）：容量（MetaOpaqueBytes）零参与盘上几何——
     //    footer/CRC 位由 header.PayloadLength（水位+实际 opaque）自述；跨重启容量随便调。
     // ════════════════════════════════════════════════════════════
 

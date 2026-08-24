@@ -836,7 +836,7 @@ public sealed partial class RawFileSystem
                     // 不入缓存不标脏——免三重内存拷贝（页 memcpy + 排干聚合 memcpy + 内核 copy_from_user；
                     // 追加重负载下缓冲档 = 3x 内存流量 vs 直达档 1x，是吞吐缺口的全部）。
                     // 流式写不污染缓存（POSIX_FADV_DONTNEED 同款语义）；读一致性经载体（数据即刻在盘）。
-                    // ★ O_DIRECT 载体例外（2026-08-19 性能轮）：写绕直落 = 每次小 O_DIRECT 写一次设备
+                    // ★ O_DIRECT 载体例外（性能轮）：写绕直落 = 每次小 O_DIRECT 写一次设备
                     // flush（实测 860μs/64KB）——必须入自管缓存由 flusher 批量排干摊销（写回吸收）。
                     var fullBytes = runBytes - runBytes % _pageSize;
                     if (_carrierDio)

@@ -3,7 +3,7 @@ using TC.Tier.Core.IO.Testing;
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
-/// DefaultCompactor 错误深水区契约测试（台账 L4，2026-08-21）——promote 瞬态/耗尽、
+/// DefaultCompactor 错误深水区契约测试（台账 L4，）——promote 瞬态/耗尽、
 /// marker IO 失败、搬迁（拷贝）失败的确定性注入。
 /// <para>★ 注入面：FaultInjectingFileSystem（fs 级 + 句柄级 op 匹配；路径 pattern = 精确串或
 ///   <c>"*"</c> 全匹配——非 glob）——按精确路径区分阶段：</para>

@@ -2,7 +2,7 @@ namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
 /// 分配器稠密度回归（VII-8 销案线）——多写者并发 Append 后段表 SegId 序列必须稠密（0..tail 连续注册）。
-/// <para>★ VII-8 根因（2026-08-16 插桩实锤）：<c>AppendSegmentRawUnsafe</c> 的 _segIndex 扩容用
+/// <para>★ VII-8 根因（插桩实锤）：<c>AppendSegmentRawUnsafe</c> 的 _segIndex 扩容用
 ///   <c>Array.Resize</c>——零初始化新数组经普通写先可见、-1 Fill 后可见——无锁读者（CAS 门/Ensure
 ///   步进）窗口内读到 _segIndex[x]=0 →「段存在（slot 0）」→ 跳过注册，尾水位穿过未注册段后
 ///   Ensure 只看 tail 当前段、永不回填 = 永久空洞（重开截断、数据不可达）。修复 = build-then-publish

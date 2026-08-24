@@ -55,7 +55,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         public readonly int PageSize = pageSize;
 
         /// <summary>数据面读写锁（per-file）——页表路由/页内容访问的唯一锁（不同文件并行、同文件读共享写独占）。
-        /// ★ SpinRWLock 写偏向 CAS RW 原语（2026-08-19 自裸 monitor 升级，2026-08-20 自 LockWord 换型）：
+        /// ★ SpinRWLock 写偏向 CAS RW 原语（自裸 monitor 升级，自 LockWord 换型）：
         ///   读共享——并发读者互不阻塞、高频写者下读者不再饥饿（裸 monitor 无公平性，17GB/s 写者轮转
         ///   lock/release 每次压过排队读者——混合负载读者饿死实测 0.2M ops/s，升级后同形态 40M+）；
         ///   写/回收独占——页表结构与页归属变更互斥；写偏向（pending 位挡新读者）保证写者不被持续读者流饿死。
@@ -180,7 +180,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
                        | FileSystemCapabilities.EmptyDirectories    // 显式目录集合（根空间）
                        | FileSystemCapabilities.AtomicDirectoryMove   // 锁内批量 re-key 原子
                        | FileSystemCapabilities.MaintenanceGate        // 维护门闩（设计 §8——三介质统一）
-                       | FileSystemCapabilities.ExclusiveLock;         // 进程内真卷锁（2026-08-19 补全）
+                       | FileSystemCapabilities.ExclusiveLock;         // 进程内真卷锁（补全）
             if (_options.Allocation == MemoryAllocationMode.Sparse)
                 caps |= FileSystemCapabilities.Sparse;               // 真稀疏：PunchHole 真物理回收
             return caps;
@@ -188,7 +188,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <remarks>mem 磁盘模拟几何（2026-08-19）：SectorSize=512（逻辑扇区——DIO 对齐基准，与 Linux 块设备
+    /// <remarks>mem 磁盘模拟几何（）：SectorSize=512（逻辑扇区——DIO 对齐基准，与 Linux 块设备
     /// 最广泛形态一致）；AllocationUnit=PageSize（空间操作对齐基准——页是分配粒度不是对齐基，两码事）。</remarks>
     public VolumeInfo Volume => new()
     {
@@ -666,7 +666,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <remarks>★ 进程内真锁（2026-08-19 补全）：LockWord CAS 互斥 + 自旋等待超时——与 Disk 卷锁行为保真
+    /// <remarks>★ 进程内真锁（补全）：LockWord CAS 互斥 + 自旋等待超时——与 Disk 卷锁行为保真
     /// （防同实例并发采集/维护编排错误；Default 全局盘的多组件共享是真实场景）。RAII lease；
     /// 超时 <see cref="IOError.SharingViolation"/>；非重入（持锁再获取立即失败——与 Disk 一致）。</remarks>
     public IDisposable AcquireExclusive(TimeSpan timeout)
@@ -681,7 +681,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>mem 卷锁原语（自旋互斥 + 有界超时——进程内单实例语义下即完备）。
-    /// <para>★ 2026-08-20：删除未使用的 LockWord 字段（作者草稿残留——互斥由 _held CAS 自实现，
+    /// <para>★ 删除未使用的 LockWord 字段（作者草稿残留——互斥由 _held CAS 自实现，
     ///   LockWord 已被 SpinRWLock 终态替代删除，rebase 后编译断链在此收口）。</para></summary>
     private sealed class MemExclusiveLock
     {
@@ -981,7 +981,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
             slot.Layout = new SparseLayout(_options.PageSize);
             if (initialSize > 0 && preallocatePhysical)
             {
-                // ★ 物理预租（2026-08-19——家族契约对齐）：Disk fallocate / Raw unwritten 区间都是物理
+                // ★ 物理预租（——家族契约对齐）：Disk fallocate / Raw unwritten 区间都是物理
                 // 预留，Sparse 此前只记逻辑长度是真缺口（预分配语义对账：账面对了物理没给）。
                 // 预分配 = 分配/清零税前移到显式预留点，写路径变纯 memcpy（追加热道零分配）。
                 // 仅 preallocate 语义物理化——CreateOrReplaceFile/GrowFile 的逻辑扩展语义不变（稀疏零物理）。
@@ -1522,7 +1522,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
             var chunk = (int)Math.Min(pageSize - inPage, source.Length - pos);
             if (!layout.Pages.TryGetValue(page, out var buf))
             {
-                // ★ 免清零租借 + 未覆盖段按需清（2026-08-19）：池复租不残留旧数据的读零安全
+                // ★ 免清零租借 + 未覆盖段按需清（）：池复租不残留旧数据的读零安全
                 //   由"新页插入前未覆盖段清零"保证——整页覆写路径零清零成本（此前无条件全页
                 //   Array.Clear 是纯浪费：数据马上整页覆写，清零只为部分写语义服务）。
                 buf = RentPhysical(pageSize, zeroMemory: false);

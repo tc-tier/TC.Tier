@@ -57,7 +57,7 @@ internal sealed partial class StorageEngine
         EnsureCpuCapacity(CancellationToken.None);   // CPU 限流（同步路径——仅超时，无外部 ct）
        var lease = _segmentTable.AllocateLease(length);
         // ★ 单段模式校验（IO 层）：分配结果超出 seg0 → 地址空间用尽。
-        //   区间统一（2026-08-21）后分配 end 不再产出 (seg+1,0)（exact-fill 停驻段末 (seg,limit)），
+        //   区间统一（）后分配 end 不再产出 (seg+1,0)（exact-fill 停驻段末 (seg,limit)），
         //   下方豁免为存量防御恒不命中——End 跨段即真超限（表级守卫 ② 已拦，此处双保险）。
         if (!EnableSegmentation && lease.End.SegId > lease.Start.SegId
             && !(lease.End.SegId == lease.Start.SegId + 1 && lease.End.Offset == 0))

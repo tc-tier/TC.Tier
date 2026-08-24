@@ -34,7 +34,7 @@ public sealed class NetworkProtocolAttribute(string protocol) : System.Attribute
 }
 
 /// <summary>
-/// ★ 程序集级协议导出标记（2026-08-24 用户裁定——Tier 通用协议导出机制）：
+/// ★ 程序集级协议导出标记（设计决策——Tier 通用协议导出机制）：
 /// 协议程序集（TC.Tier.Core.IO.S3 或外部第三方）在<b>程序集</b>上标注本特性 = 声明
 /// "本程序集导出网络协议"——TierFsGenerator 在<b>消费方编译</b>里只深入<b>带此标记</b>的
 /// 引用程序集找 <see cref="NetworkProtocolAttribute"/> 类型，生成注册桥。

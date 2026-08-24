@@ -334,7 +334,7 @@ public class LightEpochTests
     }
 
     // ════════════════════════════════════════════════════════════
-    // === DrainThen（2026-08-24 下沉 Core：Resume→Bump→条件 Suspend 封装）===
+    // === DrainThen（下沉 Core：Resume→Bump→条件 Suspend 封装）===
     // ════════════════════════════════════════════════════════════
 
     [Fact]

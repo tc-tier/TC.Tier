@@ -12,7 +12,7 @@ namespace TC.Tier.CodeGen;
 ///   （替代手写 TierFsS3ModuleInitializer——加协议 = 实现接口 + 标注，注册自动）。</para>
 /// <para>★ 标注一律 string 形态（Core→Abstractions 既有方向，不可反引 Core 类型）；
 ///   未知本性/动词编译期报错（TCSG0xx——拼错即炸）。</para>
-/// <para>★ ★ 外部协议导出配方（2026-08-24 用户裁定定稿——Tier 通用导出协议机制）：
+/// <para>★ ★ 外部协议导出配方（设计决策定稿——Tier 通用导出协议机制）：
 ///   第三方协议程序集（任意命名，如 Contoso.Storage.S3）三步行接入，全部在项目配置内：
 ///   <list type="number">
 ///   <item><description>csproj 声明导出意图（与 AssemblyInfo.cs 等价——编译时合成程序集特性）：
@@ -93,7 +93,7 @@ public sealed class TierFsGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        // ★ 外部协议注册桥（2026-08-24 用户裁定——源生成器解决，零反射）：
+        // ★ 外部协议注册桥（设计决策——源生成器解决，零反射）：
         //   [NetworkProtocol] 的本地 ModuleInitializer 只在协议程序集自身被加载时执行——纯 spec
         //   消费者（只写 TierFs.Open("network:///s3/…")，不触碰任何 S3 类型）时 JIT 不加载引用
         //   程序集 → 注册缺失（实测复现）。正解：生成器在"引用协议程序集的消费方编译"里扫描
@@ -104,7 +104,7 @@ public sealed class TierFsGenerator : IIncrementalGenerator
             var external = new List<(string Protocol, string FullName)>();
             foreach (var asm in compilation.SourceModule.ReferencedAssemblySymbols)
             {
-                // ★ 程序集级导出标记扫描（2026-08-24 用户裁定——Tier 通用协议导出机制）：
+                // ★ 程序集级导出标记扫描（设计决策——Tier 通用协议导出机制）：
                 //   只深入带 [assembly: TierProtocolExported] 的引用程序集找 [NetworkProtocol] 类型——
                 //   协议身份声明在类型（NetworkProtocolAttribute）、导出意图声明在程序集（TierProtocolExported），
                 //   关注点分离；零误扫非协议程序集（比"引 Core"判据更精确——外部协议程序集任意命名均覆盖）

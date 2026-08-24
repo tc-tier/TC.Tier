@@ -47,7 +47,7 @@ public sealed partial class SegmentTable
     /// 从 start 前进 length 字节得到新地址（跨段进位）。
     /// <para>★ 只前进：length &lt; 0 抛异常（回退调 <see cref="RetreatAddress"/>）；== 0 返回 start。</para>
     /// <para>★ 返回的 Extension 恒为 0——调用方须显式保留 start.Extension。</para>
-    /// <para>★ 区间表示统一（2026-08-21 用户裁定）：半开 [start, end)——end 是"已前进字节之后第一个位置"，
+    /// <para>★ 区间表示统一（设计决策）：半开 [start, end)——end 是"已前进字节之后第一个位置"，
     ///   恰好填满一段时<b>停驻 (segId, segLimit)</b>（段末边界规范形），不产出 (segId+1, 0) 哨兵形态。
     ///   (N, 0) 只保留"段首字节/原点"身份；段末只有一种写法——与 RetreatAddress 互为精确镜像，
     ///   与扫盘恢复尾 (seg, GrowthLimit) 同形。</para>

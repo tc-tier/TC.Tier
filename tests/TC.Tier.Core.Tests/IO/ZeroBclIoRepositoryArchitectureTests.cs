@@ -8,7 +8,7 @@ namespace TC.Tier.Core.Tests.IO;
 /// </summary>
 public sealed class ZeroBclIoRepositoryArchitectureTests
 {
-    /// <summary>存量白名单（RM-15 建账 2026-08-19 → 2026-08-20 清零）。
+    /// <summary>存量白名单（RM-15 建账 → 清零）。
     /// 原建账 9 文件（Runtime Storage 引擎面）已随 storage-engine-core-io-migration 全部清偿：
     /// SnapshotCheckpoint×2 / EngineMeta / IO/DiskFileHandle / StorageEngineFactory / DiskCompactor
     /// 随类系统坍缩删除；ScanCheckpoint / CompactorBase 改经 IFileSystem（含注释措辞去 BCL 化）。

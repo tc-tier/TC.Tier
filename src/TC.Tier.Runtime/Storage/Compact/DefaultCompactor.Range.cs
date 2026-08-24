@@ -15,7 +15,7 @@ internal sealed partial class DefaultCompactor
         => RangeCompact(lease, from, to, addresses, livePlan: null);
 
     /// <summary>申报活区间版（§XVIII）——livePlan 覆盖 [from,to) 内的搬迁规划（记录粒度洞可见）。
-    /// ★ 2026-08-24：统一异步形态（同 <see cref="Compact(CompactLease[])"/>）——后台执行 + 句柄驱动，
+    /// ★ 统一异步形态（同 <see cref="Compact(CompactLease[])"/>）——后台执行 + 句柄驱动，
     ///   取消经 op.CancellationToken（链接 _cts + Cancel()），lease 由后台任务收尾 Dispose。</summary>
     public IAsyncOperation<CompactResult> RangeCompact(
         CompactLease lease,
@@ -85,7 +85,7 @@ internal sealed partial class DefaultCompactor
             foreach (var image in images)
                 image.Temp.Flush();
 
-            // ★ 新段自写元数据（2026-08-24 用户裁定）：段元组写临时段 FileExtra——promote（rename）
+            // ★ 新段自写元数据（设计决策）：段元组写临时段 FileExtra——promote（rename）
             //   随文件同步就位，不再经引擎 tupleWriter 委托事后补写。
             foreach (var image in images)
                 WriteTempSegmentMeta(image.Temp, image.Length, image.GrowthLimit, image.Length);
@@ -104,10 +104,10 @@ internal sealed partial class DefaultCompactor
             var segmentIds = chunks.Select(static chunk => chunk.SegId).ToArray();
             // ★ 协作 drain（DrainThen，FASTER mutator 模型）——无并发 reader 时本线程同步触发；
             //   有 reader 时延迟到其退出 epoch 后触发。gate：promotion 完成前【不返回】。
-            // ★ 原子协议（2026-08-14 重排）：drain 回调内【先填 replacement 标量（min/max/growthLimit/state）、
+            // ★ 原子协议（重排）：drain 回调内【先填 replacement 标量（min/max/growthLimit/state）、
             //   再物理 promote（rename 就位）、最后一次 lease.Commit() 原子换表+区间布局】——
             //   全部准备完毕、一次提交全部成功；段/区间重排全在 lease 内部，外部只报标量。
-            // ★ L16 修复（2026-08-21）：promote 异常在 drain 线程【捕获】（不再炸无辜触发线程——
+            // ★ L16 修复（）：promote 异常在 drain 线程【捕获】（不再炸无辜触发线程——
             //   reader 的 Suspend 栈），Wait 返回后 worker 侧校验并重抛——旧 finally{Set()} 吞错
             //   + 无成功校验 = marker 已删、物理已 rename、lease 却 Rollback、上层拿到成功结果
             //   按 MigrationMap 改址 → 读零/错数据（误报成功复合事故）。失败路径 marker 保留
@@ -327,7 +327,7 @@ internal sealed partial class DefaultCompactor
         IReadOnlyList<RangeSegmentImage> images,
         IDictionary<LogicalAddress, LogicalAddress?> migrationMap)
     {
-        // ★ A8 待打磨②收口（2026-08-22）：moves 按构建序 (SourceSegmentId, SourceStart) 升序
+        // ★ A8 待打磨②收口（）：moves 按构建序 (SourceSegmentId, SourceStart) 升序
         //   （CopyCompactedRange 逐段逐区间顺序产出）——二分定位包含区间，O(地址数 × log 搬移数)
         //   替代旧 O(地址数 × 搬移数) 嵌套全扫（大地址集追赶整理的规划侧退化）。
         var bySegment = images.ToDictionary(static image => image.SegmentId);

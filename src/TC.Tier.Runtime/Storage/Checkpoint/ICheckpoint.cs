@@ -2,7 +2,7 @@ namespace TC.Tier.Runtime.Storage.Checkpoint;
 
 /// <summary>
 /// Checkpoint 门面——主引擎只认这个接口，不感知内部 Coordinator 实现。
-/// <para>★ 设计裁定（2026-08-21，用户）：**默认提供扫描，自定义存储需要自己注入**——引擎默认装配
+/// <para>★ 设计决策（，用户）：**默认提供扫描，自定义存储需要自己注入**——引擎默认装配
 ///   扫盘只读切面（<see cref="ScanCheckpoint"/>：HasSnapshot 恒 false、Writer 返 NoopWriter 接口占位、
 ///   Reader 扫盘流式重建）；需要快照加速/自定义持久化的存储方，注入自己的 <see cref="ICheckpoint"/>
 ///   实现（带真 Writer，快照导出/恢复）。</para>

@@ -8,7 +8,7 @@ namespace TC.Tier.Core.Collections;
 /// <summary>
 /// 异步优先队列——基于 lock-free 跳表（Fomitchev–Ruppert marker 删除协议）。
 /// <para>★ 高并发入队/出队 O(log n) 平均复杂度；出队时队列为空则异步等待或取消。</para>
-/// <para>★ <b>Route A 正确性基线（2026-08-14 根因档案决策）</b>：回归论文前提世界——
+/// <para>★ <b>Route A 正确性基线（根因档案决策）</b>：回归论文前提世界——
 ///   边存<b>直接对象引用</b> + <b>marker 节点</b>表达逻辑删除（单引用 64 位 CAS，无 128 位打包）、
 ///   节点 fresh 分配交 GC 回收（不池化、不 epoch、不 Id 寻址）。论文不变式 I1~I5 由构造消除，
 ///   不再自证回收协议。性能代价：每次入队一次 Gen0 分配（LOH 无压力）。详见
@@ -185,7 +185,7 @@ public sealed class AsyncPriorityQueue<T> : IDisposable
         var spin = new SpinWait();
 
         // ★ 发布纪律：node 的全部 Forward 字段在 level-0 发布（唯一使节点可达的动作）**之前**写完，
-        //   发布之后绝不再写 node 自身的任何字段。违反的后果（2026-08-17 压测 dump 取证）：
+        //   发布之后绝不再写 node 自身的任何字段。违反的后果（压测 dump 取证）：
         //   发布后删除者可立即标记其高层（读到未写完的 null → Marker），随后本线程的普通写
         //   会把 Marker 覆盖掉——已删节点"复活"成未标节点并被 TryLink 链入高层，其 level-0
         //   已被摘除 → Find 从此僵尸 pred 出发永远走不到真链头 → 队头 victim 已标无人摘 →
@@ -255,7 +255,7 @@ public sealed class AsyncPriorityQueue<T> : IDisposable
             //   （splice 也 CAS victim 的边、写普通后继引用）——被打败即留下"已删未标"字段：
             //   节点已出队（F0 已标）但高层边仍是普通引用，Find 无法识别为已删 → 永不摘除 →
             //   悬挂僵尸（key 小于层 0 队头）→ 后续 Enqueue 的 preds 落在僵尸旧世界上（发布
-            //   CAS 恒失败）+ 队头已标无人摘 → 全体自旋的活性死锁（2026-08-17 压测取证：
+            //   CAS 恒失败）+ 队头已标无人摘 → 全体自旋的活性死锁（压测取证：
             //   示波器抓到发布后 F0 被 splice 改写 + dump 抓到 F2 未标僵尸 + 双侧自旋栈）。
             //   收敛性：splice 使 victim.F[i] 沿链前进有限步后停止（后继未删时无 splice），
             //   此后标记 CAS 是唯一写者——必然成功。

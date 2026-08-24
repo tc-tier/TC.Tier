@@ -71,7 +71,7 @@ public sealed partial class SegmentTable
         if (hasSegments)
         {
             // footer 是水位权威——直接 Load（不需要 InitializeTail 算、不需要 ValidateWatermark 校验）
-            // ★ fallback 链（2026-08-14 修正）：footer 缺失（扫盘 checkpoint 无 footer）时，
+            // ★ fallback 链（修正）：footer 缺失（扫盘 checkpoint 无 footer）时，
             //   用扫盘现算的真实水位（末段 maxOffset）——旧实现退 Empty 把 reopen 水位归零，
             //   导致 NoHint/MetaFile 族"tail=0、读回 0 字节"（RecoverySemantics 根因）。
             var real = new LogicalAddress(lastSegId, lastMaxOffset);
@@ -101,7 +101,7 @@ public sealed partial class SegmentTable
     /// 保存地址表到持久化——写入段表 + 两水位。
     /// <para>★ 跳过 Invalid 段（已回收的头部段，地址空间无意义，恢复时不需要）——否则 LoadAddressTable
     ///   会从第一个 Invalid 段推断 MinSegId，导致头部回收后保存恢复丢失回收事实。</para>
-    /// <para>★ M3 修复（2026-08-24）：保存期间持<b>双尾水位独占</b>（TryHoldTailWatermark）——
+    /// <para>★ M3 修复（）：保存期间持<b>双尾水位独占</b>（TryHoldTailWatermark）——
     ///   并发 Append 的尾推进被挡（TryUpdateAllocated 前检失败自旋重试）、并发 ReclaimTail 回退被拒——
     ///   快照 = 段列表 + 双尾的一致性视图（原实现遍历段表与读 footer 之间水位可被推进 → 恢复时
     ///   footer 水位超前于段列表 = 已提交数据被当洞覆盖）。推进者的段在推进前已 EnsureSegmentsForLength

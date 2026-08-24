@@ -13,7 +13,7 @@ internal sealed partial class StorageEngine
             // ★ 未注册的前置通知（ExtentLease 段满时预建下一段）= 纯预建提示——只喂预备池
             //   （lookahead 的本职），不入队正式 Create。正式任务只服务已注册段：未注册段的
             //   物理构建无处 callback 转正、又不在池里 → 注册时的正式 Create 必然重建
-            //   （确定性双建：容量双计数/句柄覆盖/重复 meta 写，2026-08-16 建段日志实测 segId=1）。
+            //   （确定性双建：容量双计数/句柄覆盖/重复 meta 写，建段日志实测 segId=1）。
             if (!owner._segmentTable.TryGetSegment(segId, out var view) || view is not { IsValid: true })
             {
                 owner.ReplenishSegmentPool();

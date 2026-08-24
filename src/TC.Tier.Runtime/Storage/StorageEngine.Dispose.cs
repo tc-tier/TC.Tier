@@ -23,7 +23,7 @@ internal sealed partial class StorageEngine
         // ★ IO 层段预备池清池（worker 已停，无补建竞态）——毁未消费余量物理段（架构约定：余量直接毁掉）
         SweepSegmentPoolOnDispose();
         // ★ 未满段元组补写（Ready 态且 maxOffset>0 的尾段——否则元组停在 0，预分配模式扫盘
-        //   maxOffset=0 → reopen 双尾归零、数据全"丢"，2026-08-14 真实事故）。
+        //   maxOffset=0 → reopen 双尾归零、数据全"丢"，真实事故）。
         WriteUnfinishedSegmentTuples();
         // ★ 唤醒所有段上 ReadyLock 等待者（抛 ObjectDisposedException），防 Dispose 后死等。
         try

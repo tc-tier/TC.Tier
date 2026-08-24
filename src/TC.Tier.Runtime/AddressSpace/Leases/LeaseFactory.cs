@@ -8,7 +8,7 @@ namespace TC.Tier.Runtime.AddressSpace.Leases;
 /// <para>★ WithDiagnostics：每次 new + 有诊断（测试/调试——GetActiveLeases/ForceRelease 可用）。</para>
 /// <para>★ Pooled：对象池复用（高频 Append/Write 零分配）。</para>
 /// <para>★ 使用方选择模式——不改变 lease 协议语义。</para>
-/// <para>★ 类型化 lease 协议（2026-08-16 复拆）：每个操作类型独立 lease 类 + 独立池——
+/// <para>★ 类型化 lease 协议（复拆）：每个操作类型独立 lease 类 + 独立池——
 ///   池按类型分立（Append 高频、ReclaimTail 低频，互不挤占），工厂方法返回各自类型。</para>
 /// </summary>
 public abstract class LeaseFactory

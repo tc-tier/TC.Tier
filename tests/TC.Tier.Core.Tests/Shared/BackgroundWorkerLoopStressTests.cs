@@ -4,12 +4,12 @@ namespace TC.Tier.Core.Tests.Shared;
 
 /// <summary>
 /// BackgroundWorkerLoop 多生产者 × 多消费者独立压测——脱离引擎单独验证 N 的稳定性（N=2/4/8/12）。
-/// <para>★ 动机（2026-08-15）：引擎 N=2 专轮 10 轮 5 红全挂起类零异常、BucketPriorityQueue 记账静态核验通过——
+/// <para>★ 动机（）：引擎 N=2 专轮 10 轮 5 红全挂起类零异常、BucketPriorityQueue 记账静态核验通过——
 ///   需要独立复现层定位：本测试用多生产者（既有测试只单生产者）+ 高体量 + 引擎同款独占调度器，
 ///   覆盖引擎真实形态（8 写者并发 OnSegmentCreate/OnSegmentFull 入队 + 池补建 Background 混流）。</para>
 /// <para>★ 判据：不丢（总量恰好）不重（每项恰好一次）不挂（预算内完成）。</para>
 /// <remarks>★ 与 IsolatedTaskSchedulerTests 共享 InstanceTracker collection——本类 Create tracked
-/// scheduler，并行跑会污染后者的绝对计数断言（2026-08-17 flaky 根因）。</remarks>
+/// scheduler，并行跑会污染后者的绝对计数断言（flaky 根因）。</remarks>
 /// </summary>
 [Collection("instance-tracker")]
 public class BackgroundWorkerLoopStressTests

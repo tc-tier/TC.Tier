@@ -50,7 +50,7 @@ Span<byte> buf = stackalloc byte[12];
 engine.Read(addr, buf);
 ```
 
-基于结构层组合自定义存储模型（KV / WAL / 队列 / 时序）的示例见 [文档](src/TC.Tier.Runtime/docs/)。
+基于结构层组合自定义存储模型（KV / WAL / 队列 / 时序）的示例见 [使用文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)。
 
 ---
 
@@ -65,7 +65,7 @@ engine.Read(addr, buf);
 | Ring 并发批量写 | 4.45M op/s（8 写者，批量 3.2×） |
 | Compact | 写放大 WA=1.00×（零写放大） |
 
-完整基线见 `src/TC.Tier.Runtime/docs/perf/` 与 `src/TC.Tier.Core/docs/perf/`。
+完整基线见 [性能文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html)。
 
 ---
 
@@ -84,17 +84,16 @@ engine.Read(addr, buf);
 
 五层依赖单向无环：`TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products`。源生成器（`TC.Tier.CodeGen`）横切——BinaryLayout/注册桥编译期生成，零运行时反射。
 
-- 引擎使用指南：[storage-engine.md](src/TC.Tier.Runtime/docs/storage-engine.md)
-- 结构层总览：[structures.md](src/TC.Tier.Runtime/docs/structures.md)
-- 生命周期模型：[lifecycle.md](src/TC.Tier.Core/docs/lifecycle.md)
+- 引擎使用指南：[storage-engine.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)
+- 结构层总览：[structures.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html)
+- 生命周期模型：[lifecycle.md](https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html)
 
 ---
 
 ## 文档
 
-- **使用文档**（现状权威）：`src/*/docs/`
-- **性能报告**：`src/*/docs/perf/`
-- 在线文档站（DocFX，API 参考 + 使用文档）：*即将上线*
+- **使用文档 + 性能报告**：全部在 [docs.mytzz.top](https://docs.mytzz.top/)
+- **在线文档站**（API 参考 + 使用文档 + 全文搜索）：[docs.mytzz.top](https://docs.mytzz.top/)
 
 ## 贡献
 
@@ -102,6 +101,6 @@ engine.Read(addr, buf);
 
 ## License
 
-MIT — 详见 [LICENSE](LICENSE)
+MIT — 详见 [LICENSE](https://github.com/tc-tier/TC.Tier/blob/main/LICENSE)
 
-生产代码全部自研，算法参考声明与第三方依赖说明见 [THIRD-PARTY-NOTICES](THIRD-PARTY-NOTICES)。
+生产代码全部自研，算法参考声明与第三方依赖说明见 [THIRD-PARTY-NOTICES](https://github.com/tc-tier/TC.Tier/blob/main/THIRD-PARTY-NOTICES)。

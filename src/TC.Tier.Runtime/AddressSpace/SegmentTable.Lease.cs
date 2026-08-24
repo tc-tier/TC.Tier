@@ -129,10 +129,10 @@ public sealed partial class SegmentTable
         var (start, to) = AllocateRaw(length, false, ct);
         // ★ 上界校验用 to 自身（CAS 确定值），不重读 AllocatedTail——裸读无屏障，JIT 可将其 CSE 成
         //   AllocateRaw 循环内读过的旧快照（stale start），导致"区间超出上界"误判
-        //   （2026-08-21 并发撞段界实录：上界恒为"段首+payload"旧值）。CAS 成功 ⇒ to 即当前分配水位。
+        //   （并发撞段界实录：上界恒为"段首+payload"旧值）。CAS 成功 ⇒ to 即当前分配水位。
         ValidateRange(start, to, to, nameof(AppendLease));
         var lease = _leaseFactory.NewAppend(this, start, to, _logger);
-        // ★ L13 收口（2026-08-21）：物化后校验——尾推进（AllocateRaw）与区间物化（NewAppend 占位）
+        // ★ L13 收口（）：物化后校验——尾推进（AllocateRaw）与区间物化（NewAppend 占位）
         //   非原子：期间 ReclaimTail 可覆盖并退水到本区间之下（其 lease 端点含本区间），
         //   本 lease 的地址已死（后续分配将重叠发放）。物化完成时 B 已被 extent 互斥挡住
         //   （其覆盖含本区间）——此刻尾 < to ⟺ 已被退水，放弃整笔让上层重试。
@@ -218,7 +218,7 @@ public sealed partial class SegmentTable
             throw new ArgumentOutOfRangeException(nameof(from), $"CompactLease: from {from} > to {to}");
         if (from.SegId < MinSegId)
             throw new ArgumentOutOfRangeException(nameof(from), $"CompactLease: from {from} < MinAddress");
-        // ★ L19（2026-08-22）：上界校验从"to ≤ CommittedTail"放宽为"to ≤ 段几何界"——
+        // ★ L19（）：上界校验从"to ≤ CommittedTail"放宽为"to ≤ 段几何界"——
         //   尾段 lease 须扩到 GrowthLimit 以阻断贴边追加（占区间 ≠ 数据窗；数据打包由
         //   lease.DataEnd 钳在 CommittedTail）。区间统一下 to 恒为段末边界规范形 (seg, limit)
         //   或旧哨兵 (maxSegId+1, 0)（恢复路径钳制后不再产出，防御性保留）。
@@ -282,7 +282,7 @@ public sealed partial class SegmentTable
         if (!_tailSlot.TryHoldTailWatermark())
             throw new InvalidOperationException(
                 "ReclaimTail: 双尾水位正在被另一个 ReclaimTail 处理，不能并发");
-        // ★ L13 修复（2026-08-21）：闭合"检查→CAS"反向窗口——分配者过 hold 检查后、CAS 前，
+        // ★ L13 修复（）：闭合"检查→CAS"反向窗口——分配者过 hold 检查后、CAS 前，
         //   本线程恰好置 hold 并重读，会误以为分配者不存在。持 hold 后重读：若尾已推进
         //   （有 CAS 在 hold 置位瞬间完成）则释放重来——分配者下一轮必被 hold 挡住，
         //   本线程下一轮快照含其区间，覆盖完备。
@@ -333,7 +333,7 @@ public sealed partial class SegmentTable
     }
 
     // ★ 单段模式：① tail 已跨段（SegId > MinSegId）= seg0 满 → 直接抛；② 数据超 seg0 容量 → 抛。
-    //   ★ 区间统一（2026-08-21）：exact-fill（offset+length == GrowthLimit）放行后尾停驻 (seg,limit)
+    //   ★ 区间统一（）：exact-fill（offset+length == GrowthLimit）放行后尾停驻 (seg,limit)
     //   不跨段——① 变防御性不可达；刚好装满 seg0 后下次写由 ② 抛"容量超限"（正确错误语义）。
     if (EnableSingleSegment)
     {
@@ -401,7 +401,7 @@ public sealed partial class SegmentTable
                 //   但 ApplyHints 设计为恢复期单线程（Allocate 之前同步完成），故间隙不构成活跃竞态。
                 Interlocked.CompareExchange(ref _phase, (int)LifecyclePhase.Runtime, (int)LifecyclePhase.Recovery);
                 if (!isCommit) return (start, end);
-                // ★ L27 收口（2026-08-22）：committed 推进改 CAS 重试循环。旧实现单发失败即返回
+                // ★ L27 收口（）：committed 推进改 CAS 重试循环。旧实现单发失败即返回
                 //   (start,end) 且不补种——并发 AllocateLease 先推尾时（其种子只盖自身区间），
                 //   本区间 [start,end) 无 sparse 种子：区间在 VisibleOffset 之下却无记录 → 读门
                 //   永阻（占位区永久不可读）。重试直到本区间种子落位（他人已推过 end 时只补种）。
@@ -449,7 +449,7 @@ public sealed partial class SegmentTable
                         segOff = 0;
                     }
 
-                    // ★ L13 收口（2026-08-21）：种子后校验——尾推进与 sparse 种子非原子，期间
+                    // ★ L13 收口（）：种子后校验——尾推进与 sparse 种子非原子，期间
                     //   ReclaimTail 可覆盖并退水到 end 之下（返回的预约地址已死，后续分配将重叠）。
                     //   死区 sparse 记录为可占终态，后续分配到位时自然分裂复用——无需清理。
                     //   ★ 读法撕裂/CSE 免疫（IsAllocatedBelow——裸单读 exact-fill 段界假阳性）。
@@ -556,7 +556,7 @@ public sealed partial class SegmentTable
         var spinner = new SpinWait();
         while (true)
         {
-            // ★ L13 收口（2026-08-21）：水位独占（ReclaimTail 回退中）期间 Committed 推进退避。
+            // ★ L13 收口（）：水位独占（ReclaimTail 回退中）期间 Committed 推进退避。
             if (_tailSlot.IsTailWatermarkHeld)
             {
                 spinner.SpinOnce();
@@ -575,7 +575,7 @@ public sealed partial class SegmentTable
             var next = new LogicalAddress(target.SegId, cur.Extension, target.Offset);
             if (_tailSlot.TryUpdateCommitted(cur, next))
             {
-                // ★ L25 收口（2026-08-22）：CAS 成功瞬间 ReclaimTail 可能已持 hold 并退 Allocated
+                // ★ L25 收口（）：CAS 成功瞬间 ReclaimTail 可能已持 hold 并退 Allocated
                 //   （newTail ∈ [Committed, Allocated) 场景走 RetreatAllocatedOnly——不动 Committed，
                 //   expected 位精确 CAS 挡不住）→ 本推进越过新边界，C>A 持久破坏。hold 自撤销：
                 //   回退 CAS（next→cur）——失败（他人已在此上推进）可容忍：其路径同样带本防护。
@@ -768,7 +768,7 @@ public sealed partial class SegmentTable
                 if ((uint)idx >= (uint)Volatile.Read(ref _segCount)) continue;
                 var seg = segs[idx];
                 if (seg is null || !seg.IsValid) continue;
-                // ★ L12 修复（2026-08-21）：换段从"新建对象换槽"改为【原位更新】——对象身份/锁/
+                // ★ L12 修复（）：换段从"新建对象换槽"改为【原位更新】——对象身份/锁/
                 //   物理门不变，自旋写者（AcquireExtent 持旧引用）与读计划锁天然互斥。
                 //   区间表布局在 extent lock 内单发布 + CompactVersion 递增（陈旧认知快速失败）。
                 //   旧实现 new Segment + Volatile.Write 换槽：自旋写者醒来插进死对象（对全宇宙
@@ -777,7 +777,7 @@ public sealed partial class SegmentTable
                 var layout = new List<ExtentRecord>(2);
                 if (spec.MaxOffset > 0)
                     layout.Add(new ExtentRecord(spec.MinOffset, spec.MaxOffset, ExtentStateCode.Committed, sparse: false));
-                // ★ L19 收口（2026-08-22）：[新 MaxOffset, min(旧 MaxOffset, preserveFrom)) = 打包释放区
+                // ★ L19 收口（）：[新 MaxOffset, min(旧 MaxOffset, preserveFrom)) = 打包释放区
                 //   （窗口数据已滑走）→ sparse 空槽；[preserveFrom, 旧 MaxOffset) 的旧终态区间由
                 //   ApplyCompactReplacement 原样拼接保留——写者恰在 lease 获取前提交、数据落在窗口外时
                 //   不再被 blanket sparse 洗成读零（磁盘实锤：单轮丢 512B 记录）。

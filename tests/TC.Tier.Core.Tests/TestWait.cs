@@ -3,7 +3,7 @@ namespace TC.Tier.Core.Tests;
 /// <summary>
 /// 异步轮询对齐 helper——替代测试中固定 <c>Task.Delay</c> 的 delay 型同步。
 /// <para>★ 动机：固定 Delay 把"线程池调度延迟 &lt; N ms"当成立假设——并行测试套压公共池时
-///   该假设被踩穿即假失败（2026-08-18 BackgroundWorkerLoopTests 全量套实测踩中）。等待必须与
+///   该假设被踩穿即假失败（BackgroundWorkerLoopTests 全量套实测踩中）。等待必须与
 ///   被断言的条件对齐（轮询/事件），不是与假设的延迟对齐。</para>
 /// </summary>
 internal static class TestWait

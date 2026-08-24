@@ -4,7 +4,7 @@ namespace TC.Tier.Core.Tests;
 
 /// <summary>
 /// 测试宿主线程池预热——消除满套并行下的 <c>Task.Run</c> 起跑延迟（池注入节流）。
-/// <para>★ 根因（2026-08-20 三连假红后收口）：xUnit 并行 collection 打满线程池后，池的注入节流
+/// <para>★ 根因（三连假红后收口）：xUnit 并行 collection 打满线程池后，池的注入节流
 ///   （约 1 线程/ms + 饥饿检测延迟）使新排队的 Task.Run <b>起跑</b>延迟可达秒级——固定毫秒
 ///   <c>Wait(N)</c> 的隐含假设是"任务及时起跑"，满套下必假红。本会话三例：LockWordTests
 ///   Shared_OverlappingHolders / ChaseCompaction 发布竞态 / AcquireExclusive_MemRealLock

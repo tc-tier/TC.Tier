@@ -17,7 +17,7 @@ public sealed partial class Segment
     private readonly List<ExtentRecord> _extentList = new(capacity: 8);
 
     /// <summary>
-    /// ★ L19 收口（2026-08-22）：在途（in-flight）区间记录独立小表。
+    /// ★ L19 收口（）：在途（in-flight）区间记录独立小表。
     /// <para>宽记录问题：整段 lease（Write/Reclaim/Compact 覆盖已提交区）的在途记录可<b>包含</b>
     /// 多条终态记录（插入序不保证相邻），破坏"终态记录互不相交、按 Start 二分"的扫描前提——
     /// 按 Start 二分落在中间终态记录上，宽在途记录漏扫（追加钻进整理中段，磁盘实锤 512B 丢写）。</para>
@@ -95,7 +95,7 @@ public sealed partial class Segment
     [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
     internal bool CanAcquireUnsafe(long start, long end, byte requestState)
     {
-        // ★ L19 收口（2026-08-22）：宽在途记录（整段 lease 包含终态记录）走 _outstanding 小表 O(m)
+        // ★ L19 收口（）：宽在途记录（整段 lease 包含终态记录）走 _outstanding 小表 O(m)
         //   检查——主表保持"终态互不相交"二分前提，O(log n + k) 协议不变。
         //   在途态一律排他（在途无 Aborted，L1 放行规则不适用）。
         for (var i = 0; i < _outstanding.Count; i++)
@@ -110,7 +110,7 @@ public sealed partial class Segment
         while (idx > 0 && _extentList[idx - 1].Start == _extentList[idx].Start)
             idx--;
         idx = Math.Max(0, idx);
-        // ★ L1 销案（2026-08-21）：Reclaim 族（中间/头/尾）可重占 Aborted——重试治愈毒化区。
+        // ★ L1 销案（）：Reclaim 族（中间/头/尾）可重占 Aborted——重试治愈毒化区。
         //   幂等论证：Aborted = punch/commit 非原子窗口的"数据完好或已归零"二态未知；Reclaim 契约
         //   = 销毁数据成洞（不读数据）——再 punch 两分支收敛同终态（完好→归零；已零→no-op），
         //   终态 Committed+sparse = Reclaim 成功规范终态。Write/Append 仍拒（占用矩阵 §7.2 不变——
@@ -140,7 +140,7 @@ public sealed partial class Segment
     [SuppressMessage("ReSharper", "InconsistentlySynchronizedField")]
     internal bool IsRangeFullyDrainedUnsafe(long start, long end)
     {
-        // ★ L19 收口（2026-08-22）：宽在途记录走 _outstanding 小表（主表二分协议不变）。
+        // ★ L19 收口（）：宽在途记录走 _outstanding 小表（主表二分协议不变）。
         for (var i = 0; i < _outstanding.Count; i++)
         {
             var o = _outstanding[i];
@@ -189,7 +189,7 @@ public sealed partial class Segment
         if (_extentList.Count == 0)
             return (offset, ExtentStateCode.Committed);
 
-        // ★ L19 收口（2026-08-22）：宽在途记录走 _outstanding 小表（主表二分协议不变）——
+        // ★ L19 收口（）：宽在途记录走 _outstanding 小表（主表二分协议不变）——
         //   命中即在途阻断（返回宽记录起点，读门保守拒绝）。
         for (var i = 0; i < _outstanding.Count; i++)
         {
@@ -290,7 +290,7 @@ public sealed partial class Segment
             _extentList.Insert(idx, record);
         }
 
-        // ★ L19 收口（2026-08-22）：在途记录注册进 _outstanding 小表——占用/排水/可读扫描的
+        // ★ L19 收口（）：在途记录注册进 _outstanding 小表——占用/排水/可读扫描的
         //   宽记录检查走它（终态表保持互不相交二分前提）。
         if (ExtentStateCode.IsInFlight(state))
             _outstanding.Add(record);
@@ -439,7 +439,7 @@ public sealed partial class Segment
     }
 
     /// <summary>
-    /// ★ Compact 原位更新（L12 修复 2026-08-21）——同段号换内脏而非新建对象换槽：
+    /// ★ Compact 原位更新（L12 修复 ）——同段号换内脏而非新建对象换槽：
     /// 持 extent lock 内一次性完成 [换区间表 + 几何字段（maxOffset/growthLimit）+ 版本递增]，
     /// 对象身份/锁实例/物理门不变。
     /// <para>★ 引用恒稳收益：自旋写者（AcquireExtent）、读计划锁（SegmentLock）、句柄池持的都是
@@ -469,14 +469,14 @@ public sealed partial class Segment
     /// <summary>
     /// ★ Compact 原位更新（带 minOffset——RangeCompact 打包前缀保留区形态）：
     /// 与 <see cref="ApplyCompactReplacement(long, long, IReadOnlyList{ExtentRecord})"/> 同协议，
-    /// 额外推进 <c>_minOffset</c>（头部保留区起点，重整后由 spec 裁定）。
+    /// 额外推进 <c>_minOffset</c>（头部保留区起点，重整后由 spec 决策）。
     /// </summary>
     internal void ApplyCompactReplacement(long newGrowthLimit, long newMaxOffset, long newMinOffset,
         IReadOnlyList<ExtentRecord> layout)
         => ApplyCompactReplacement(newGrowthLimit, newMaxOffset, newMinOffset, long.MaxValue, layout);
 
     /// <summary>
-    /// ★ Compact 原位更新（L19 收口 2026-08-22，带 preserveFrom——数据窗外旧区间保留）：
+    /// ★ Compact 原位更新（L19 收口 ，带 preserveFrom——数据窗外旧区间保留）：
     /// 持 extent lock 内一次性完成 [换区间表 + 几何字段（maxOffset/growthLimit）+ 版本递增]，
     /// 对象身份/锁实例/物理门不变。
     /// <para>★ preserveFrom &lt; long.MaxValue 时，旧区间表中 ≥ preserveFrom 的<b>终态</b>记录
@@ -613,7 +613,7 @@ public sealed partial class Segment
         //   覆盖写场景（含非 sparse）：同 [start,end) 反复覆写时，占位 Split 不删完全重合的旧
         //   Committed（只拆边界不齐的），前驱/后继合并又只认严格相接（prev.End==start /
         //   next.Start==end）——同区间重合条永不归并，每次复写净 +1 条 → 表线性膨胀、
-        //   单 op O(记录数)（2026-08-21 压测实锤：10 万次复写 42→299 µs/op）。
+        //   单 op O(记录数)（压测实锤：10 万次复写 42→299 µs/op）。
         //   此处清理 = 归并收口：旧记录语义已被新 lease 的 Committed 完全取代。
         //   在途态（Leased）不删——CanAcquireUnsafe 排他保证本区间无并发在途。
         long finalStart = _extentList[idx].Start;
@@ -776,7 +776,7 @@ public sealed partial class Segment
     /// 检查 [start, end) 是否含<b>终态不可读</b>区间（Aborted/Wasted——失败写/回收垃圾，
     /// 永不变可读）。读侧活性守卫用：含终态不可读时 <see cref="IsRangeFullyReadable"/> 恒 false，
     /// 等待它的自旋（AcquireReadPlan）必须快速失败而非无限自旋（挂死）。
-    /// <para>★ L14 修复（2026-08-21）：end &gt; VisibleOffset 同判永不可读——ReclaimTail 的
+    /// <para>★ L14 修复（）：end &gt; VisibleOffset 同判永不可读——ReclaimTail 的
     ///   RetreatOffset 删记录回退 VisibleOffset（不落 Aborted/Wasted 终态标记），跨截断点的读
     ///   plan 既不可读也扫不到终态记录 → 永久自旋。合法读的区间尾 ≤ CommittedTail ≤ VisibleOffset
     ///   （Committed 蕴含记录存在），end 越过 VisibleOffset ⟺ 该区已被截断抹除——快速失败

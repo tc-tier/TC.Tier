@@ -16,8 +16,8 @@ internal sealed partial class StorageEngine
     /// <para>★ 两个调用方共享（幂等基元）：① worker 正式建段（<see cref="CreateSegmentPhysical"/>）；
     ///   ② IO 层预备池预建（<c>StorageEngine.SegmentPool.cs</c> 的 lookahead）——
     ///   物理建段是 IO 层的事，段表只发通知（OnSegmentCreate/OnSegmentFull），池攒 N 个现成段、
-    ///   随取随补、Dispose 毁余量（架构约定 2026-08-14）。</para>
-    /// <para>★ 调用契约（2026-08-16）：两调用方经 build-gate single-flight 互斥进入
+    ///   随取随补、Dispose 毁余量（架构约定 ）。</para>
+    /// <para>★ 调用契约（）：两调用方经 build-gate single-flight 互斥进入
     ///   （<see cref="EnsureSegmentPhysicalAsync"/> / <c>PreCreateSegmentPhysical</c>，均在
     ///   StorageEngine.SegmentPool.cs）——本方法自身不再防重，直接调用者之外勿绕过 gate。</para>
     /// </summary>
