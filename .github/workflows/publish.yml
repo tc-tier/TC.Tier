@@ -5,15 +5,11 @@ on:
     tags: ['v*', 'runtime-v*']
 
 jobs:
-  publish:
+  build:
     runs-on: windows-latest
-    permissions:
-      contents: read
-      id-token: write   # NuGet Trusted Publishing（OIDC 零密钥认证——nuget.org 策略绑定本 workflow）
     steps:
       - uses: actions/checkout@v4
 
-      # Trusted publishing 需要 .NET SDK 9.0.2xx+（dotnet nuget push OIDC 支持；global.json rollForward=latestMajor 放行）
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
@@ -40,6 +36,25 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME#runtime-v}
           dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts/*.nupkg
+
+  # ★ 独立 publish job：fresh OIDC token（build+test+pack 超 5 分钟会过期——split job 是标准做法）
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: nupkg
+          path: artifacts
 
       - name: Push to nuget.org (trusted publishing, OIDC token as api-key)
         shell: bash
