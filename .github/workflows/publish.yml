@@ -41,6 +41,6 @@ jobs:
           VERSION=${GITHUB_REF_NAME#runtime-v}
           dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
 
-      - name: Push to nuget.org (trusted publishing, no API key)
+      - name: Push to nuget.org (trusted publishing, OIDC token as api-key)
         shell: bash
-        run: dotnet nuget push artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push artifacts/*.nupkg --api-key "$ACTIONS_ID_TOKEN_REQUEST_TOKEN" --source https://api.nuget.org/v3/index.json --skip-duplicate
