@@ -3,7 +3,7 @@ namespace TC.Tier.Runtime.Tests.Storage;
 /// <summary>
 /// 物理建段 single-flight 压测——N=2 消费者 + 预备池补建并发：同一 segId 的
 /// <c>CreateSegmentPhysical</c> 必须恰好执行一次。
-/// <para>★ 2026-08-16 引擎 N≥2 审计：池补建（PreCreateSegmentPhysical）与正式建段任务
+/// <para>★ 引擎 N≥2 审计：池补建（PreCreateSegmentPhysical）与正式建段任务
 ///   （EnsureSegmentPhysicalAsync）之间存在双建窗口——容量双重计数、句柄缓存覆盖泄漏
 ///   （Windows 上阻文件删除）、重复等值 meta 写。修复 = build-gate single-flight
 ///   （TryConsumeOrClaimPhysicalBuild 原子取用或声明 + 在途等待）。断言依据

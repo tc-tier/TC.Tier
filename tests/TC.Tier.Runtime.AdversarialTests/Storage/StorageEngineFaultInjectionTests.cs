@@ -97,7 +97,7 @@ public sealed class StorageEngineFaultInjectionTests : StorageEngineTestBase
     }
 
     // ═══════════════════════════════════════════════════════════════
-    //  L1（2026-08-21）：Abort 区间重占——Reclaim 族可幂等重占 Aborted，
+    //  L1（）：Abort 区间重占——Reclaim 族可幂等重占 Aborted，
     //  Failed.lastPunchedOffset 断点重试由此可达（治愈全部毒化区）。
     // ═══════════════════════════════════════════════════════════════
 

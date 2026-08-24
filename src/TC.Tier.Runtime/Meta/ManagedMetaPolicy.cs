@@ -3,7 +3,7 @@ namespace TC.Tier.Runtime.Meta;
 /// <summary>
 /// Managed meta 策略——独立 <c>IStorageEngine</c> + 四段自描述块 + Magic/CRC 校验。
 /// <para>★ 统一布局：[统一 Header N B][内部水位线（结构化）][外部 opaque（实际用量）][统一 Footer CRC 4B]。</para>
-/// <para>★ 自描述核心（用户裁定 2026-08-21）：header.PayloadLength = 水位字节数 + opaque <b>实际用量</b>；
+/// <para>★ 自描述核心（设计决策 ）：header.PayloadLength = 水位字节数 + opaque <b>实际用量</b>；
 ///   水线位置 = HeaderSize（固定）；opaque 范围 = 其后至 PayloadLength；footer 位 = HeaderSize + PayloadLength。
 ///   <b>容量（可变的启动配置）零参与盘上几何</b>——跨重启容量随便调，读侧全按盘上自述定位，水位无条件恢复。</para>
 /// <para>★ 容量（MetaOpaqueBytes）只做写侧约束：opaque 写入上限 + 缓冲分配 + 引擎段几何。</para>

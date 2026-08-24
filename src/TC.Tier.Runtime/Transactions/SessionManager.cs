@@ -9,7 +9,7 @@ namespace TC.Tier.Runtime.Transactions;
 /// ★ Session 管理器——组合域统一协调协议层（session-manager-design.md v2，Runtime/Transactions 收官件）。
 /// <para>每组合域一个；读写检查点三 op 的唯一进出：写=staged 物化委托经单飞提交管线
 /// （纯内存序+排空批合并，FIFO 全序）；检查点=管线内串行回合；读=会话 scope/地址直达（协议面另件）。</para>
-/// <para>★ 零自有存储、零持久化决策（v2 裁定）：持久化真源=参与者各自 meta 水位
+/// <para>★ 零自有存储、零持久化决策（v2 决策）：持久化真源=参与者各自 meta 水位
 /// （2PC 六件套本就持久），时机归参与者自身策略；悬挂裁决按域声明（默认 forward-commit 前推）。</para>
 /// <para>线程安全（管线/计数/通道）；会话（TierSession）单线程使用契约。</para>
 /// </summary>
@@ -104,7 +104,7 @@ public sealed class SessionManager : LifecycleBase
             SingleReader = true,
             // ★ false：读方续体恒经调度器——管线循环永在管线自身执行流（单飞提交线程语义）。
             //   true 时 TryWrite 会在入队方线程内联跑整圈管线（2PC 寄生调用方线程；
-            //   时序控制场景（Prepare 阻塞）= 调用方死等自己——2026-08-22 SessionPipelineTests
+            //   时序控制场景（Prepare 阻塞）= 调用方死等自己——SessionPipelineTests
             //   卡死现场 dotnet-stack 实锤）。
             AllowSynchronousContinuations = false,
         });

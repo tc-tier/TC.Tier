@@ -1,7 +1,7 @@
 namespace TC.Tier.Runtime.Storage;
 
 /// <summary>
-/// 存储引擎构建者（builder.build——2026-08-24 用户裁定：Options 构建配置 → Builder 构建引擎 →
+/// 存储引擎构建者（builder.build——设计决策：Options 构建配置 → Builder 构建引擎 →
 /// Start 启动引擎一步到位）。
 /// <para>★ 外部使用者的唯一引擎入口：<c>using var builder = options.Builder(fs); var dev = builder.Start(hints)</c>
 ///   或 <c>StartAsync(hints)</c>——构建 + Initialize + 就绪等待一体；实现类（StorageEngine）internal

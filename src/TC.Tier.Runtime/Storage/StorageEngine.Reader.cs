@@ -167,7 +167,7 @@ internal sealed partial class StorageEngine
     /// 加共享读锁 + 校验可读——经段表包装（segId 级，不接触 Segment）。
     /// <para>★ <b>全有或全无</b>：任一 plan 段的锁拿不到（TryGetLock=false，建段窗口内段未入表）→ 整体回退重试。
     ///   保证不变量：<b>成功返回时持有全部 plan 段的共享锁</b>——释放（ReleaseReadPlan）才永远配对。</para>
-    /// <para>★ 修复的 bug（dump 取证 2026-08-14）：旧实现按 TryGetLock 逐段"有则拿"，失败回退时重新 TryGetLock 释放——
+    /// <para>★ 修复的 bug（dump 取证 ）：旧实现按 TryGetLock 逐段"有则拿"，失败回退时重新 TryGetLock 释放——
     ///   建段竞态窗口内 acquire=false/release=true 两阶段结果翻转 → <b>释放从未获取的锁</b> → 读计数变负
     ///   （实测 -3）→ 负数借位到高位假"写者位" → reader/Dispose 全部永久自旋楔死。</para>
     /// </summary>

@@ -37,7 +37,7 @@ public sealed class AsyncManualResetEvent
 {
     // waiter 链表节点：每个等待者一个独立的池化完成源
     private WaitNode? _head;
-    // ★ 单 waiter 快路径槽（2026-08-17）：CAS 抢占单槽，1:1 唤醒免 WaitNode 分配与锁；
+    // ★ 单 waiter 快路径槽（）：CAS 抢占单槽，1:1 唤醒免 WaitNode 分配与锁；
     //   被占用时溢出回退链表。Set 侧 Exchange 取走。
     private PooledValueTaskSource? _singleWaiter;
     private int _syncWaiters;   // 定时同步等待者计数——Set 仅在 >0 时 Pulse（异步场景免白付 PulseAll）

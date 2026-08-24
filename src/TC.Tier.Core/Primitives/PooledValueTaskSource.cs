@@ -35,7 +35,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     public object? CleanupState;
     public Action<object?, PooledValueTaskSource>? OnCleanup;
 
-    // ★ 单次完成守卫（2026-08-14 竞态修复）：0=武装（租出待完成）；1=已完成；2=已归还池。
+    // ★ 单次完成守卫（竞态修复）：0=武装（租出待完成）；1=已完成；2=已归还池。
     //   取消回调 / Set 广播遍历 / 归还后的残留信号，任何两个并发撞上都会双触发
     //   ManualResetValueTaskSourceCore.SignalCompletion 抛 InvalidOperationException
     //   （AsyncManualResetEventTests 并行分组变化即暴露）。CAS 守护：只有第一个完成者生效，

@@ -18,7 +18,7 @@ internal sealed partial class DefaultCompactor
         // 每个 lease 独立计算新段布局、独立拷贝；Phase 2 统一 Promote + 全部 lease.Commit
         var perLeasePlans = new List<LeasePlan>(leases.Length);
         List<IFileHandle> allTempHandles = new();
-        bool markerWritten = false;   // ★ 现场保留契约（2026-08-24）：Phase 2（marker 已写）失败保留临时文件
+        bool markerWritten = false;   // ★ 现场保留契约（）：Phase 2（marker 已写）失败保留临时文件
 
         try
         {
@@ -64,7 +64,7 @@ internal sealed partial class DefaultCompactor
                 // flush 本 lease 临时段
                 foreach (var h in tempHandles) h.Flush();
 
-                // ★ 新段自写元数据（2026-08-24 用户裁定：元数据随新段走，fs 替换同步就位）——
+                // ★ 新段自写元数据（设计决策：元数据随新段走，fs 替换同步就位）——
                 //   段元组写临时段 FileExtra（xattr 随 inode / sidecar 随 TryMoveSidecar），
                 //   promote（rename）时随文件就位——不再经引擎 tupleWriter 委托事后补写。
                 for (int i = 0; i < tempHandles.Count; i++)
@@ -88,7 +88,7 @@ internal sealed partial class DefaultCompactor
             }
 
             // ── Phase 2: 提交（不可取消）── 文件循环替换在前、段表原子提交殿后 ──
-            // ★ 顺序重排（2026-08-24 用户裁定）：拷贝（耗时全部）→ 循环{ rename 临时段 + SetReplacement }
+            // ★ 顺序重排（设计决策）：拷贝（耗时全部）→ 循环{ rename 临时段 + SetReplacement }
             //   → 最后 lease.Commit（瞬间原子）。提交阶段无长耗时、失败断点续传（PromoteTemp 幂等：
             //   TempExists 判断跳过已替换段，与 RecoverCompactMarker 恢复循环同构）——rename 失败
             //   抛类型化异常（FileIOException.SharingViolation）由使用方（引擎）决策：关句柄后续传/回滚。
@@ -104,7 +104,7 @@ internal sealed partial class DefaultCompactor
             {
                 if (plan.NewSegCount == 0)
                 {
-                    // ★ L19 配套（2026-08-22）：lease 尾段扩到 GrowthLimit 后"零数据 lease"也有 chunk
+                    // ★ L19 配套（）：lease 尾段扩到 GrowthLimit 后"零数据 lease"也有 chunk
                     //   （旧钳制下空区间零 chunk、Commit 无绊线可触）——显式填充：零数据整理 = 空段槽
                     //   （SetReplacement(旧上限, 0)：MaxOffset 归零、区间表清空，读零语义不变）。
                     //   空设备/全打洞 lease 的正常形态。
@@ -225,7 +225,7 @@ internal sealed partial class DefaultCompactor
                 }
             }
 
-            // ★ 现场保留契约（2026-08-24 用户裁定——失败决策权归使用方）：
+            // ★ 现场保留契约（设计决策——失败决策权归使用方）：
             //   - Phase 2 失败（marker 已写）：【保留】临时文件 + marker——续传（引擎关句柄后
             //     Retry/Recover 补执行或下次启动 marker 恢复的前提；删除 = 摧毁搬迁成果（重拷贝）。
             //   - Phase 1 失败（marker 未写）：【清理】半成品临时文件——无 marker 无恢复路径，
@@ -244,7 +244,7 @@ internal sealed partial class DefaultCompactor
                 }
             }
 
-            // ★ L4 取证修复（2026-08-21）：搬迁中途失败的 lease 不在 perLeasePlans（Add 在 CopyData
+            // ★ L4 取证修复（）：搬迁中途失败的 lease 不在 perLeasePlans（Add 在 CopyData
             //   成功之后）——只 Dispose plans 会泄漏其在途区间（CompactLeased 残留 → 读门永自旋，
             //   满负载下全量挂死）。全部 leases 统一 Dispose：幂等（已终态 no-op），plans 内与
             //   中途失败的一并兜底回滚。
@@ -339,7 +339,7 @@ internal sealed partial class DefaultCompactor
             using var handle = OpenSourceHandle(chunk.SegId);
             var ranges = handle.EnumerateAllocatedRanges();
             var list = new List<(long Start, long End)>();
-            // ★ L19（2026-08-22）：数据窗按 lease.DataEnd 裁剪（默认=End；全量 Compact 由引擎
+            // ★ L19（）：数据窗按 lease.DataEnd 裁剪（默认=End；全量 Compact 由引擎
             //   钳到 CommittedTail）——lease 上界扩到 GrowthLimit 只用于阻断贴边追加，
             //   PreallocateFile 预分配幻影区（未提交占位）不得进打包窗。
             var dataEnd = lease.DataEnd;

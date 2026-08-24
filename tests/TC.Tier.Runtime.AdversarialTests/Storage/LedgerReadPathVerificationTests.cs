@@ -5,7 +5,7 @@ using TC.Tier.Core.Primitives;
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
-/// 台账 L18/L19 销案验证压测（2026-08-22）——读路径一致性批次 A 的对抗性复现面。
+/// 台账 L18/L19 销案验证压测（）——读路径一致性批次 A 的对抗性复现面。
 /// <list type="bullet">
 /// <item>L19：Compact lease 尾段全覆盖后，贴边追加（append 起点 == 整理窗口尾 == CommittedTail）
 ///   与 RangeCompact 高强度交织——不失败、不丢、逐字节可读（旧实现"贴边不交叠"窗口静默丢写/换段 no-op）。</item>

@@ -50,7 +50,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     public string Path => _path;
 
     /// <inheritdoc/>
-    /// <remarks>★ DIO 形态模拟（2026-08-19 行为保真补全）：带 NoBuffering 提示 = <see cref="UnbufferedIoSupport.Supported"/>
+    /// <remarks>★ DIO 形态模拟（行为保真补全）：带 NoBuffering 提示 = <see cref="UnbufferedIoSupport.Supported"/>
     /// + <see cref="RequiredAlignment"/> 对齐强制——与 Disk 的 DIO 句柄行为逐字对齐（三重对齐违规抛
     /// <see cref="IOError.AlignmentError"/>）。理由：Mem 是测试/模拟介质（Capacity 模拟 DiskFull 同款先例），
     /// 对齐纪律必须在开发期强制执行——否则消费方的对齐 bug 在 Mem 测试期静默通过，切 Disk 生产时大量爆炸。

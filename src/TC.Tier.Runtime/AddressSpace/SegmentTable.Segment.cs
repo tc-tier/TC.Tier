@@ -288,7 +288,7 @@ public sealed partial class SegmentTable
     {
         if (seg.SegId >= _segIndex.Length)
         {
-            // ★ VII-8 根因修复（2026-08-16）：新数组【先填 -1 再单点发布】——禁用 Array.Resize。
+            // ★ VII-8 根因修复（）：新数组【先填 -1 再单点发布】——禁用 Array.Resize。
             //   Array.Resize 内部对字段做普通写：零初始化数组先可见、-1 Fill 后可见——无锁读者
             //   （CAS 门/Ensure 步进）在窗口内读到 _segIndex[x]=0 →「段存在（slot 0）」→ 跳过注册，
             //   尾水位穿过未注册段后 Ensure 只看 tail 当前段、永不回填 = 永久空洞（重开截断、数据不可达）。

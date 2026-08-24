@@ -722,7 +722,7 @@ public sealed partial class RawFileSystem : IFileSystem, IContiguousVolume
     private unsafe void WriteCarrier(long offset, ReadOnlySpan<byte> source)
     {
         // 成员分段 + 各自 DIO 纪律（对齐窗口 RMW——数据面已按块对齐，免 RMW 热路径）。
-        // 写窗口 64KB（2026-08-19 实测 O_DIRECT 写成本曲线：64KB=189μs 甜点，256KB=3.3ms/1MB=12ms 灾难段）
+        // 写窗口 64KB（实测 O_DIRECT 写成本曲线：64KB=189μs 甜点，256KB=3.3ms/1MB=12ms 灾难段）
         const int chunkAlign = 64 << 10;
         var done = 0;
         while (done < source.Length)
@@ -770,7 +770,7 @@ public sealed partial class RawFileSystem : IFileSystem, IContiguousVolume
     }
 
     /// <summary>
-    /// DONTNEED 扫描纪律（2026-08-19 性能轮结论）：文件载体走缓冲 IO（内核 writeback 吸收是缓冲档
+    /// DONTNEED 扫描纪律（性能轮结论）：文件载体走缓冲 IO（内核 writeback 吸收是缓冲档
     /// 平权 Disk 的存在条件——实测本机 O_DIRECT 同步写地板仅 ~500MB/s，且 fadvise(DONTNEED) 对脏页
     /// 触发立即写回，写路径任何"弃页"手段都等价于把 O_DIRECT 的每写一次设备往返请回来）。
     /// 因此只对<b>直达档读</b>（干净页——弃之无写回代价）施加：扫描不驻留 OS 缓存。

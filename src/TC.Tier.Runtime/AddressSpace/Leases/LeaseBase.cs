@@ -8,7 +8,7 @@ namespace TC.Tier.Runtime.AddressSpace.Leases;
 /// <para>★ 每个操作类型是独立的类型化 lease 协议（<see cref="AppendLease"/>/<see cref="WriteLease"/>/
 ///   <see cref="ReclaimLease"/>/<see cref="ReclaimHeadLease"/>/<see cref="ReclaimTailLease"/>）——
 ///   类型即协议：终态收敛由子类 override <see cref="FinalizeTerminalCore"/> 表达，不做 kind 字节路由
-///   （2026-08-16 复拆：五合一的单体 OperationLease 抹掉了类型协议边界，上层怎么修都修不干净）。</para>
+///   （复拆：五合一的单体 OperationLease 抹掉了类型协议边界，上层怎么修都修不干净）。</para>
 /// <para>★ chunk 终态仲裁（doneMask）与 Extents 机械在基类——与操作类型正交。</para>
 /// </summary>
 public abstract partial class LeaseBase : IDisposable, ITrackedLease
@@ -33,7 +33,7 @@ public abstract partial class LeaseBase : IDisposable, ITrackedLease
     /// <para>避免诊断枚举与 Commit/Rollback/Reset 并发时读到：撕裂的字段对、或已归还/复用的 ArrayPool 数组。</para>
     /// <para>仅 SegIds（诊断冷路径）与 Extents 发布点持锁；热路径（每 chunk）零锁。
     /// ★ SpinLock struct（4B 零堆分配）——默认工厂每次 new（对象小、池化成本更高），
-    ///   每 lease 一次的锁对象分配是真实成本（2026-08-16 用户裁定收缩）。</para>
+    ///   每 lease 一次的锁对象分配是真实成本（设计决策收缩）。</para>
     /// </summary>
     private SpinLock _extentsSync;
     /// <summary>
@@ -231,7 +231,7 @@ public abstract partial class LeaseBase : IDisposable, ITrackedLease
     /// chunk 物理门——类型化协议各自表达对本 chunk 段稳态的要求（调用点：chunk 流水线第一拍 + 整体提交扫尾）。
     /// <para>★ 基类默认<b>无门</b>（Reclaim 系协议：打洞/截断/删段，不等物理就绪）。</para>
     /// <para>★ <see cref="AppendLease"/>/<see cref="WriteLease"/> override 为 Empty→Ready 物理门——
-    ///   Append/Write 全部 chunk IO 与提交都必须等物理段（2026-08-16 用户裁定：协议要求不可混合进基类）。</para>
+    ///   Append/Write 全部 chunk IO 与提交都必须等物理段（设计决策：协议要求不可混合进基类）。</para>
     /// </summary>
     /// <param name="ext">目标 chunk 的区间租约。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -298,7 +298,7 @@ public abstract partial class LeaseBase : IDisposable, ITrackedLease
     {
         if (Volatile.Read(ref _state) != (int)LeaseState.Active) return;
         if (!TryMarkDone(index)) return;
-        // ★ L15 修复（2026-08-21）：数组引用在 _extentsSync 内快照——TryMarkDone 赢位后可被抢占，
+        // ★ L15 修复（）：数组引用在 _extentsSync 内快照——TryMarkDone 赢位后可被抢占，
         //   并发整体 Commit()/Rollback() 已 ReleaseExtents（换 Empty + 归池清零），裸读会 IOoR/
         //   操作他人重租的 buffer。ExtentLease 为 readonly struct——快照后调用与数组生命周期解耦
         //   （陈旧段认知由 CompactVersion 哨兵拦截）。

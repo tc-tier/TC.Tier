@@ -1,7 +1,7 @@
 namespace TC.Tier.Runtime.Storage;
 
 /// <summary>
-/// IO 层段预备池 partial（lookahead）——<b>物理建段是 IO 层的事</b>（架构约定 2026-08-14）：
+/// IO 层段预备池 partial（lookahead）——<b>物理建段是 IO 层的事</b>（架构约定 ）：
 /// <list type="bullet">
 /// <item>段表 = 逻辑层：只发通知（<c>OnSegmentCreate/OnSegmentFull</c>）+ 提供剩余容量；不关心物理预建。</item>
 /// <item>IO 层（本 partial）= 物理资产：收到通知后<b>攒 N 个现成物理段</b>（文件+meta+容量计数全部就绪），
@@ -22,17 +22,17 @@ internal sealed partial class StorageEngine
     /// 构建声明（single-flight）：segId → 完成信号（true=已入池可取用 / false=弃建或失败）。
     /// <para>★ 池补建（<see cref="PreCreateSegmentPhysical"/>）与正式建段
     ///   （<see cref="EnsureSegmentPhysicalAsync"/>）经此互斥——N≥2 双消费者并发建同一物理段
-    ///   的窗口（容量双重计数 / 句柄缓存覆盖泄漏 / 重复等值 meta 写）由此关死（2026-08-16 引擎 N≥2 审计）。</para>
+    ///   的窗口（容量双重计数 / 句柄缓存覆盖泄漏 / 重复等值 meta 写）由此关死（引擎 N≥2 审计）。</para>
     /// </summary>
     private readonly Dictionary<int, TaskCompletionSource<bool>> _poolBuildGates = new();
     private bool _poolEnabled;
     /// <summary>本生命周期发生过 hint 截断（ApplyHints 小值修正删过段）——抑制池：
-    /// 截断后预建会把刚删的段以空文件"复活"，违反"hint 之后整段删除"的可观测语义（2026-08-14）。</summary>
+    /// 截断后预建会把刚删的段以空文件"复活"，违反"hint 之后整段删除"的可观测语义（）。</summary>
     private bool _poolSuppressedByTruncation;
 
     /// <summary>
     /// lookahead 深度——池保持的现成段数（尾段之后 N 个）。默认 2（开——写者零等待）。
-    /// <para>★ 默认开的依据（2026-08-15）：WaitSegmentReady 无超时 park 在并行负载下实测饿死写者
+    /// <para>★ 默认开的依据（）：WaitSegmentReady 无超时 park 在并行负载下实测饿死写者
     ///   （dotnet-stack 取证：写者物理门等待 park 120s+，count 771/800 零失败——等待者永不醒；§6.1 零锁化后该家族结构性消灭）。
     ///   池命中 → CreateSegmentCallback 同步转正（Empty→Ready 立即完成）→ 写者零等待，该路径根治。
     ///   hint 截断的生命周期自动抑制（ApplyHintTruncationUpfront → SuppressSegmentPoolForLifecycle）。</para>
@@ -88,7 +88,7 @@ internal sealed partial class StorageEngine
     /// <summary>
     /// 池预建执行（worker 线程）——物理建段 + 入池。
     /// <para>★ 全程守卫：Dispose 关池后立即退出（防与 Resources.Dispose 竞态——worker 线程在引擎
-    ///   释放后触碰 IO 组件 = 未处理异常崩宿主，2026-08-14 实测）；任何异常吞掉（补建是优化，绝不致命）。</para>
+    ///   释放后触碰 IO 组件 = 未处理异常崩宿主，实测）；任何异常吞掉（补建是优化，绝不致命）。</para>
     /// <para>★ single-flight：经 <see cref="TryAcquirePoolBuildGate"/> 声明构建权——正式 Create 任务
     ///   正在建该段时弃建；建成后<b>无条件入池</b>（段表已注册亦入：等 gate 的正式任务正好取用转正，
     ///   双建已被 gate 互斥排除——旧"复查弃建"分支反而留下双计数/句柄覆盖窗口）。</para>
@@ -154,7 +154,7 @@ internal sealed partial class StorageEngine
         lock (_poolLock)
         {
             if (!_pooledSegIds.Remove(segId)) return false;
-            // ★ L17 收口（2026-08-22）：转正回调与取用同临界区——旧实现"取用后、回调前"的
+            // ★ L17 收口（）：转正回调与取用同临界区——旧实现"取用后、回调前"的
             //   抢占窗口：段已出池、尚未 Ready、无 gate → 并发正式 Create 见「Empty+未池化+
             //   无在途」→ 第二次物理构建（全量并发时序 ~1/6 轮实锤，seg 双建诊断：pooled 已
             //   无该段、claim 判 Empty、create 时 st=Ready——回调恰在 claim 与 build 之间落地）。
@@ -208,7 +208,7 @@ internal sealed partial class StorageEngine
         {
             if (_poolEnabled && _pooledSegIds.Remove(segId))
             {
-                // ★ L17 收口（2026-08-22）：同 TryConsumePooledSegment——回调与取用同临界区，
+                // ★ L17 收口（）：同 TryConsumePooledSegment——回调与取用同临界区，
                 //   消「已出池、未 Ready、无 gate」的二次构建窗口。
                 _segmentTable.CreateSegmentCallback(segId, success: true);
                 return PhysicalBuildClaim.Consumed;

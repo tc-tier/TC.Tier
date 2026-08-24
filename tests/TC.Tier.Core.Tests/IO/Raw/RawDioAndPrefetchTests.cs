@@ -4,7 +4,7 @@ using TC.Tier.Core.IO.Raw;
 namespace TC.Tier.Core.Tests.IO.Raw;
 
 /// <summary>
-/// DONTNEED 流式纪律与异步预读回归族（2026-08-19 性能轮）：
+/// DONTNEED 流式纪律与异步预读回归族（性能轮）：
 /// 文件载体缓冲 IO + fadvise(DONTNEED)（内核吸收写突发、OS 缓存驻留受控）/ 预取窗口驻留 /
 /// MMF 写入对直达读可见（视图关闭排干收口）。
 /// </summary>

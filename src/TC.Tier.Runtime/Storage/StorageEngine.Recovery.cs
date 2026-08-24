@@ -45,7 +45,7 @@ internal sealed partial class StorageEngine
             {
                 // ★ 命名构造（fresh 空 seg0：minOffset=0、maxOffset=0）。
                 //   旧 5 元组字面量位序错位把 growthLimit 塞进 minOffset 位 → RealSize 为负 →
-                //   SequentialReader 跳段抛 PartitionInvalid、水位/容量计数全歪（2026-08-14 取证）。
+                //   SequentialReader 跳段抛 PartitionInvalid、水位/容量计数全歪（取证）。
                 //   SegmentScanEntry 构造强校验后此类错位当场爆炸。
                 new(new SegmentSpec(minOffset: 0, growthLimit: growthLimit, maxOffset: 0, stableState: StableState.Ready))
             };
@@ -86,7 +86,7 @@ internal sealed partial class StorageEngine
             //   损坏 marker → 删除；有效 marker → 补执行 Phase 2（lease 由段表按缓存区间重建）。
             owner._compact.Recover((start, end) =>
             {
-                // ★ 存量盘旧形态归一（L4 取证 2026-08-21 首案；2026-08-21 区间统一后仅服务存量 marker）：
+                // ★ 存量盘旧形态归一（L4 取证 首案；区间统一后仅服务存量 marker）：
                 //   旧二进制持久化的 marker to=(maxSeg+1,0) 与扫盘尾 (seg,growthLimit) 是线性等价地址，
                 //   但元组比较越界。新写不再产出旧形态（AdvanceAddress 恰满停驻段末），此钳制只归一
                 //   存量盘的旧形态 marker——线性等价时钳到扫盘尾，真越界（尾段未满）仍抛。

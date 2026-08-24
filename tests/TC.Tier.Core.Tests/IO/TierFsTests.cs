@@ -18,7 +18,7 @@ public sealed class TierFsTests
 
     private static string TempDir()
     {
-        var dir = TestTempDir.Create("tierfs-tests");   // 2026-08-20 修复：此前绕过 TestTempDir——零清理零重定向（C 盘 29G 残留最大漏源）
+        var dir = TestTempDir.Create("tierfs-tests");   // 修复：此前绕过 TestTempDir——零清理零重定向（C 盘 29G 残留最大漏源）
         Directory.CreateDirectory(dir);
         return dir;
     }

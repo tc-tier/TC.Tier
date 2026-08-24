@@ -10,7 +10,7 @@ namespace TC.Tier.Core.Primitives;
 ///   成功返回 true；失败 park 等待唤醒（带超时防丢失唤醒），返回 false 由调用方重试。</para>
 /// <para>  释放方：资源变为可获取后调 <see cref="Wake"/>——PulseAll + 让渡 5ms 先手（唤醒者随后的
 ///   复占是热自旋 µs 级，刚被唤醒的竞争者若无先手则每次 Pulse 后仍被抢回——实测 4/8 超时残余）。</para>
-/// <para>★ 演进自 SegmentTable 手搓公平门（2026-08-18 AcquireExtent 双写者长持锁窗口饥饿根治，
+/// <para>★ 演进自 SegmentTable 手搓公平门（AcquireExtent 双写者长持锁窗口饥饿根治，
 ///   7a9685aa），行为保持式下沉——50ms park / 5ms 让渡为当时调优值，常量不做配置项。</para>
 /// <para>★ 成本：无等待者时 fast path 仅一次 volatile 读（~1ns），Wake 零阻塞直返；有等待者走
 ///   Monitor（µs 级）——用于「临界区外就是 IO」的场景足够，不做队列自旋（无真实调用点）。</para>

@@ -7,7 +7,7 @@ namespace TC.Tier.Contracts.Storage;
 ///   本接口在其上追加 IO 行为（Append/Read/Write 等）+ 动态水位（AllocatedTail 等）。
 ///   子系统（Meta/Compact）只需依赖 <see cref="IStorageInfo"/> 即可，避免与 IO 耦合。</para>
 /// <para>★ 初始化：<b>不在接口面</b>——启动统一经 <c>StorageEngineBuilder.Start/StartAsync</c> 一步到位
-///   （内部 Initialize + WaitForReady），不允许外部直接调 Initialize（2026-08-24 用户裁定：接口面消除）。
+///   （内部 Initialize + WaitForReady），不允许外部直接调 Initialize（设计决策：接口面消除）。
 ///   恢复 hints（<see cref="EngineRecoveryHints"/>，只含恢复水位——段表双尾修正）经 Start(hints) 传入；
 ///   段生长上限/分段开关是构造期配置（Options 配置链传入），不经启动入口。</para>
 /// </summary>
@@ -171,7 +171,7 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
 
     /// <summary>
     /// 启动后台区间回收——立即返回句柄，物理打洞在线程池上执行，调用线程 0 等待。
-    /// <para>★ 命名（2026-08-24 裁定）：Async 后缀保留给可 await 的方法（返回 Task/ValueTask）；
+    /// <para>★ 命名（决策）：Async 后缀保留给可 await 的方法（返回 Task/ValueTask）；
     ///   本方法返回 <see cref="IAsyncOperation"/> 句柄，等待走 <c>await op.WaitAsync()</c>——
     ///   动词 Start 表达"启动后台操作"。失败断点：Failed 事件异常的 <c>Data["lastPunchedOffset"]</c>
     ///   携带最后成功打洞地址，调用方据此重试剩余区间。</para>
@@ -221,7 +221,7 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
                                            SnapshotMode snapshotMode = SnapshotMode.Consistent);
 
     // === Compact（碎片整理） ===
-    // ★ Compact 是威胁操作（整段搬迁 + 删段）——2026-08-24 用户裁定：一律后台句柄形态，
+    // ★ Compact 是威胁操作（整段搬迁 + 删段）——设计决策：一律后台句柄形态，
     //   同步入口废除（GetAwaiter().GetResult() 强制等待有线程池耗尽死锁风险；超时经
     //   await op.WaitAsync(ct) 调用方自控）。后台入口返回 IAsyncOperation 句柄。
 

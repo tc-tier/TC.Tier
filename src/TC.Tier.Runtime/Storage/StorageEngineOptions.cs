@@ -1,7 +1,7 @@
 namespace TC.Tier.Runtime.Storage;
 
 /// <summary>
-/// 存储引擎配置构建器（完整 builder 模式，2026-08-24 用户裁定）——外部使用者的构建链起点：
+/// 存储引擎配置构建器（完整 builder 模式，设计决策）——外部使用者的构建链起点：
 /// <c>new StorageEngineOptions(...).WithXxx()...Builder(fs).Start()</c>，实现类 internal 不对外。
 /// <para>★ 不可变（record class）：全部属性 init-only，<c>With*</c> 返回<b>新实例</b>（with 表达式）——
 ///   配置对象可安全共享/复用（模板派生变体）、链式无副作用、线程安全。</para>

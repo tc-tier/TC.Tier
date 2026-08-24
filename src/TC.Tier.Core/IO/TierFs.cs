@@ -230,7 +230,7 @@ public static partial class TierFs
     }
 
     // ═══════════════ network（网络文件系统——二级协议注册表）═══════════════
-    // ★ 注册契约（2026-08-24 定稿——零反射纪律，NativeAOT 兼容）：[NetworkProtocol] 的
+    // ★ 注册契约（定稿——零反射纪律，NativeAOT 兼容）：[NetworkProtocol] 的
     //   ModuleInitializer 只在协议程序集被 CLR 实际加载时执行。程序集加载 = 触碰其中任一类型
     //   （如 `S3ProtocolBuilder.Instance`——ModuleInitializer 随程序集加载自动注册）。
     //   "引用即生效"的措辞收回（JIT 不会仅因 spec 字符串加载引用程序集——实测复现注册缺失）；

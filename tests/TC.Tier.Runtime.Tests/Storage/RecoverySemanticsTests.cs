@@ -103,7 +103,7 @@ public sealed class RecoverySemanticsTests : IDisposable
     /// ③ hint &gt; 真实水位：接受（可大可小——上层修正值，大 = 覆盖老数据，正常路径）。
     /// </summary>
     /// <remarks>
-    /// ★ 语义修订（2026-08-14 架构约定）：hint 是上层传递的修正值，可大可小——
+    /// ★ 语义修订（架构约定）：hint 是上层传递的修正值，可大可小——
     ///   大 = 覆盖老数据（上层保证 checkpoint 语义有效），不抛数据损坏异常；
     ///   水位推到 hint，hint 所在段 MaxOffset 联动推进使地址生效。
     /// </remarks>

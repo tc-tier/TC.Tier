@@ -2,7 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Runtime.AddressSpace.Leases;
 
-// ═══ 类型化 lease 协议（2026-08-16 复拆）═══
+// ═══ 类型化 lease 协议（复拆）═══
 // 每个操作类型一个独立 lease 协议，共用 LeaseBase 机械（占住/doneMask/Dispose）。
 // 类型即协议——终态收敛由各类型表达，不做 kind 字节路由。
 // ★ source/logger 经基类 protected 属性取用（Reset 可更新）——子类不自持 readonly 字段：

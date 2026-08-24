@@ -12,7 +12,7 @@ public abstract class LifecycleBase(ILogger? logger = null)
 /// 通用生命周期骨架基类（Core 层）。数据结构基类与 IO 引擎基类共同继承本类，获得统一的
 /// <para>★ 实现 <see cref="ILifecycle{THints}"/>——统一"同步 void Initialize 启动后台恢复 + 观测/等待"模型，
 ///   详见 src/TC.Tier.Core/docs/lifecycle.md。★ <b>Initialize 是类面方法（不在 ILifecycle 接口面）</b>——
-///   2026-08-24 用户裁定接口面消除：启动入口由各持有者自己的装配面提供（引擎 = StorageEngineBuilder.Start），
+///   设计决策接口面消除：启动入口由各持有者自己的装配面提供（引擎 = StorageEngineBuilder.Start），
 ///   接口只保留观测/等待；结构层内部组合面仍经具体类型调用。</para>
 /// <para>★ 内建 <see cref="Resources"/>（<see cref="ResourceGroup"/>）——统一资源释放，
 ///   子类构造期/钩子里 <c>Resources.Add(...)</c>，Dispose 自动统一转发（消灭各基类 _owner/_disposables 样板）。</para>
@@ -42,7 +42,7 @@ public abstract class LifecycleBase<THints> : ILifecycle<THints>, IDisposable, I
     ///   默认实例的创建收在 Initialize 的 CAS 闸门内（单一创建点，天然互斥）。
     ///   早期实现 <c>_recovery ??= CreateRecovery()</c> 在 getter 懒创建：并发读双实例竞态 +
     ///   Initialize 前任何 <see cref="IsReady"/> 观测读都会偷跑工厂（Dispose 前查一下也凭空建出
-    ///   Recovery）——已废除（用户裁定：风险不该上层承担，基类直接原子）。</para></summary>
+    ///   Recovery）——已废除（设计决策：风险不该上层承担，基类直接原子）。</para></summary>
     protected IRecovery<THints>? Recovery
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -224,7 +224,7 @@ public abstract class LifecycleBase<THints> : ILifecycle<THints>, IDisposable, I
 
     /// <summary>
     /// ★ 统一就绪入口（同步 void，启动内部后台恢复后立即返回）。模板方法，子类不改流程、只 override 钩子。
-    /// <para>★ <b>类面方法，不在 ILifecycle 接口面</b>（2026-08-24 裁定）——外部禁止经接口调 Initialize；
+    /// <para>★ <b>类面方法，不在 ILifecycle 接口面</b>（决策）——外部禁止经接口调 Initialize；
     ///   引擎侧经 StorageEngineBuilder.Start/StartAsync 一步到位，结构层经具体类型内部调用。</para>
     /// <para>流程：CAS 幂等闸门 → <see cref="OnInitializeBegin"/>（引擎 init + 资源/策略装配）
     ///   → <see cref="CreateRecovery"/> → 订阅进度事件 → 后台 task 跑 Recover → Completed/FAILED。</para>

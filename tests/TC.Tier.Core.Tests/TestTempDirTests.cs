@@ -1,7 +1,7 @@
 namespace TC.Tier.Core.Tests;
 
 /// <summary>
-/// TestTempDir 自测（测试基建 1:1）——2026-08-20 残留事故复盘后的安全网验证：
+/// TestTempDir 自测（测试基建 1:1）——残留事故复盘后的安全网验证：
 /// 正常创建/清理 / 陈旧清扫删旧留新（GUID 后缀判据 + 年龄阈值）/ GUID 判据不误伤非测试目录名。
 /// </summary>
 public sealed class TestTempDirTests

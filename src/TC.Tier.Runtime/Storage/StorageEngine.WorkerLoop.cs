@@ -58,7 +58,7 @@ internal sealed partial class StorageEngine
             switch (item.Event)
             {
                 case SegmentWorkEvent.Create:
-                    // ★ 池取用/声明 single-flight（与池补建互斥防双建——2026-08-16 审计）
+                    // ★ 池取用/声明 single-flight（与池补建互斥防双建——审计）
                     //   → 建物理段 → 成败都回调段表（CreateSegmentCallback 解除 Empty（物理门开），唤醒等段的写路径）。
                     owner.EnsureSegmentPhysical(item.SegId, item.GrowthLimit, ct);
                     break;

@@ -61,7 +61,7 @@ public sealed unsafe class LightEpoch : IDisposable
 
 #if DEBUG
     // ═══ 常设 Debug 仪器（Release 零开销）═══
-    // ★ 协议违反绊线 + 值示波器。教训（2026-08-14 AsyncPriorityQueue 挂死事故）：
+    // ★ 协议违反绊线 + 值示波器。教训（AsyncPriorityQueue 挂死事故）：
     //   队列节点重复回收 → 生产者卡死在 Search 持 epoch 不退出 → 消费者 BumpCurrentEpoch 槽满自旋。
     //   挂死期间 Release 构建零检测，只能靠 hang dump 逐线程考古。此后 LightEpoch 协议违反
     //   （未配对 Resume/Suspend、跨线程 Suspend、重入、嵌套 bump、Dispose 持保护）在 Debug 构建
@@ -416,7 +416,7 @@ public sealed unsafe class LightEpoch : IDisposable
     }
 
     /// <summary>
-    /// 协作 drain 便捷封装（2026-08-24 下沉 Core，语义 = StorageEngine 旧 IEngineEpoch.DrainThen）：
+    /// 协作 drain 便捷封装（下沉 Core，语义 = StorageEngine 旧 IEngineEpoch.DrainThen）：
     /// <see cref="Resume"/>（本线程计入 epoch 表）→ <see cref="BumpCurrentEpoch(Action)"/> → 条件 <see cref="Suspend"/>。
     /// <para>★ 在调用方（mutator）线程上协作 drain——无并发 reader 时 <paramref name="safeAction"/> 在
     ///   <c>BumpCurrentEpoch</c> 内部同步触发；有 reader 时延迟到其退出 epoch（<c>Suspend→SuspendDrain</c>）
