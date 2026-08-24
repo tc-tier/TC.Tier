@@ -60,6 +60,12 @@ jobs:
           name: nupkg
           path: artifacts
 
-      - name: Push to nuget.org (trusted publishing——SDK 9.0.2xx+ 自动 OIDC，不传 api-key)
-        shell: bash
-        run: dotnet nuget push artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate
+      # ★ Trusted publishing 标准流程：OIDC token → NuGet/login 交换短期 API key（1h）→ push
+      - name: NuGet login (OIDC to temp API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Push to nuget.org
+        run: dotnet nuget push artifacts/*.nupkg --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
