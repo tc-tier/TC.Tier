@@ -11,18 +11,19 @@ NuGet **Trusted Publishing**（OIDC 零密钥）：nuget.org 策略 `TC.Tier pub
 | `TC.Tier.Contracts` | 正式（1.0.0+） | 契约层（零依赖），稳定冻结 |
 | `TC.Tier.Core` | 正式（1.0.0+） | 内核基础设施，稳定冻结 |
 | `TC.Tier.CodeGen` | 正式（1.0.0+） | 源生成器（analyzer 包），稳定冻结 |
+| `TC.Tier.Core.IO.S3` | 正式（1.0.0+） | S3 兼容对象存储（SigV4 自写，network:///s3 介质），稳定冻结 |
 | `TC.Tier.Runtime` | beta（0.0.1-beta 起） | 运行时（引擎/结构层），渐进演进；依赖自动带 Contracts/Core 正式版 |
 
 ## 发布步骤
 
-### 1. 发正式三包（Contracts / Core / CodeGen）
+### 1. 发正式包（Contracts / Core / CodeGen / Core.IO.S3）
 
 ```bash
 git tag v1.0.0            # 版本号 = tag 去 v 前缀
 git push origin v1.0.0
 ```
 
-`publish.yml` 检测 `v*` tag → 构建 + 测试 → pack 三正式包（版本 1.0.0）→ 推送 nuget.org。
+`publish.yml` 检测 `v*` tag → 构建 + 测试 → pack 四正式包（版本 1.0.0）→ 推送 nuget.org。
 
 ### 2. 发 Runtime beta 包
 
