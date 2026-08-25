@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>TC.Tier | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="TC.Tier | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="favicon.ico">
+      <link rel="stylesheet" href="styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="styles/docfx.css">
+      <link rel="stylesheet" href="styles/main.css">
+      <meta property="docfx:navrel" content="toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="index.html">
+                <img id="logo" class="svg" src="logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="tctier">TC.Tier</h1>
+
+<blockquote>
+<p>An out-of-the-box, composable high-performance storage runtime for .NET.</p>
+</blockquote>
+<p>English · <a href="README.html">中文</a></p>
+<p>TC.Tier offers storage at two levels:</p>
+<ul>
+<li><strong>Ready to use</strong> — the <code>StorageEngine</code> provides in-place rewrite (KV semantics), sequential append (WAL semantics), Blob large-value separation, and mirror/snapshot out of the box.</li>
+<li><strong>Composable</strong> — build your own storage model on a unified 16-byte logical address space, combining index (hash / B+ tree / skip list), Ring, Log, and other building blocks.</li>
+</ul>
+<p>The project is evolving quickly: the runtime package is currently in beta and APIs may change. Bug reports, feature requests, and even criticism are all welcome via <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> or <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a>.</p>
+<hr>
+<h2 id="highlights">Highlights</h2>
+<ul>
+<li><strong>16-byte logical address space</strong> — segment-spanning, reusable without truncation; equality and hashing compare the address itself</li>
+<li><strong>Two write models</strong> — Mode A: pre-allocate + in-place rewrite (KV semantics); Mode B: sequential append (WAL semantics)</li>
+<li><strong>Pluggable indexes</strong> — hash / B+ tree / skip list under one abstraction</li>
+<li><strong>Concurrency-friendly</strong> — lock-free reads; non-overlapping regions can be written in parallel (~3.1× scaling on 4 threads in our measurements)</li>
+<li><strong>Native C#, zero reflection</strong> — source generators replace reflection; hot paths use native memory; NativeAOT-compatible</li>
+<li><strong>One abstraction, four file systems</strong> — local (<code>local://</code>, Direct IO), in-memory (<code>memory:</code>), virtual (<code>virtual://</code>, .raw-backed), network (<code>network:///s3</code>, S3 protocol contract); switch via the <code>TierFs</code> factory with no code changes</li>
+<li><strong>Background compaction</strong> — whole-segment moves run in the background without blocking reads/writes, and resume automatically on failure</li>
+</ul>
+<hr>
+<h2 id="install">Install</h2>
+<pre><code class="lang-bash"># Runtime package (currently beta; pulls in Core / Contracts)
+dotnet add package TC.Tier.Runtime --prerelease
+</code></pre>
+<p>Stable packages (v1.0.x): <code>TC.Tier.Contracts</code>, <code>TC.Tier.Core</code>, <code>TC.Tier.CodeGen</code>, <code>TC.Tier.Core.IO.S3</code> (network file system on S3).</p>
+<h2 id="quick-start">Quick start</h2>
+<pre><code class="lang-csharp">using TC.Tier.Contracts.Storage;
+using TC.Tier.Core.IO;
+using TC.Tier.Runtime.Storage;
+
+// ① Pick a file system — swap the URI and the code stays the same
+using var vol = TierFs.New(&quot;memory:&quot;);
+
+// ② Three-step assembly: Options → Builder → StartAsync (includes recovery; async-first)
+await using var engine = await new StorageEngineOptions(&quot;demo&quot;).Builder(vol).StartAsync();
+
+// ③ Write &amp; read back: AppendAsync is sequential (WAL semantics), WriteAsync rewrites in place (KV semantics)
+ReadOnlyMemory&lt;byte&gt; payload = &quot;hello, tier!&quot;u8;
+var addr = await engine.AppendAsync(payload, CancellationToken.None);   // returns the starting logical address
+await engine.WriteAsync(addr, payload, CancellationToken.None);         // rewrite the same address in place
+var buf = new byte[payload.Length];
+var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // read back
+</code></pre>
+<p>More examples of composing index / Ring / Log into custom storage models: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">usage docs</a>.</p>
+<hr>
+<h2 id="performance">Performance</h2>
+<p>Measured locally on Windows with .NET 8 — <strong>for reference only</strong>; real numbers depend on your hardware and workload. Full methodology and details: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html">performance docs</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Scenario</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Steady in-place rewrite, 64B (single thread)</td>
+<td>532 ns/op</td>
+</tr>
+<tr>
+<td>Rewrite 64B, 4 threads</td>
+<td>~176 ns/op (~3.1× scaling)</td>
+</tr>
+<tr>
+<td>Large rewrite 64KB</td>
+<td>11.5 GB/s</td>
+</tr>
+<tr>
+<td>Point lookup (hash index)</td>
+<td>158 ns/op; ~94.7 ns/op batched (zero allocation)</td>
+</tr>
+<tr>
+<td>Log recovery</td>
+<td>~9 ms per 500K records</td>
+</tr>
+<tr>
+<td>Ring batched concurrent writes (8 writers)</td>
+<td>6.07M op/s (3.0× vs single writer)</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="architecture">Architecture</h2>
+<pre><code>Official products (planned): TierKV / TierWAL / TierBlob / TierQueue / TierTimeSeries
+────────────────────────────────────────────────
+Storage Runtime (composable kernel)
+  Index (Hash/BTree/SkipList) · Ring · Log · Blob (metadata/mirror/snapshot)
+────────────────────────────────────────────────
+Storage Engine (Options → Builder → Start/StartAsync; 16-byte logical address space)
+────────────────────────────────────────────────
+File system layer (local:// / memory: / virtual:// / network:///s3)
+</code></pre>
+<p>Acyclic dependency chain: <code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code>. The source generator (<code>TC.Tier.CodeGen</code>) is cross-cutting — BinaryLayout and registration bridges are generated at compile time, with zero runtime reflection.</p>
+<ul>
+<li>Engine guide: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">storage-engine.md</a></li>
+<li>Structures overview: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html">structures.md</a></li>
+<li>Lifecycle model: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html">lifecycle.md</a></li>
+</ul>
+<hr>
+<h2 id="documentation">Documentation</h2>
+<p>Usage docs and performance reports live at <a href="https://docs.mytzz.top/">docs.mytzz.top</a> — API reference plus full-text search.</p>
+<h2 id="feedback">Feedback</h2>
+<ul>
+<li><strong>Issues</strong> — bug reports and feature requests: <a href="https://github.com/tc-tier/TC.Tier/issues">tc-tier/TC.Tier/issues</a></li>
+<li><strong>Discussions</strong> — usage questions, architecture discussions, anything: <a href="https://github.com/tc-tier/TC.Tier/discussions">tc-tier/TC.Tier/discussions</a></li>
+</ul>
+<p>The project is still young — questions, suggestions, and criticism are all genuinely welcome.</p>
+<h2 id="contributing">Contributing</h2>
+<p>See <a href="CONTRIBUTING.html">CONTRIBUTING.md</a> — build &amp; test conventions, code style (enforced at compile time: no reflection TCSG030 / no sync-over-async TCSG031).</p>
+<h2 id="license">License</h2>
+<p>MIT — see <a href="https://github.com/tc-tier/TC.Tier/blob/main/LICENSE">LICENSE</a>.</p>
+<p>The core implementation is self-contained; algorithm attribution and third-party notices: <a href="https://github.com/tc-tier/TC.Tier/blob/main/THIRD-PARTY-NOTICES">THIRD-PARTY-NOTICES</a>.</p>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/README.en.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="styles/docfx.js"></script>
+    <script type="text/javascript" src="styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Enum FileMetaSupport | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Enum FileMetaSupport | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="文件系统对扩展属性（xattr/ADS）的支持程度——平台中性的底层探测结果。 ★ 归属 NativeInterop 层（internal）：描述底层文件系统是否支持把段元信息附着到段文件本身   （Linux xattr / Windows NTFS ADS / macOS xattr），由  探测得出。   **不公开**——上层 Device 层消费时据此选择 meta 写入策略（xattr 主路径 vs 异步边车回退）。 ★ 二态语义（简化版，对比  的四态）： ：文件系统支持 xattr/ADS，写入 + 读回校验成功——主路径走 per-segment   扩展属性（与段文件同 inode，天然一致，段级原子）。：文件系统不支持（FAT32、某些网络盘、容器 overlayfs 限制），   或探测时异常——回退异步边车后台写（device 级集中文件，崩溃容忍）。：尚未探测（理论不应出现，Initialize 必探测一次）。 ★ 探测策略与  一致：try/catch 包裹，失败保守降级（安全侧   倾斜，不支持时走异步边车更稳，避免主路径写 xattr 反复失败拖慢）。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.NativeInterop.FileMetaSupport">
+
+
+
+
+  <h1 id="TC_Tier_Core_NativeInterop_FileMetaSupport" data-uid="TC.Tier.Core.NativeInterop.FileMetaSupport" class="text-break">Enum FileMetaSupport</h1>
+  <div class="markdown level0 summary"><p>文件系统对扩展属性（xattr/ADS）的支持程度——平台中性的底层探测结果。</p>
+<p>★ 归属 NativeInterop 层（internal）：描述底层文件系统是否支持把段元信息附着到段文件本身
+  （Linux xattr / Windows NTFS ADS / macOS xattr），由 <span class="xref">TC.Tier.Core.NativeInterop.FileNative</span> 探测得出。
+  **不公开**——上层 Device 层消费时据此选择 meta 写入策略（xattr 主路径 vs 异步边车回退）。</p>
+<p>★ 二态语义（简化版，对比 <a class="xref" href="TC.Tier.Core.NativeInterop.UnbufferedIoSupport.html">UnbufferedIoSupport</a> 的四态）：</p>
+<ul><li><a class="xref" href="TC.Tier.Core.NativeInterop.FileMetaSupport.html#TC_Tier_Core_NativeInterop_FileMetaSupport_Supported">Supported</a>：文件系统支持 xattr/ADS，写入 + 读回校验成功——主路径走 per-segment
+  扩展属性（与段文件同 inode，天然一致，段级原子）。</li><li><a class="xref" href="TC.Tier.Core.NativeInterop.FileMetaSupport.html#TC_Tier_Core_NativeInterop_FileMetaSupport_Unsupported">Unsupported</a>：文件系统不支持（FAT32、某些网络盘、容器 overlayfs 限制），
+  或探测时异常——回退异步边车后台写（device 级集中文件，崩溃容忍）。</li><li><a class="xref" href="TC.Tier.Core.NativeInterop.FileMetaSupport.html#TC_Tier_Core_NativeInterop_FileMetaSupport_NotProbed">NotProbed</a>：尚未探测（理论不应出现，Initialize 必探测一次）。</li></ul>
+<p>★ 探测策略与 <a class="xref" href="TC.Tier.Core.NativeInterop.UnbufferedIoSupport.html">UnbufferedIoSupport</a> 一致：try/catch 包裹，失败保守降级（安全侧
+  倾斜，不支持时走异步边车更稳，避免主路径写 xattr 反复失败拖慢）。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.NativeInterop.html">NativeInterop</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_NativeInterop_FileMetaSupport_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public enum FileMetaSupport</code></pre>
+  </div>
+  <h3 id="fields">Fields
+</h3>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    <thead>
+    </thead></thead><tbody>
+      <tr>
+        <td id="TC_Tier_Core_NativeInterop_FileMetaSupport_NotProbed">NotProbed</td>
+        <td><p>尚未探测（理论不应出现，Initialize 必探测一次并缓存结果）。</p>
+</td>
+      </tr>
+      <tr>
+        <td id="TC_Tier_Core_NativeInterop_FileMetaSupport_Supported">Supported</td>
+        <td><p>文件系统支持 xattr/ADS——主路径走 per-segment 扩展属性（段前写 + 段满写真实偏移）。</p>
+</td>
+      </tr>
+      <tr>
+        <td id="TC_Tier_Core_NativeInterop_FileMetaSupport_Unsupported">Unsupported</td>
+        <td><p>文件系统不支持——回退异步边车后台写（device 级集中文件，自适应频率）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Contracts.Meta | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Contracts.Meta | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Contracts.Meta">
+
+  <h1 id="TC_Tier_Contracts_Meta" data-uid="TC.Tier.Contracts.Meta" class="text-break">Namespace TC.Tier.Contracts.Meta</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.IMetaLayout-2.html">IMetaLayout&lt;THeader, TPayload&gt;</a></h4>
+      <section><p>Meta 布局契约</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.IMetaPolicy-2.html">IMetaPolicy&lt;THeader, TPayload&gt;</a></h4>
+      <section><p>Meta 策略统一接口——结构化元数据的持久化契约（独立能力，不限使用方）。</p>
+<p>★ 统一布局：<b>[Header 纯规范][Payload 结构化水位 + opaque 扩展][Footer Crc32C 4B]</b>。
+Header 只放规范字段（Magic/Version/Flags/PayloadLength/PaddingLength），水位一律走 Payload；
+opaque 是写在结构化水位之后的原始扩展字节，长度由 Header.PayloadLength 倒推。</p>
+<p>★ 契约（所有实现必须一致）：</p>
+<ul><li><b>未 Load 的读返回空</b>——ReadHeader/ReadMetaPayload 返回 null、
+ReadPayload 返回 Empty（Commit 成功后视为已 Load，同实例可读）；</li><li><b>重新 Load 全量重置缓存</b>——上一轮的 header/payload/opaque 不残留；</li><li><b>Load 返回 false 的三种情况等价</b>：空/无数据/校验失败（Magic、版本、CRC、长度界），
+不区分原因；</li><li><b>Dispose 幂等</b>，重复调用不抛。</li></ul>
+</section>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></h4>
+      <section><p>Meta 传输契约——策略与存储介质之间的唯一通道：写一个完整 meta block / 读回最后一条。</p>
+<p>★ 实现决定介质与放置策略（单槽覆盖 / 追加到自身存储流后倒扫 / 远程服务……），
+  策略不关心；块的格式与 CRC 完全由策略负责（[Header][Payload][Footer Crc32C]），
+  传输只搬字节——实现不需要理解块内容，也不承担完整性校验。</p>
+<p>契约：</p>
+<ul><li><b>读写统一 Span/Memory 视图，零中间拷贝</b>——<code>WriteBlock</code> 收
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan&lt;T&gt;</a>（byte），<code>ReadLastBlock</code> 回 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan&lt;T&gt;</a>；</li><li><b>空 = 无数据</b>——<code>ReadLastBlock</code> 返回 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1.isempty">IsEmpty</a>
+  （异步版返回空 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory&lt;T&gt;</a>）即"从未写入"，不用 null；</li><li><b>视图生命周期</b>——返回的 Span/Memory 有效至本传输的下一次调用
+  （实现以字段持有底层缓冲，不转移所有权）；调用方需要留存必须立即拷贝；</li><li><code>WriteBlock</code> 写入的块即成为本传输的"最后一条"（覆盖或追加由实现决定，
+  语义上 last-write-wins）；同步/异步成员语义对等。</li></ul>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyKind.html">MetaPolicyKind</a></h4>
+      <section><p>Meta 策略模式</p>
+</section>
+    <h3 id="delegates">
+Delegates
+</h3>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory&lt;TMetaHeader, TMetaPayload&gt;</a></h4>
+      <section><p>Meta 策略工厂委托（按模式构造）</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-3.html">MetaPolicyFactory&lt;TSetting, TMetaHeader, TMetaPayload&gt;</a></h4>
+      <section><p>Meta 策略工厂委托（按设置构造）</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Contracts.Meta.TransportMetaFactory-3.html">TransportMetaFactory&lt;TMetaTransport, TMetaHeader, TMetaPayload&gt;</a></h4>
+      <section><p>Meta 策略工厂委托（Transport 模式用——注入传输实例）</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

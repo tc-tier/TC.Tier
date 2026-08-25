@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>异步同步原语与队列（AsyncManualResetEvent / AsyncCountDown / AsyncQueue） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="异步同步原语与队列（AsyncManualResetEvent / AsyncCountDown / AsyncQueue） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="异步同步原语与队列asyncmanualresetevent--asynccountdown--asyncqueue">异步同步原语与队列（AsyncManualResetEvent / AsyncCountDown / AsyncQueue）</h1>
+
+<blockquote>
+<p>Task-based 异步同步原语 + 异步队列的用法。它们共享 <code>PooledValueTaskSource</code> 池化底座（零/低分配等待）。
+完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>；原生内存与池见 <a href="memory.html"><code>memory.md</code></a>；
+实测数字见 <a href="perf/core-primitives-perf.html"><code>perf/core-primitives-perf.md</code></a>。
+<strong>优先队列族</strong>（<code>BucketPriorityQueue</code>/<code>SkipListPriorityQueue</code>/<code>AsyncPriorityQueue</code>）<strong>不在本文</strong>——
+独有文档：<a href="priority-queues.html"><code>priority-queues.md</code></a>（使用）+ <a href="perf/priority-queues-performance.html"><code>perf/priority-queues-performance.md</code></a>（实测）。</p>
+</blockquote>
+<hr>
+<h2 id="0-选型决策">0. 选型决策</h2>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>用</th>
+<th>线程安全</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>异步等事件</strong>（多 waiter 广播）</td>
+<td><code>AsyncManualResetEvent</code></td>
+<td>是</td>
+<td><code>WaitAsync</code> 等、<code>Set</code> 唤醒所有、<code>Reset</code> 重置</td>
+</tr>
+<tr>
+<td><strong>等 N 个并行子任务全完成</strong></td>
+<td><code>AsyncCountDown</code></td>
+<td>是</td>
+<td><code>Add</code>/<code>Remove</code> 计数到 0 唤醒</td>
+</tr>
+<tr>
+<td><strong>异步生产-消费队列</strong>（持续运行）</td>
+<td><code>AsyncQueue&lt;T&gt;</code></td>
+<td>是（多生产多消费）</td>
+<td><code>Enqueue</code>/<code>DequeueAsync</code>（空时异步等）</td>
+</tr>
+<tr>
+<td>带优先级的队列</td>
+<td>优先队列族</td>
+<td>—</td>
+<td>独有文档：<a href="priority-queues.html"><code>priority-queues.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-asyncmanualresetevent--异步等事件多-waiter-广播">1. <code>AsyncManualResetEvent</code> —— 异步等事件（多 waiter 广播）</h2>
+<p>异步版 <code>ManualResetEventSlim</code>——暴露 <code>ValueTask</code> 等待 + 多 waiter 广播。已 set 时快速路径零分配。</p>
+<h3 id="用法">用法</h3>
+<pre><code class="lang-csharp">var ev = new AsyncManualResetEvent(initialState: false);  // 初始未触发
+
+// 等待方（可多个）
+async Task Waiter()
+{
+    await ev.WaitAsync(ct);   // 未 set 时异步等；已 set 时立即返回（零分配）
+    /* 事件已触发 */
+}
+
+// 触发方
+ev.Set();        // 唤醒所有等待者
+ev.Reset();      // 重置为未触发（可复用）
+
+ev.IsSet;        // 查询状态
+ev.Wait(ct);     // 同步阻塞版（慎用，通常用 WaitAsync）
+</code></pre>
+<h3 id="关键-api">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AsyncManualResetEvent()</code> / <code>(bool initialState)</code></td>
+<td>构造（唤醒默认线程池异步调度——Set 可持锁，安全）</td>
+</tr>
+<tr>
+<td><code>(bool initialState, bool runContinuationsAsynchronously)</code></td>
+<td>同上 + 唤醒调度模式：<code>false</code> = 内联模式（Set 调用者线程内联续体，真实唤醒 ~93ns vs 默认 ~843ns；⚠️ <strong>仅限 Set 调用点不持锁</strong>——持 SpinLock 等不可重入锁会自死锁）</td>
+</tr>
+<tr>
+<td><code>WaitAsync(ct)</code> → <code>ValueTask</code></td>
+<td>异步等（已 set 零分配）</td>
+</tr>
+<tr>
+<td><code>Wait(ct)</code></td>
+<td>同步阻塞版</td>
+</tr>
+<tr>
+<td><code>Set()</code></td>
+<td>触发，唤醒所有 waiter</td>
+</tr>
+<tr>
+<td><code>Reset()</code></td>
+<td>重置为未触发</td>
+</tr>
+<tr>
+<td><code>IsSet</code></td>
+<td>状态查询</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ 为每个 waiter 独立挂 <code>ValueTaskSource</code>（不能共享单消费者 source）；1:1 高频唤醒走单槽快路径（免分配免锁），多 waiter 溢出回退链表。
+实测数字与选型见 <a href="perf/core-primitives-perf.html"><code>perf/core-primitives-perf.md</code></a> §3。</p>
+</blockquote>
+<hr>
+<h2 id="2-asynccountdown--等-n-个完成">2. <code>AsyncCountDown</code> —— 等 N 个完成</h2>
+<p><code>Add()</code>/<code>Remove()</code> 计数，到 0 唤醒等待者。纯 <code>Interlocked</code> 无锁。</p>
+<h3 id="用法-1">用法</h3>
+<pre><code class="lang-csharp">var cd = new AsyncCountDown();
+for (int i = 0; i &lt; N; i++) cd.Add();   // 计数 +N
+
+// 各子任务完成时 Remove
+Parallel.For(0, N, i =&gt; { DoWork(i); cd.Remove(); });
+
+await cd.WaitUntilEmptyAsync(ct);       // 计数归 0 时唤醒
+</code></pre>
+<h3 id="关键-api-1">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AsyncCountDown()</code></td>
+<td>构造（唤醒默认线程池异步调度）</td>
+</tr>
+<tr>
+<td><code>AsyncCountDown(bool runContinuationsAsynchronously)</code></td>
+<td>同上 + 唤醒调度模式：<code>false</code> = 内联（<code>Remove</code> 调用者线程内联续体，稳态 ~135ns vs 默认 ~846ns；⚠️ 仅限 <code>Remove</code> 调用点不持锁）</td>
+</tr>
+<tr>
+<td><code>Add()</code> / <code>Remove()</code></td>
+<td>增/减计数（纯 <code>Interlocked</code>，纳秒级）</td>
+</tr>
+<tr>
+<td><code>WaitUntilEmptyAsync(ct)</code> → <code>ValueTask</code></td>
+<td>等计数归 0</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-asyncqueuet--异步生产-消费队列">3. <code>AsyncQueue&lt;T&gt;</code> —— 异步生产-消费队列</h2>
+<p><code>ConcurrentQueue&lt;T&gt;</code> + 池化等待节点。队列非空时出队零分配。</p>
+<h3 id="用法-2">用法</h3>
+<pre><code class="lang-csharp">var q = new AsyncQueue&lt;int&gt;();
+
+// 生产者
+q.Enqueue(42);
+q.Count;            // 当前元素数
+
+// 消费者（空时异步等）
+int item = await q.DequeueAsync(ct);
+q.TryDequeue(out var x);   // 非阻塞尝试出队
+</code></pre>
+<h3 id="关键-api-2">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Enqueue(T)</code></td>
+<td>入队</td>
+</tr>
+<tr>
+<td><code>DequeueAsync(ct)</code> → <code>ValueTask&lt;T&gt;</code></td>
+<td>出队（空时异步等）</td>
+</tr>
+<tr>
+<td><code>TryDequeue(out T)</code> → <code>bool</code></td>
+<td>非阻塞尝试</td>
+</tr>
+<tr>
+<td><code>Count</code></td>
+<td>元素数</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <strong>不是通用 Channel</strong>——不支持 <code>Complete</code>/背压，适合「持续运行永不关闭」的消费循环。</p>
+</blockquote>
+<hr>
+<h2 id="4-优先队列族见独有文档">4. 优先队列族——见独有文档</h2>
+<p><code>BucketPriorityQueue</code> / <code>SkipListPriorityQueue</code> / <code>AsyncPriorityQueue</code>（含 V2/V3 实验线）的完整用法、
+选型与 Linux 验证结论见 <strong><a href="priority-queues.html"><code>priority-queues.md</code></a></strong>；实测数字见
+<a href="perf/priority-queues-performance.html"><code>perf/priority-queues-performance.md</code></a>。</p>
+<hr>
+<h2 id="5-pooledvaluetasksource--池化-awaitable-底座">5. <code>PooledValueTaskSource</code> —— 池化 awaitable 底座</h2>
+<p><code>IValueTaskSource</code> 的池化实现——thread-local 栈 + global 回退 + 批量搬运，常规 Rent/Return <strong>零争用零堆分配</strong>。是多 waiter 异步原语（上面的 Event/CountDown/Queue）的共同底座。</p>
+<p><strong>通常不直接用</strong>——除非你在写自定义异步同步原语。调用方直接用上面的 Event/CountDown/Queue 即可。如需自定义，参考 <code>AsyncManualResetEvent</code> 的实现（为每个 waiter 独立挂 source）。</p>
+<hr>
+<h2 id="6-决策速查">6. 决策速查</h2>
+<pre><code>我要异步等一个事件（多 waiter）？
+  → AsyncManualResetEvent。WaitAsync 等，Set 唤醒，Reset 复用。
+
+我要等 N 个并行子任务全完成？
+  → AsyncCountDown。Add N 次，各完成 Remove，WaitUntilEmptyAsync。
+
+我要异步生产-消费队列（持续运行）？
+  → AsyncQueue&lt;T&gt;。Enqueue/DequeueAsync。不支持 Complete/背压。
+
+我要带优先级的队列？
+  → 优先队列族——独有文档 priority-queues.md（§4）。
+</code></pre>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/async-primitives.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

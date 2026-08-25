@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class RecoveryBase&lt;THints&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class RecoveryBase&lt;THints&gt; | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="★ 通用恢复模板基类（Core 层）——模板方法模式：钉死  编排， 子类只 override （真正的恢复算法）。 与  对称：LifecycleBase 钉死 Initialize 的   前→中→后三阶段，RecoveryBase 钉死 RecoverAsync 的五步编排   （TryEnter → WaitForDependencies → Start → Core → Complete → MarkReady）。两者合起来构成   &quot;生命周期 + 恢复&quot; 的完整通用骨架——继承 LifecycleBase + 注入 RecoveryBase 派生实例即可。 ★ 消灭各  实现复制粘贴的状态机样板：   CAS 三态闸门 + _state + MarkReady/Reset/RaiseProgress/   TryEnterRecovering + Start/Complete 钩子 + RecoverAsync 编排 + 失败置 Failed——全部收进基类。 ★ / 由本模板在 RecoverAsync 内   保证调用（串行接在 Core 前后），不再是各实现手动调的&quot;伪钩子&quot;。当前为 public virtual 以满足    接口契约；待接口瘦身（移除这两个方法）后收为 protected virtual。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.RecoveryBase`1">
+
+
+
+  <h1 id="TC_Tier_Core_Shared_RecoveryBase_1" data-uid="TC.Tier.Core.Shared.RecoveryBase`1" class="text-break">Class RecoveryBase&lt;THints&gt;</h1>
+  <div class="markdown level0 summary"><p>★ 通用恢复模板基类（Core 层）——模板方法模式：钉死 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync__0_System_Threading_CancellationToken_">RecoverAsync(THints, CancellationToken)</a> 编排，
+子类只 override <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync__0_System_Threading_CancellationToken_">OnRecoveryCoreAsync(THints, CancellationToken)</a>（真正的恢复算法）。</p>
+<p>与 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a> 对称：<code>LifecycleBase</code> 钉死 Initialize 的
+  前→中→后三阶段，<code>RecoveryBase</code> 钉死 RecoverAsync 的五步编排
+  （TryEnter → WaitForDependencies → Start → Core → Complete → MarkReady）。两者合起来构成
+  "生命周期 + 恢复" 的完整通用骨架——继承 <code>LifecycleBase</code> + 注入 <code>RecoveryBase</code> 派生实例即可。</p>
+<p>★ 消灭各 <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery&lt;TRecoveryHints&gt;</a> 实现复制粘贴的状态机样板：
+  CAS 三态闸门 + <code>_state</code> + <code>MarkReady</code>/<code>Reset</code>/<code>RaiseProgress</code>/
+  <code>TryEnterRecovering</code> + Start/Complete 钩子 + RecoverAsync 编排 + 失败置 Failed——全部收进基类。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart">OnRecoveryStart()</a>/<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete">OnRecoveryComplete()</a> 由本模板在 RecoverAsync 内
+  <b>保证调用</b>（串行接在 Core 前后），不再是各实现手动调的"伪钩子"。当前为 <code>public virtual</code> 以满足
+  <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html">IRecovery</a> 接口契约；待接口瘦身（移除这两个方法）后收为 <code>protected virtual</code>。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">RecoveryBase&lt;THints&gt;</span></div>
+      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.LogRecovery-1.html">LogBase.LogRecovery&lt;TLogBase&gt;</a></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;THints&gt;</div>
+    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html">IRecovery</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Shared_RecoveryBase_1_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class RecoveryBase&lt;THints&gt; : IRecovery&lt;THints&gt;, IRecovery where THints : struct</code></pre>
+  </div>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">THints</span></td>
+        <td><p>恢复 hints 类型（值类型 struct，由各持有者自定义，如
+<code>EngineRecoveryHints</code>/<code>LogRecoveryHints</code>/<code>RingRecoveryHints</code> 等）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1__ctor_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.#ctor*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1__ctor" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.#ctor">RecoveryBase()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected RecoveryBase()</code></pre>
+  </div>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_IsReady_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.IsReady*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_IsReady" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.IsReady">IsReady</h4>
+  <div class="markdown level1 summary"><p>是否已就绪（恢复完成或无需恢复）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsReady { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_RecoveryState_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RecoveryState*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_RecoveryState" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RecoveryState">RecoveryState</h4>
+  <div class="markdown level1 summary"><p>恢复状态快照（原子可读，并发安全）。只读——由实现内部推进。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RecoveryState RecoveryState { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryState.html">RecoveryState</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_CancelRecovery_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.CancelRecovery*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_CancelRecovery" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.CancelRecovery">CancelRecovery()</h4>
+  <div class="markdown level1 summary"><p>★ 取消恢复（显式通道）——LifecycleBase.CancelRecovery 调用，通知 IRecovery 实现做取消清理。</p>
+<p>与 CancellationToken 配合：LifecycleBase 同时发 CTS.Cancel()（信号兜底）+ 本方法（显式通知）。
+  实现可在此停止扫盘、释放扫描持有的资源、记录取消点等——这些只靠 ct 轮询做不到。</p>
+<p>★ 默认实现为空操作（DIM，仅依赖 ct 轮询）；需要显式取消清理的实现 override 本方法。
+  对齐 lease <code>Rollback()</code>/<code>ForceRelease()</code> 显式动作范式。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual void CancelRecovery()</code></pre>
+  </div>
+  <h5 id="TC_Tier_Core_Shared_RecoveryBase_1_CancelRecovery_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>DIM 默认空——靠 <code>CancellationToken</code> 轮询即可取消；需要显式取消清理
+（释放扫描持有的资源、记录取消点）的子类 override 本方法。对齐 <code>IRecovery.CancelRecovery</code> 语义。</p>
+</div>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_MarkReady_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.MarkReady*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_MarkReady" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.MarkReady">MarkReady()</h4>
+  <div class="markdown level1 summary"><p>★ 标记就绪——模板在 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete">OnRecoveryComplete()</a> 后自动调。</p>
+<pre><code>        &lt;p&gt;外部一般不直接调；需要&quot;跳过 Core 直接就绪&quot;的场景，子类在
+          &lt;xref href=&quot;TC.Tier.Core.Shared.RecoveryBase%601.OnRecoveryCoreAsync(%600%2cSystem.Threading.CancellationToken)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 内 &lt;code&gt;return ValueTask.CompletedTask&lt;/code&gt; 即可，模板仍会统一 MarkReady。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void MarkReady()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.OnRecoveryComplete*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.OnRecoveryComplete">OnRecoveryComplete()</h4>
+  <div class="markdown level1 summary"><p>★ 恢复完成钩子——默认上报 <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Completed">Completed</a>/100%。由模板保证在 Core 成功后、
+<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_MarkReady">MarkReady()</a> 前调用。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual void OnRecoveryComplete()</code></pre>
+  </div>
+  <h5 id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>同 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart">OnRecoveryStart()</a>：当前 <code>public virtual</code> 满足接口，待瘦身收为
+<code>protected virtual</code>。外部不应直接调。</p>
+</div>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.OnRecoveryCoreAsync*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync__0_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.OnRecoveryCoreAsync(`0,System.Threading.CancellationToken)">OnRecoveryCoreAsync(THints, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 恢复核心——子类<b>唯一必须 override</b> 的钩子：真正的恢复算法（扫盘 / 读 meta / 回放 / 重建索引 / 装配策略）。</p>
+<p>在 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart">OnRecoveryStart()</a> 之后、<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete">OnRecoveryComplete()</a> 之前执行。进度上报用
+  <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RaiseProgress_System_Int32_System_String_">RaiseProgress(int, string?)</a>（推进 phase/percent/detail）；取消检查用 <code class="paramref">ct</code>（在 IO checkpoint 处
+  <code>ct.ThrowIfCancellationRequested()</code>）。</p>
+<p>★ 四级回退（hints → meta → 引擎水位 → 扫盘）等恢复策略差异，全部封装在此 override 内——
+  模板不关心具体算法，只保证 Start/Core/Complete 的串行编排。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract ValueTask OnRecoveryCoreAsync(THints hints, CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">THints</span></td>
+        <td><span class="parametername">hints</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.OnRecoveryStart*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.OnRecoveryStart">OnRecoveryStart()</h4>
+  <div class="markdown level1 summary"><p>★ 恢复开始钩子——默认上报 <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Recovering">Recovering</a>/0%。由模板保证在 Core 前调用。</p>
+<p>子类可 override 改 detail 文案（如 "engine recovery start"/"index recovery start"），
+  一般不需要改起始 phase（统一 Recovering 便于上层进度条聚合）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual void OnRecoveryStart()</code></pre>
+  </div>
+  <h5 id="TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart_remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>当前 <code>public virtual</code> 以满足 <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html">IRecovery</a> 接口契约——待接口瘦身
+（移除 OnRecoveryStart/OnRecoveryComplete）后收为 <code>protected virtual</code>。外部代码<b>不应</b>直接调本方法，
+恢复编排只应通过 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync__0_System_Threading_CancellationToken_">RecoverAsync(THints, CancellationToken)</a> 驱动。</p>
+</div>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_RaiseProgress_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RaiseProgress*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_RaiseProgress_System_Int32_System_String_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RaiseProgress(System.Int32,System.String)">RaiseProgress(int, string?)</h4>
+  <div class="markdown level1 summary"><p>★ 上报进度——原子更新 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoveryState">RecoveryState</a>（phase/percent/detail）并触发
+<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoveryProgressChanged">RecoveryProgressChanged</a> 事件。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected void RaiseProgress(int percent, string? detail = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">percent</span></td>
+        <td><p>进度百分比（0-100）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">detail</span></td>
+        <td><p>进度详情描述。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RecoverAsync*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync__0_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RecoverAsync(`0,System.Threading.CancellationToken)">RecoverAsync(THints, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 固定编排：CAS 闸门 → <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_WaitForDependenciesAsync_System_Threading_CancellationToken_">WaitForDependenciesAsync(CancellationToken)</a>（层间 join）→
+<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart">OnRecoveryStart()</a> → <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync__0_System_Threading_CancellationToken_">OnRecoveryCoreAsync(THints, CancellationToken)</a>（★ 唯一必 override）→
+<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete">OnRecoveryComplete()</a> → <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_MarkReady">MarkReady()</a>；异常置 <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Failed">Failed</a>。</p>
+<p>★ 子类<b>不</b> override 本方法——恢复算法差异通过 override <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync__0_System_Threading_CancellationToken_">OnRecoveryCoreAsync(THints, CancellationToken)</a> 表达，
+  层间依赖（等子引擎就绪）通过 override <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_WaitForDependenciesAsync_System_Threading_CancellationToken_">WaitForDependenciesAsync(CancellationToken)</a> 表达。</p>
+<p>★ 并发语义：已 Ready → 幂等 no-op 返回；Recovering 中 → 抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>
+  （恢复不可重入）；Unrecovered → 进入恢复。</p>
+<p>★ 失败语义（含取消）：异常 → 置 <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Failed">Failed</a>（存 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoveryState">RecoveryState</a> 的
+  <code>Error</code>，可观测）+ 闸门回 Unrecovered（允许重试）+ 重抛。取消当前并入 Failed——对齐现有各 IRecovery 实现；
+  子类若需"取消≠失败"的细分，可在 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync__0_System_Threading_CancellationToken_">OnRecoveryCoreAsync(THints, CancellationToken)</a> 内自行 catch
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a> 处理。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask RecoverAsync(THints hints, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">THints</span></td>
+        <td><span class="parametername">hints</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_Reset_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.Reset*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_Reset" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.Reset">Reset()</h4>
+  <div class="markdown level1 summary"><p>★ 重置恢复状态为未恢复——允许再次 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync__0_System_Threading_CancellationToken_">RecoverAsync(THints, CancellationToken)</a> 覆盖之前的结果。</p>
+<pre><code>        &lt;p&gt;由 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;.Initialize 的重试路径调用（旧恢复取消/失败后重新 Initialize）。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Reset()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Shared_RecoveryBase_1_WaitForDependenciesAsync_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.WaitForDependenciesAsync*"></a>
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_WaitForDependenciesAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.WaitForDependenciesAsync(System.Threading.CancellationToken)">WaitForDependenciesAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 层间依赖 join——<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync__0_System_Threading_CancellationToken_">RecoverAsync(THints, CancellationToken)</a> 在 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart">OnRecoveryStart()</a> <b>之前</b>调。</p>
+<p>默认 <code>CompletedTask</code>（无依赖，如 Blob/Block）。需要"子引擎先就绪"的持有者 override：在此
+  <code>await owner._engine.WaitForReadyAsync(ct)</code>（Log/Index/Ring/Metadata 模式）。</p>
+<p>★ 这是 fire-and-forget Initialize 模型下层间数据依赖的合法表达点：父层恢复核心读子层恢复产物
+  （如引擎 SectorSize / 段表），故须在 Core 前 join 子层。见 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a> 的
+  "Complete/Ready/恢复完成 三者同义"不变量——join 的正是这个语义。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual ValueTask WaitForDependenciesAsync(CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="events">Events
+</h3>
+
+
+  <h4 id="TC_Tier_Core_Shared_RecoveryBase_1_RecoveryProgressChanged" data-uid="TC.Tier.Core.Shared.RecoveryBase`1.RecoveryProgressChanged">RecoveryProgressChanged</h4>
+  <div class="markdown level1 summary"><p>恢复进度变化事件（进度条订阅）。可空。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;RecoveryProgress&gt;? RecoveryProgressChanged</code></pre>
+  </div>
+  <h5 class="eventType">Event Type</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryProgress.html">RecoveryProgress</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery&lt;TRecoveryHints&gt;</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html">IRecovery</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

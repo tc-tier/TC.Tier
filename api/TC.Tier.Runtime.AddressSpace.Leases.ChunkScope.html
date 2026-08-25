@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Struct ChunkScope | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Struct ChunkScope | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="chunk 视图 + 分段提交控制——完整迭代器模式（foreach / for / while 三态，）。 ★ 普通struct（非 ref）——foreach/for 循环体内可 await（CopyChunksAsync 兼容）。 ★ 几何属性沿用 RangeChunk 命名（SegId/SegOff/SegEnd/Length）；   / 显式分段终态（doneMask 保 exactly-once，重复调用安全）。 ★ 消费方协议（三种等价写法）： foreach (var chunk in lease) { IO(chunk); chunk.Commit(); }——pattern-based GetEnumerator，零分配for (var i = 0; i &amp;lt; lease.ChunkCount; i++) { var chunk = lease[i]; IO(chunk); chunk.Commit(); }——索引器含物理门while (iter.MoveNext()) { IO(iter.Current); iter.CommitCurrent(); }——原 while 模式保留">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope">
+
+
+
+  <h1 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope" class="text-break">Struct ChunkScope</h1>
+  <div class="markdown level0 summary"><p>chunk 视图 + 分段提交控制——完整迭代器模式（foreach / for / while 三态，）。</p>
+<p>★ 普通struct（非 ref）——foreach/for 循环体内可 await（CopyChunksAsync 兼容）。</p>
+<p>★ 几何属性沿用 RangeChunk 命名（SegId/SegOff/SegEnd/Length）；
+  <a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.html#TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Commit">Commit()</a>/<a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.html#TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Rollback">Rollback()</a> 显式分段终态（doneMask 保 exactly-once，重复调用安全）。</p>
+<p>★ 消费方协议（三种等价写法）：</p>
+<ul><li><code>foreach (var chunk in lease) { IO(chunk); chunk.Commit(); }</code>——pattern-based GetEnumerator，零分配</li><li><code>for (var i = 0; i &lt; lease.ChunkCount; i++) { var chunk = lease[i]; IO(chunk); chunk.Commit(); }</code>——索引器含物理门</li><li><code>while (iter.MoveNext()) { IO(iter.Current); iter.CommitCurrent(); }</code>——原 while 模式保留</li></ul>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetype.equals">ValueType.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetype.gethashcode">ValueType.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetype.tostring">ValueType.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.AddressSpace.html">AddressSpace</a>.<a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.html">Leases</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
+  <h5 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly struct ChunkScope</code></pre>
+  </div>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Length_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.Length*"></a>
+  <h4 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Length" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.Length">Length</h4>
+  <div class="markdown level1 summary"><p>该 chunk 的长度（字节）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Length { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_SegEnd_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.SegEnd*"></a>
+  <h4 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_SegEnd" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.SegEnd">SegEnd</h4>
+  <div class="markdown level1 summary"><p>该 chunk 的段内结束偏移（不包含）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long SegEnd { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_SegId_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.SegId*"></a>
+  <h4 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_SegId" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.SegId">SegId</h4>
+  <div class="markdown level1 summary"><p>该 chunk 所属段 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int SegId { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_SegOff_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.SegOff*"></a>
+  <h4 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_SegOff" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.SegOff">SegOff</h4>
+  <div class="markdown level1 summary"><p>该 chunk 的段内起始偏移（包含）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long SegOff { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Commit_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.Commit*"></a>
+  <h4 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Commit" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.Commit">Commit()</h4>
+  <div class="markdown level1 summary"><p>分段提交——chunk 终态迁移（Leased→Committed，区间当场归还/渐进可见）。</p>
+<p>★ exactly-once：doneMask 仲裁，重复调用/对端路径已终态时 no-op。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Commit()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Rollback_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.Rollback*"></a>
+  <h4 id="TC_Tier_Runtime_AddressSpace_Leases_ChunkScope_Rollback" data-uid="TC.Tier.Runtime.AddressSpace.Leases.ChunkScope.Rollback">Rollback()</h4>
+  <div class="markdown level1 summary"><p>分段回滚——chunk 终态迁移（Leased→Wasted 可覆写空洞）。</p>
+<p>★ exactly-once：doneMask 仲裁。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Rollback()</code></pre>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

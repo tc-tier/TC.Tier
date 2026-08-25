@@ -1,0 +1,1000 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class EntryLog | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class EntryLog | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="EntryLog — 通用 entry 顺序日志实现类（WAL 是其典型用途，非唯一用途）。 ★ EntryLog.md：通用 per-entry [16B EntryCodec header][payload+4B对齐] 纯追加顺序日志。 ★ 提交模型（两层，职责分离）：   1. 底层页提交契约（恒成立，不可配置）：Append 跨页 → FlushPage 数据落盘 →          同步执行 commit 链（meta.Commit + 推进 CommittedOffset）。         这是页模式的本质保证——前一页换出时即持久化，无需任何策略注入。最坏情况：写满一页才提交。   2. 可选提前提交（注入式优化，降延迟）： 在页未满时提前触发提交。         注入 null（默认）= 仅依赖底层页契约；注入  = 三维度提前提交。 ★ 上述两层取代旧的&quot;fire-and-forget 后台循环 + Append 内 spawn 提交&quot;模型——后者线程池饥饿即系统挂，         且错误被静默吞。新模型提交都在写线程同步完成，无并发、错误冒泡。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog">
+
+
+
+  <h1 id="TC_Tier_Runtime_Structures_Log_EntryLog" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog" class="text-break">Class EntryLog</h1>
+  <div class="markdown level0 summary"><p>EntryLog — 通用 entry 顺序日志实现类（WAL 是其典型用途，非唯一用途）。</p>
+<p>★ EntryLog.md：通用 per-entry [16B EntryCodec header][payload+4B对齐] 纯追加顺序日志。</p>
+<p>★ 提交模型（两层，职责分离）：</p>
+<p>  1. <b>底层页提交契约（恒成立，不可配置）</b>：Append 跨页 → FlushPage 数据落盘 →
+        <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushed_TC_Tier_Contracts_Storage_LogicalAddress_">OnPageFlushed(LogicalAddress)</a> 同步执行 commit 链（meta.Commit + 推进 CommittedOffset）。
+        这是页模式的本质保证——前一页换出时即持久化，无需任何策略注入。最坏情况：写满一页才提交。</p>
+<p>  2. <b>可选提前提交（注入式优化，降延迟）</b>：<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.html">ICommitPolicy</a> 在页未满时提前触发提交。
+        注入 null（默认）= 仅依赖底层页契约；注入 <span class="xref">TC.Tier.Runtime.Structures.Log.GroupCommitPolicy</span> = 三维度提前提交。</p>
+<p>★ 上述两层取代旧的"fire-and-forget 后台循环 + Append 内 spawn 提交"模型——后者线程池饥饿即系统挂，
+        且错误被静默吞。新模型提交都在写线程同步完成，无并发、错误冒泡。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</div>
+    <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></div>
+    <div class="level3"><span class="xref">EntryLog</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_BeginAppendBatch">LogBase.BeginAppendBatch()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_SetOpaqueMeta_System_ReadOnlySpan_System_Byte__">LogBase.SetOpaqueMeta(ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_ReadOpaqueMeta">LogBase.ReadOpaqueMeta()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OpenCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_">LogBase.OpenCursor(LogicalAddress, LogicalAddress, bool)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Prepare_System_Int64_">LogBase.Prepare(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_PrepareAsync_System_Int64_System_Threading_CancellationToken_">LogBase.PrepareAsync(long, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_ConfirmCommitted_System_Int64_">LogBase.ConfirmCommitted(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Abort_System_Int64_">LogBase.Abort(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_AbortAsync_System_Int64_System_Threading_CancellationToken_">LogBase.AbortAsync(long, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OnCommitted_System_Int64_System_Action_">LogBase.OnCommitted(long, Action)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_TruncatePrefix_TC_Tier_Contracts_Storage_LogicalAddress_">LogBase.TruncatePrefix(LogicalAddress)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_TruncateSuffix_TC_Tier_Contracts_Storage_LogicalAddress_">LogBase.TruncateSuffix(LogicalAddress)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Append_System_ReadOnlySpan_System_Byte__">LogBase.Append(ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_AppendAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">LogBase.AppendAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Flush">LogBase.Flush()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_FlushAsync_System_Threading_CancellationToken_">LogBase.FlushAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_MetaPolicy">LogBase.MetaPolicy</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_BeginAddress">LogBase.BeginAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_TailAddress">LogBase.TailAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_PageSize">LogBase.PageSize</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_LogPageSizeBits">LogBase.LogPageSizeBits</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_LastCommittedSeq">LogBase.LastCommittedSeq</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_LastPreparedSeq">LogBase.LastPreparedSeq</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;LogRecoveryHints&gt;.GetAliveInstances(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;LogRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;LogRecoveryHints&gt;.Initialize(LogRecoveryHints)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;LogRecoveryHints&gt;.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;LogRecoveryHints&gt;.DisposeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;LogRecoveryHints&gt;.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;LogRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Structures.html">Structures</a>.<a class="xref" href="TC.Tier.Runtime.Structures.Log.html">Log</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
+  <h5 id="TC_Tier_Runtime_Structures_Log_EntryLog_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class EntryLog : LogBase, ILifecycle&lt;LogRecoveryHints&gt;, IDisposable, IAsyncDisposable, ITransactionParticipant</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog__ctor_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.#ctor*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Log_EntryLogSettings_TC_Tier_Runtime_Structures_Log_Contracts_ICommitPolicy_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Log_LogRecoveryHints__TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_TC_Tier_Runtime_Structures_Log_Contracts_ILogCursor__TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaHeader_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Log.EntryLogSettings,TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Log.LogRecoveryHints},TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory{TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor},TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Log.Contracts.LogMetaHeader,TC.Tier.Runtime.Structures.Log.Contracts.LogMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport)">EntryLog(IFileSystem, EntryLogSettings, ICommitPolicy?, IRecovery&lt;LogRecoveryHints&gt;?, LogCursorFactory&lt;ILogCursor&gt;?, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;?, IMetaTransport?)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public EntryLog(IFileSystem fileSystem, EntryLogSettings settings, ICommitPolicy? commitPolicy = null, IRecovery&lt;LogRecoveryHints&gt;? recovery = null, LogCursorFactory&lt;ILogCursor&gt;? cursorFactory = null, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;? metaPolicyFactory = null, IMetaTransport? metaTransport = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">fileSystem</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLogSettings.html">EntryLogSettings</a></td>
+        <td><span class="parametername">settings</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.html">ICommitPolicy</a></td>
+        <td><span class="parametername">commitPolicy</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</td>
+        <td><span class="parametername">recovery</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory-1.html">LogCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor.html">ILogCursor</a>&gt;</td>
+        <td><span class="parametername">cursorFactory</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogMetaHeader.html">LogMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogMetaPayload.html">LogMetaPayload</a>&gt;</td>
+        <td><span class="parametername">metaPolicyFactory</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></td>
+        <td><span class="parametername">metaTransport</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_CommittedOffset_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.CommittedOffset*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_CommittedOffset" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.CommittedOffset">CommittedOffset</h4>
+  <div class="markdown level1 summary"><p>已 commit 的最高地址（commit 边界水位）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public LogicalAddress CommittedOffset { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_LastCommitError_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.LastCommitError*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_LastCommitError" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.LastCommitError">LastCommitError</h4>
+  <div class="markdown level1 summary"><p>最近一次提交错误（若有）。上层应周期查询以发现持久化失败。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Exception? LastCommitError { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_CommitAsync_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.CommitAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_CommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.CommitAsync(System.Threading.CancellationToken)">CommitAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 显式提交（异步轨）：用户显式调 CommitAsync，保证当前写游标 TailAddress 之前的所有 entry 已 commit。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask CommitAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>取消令牌</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td><p>表示异步提交操作的任务</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_CreateRecovery_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.CreateRecovery*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_CreateRecovery" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.CreateRecovery">CreateRecovery()</h4>
+  <div class="markdown level1 summary"><p>★ 恢复算法工厂——默认 DefaultLogRecovery。在 Initialize 的 CAS 闸门内被调一次
+（基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IRecovery&lt;LogRecoveryHints&gt; CreateRecovery()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_CreateRecovery">LogBase.CreateRecovery()</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_DisposeOverride_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.DisposeOverride*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
+  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void DisposeOverride(bool disposing)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">disposing</span></td>
+        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
+本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_DisposeOverride_System_Boolean_">LogBase.DisposeOverride(bool)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_OnAborted_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnAborted*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_OnAborted_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnAborted(TC.Tier.Contracts.Storage.LogicalAddress)">OnAborted(LogicalAddress)</h4>
+  <div class="markdown level1 summary"><p>★ Abort 尾截断后夹 CommittedOffset 到回退点——group commit 可能把悬干数据标记为已提交
+（Prepare 的 AppendMeta(TailAddress) 同样推进 meta CommittedOffset），回滚必须一并夹回，
+否则 CommittedOffset &gt; TailAddress 违反 §7 不变量、Replay 读到已物理销毁的区域。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void OnAborted(LogicalAddress rollbackTail)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">rollbackTail</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OnAborted_TC_Tier_Contracts_Storage_LogicalAddress_">LogBase.OnAborted(LogicalAddress)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_OnAppended_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnAppended*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_OnAppended_TC_Tier_Contracts_Storage_LogicalAddress_System_Int32_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnAppended(TC.Tier.Contracts.Storage.LogicalAddress,System.Int32,System.Boolean)">OnAppended(LogicalAddress, int, bool)</h4>
+  <div class="markdown level1 summary"><p>每次 Append/AppendAsync/AppendBatch 后调用：累计未提交量，按策略判定是否提前提交。</p>
+<p>★ 默认 GroupCommitPolicy（从 settings 三维度阈值构造），三维度任一满足即触发。</p>
+<p>★ P0 修复：提前提交必须先 flush（FlushUntil）把内存页数据落盘，再推进 CommittedOffset——</p>
+<p>  保证 §7 不变量 CommittedOffset ≤ FlushedUntil（已 commit 必已落盘）。</p>
+<p>  旧实现直接 CommitCore(TailAddress) 跳过 flush，TailAddress 可能指向仍在 _pageBuf 内存的 entry，</p>
+<p>  导致 _committedOffset 超前于真实落盘字节，崩溃丢失已 commit 数据。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void OnAppended(LogicalAddress entryAddress, int payloadLength, bool isMeta)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">entryAddress</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">payloadLength</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">isMeta</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OnAppended_TC_Tier_Contracts_Storage_LogicalAddress_System_Int32_System_Boolean_">LogBase.OnAppended(LogicalAddress, int, bool)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushed_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnPageFlushed*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushed_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnPageFlushed(TC.Tier.Contracts.Storage.LogicalAddress)">OnPageFlushed(LogicalAddress)</h4>
+  <div class="markdown level1 summary"><p>★ 底层页提交契约（恒成立）：每次页 flush 落盘后同步 commit 到 flushedUntil。</p>
+<p>由基类 FlushPage（跨页 Append / Flush / Dispose）在 IO 完成后调用。此方法在写线程同步执行，
+无并发、无 fire-and-forget、错误冒泡到 <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_LastCommitError">LastCommitError</a>。</p>
+<p>这是页模式的本质保证——前一页换出即持久化（数据 + meta + CommittedOffset 推进）。
+不依赖任何注入策略，删除 <a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.html">ICommitPolicy</a> 此保证依然成立。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void OnPageFlushed(LogicalAddress flushedUntil)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">flushedUntil</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OnPageFlushed_TC_Tier_Contracts_Storage_LogicalAddress_">LogBase.OnPageFlushed(LogicalAddress)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushedAsync_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnPageFlushedAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushedAsync_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.OnPageFlushedAsync(TC.Tier.Contracts.Storage.LogicalAddress)">OnPageFlushedAsync(LogicalAddress)</h4>
+  <div class="markdown level1 summary"><p>★ 底层页提交契约（异步轨）：异步入口（AppendAsync/FlushAsync/PrepareAsync）的页提交挂载点。</p>
+<p>走纯异步 commit 链（<span class="xref">TC.Tier.Runtime.Structures.Log.EntryLog.CommitCoreAsync(TC.Tier.Contracts.Storage.LogicalAddress)</span> → meta.CommitAsync），无 sync-over-async。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override ValueTask OnPageFlushedAsync(LogicalAddress flushedUntil)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">flushedUntil</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OnPageFlushedAsync_TC_Tier_Contracts_Storage_LogicalAddress_">LogBase.OnPageFlushedAsync(LogicalAddress)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_Replay_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.Replay*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_Replay_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Runtime_Structures_Log_Contracts_EntryReplayHandler_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.Replay(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Runtime.Structures.Log.Contracts.EntryReplayHandler,System.Boolean)">Replay(LogicalAddress, EntryReplayHandler, bool)</h4>
+  <div class="markdown level1 summary"><p>★ 重放已 commit 的 entry（回调式，零装箱）：从 <code class="paramref">fromAddress</code> 扫到 <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_CommittedOffset">CommittedOffset</a>，
+对每条 entry 调 <code class="paramref">handler</code>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Replay(LogicalAddress fromAddress, EntryReplayHandler handler, bool verifyCrc = false)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">fromAddress</span></td>
+        <td><p>重放起始地址（默认 0 = 从头重放）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.EntryReplayHandler.html">EntryReplayHandler</a></td>
+        <td><span class="parametername">handler</span></td>
+        <td><p>处理每条 entry 的回调。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">verifyCrc</span></td>
+        <td><p>是否每条验 CRC（默认 false 快速扫描）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><p>重放的 entry 条数。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_Replay_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.Replay*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_Replay_TC_Tier_Runtime_Structures_Log_Contracts_EntryReplayHandler_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.Replay(TC.Tier.Runtime.Structures.Log.Contracts.EntryReplayHandler,System.Boolean)">Replay(EntryReplayHandler, bool)</h4>
+  <div class="markdown level1 summary"><p>★ 从头重放（便捷重载，默认快速扫描）：对每条 entry 调 <code class="paramref">handler</code>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Replay(EntryReplayHandler handler, bool verifyCrc = false)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.EntryReplayHandler.html">EntryReplayHandler</a></td>
+        <td><span class="parametername">handler</span></td>
+        <td><p>处理每条 entry 的回调。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">verifyCrc</span></td>
+        <td><p>是否每条验 CRC（默认 false 快速扫描）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><p>重放的 entry 条数。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_ReplayAsync_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.ReplayAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_ReplayAsync_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Runtime_Structures_Log_Contracts_AsyncEntryReplayHandler_System_Boolean_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.ReplayAsync(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Runtime.Structures.Log.Contracts.AsyncEntryReplayHandler,System.Boolean,System.Threading.CancellationToken)">ReplayAsync(LogicalAddress, AsyncEntryReplayHandler, bool, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 异步重放已 commit 的 entry（回调式，零装箱）：从 <code class="paramref">fromAddress</code> 扫到 <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_CommittedOffset">CommittedOffset</a>，
+对每条 entry 调 <code class="paramref">handler</code>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReplayAsync(LogicalAddress fromAddress, AsyncEntryReplayHandler handler, bool verifyCrc = false, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">fromAddress</span></td>
+        <td><p>重放起始地址（默认 0 = 从头重放）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.AsyncEntryReplayHandler.html">AsyncEntryReplayHandler</a></td>
+        <td><span class="parametername">handler</span></td>
+        <td><p>处理每条 entry 的回调。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">verifyCrc</span></td>
+        <td><p>是否每条验 CRC（默认 false 快速扫描）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>取消令牌。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td><p>重放的 entry 条数。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></td>
+        <td><p>当 <code class="paramref">handler</code> 为 null 时抛出。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_ReplayAsync_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.ReplayAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_ReplayAsync_TC_Tier_Runtime_Structures_Log_Contracts_AsyncEntryReplayHandler_System_Boolean_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.ReplayAsync(TC.Tier.Runtime.Structures.Log.Contracts.AsyncEntryReplayHandler,System.Boolean,System.Threading.CancellationToken)">ReplayAsync(AsyncEntryReplayHandler, bool, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 从头异步重放（便捷重载，默认快速扫描）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReplayAsync(AsyncEntryReplayHandler handler, bool verifyCrc = false, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.AsyncEntryReplayHandler.html">AsyncEntryReplayHandler</a></td>
+        <td><span class="parametername">handler</span></td>
+        <td><p>处理每条 entry 的回调。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">verifyCrc</span></td>
+        <td><p>是否每条验 CRC（默认 false 快速扫描）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>取消令牌。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td><p>重放的 entry 条数。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></td>
+        <td><p>当 <code class="paramref">handler</code> 为 null 时抛出。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_EntryLog_WaitForCommitAsync_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.WaitForCommitAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_EntryLog_WaitForCommitAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.WaitForCommitAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">WaitForCommitAsync(LogicalAddress, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 等待 commit：阻塞等待直到 CommittedOffset ≥ <code class="paramref">untilAddress</code>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask WaitForCommitAsync(LogicalAddress untilAddress, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">untilAddress</span></td>
+        <td><p>等待的目标地址</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td><p>取消令牌</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td><p>表示等待操作的任务</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

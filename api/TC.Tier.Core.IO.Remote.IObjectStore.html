@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Interface IObjectStore | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Interface IObjectStore | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="对象存储开放契约——远程对象介质的厂商中立抽象（S3 事实标准为通用货币）。 ★ Core 只定义契约；实现注入：TC.Tier.Core.IO.S3（SigV4 自写，覆盖 S3/OSS/MinIO/R2/B2 等   S3 兼容云）/ （内存替身）/ 任意第三方实现。 ★ 接口风格 = 异步族为主实现路径（HttpClient 本质异步——同步全量阻塞等待会线程池饥饿）；   同步便捷包装见 （低频路径专用）。 ★ 对象键编码（契约冻结项，&#167;9.5）：UTF-8 / 键长 ≤1024 字节（S3 上限，超限抛错）/   禁 &#39;\0&#39; 与 CR/LF（破坏签名 canonical request）；统一经  校验。 ★ 错误出口：（Core/IO 唯一异常类型）；键不存在 = NotFound；   条件失配 = ；能力缺失路径 = Unsupported。 ★ GetAsync EOF 语义（对齐 IFileHandle.Read 的 pread-EOF 契约）：offset ≥ 对象长度 → 返回 0   （S3 416 RangeNotSatisfiable 映射为 0，不抛）——桥层 Read 直通无特判。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO.Remote.IObjectStore">
+
+
+
+  <h1 id="TC_Tier_Core_IO_Remote_IObjectStore" data-uid="TC.Tier.Core.IO.Remote.IObjectStore" class="text-break">Interface IObjectStore</h1>
+  <div class="markdown level0 summary"><p>对象存储开放契约——远程对象介质的厂商中立抽象（S3 事实标准为通用货币）。</p>
+<p>★ Core 只定义契约；实现注入：TC.Tier.Core.IO.S3（SigV4 自写，覆盖 S3/OSS/MinIO/R2/B2 等
+  S3 兼容云）/ <span class="xref">TC.Tier.Core.IO.Testing.MemoryObjectStore</span>（内存替身）/ 任意第三方实现。</p>
+<p>★ 接口风格 = <b>异步族为主实现路径</b>（HttpClient 本质异步——同步全量阻塞等待会线程池饥饿）；
+  同步便捷包装见 <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html">ObjectStoreExtensions</a>（低频路径专用）。</p>
+<p>★ 对象键编码（契约冻结项，§9.5）：UTF-8 / 键长 ≤1024 字节（S3 上限，超限抛错）/
+  禁 '\0' 与 CR/LF（破坏签名 canonical request）；统一经 <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectKeyValidator.html">ObjectKeyValidator</a> 校验。</p>
+<p>★ 错误出口：<a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a>（Core/IO 唯一异常类型）；键不存在 = NotFound；
+  条件失配 = <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_PreconditionFailed">PreconditionFailed</a>；能力缺失路径 = Unsupported。</p>
+<p>★ GetAsync EOF 语义（对齐 IFileHandle.Read 的 pread-EOF 契约）：offset ≥ 对象长度 → 返回 0
+  （S3 416 RangeNotSatisfiable 映射为 0，不抛）——桥层 Read 直通无特判。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">IDisposable.Dispose()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a>.<a class="xref" href="TC.Tier.Core.IO.Remote.html">Remote</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_IO_Remote_IObjectStore_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IObjectStore : IDisposable</code></pre>
+  </div>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_Capabilities_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.Capabilities*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_Capabilities" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.Capabilities">Capabilities</h4>
+  <div class="markdown level1 summary"><p>能力协商位——构造时一次性声明/探测。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ObjectStoreCapabilities Capabilities { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreCapabilities.html">ObjectStoreCapabilities</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_AbortMultipartUploadAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.AbortMultipartUploadAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_AbortMultipartUploadAsync_System_String_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.AbortMultipartUploadAsync(System.String,System.String,System.Threading.CancellationToken)">AbortMultipartUploadAsync(string, string, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>定向放弃会话（uploadId 粒度——供非本进程创建会话的清理路径）；幂等（NoSuchUpload 视为成功）。
+与 <a class="xref" href="TC.Tier.Core.IO.Remote.IMultipartUpload.html#TC_Tier_Core_IO_Remote_IMultipartUpload_AbortAsync_System_Threading_CancellationToken_">AbortAsync(CancellationToken)</a> 语义等价，共享底层调用。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask AbortMultipartUploadAsync(string key, string uploadId, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">uploadId</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_CopyAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CopyAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_CopyAsync_System_String_System_String_TC_Tier_Core_IO_Remote_CopyMetadata_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CopyAsync(System.String,System.String,TC.Tier.Core.IO.Remote.CopyMetadata,System.Threading.CancellationToken)">CopyAsync(string, string, CopyMetadata?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>整对象服务端拷贝（CopyObject 语义——dest 新建/替换，与源独立；缺 ServerSideCopy 能力时下载重传）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask CopyAsync(string sourceKey, string destKey, CopyMetadata? metadata = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">sourceKey</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">destKey</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.CopyMetadata.html">CopyMetadata</a></td>
+        <td><span class="parametername">metadata</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_CopyMetadataAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CopyMetadataAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_CopyMetadataAsync_System_String_TC_Tier_Core_IO_Remote_ObjectMetadata_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CopyMetadataAsync(System.String,TC.Tier.Core.IO.Remote.ObjectMetadata,System.Threading.CancellationToken)">CopyMetadataAsync(string, ObjectMetadata?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>元数据更新（服务端 CopyObject 自拷贝 + REPLACE 指令的语义归一）——不改对象内容只换元数据。
+<code class="paramref">replace</code> = null → 保留现有元数据；非 null → 以此替换。返回更新后的元数据。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;ObjectMetadata&gt; CopyMetadataAsync(string sourceKey, ObjectMetadata? replace = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">sourceKey</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></td>
+        <td><span class="parametername">replace</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_CopyRangeAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CopyRangeAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_CopyRangeAsync_System_String_System_String_System_Int64_System_Int64_TC_Tier_Core_IO_Remote_CopyMetadata_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CopyRangeAsync(System.String,System.String,System.Int64,System.Int64,TC.Tier.Core.IO.Remote.CopyMetadata,System.Threading.CancellationToken)">CopyRangeAsync(string, string, long, long, CopyMetadata?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>范围拷贝原语——新建 dest（若已存在则替换）= 源 [sourceOffset, sourceOffset+length) 的内容；
+返回实际拷贝长度。S3 映射 UploadPartCopy / GetRange+Put。★ 不支持&quot;对已有对象部分覆写&quot;（S3 无此能力）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;long&gt; CopyRangeAsync(string sourceKey, string destKey, long sourceOffset, long length, CopyMetadata? metadata = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">sourceKey</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">destKey</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">sourceOffset</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">length</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.CopyMetadata.html">CopyMetadata</a></td>
+        <td><span class="parametername">metadata</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_CreateMultipartUpload_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CreateMultipartUpload*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_CreateMultipartUpload_System_String_TC_Tier_Core_IO_Remote_ObjectMetadata_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.CreateMultipartUpload(System.String,TC.Tier.Core.IO.Remote.ObjectMetadata)">CreateMultipartUpload(string, ObjectMetadata?)</h4>
+  <div class="markdown level1 summary"><p>开启 multipart 会话（会话 = upload-id 的厂商中立句柄；part 粒度编排归桥层）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IMultipartUpload CreateMultipartUpload(string key, ObjectMetadata? metadata = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></td>
+        <td><span class="parametername">metadata</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.IMultipartUpload.html">IMultipartUpload</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_DeleteAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.DeleteAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_DeleteAsync_System_String_System_Nullable_TC_Tier_Core_IO_Remote_DeleteCondition__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.DeleteAsync(System.String,System.Nullable{TC.Tier.Core.IO.Remote.DeleteCondition},System.Threading.CancellationToken)">DeleteAsync(string, DeleteCondition?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>删除（幂等——POSIX unlink 对齐：不存在仍成功）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask DeleteAsync(string key, DeleteCondition? condition = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.DeleteCondition.html">DeleteCondition</a>?</td>
+        <td><span class="parametername">condition</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_GetAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.GetAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_GetAsync_System_String_System_Int64_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.GetAsync(System.String,System.Int64,System.Memory{System.Byte},System.Threading.CancellationToken)">GetAsync(string, long, Memory&lt;byte&gt;, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>Range GET——读 [offset, offset+destination.Length) 命中对象数据的部分；
+返回实际读取数（EOF 处可能小于请求；offset ≥ 长度 → 0，416 映射 0 不抛）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;int&gt; GetAsync(string key, long offset, Memory&lt;byte&gt; destination, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">offset</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
+        <td><span class="parametername">destination</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_HeadAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.HeadAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_HeadAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.HeadAsync(System.String,System.Threading.CancellationToken)">HeadAsync(string, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>元数据/存在性探测（HeadObject 语义）；不存在返回 null。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;ObjectInfo?&gt; HeadAsync(string key, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.ObjectInfo.html">ObjectInfo</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_ListAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_ListAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListAsync(System.String,System.Threading.CancellationToken)">ListAsync(string?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>前缀枚举（ListObjectsV2 语义；分页归一在实现内）。★ 全量加载——段目录千级键适用，
+十万级键大桶见 io.md 规模边界声明。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;ObjectEntry&gt;&gt; ListAsync(string? prefix = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">prefix</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.ObjectEntry.html">ObjectEntry</a>&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_ListDelimitedAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListDelimitedAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_ListDelimitedAsync_System_String_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListDelimitedAsync(System.String,System.String,System.Threading.CancellationToken)">ListDelimitedAsync(string?, string?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>分隔符列举（ListObjectsV2 + delimiter 语义——目录模拟的底座，filesystem-root-space-design §7）：
+键在 prefix 后首个 <code class="paramref">delimiter</code> 处截断聚合成 <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectListing.html#TC_Tier_Core_IO_Remote_ObjectListing_CommonPrefixes">CommonPrefixes</a>
+（去重），未截断的整键入 <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectListing.html#TC_Tier_Core_IO_Remote_ObjectListing_Objects">Objects</a>。</p>
+<p>默认实现 = <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html#TC_Tier_Core_IO_Remote_IObjectStore_ListAsync_System_String_System_Threading_CancellationToken_">ListAsync(string?, CancellationToken)</a> 全量 + 客户端切分聚合（小桶零损失；S3 实现覆写为
+原生 delimiter——服务端聚合省流量）。delimiter=null ≡ ListAsync（无聚合）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;ObjectListing&gt; ListDelimitedAsync(string? prefix = null, string? delimiter = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">prefix</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">delimiter</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.ObjectListing.html">ObjectListing</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_ListMultipartUploadsAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListMultipartUploadsAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_ListMultipartUploadsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListMultipartUploadsAsync(System.Threading.CancellationToken)">ListMultipartUploadsAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>枚举进行中的 multipart 会话（ListMultipartUploads 语义归一）——孤儿清理与运维面专用，
+不进桥的日常路径（大桶会话枚举本身是重操作）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;MultipartUploadSession&gt;&gt; ListMultipartUploadsAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.MultipartUploadSession.html">MultipartUploadSession</a>&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_ListStreamingAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListStreamingAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_ListStreamingAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.ListStreamingAsync(System.String,System.Threading.CancellationToken)">ListStreamingAsync(string?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>流式枚举（IAsyncEnumerable——十万级键大桶消费者；分页在实现内推进）。
+默认实现 = <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html#TC_Tier_Core_IO_Remote_IObjectStore_ListAsync_System_String_System_Threading_CancellationToken_">ListAsync(string?, CancellationToken)</a> 整量包装（小桶零损失；S3 实现覆写真流式）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;ObjectEntry&gt; ListStreamingAsync(string? prefix = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">prefix</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.ObjectEntry.html">ObjectEntry</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_PutAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.PutAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_PutAsync_System_String_System_IO_Stream_System_Int64_TC_Tier_Core_IO_Remote_ObjectMetadata_System_Nullable_TC_Tier_Core_IO_Remote_PutCondition__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.PutAsync(System.String,System.IO.Stream,System.Int64,TC.Tier.Core.IO.Remote.ObjectMetadata,System.Nullable{TC.Tier.Core.IO.Remote.PutCondition},System.Threading.CancellationToken)">PutAsync(string, Stream, long, ObjectMetadata?, PutCondition?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>整对象 PUT（流式）。三形态：①可寻+长度已知 = 单段签名上传；②不可寻+长度已知 =
+chunked 流式签名直传（STREAMING-AWS4-HMAC-SHA256-PAYLOAD 链式签名——免整驻免双遍哈希）；
+③<b>长度未知（length &lt; 0）= spool 后上传</b>（实现中转不整驻内存——S3 侧临时文件）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask PutAsync(string key, Stream data, long length, ObjectMetadata? metadata = null, PutCondition? condition = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
+        <td><span class="parametername">data</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">length</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></td>
+        <td><span class="parametername">metadata</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.PutCondition.html">PutCondition</a>?</td>
+        <td><span class="parametername">condition</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Remote_IObjectStore_PutAsync_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.PutAsync*"></a>
+  <h4 id="TC_Tier_Core_IO_Remote_IObjectStore_PutAsync_System_String_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_IO_Remote_ObjectMetadata_System_Nullable_TC_Tier_Core_IO_Remote_PutCondition__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Remote.IObjectStore.PutAsync(System.String,System.ReadOnlyMemory{System.Byte},TC.Tier.Core.IO.Remote.ObjectMetadata,System.Nullable{TC.Tier.Core.IO.Remote.PutCondition},System.Threading.CancellationToken)">PutAsync(string, ReadOnlyMemory&lt;byte&gt;, ObjectMetadata?, PutCondition?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>整对象 PUT（幂等原子替换——S3 PUT 语义）；元数据随 PUT 原子提交。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask PutAsync(string key, ReadOnlyMemory&lt;byte&gt; data, ObjectMetadata? metadata = null, PutCondition? condition = null, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">key</span></td>
+        <td><p>对象键（经 <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectKeyValidator.html">ObjectKeyValidator</a> 校验）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
+        <td><span class="parametername">data</span></td>
+        <td><p>对象内容。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></td>
+        <td><span class="parametername">metadata</span></td>
+        <td><p>用户元数据（null = 无；超限抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>，不静默截断）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Remote.PutCondition.html">PutCondition</a>?</td>
+        <td><span class="parametername">condition</span></td>
+        <td><p>条件前置（null = 无条件）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="extensionmethods">Extension Methods</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_Copy_TC_Tier_Core_IO_Remote_IObjectStore_System_String_System_String_TC_Tier_Core_IO_Remote_CopyMetadata_">ObjectStoreExtensions.Copy(IObjectStore, string, string, CopyMetadata?)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_CopyMetadata_TC_Tier_Core_IO_Remote_IObjectStore_System_String_TC_Tier_Core_IO_Remote_ObjectMetadata_">ObjectStoreExtensions.CopyMetadata(IObjectStore, string, ObjectMetadata?)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_CopyRange_TC_Tier_Core_IO_Remote_IObjectStore_System_String_System_String_System_Int64_System_Int64_TC_Tier_Core_IO_Remote_CopyMetadata_">ObjectStoreExtensions.CopyRange(IObjectStore, string, string, long, long, CopyMetadata?)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_Delete_TC_Tier_Core_IO_Remote_IObjectStore_System_String_System_Nullable_TC_Tier_Core_IO_Remote_DeleteCondition__">ObjectStoreExtensions.Delete(IObjectStore, string, DeleteCondition?)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_Get_TC_Tier_Core_IO_Remote_IObjectStore_System_String_System_Int64_System_Memory_System_Byte__">ObjectStoreExtensions.Get(IObjectStore, string, long, Memory&lt;byte&gt;)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_Head_TC_Tier_Core_IO_Remote_IObjectStore_System_String_">ObjectStoreExtensions.Head(IObjectStore, string)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_List_TC_Tier_Core_IO_Remote_IObjectStore_System_String_">ObjectStoreExtensions.List(IObjectStore, string?)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectStoreExtensions.html#TC_Tier_Core_IO_Remote_ObjectStoreExtensions_Put_TC_Tier_Core_IO_Remote_IObjectStore_System_String_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_IO_Remote_ObjectMetadata_System_Nullable_TC_Tier_Core_IO_Remote_PutCondition__">ObjectStoreExtensions.Put(IObjectStore, string, ReadOnlyMemory&lt;byte&gt;, ObjectMetadata?, PutCondition?)</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

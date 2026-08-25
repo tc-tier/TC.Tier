@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Structures 使用指南——Ring / 索引 / Log / Metadata / Mirror / Snapshot | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Structures 使用指南——Ring / 索引 / Log / Metadata / Mirror / Snapshot | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="structures-使用指南ring--索引--log--metadata--mirror--snapshot">Structures 使用指南——Ring / 索引 / Log / Metadata / Mirror / Snapshot</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：用结构层组合存储模型的人（KV / WAL / 队列 / 时序形态的构建者）。
+<strong>回答什么</strong>：七种结构各自是什么、怎么选、怎么组合成 KV、恢复与生命周期怎么走、什么绝对不要做。
+<strong>本篇只讲怎么用</strong>——机制细节（帧格式、水位全表、协议内部状态机）在文末&quot;想深入&quot;链接与源码注释，
+不在此重复。每结构自有引擎（StorageEngine），文件系统 = 构造传哪个 <code>IFileSystem</code>；meta 统一协议见
+<a href="meta.html"><code>meta.md</code></a>；性能数字见 <a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-快速上手组合-kv三步可运行">0. 快速上手：组合 KV（三步，可运行）</h2>
+<h3 id="01-声明封闭形态ringkey-源生成器一行">0.1 声明封闭形态（<code>[RingKey]</code> 源生成器，一行）</h3>
+<p>开放泛型（<code>BlittableRing&lt;TKey&gt;</code>/<code>HashIndex&lt;TKey&gt;</code> 等）的构造是 <code>protected internal</code>——消费面只经
+<code>[RingKey]</code> 生成的<strong>封闭薄类</strong>（编译期封闭 + Create 工厂）。内置 <code>long</code> 已声明（<code>TC.Tier.Runtime</code>
+程序集），<code>RingOfLong</code>/<code>HashOfLong</code>/<code>BTreeOfLong</code>/<code>SkipListOfLong</code> 开箱即用；自定义 Key 在消费程序集
+加一行：</p>
+<pre><code class="lang-csharp">[assembly: RingKey(typeof(OrderId))]   // 产出 RingOfOrderId / HashOfOrderId / ...
+</code></pre>
+<h3 id="02-装配与写读真实签名">0.2 装配与写读（真实签名）</h3>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Runtime.Storage;
+using TC.Tier.Runtime.Structures.Ring;
+using TC.Tier.Runtime.Structures.ProbingIndex;
+using TC.Tier.Contracts.Structures;
+
+// ① 文件系统 + 配置（默认值即生产值；示例用小型页池便于观察）
+using var fs = TierFs.New(&quot;memory:&quot;);
+var ringSettings = new BlittableRingSettings(new StorageEngineOptions(&quot;kv-ring&quot;, 64L &lt;&lt; 20))
+{
+    PageSize = 4096, MemorySize = 64 * 1024, MutableFraction = 0.5,
+};
+var hashSettings = new HashIndexSettings(new StorageEngineOptions(&quot;kv-hash&quot;, 64L &lt;&lt; 20));
+
+// ② 封闭类型 Create 一步就绪（Create = 构造 + Initialize + WaitForReady）
+using var ring  = RingOfLong.Create(ringSettings, fs);        // 真相源：record 流
+using var index = HashOfLong.Create(fs, hashSettings, ring);  // 派生数据：判等闭环必注入 ring
+
+// ③ 写读编排（正序两步写 / 两段合口径读）
+static LogicalAddress KvPut(RingOfLong ring, IIndex&lt;long&gt; index, long key, ReadOnlySpan&lt;byte&gt; value)
+{
+    var addr = ring.Write(key, value);        // ① 真相源先写，得地址
+    index.Insert(key, addr, LogicalAddress.Empty);   // ② 索引后插（指向该地址）
+    return addr;
+}
+
+static bool KvTryGet(RingOfLong ring, IIndex&lt;long&gt; index, long key, Span&lt;byte&gt; buf, out int len)
+{
+    len = 0;
+    var addr = index.Find(key);               // ① 索引命中得地址
+    if (addr == LogicalAddress.Empty) return false;
+    len = ring.GetValue(addr, buf);           // ② 真相源按址取值
+    return true;
+}
+</code></pre>
+<p><strong>终态读形态（批量最快）</strong>：<code>ring.EnterReadScope()</code> + <code>index.EnterScope()</code> 一批一进出 +
+<code>IndexScope.Find</code> + <code>Ring.GetValueSpan</code>（零拷贝切片；溢出 record 回退 thread-static 拷贝）。
+批口径实测反超 FASTER（perf 文档 §3）。</p>
+<h3 id="03-恢复两段式协议锚点-w">0.3 恢复（两段式协议，锚点 W）</h3>
+<pre><code>① Ring.Create → 恢复水位；锚点 W = ring.ReadOpaqueMeta()
+   （无锚点 / 损坏 / W 越过当前尾 → 回退 BeginAddress——宁可旧多重放）
+② index 拉流重放：ScanAsync(W, TailAddress) 逐条 Insert 自建
+   （Hash/SortedIndex 有主存储帧时优先载帧，见 §3.2）
+</code></pre>
+<p>锚点 W = 索引上次主存储 dump/重放完成的水位，经 Ring 的 opaque 随水位线原子落盘；每次
+dump/重放后 <code>ring.SetOpaqueMeta(W)</code> 即可。恢复协议全文见 <a href="meta.html"><code>meta.md</code></a>。</p>
+<hr>
+<h2 id="1-概念术语在此定义">1. 概念（术语在此定义）</h2>
+<ul>
+<li><strong>2 主结构 + 4 搭配件 = 产品发生器</strong>：Ring（数据真相源）/ Log（操作流）是主结构；
+索引/元数据/镜像/快照是搭配件（经桥单向依赖、可摘——<strong>存在性=优化非正确性</strong>）。</li>
+<li><strong>真相源 vs 派生数据</strong>：Ring 是数据真相（record 流），索引是派生数据（可重建）。
+写编排<strong>正序</strong>：先真相源写、再索引插；反向 = 索引指向不存在的数据。</li>
+<li><strong>地址一等公民</strong>：16B <code>LogicalAddress</code> 是唯一的取值句柄——先经索引发现地址，之后永久直达取值
+（跳过 hash）；判等/哈希只比较地址本身。</li>
+<li><strong>恢复统一模型</strong>：载基线（快照/镜像，到 W）+ 重放（W, 尾]。快照按字节截断（纯流式），
+镜像按版本号截断（版本链 N=2/回跳/回退）——同族异坐标系。</li>
+<li><strong>术语</strong>：WAL = 写前日志（Log 即 WAL）；RCU = 读-拷贝-更新（Ring 原地更新语义）；
+opaque = 外部记录随水位线原子落盘的扩展槽（meta.md §4）；2PC 六件套 = Prepare/ConfirmCommitted/
+OnCommitted/Abort 的事务参与协议（§4）；帧 = 持久化格式的三段式单元（头先行校验/体/尾 CRC）。</li>
+</ul>
+<hr>
+<h2 id="2-怎么选七种结构速查">2. 怎么选（七种结构速查）</h2>
+<table>
+<thead>
+<tr>
+<th>结构</th>
+<th>是什么</th>
+<th>何时用</th>
+<th>注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Ring</strong>（<code>BlittableRing&lt;TKey&gt;</code>）</td>
+<td>追加式 KV 环：页池 + 单调逻辑地址 + 原地更新 + 环形驱逐</td>
+<td><strong>主真相源</strong>——KV 数据本体；高并发写/读</td>
+<td>默认内存上限 16GB（<code>MemorySize</code> 旋钮）；<code>TKey : unmanaged</code></td>
+</tr>
+<tr>
+<td><strong>HashIndex</strong></td>
+<td>探测族：条目=地址+tag，不物化 key，判等经 KeyResolver 回读</td>
+<td>点查为主、内存最省（实测 161 ns）</td>
+<td><strong>构造必注入 KeyResolver</strong>（判等闭环）；无有序遍历</td>
+</tr>
+<tr>
+<td><strong>BTreeIndex / SkipListIndex</strong></td>
+<td>比较族：条目物化 (key, 地址)，有序遍历/range scan</td>
+<td>需要排序/范围查询</td>
+<td>单写者（插入）；恢复重放需要 KeyResolver</td>
+</tr>
+<tr>
+<td><strong>Log</strong>（<code>EntryLog</code>/<code>DeltaLog</code>）</td>
+<td>WAL 页帧流：组提交 + 恢复水位</td>
+<td>纯顺序日志；checkpoint delta</td>
+<td><strong>单写者</strong>；超单页抛（entry 不跨页）</td>
+</tr>
+<tr>
+<td><strong>Metadata</strong>（<code>VersionedMetadata</code>）</td>
+<td>版本链追加式单值元数据，N=2 轮转回收</td>
+<td>跨重启单值状态（水位/配置/锚点）；meta 外部隔离传输</td>
+<td><code>PayloadSize</code> 须 ≥ 托管块上界</td>
+</tr>
+<tr>
+<td><strong>Mirror</strong>（<code>WholeMirror</code>/<code>PagedMirror</code>）</td>
+<td>字节镜像：完整状态基线的版本链形态</td>
+<td>整体快照外存（流式）/ 分页增量镜像</td>
+<td>与 Snapshot 同族异坐标系</td>
+</tr>
+<tr>
+<td><strong>Snapshot</strong>（<code>StreamSnapshot</code>）</td>
+<td>完整状态基线的纯流式形态（按字节截断）</td>
+<td>流式帧文件快照</td>
+<td>无版本概念</td>
+</tr>
+</tbody>
+</table>
+<p><strong>索引三选</strong>：点查 → Hash；有序遍历/range → BTree/SkipList；高写并发小记录 → SkipList（无分裂重排）。
+性能对照见 <a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a> §3。</p>
+<hr>
+<h2 id="3-怎么用关键用法">3. 怎么用（关键用法）</h2>
+<h3 id="31-ring写读--水位--线程模型">3.1 Ring：写读 / 水位 / 线程模型</h3>
+<ul>
+<li><strong>写</strong>：<code>Write/WriteAsync</code>（追加返回地址，多线程并发安全）；<code>UpdateValue</code>（原地 RCU 覆写，同尺寸）；
+批量写经 <code>BeginWriteBatch</code>（多写者无锁窗口）。</li>
+<li><strong>读</strong>：<code>GetValue</code>（拷贝出参，自保护）；<code>GetValueSpan</code>（<strong>零拷贝切片——必须在 <code>ReadScope</code> 内消费</strong>，
+驱逐经 epoch 排水，scope 外持有 = 使用已回收内存）。</li>
+<li><strong>水位</strong>（只记三个就够）：<code>BeginAddress</code>（头）/ <code>TailAddress</code>（分配尾）/ <code>FlushedUntilAddress</code>（已落盘水位
+W）。其余只读视图（Safe* 系列 = 排水完成可安全消费版本）见类型 XML 注释。</li>
+<li><strong>截断</strong>：<code>TruncatePrefix</code>（头回收，与写完全并行）；<code>TruncateSuffix</code>（尾回退，D2 唯一异常路径）。</li>
+<li><strong>快照</strong>：<code>OpenSnapshotReader/Writer</code> 区间字节流导出/导入。</li>
+</ul>
+<h3 id="32-索引契约与持久化">3.2 索引：契约与持久化</h3>
+<pre><code class="lang-csharp">public interface IIndex&lt;in TKey&gt;   // 五成员最小协议（组合层消费面）
+{
+    LogicalAddress Find(TKey key);                 // Empty = 不存在
+    LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress);
+    bool Delete(TKey key);
+    long EntryCount { get; }
+    long IndexSize { get; }                        // 索引内存占用（字节）
+}
+</code></pre>
+<p>两族基类均实现 <code>IIndex&lt;TKey&gt;</code> + <code>ITransactionParticipant</code>，均提供 <code>BeginAddress</code>（恢复窗口起点）、
+<code>EnterScope()</code> → <code>IndexScope</code>（跳 epoch 的点查形态）、<code>FindBatch(keys, results)</code>（批量）。</p>
+<p><strong>持久化两形态</strong>（恢复加速，非正确性——不配也安全，走全量重放）：</p>
+<ul>
+<li>HashIndex：<strong>自建主存储</strong>（内置后台 dump，<code>PersistenceKind</code> 可关）；</li>
+<li>SortedIndex：<strong>桥接注入</strong> <code>ITransferPersistence</code>（内置桥 <code>WholeMirrorPersistence</code> 托管 WholeMirror；
+不注入 = 纯重放 fail-safe）。</li>
+</ul>
+<h3 id="33-log组提交与回放">3.3 Log：组提交与回放</h3>
+<p><code>Append</code>（返回地址，超单页抛）→ 批量 <code>BeginAppendBatch()</code> → 显式提交 <code>CommitAsync</code>（= flush +
+推进 CommittedOffset + meta.Commit）或 <code>Flush</code>（只落盘不推进水位）。回放 <code>Replay</code>（只读已提交，
+<code>verifyCrc</code> 可选）。组提交策略（字节量/条数/时间间隔三维）构造注入。<strong>单写者</strong>——多生产者经队列汇聚。</p>
+<h3 id="34-metadata--mirror--snapshot">3.4 Metadata / Mirror / Snapshot</h3>
+<ul>
+<li><strong>Metadata</strong>：<code>Write(data)→地址</code> / <code>Read(dst)</code> / <code>AsSpan()</code> / <code>GetRef&lt;T&gt;()</code>；崩溃安全天然（写到一半 =
+旧版本完好）。两消费形态：直接用（跨重启单值状态）；3a 外部隔离传输（<code>MetadataMetaTransport</code> 托管，
+勿自写单槽文件）。</li>
+<li><strong>Mirror</strong>：写会话三拍 <code>BeginSession()</code> → <code>AppendChunk(bytes)×n</code> → <code>EndSession()</code>（不知尺寸、零缓冲，
+EndSession flush）；<code>ReadChunk</code> 按帧读。PagedMirror 逐页 <code>WritePage</code>。2PC 六件套全实现（Abort = 丢弃
+未确认会话）。</li>
+<li><strong>Snapshot</strong>：<code>OpenWrite/OpenWriteRange</code> → <code>StreamFrameWriter</code>（Write + Complete）；<code>OpenRead</code> 反向。
+⚠️ 与 Ring 自带的区间快照（§3.1）无引用关系——那是 Ring 导出能力，这是独立文件形态。</li>
+</ul>
+<h3 id="35-生命周期与-2pc">3.5 生命周期与 2PC</h3>
+<ul>
+<li><strong>生命周期</strong>（全部结构统一）：<code>Create(...)</code> 一步就绪（= 构造 + Initialize + WaitForReady）；
+或构造 → <code>Initialize(hints)</code> → <code>WaitForReady</code> 分步（观察恢复/注入恢复窗口）。Dispose 幂等。</li>
+<li><strong>跨结构原子性</strong>：2PC 六件套由 <code>ITransactionParticipant</code> 暴露，协调器 = <code>Transactions/TransactionLog</code>
+（写独立 commit record 文件驱动 Prepare/Confirm/Abort）。<strong>上层编排归 Session</strong>（统一协调协议层：
+写=staged 物化委托经单飞提交管线、检查点=管线串行回合、悬挂裁决）——使用指南见
+<a href="session.html"><code>session.md</code></a>。</li>
+</ul>
+<hr>
+<h2 id="4-反模式组合层必守">4. 反模式（组合层必守）</h2>
+<ol>
+<li><strong>写编排反序</strong>：先 <code>index.Insert</code> 再 <code>ring.Write</code>——索引指向不存在的数据。</li>
+<li><strong>零拷贝 span 逃逸 scope</strong>：<code>GetValueSpan</code> 返回值禁止越过 <code>ReadScope.Dispose()</code>。</li>
+<li><strong>Log 并发 Append</strong>：单写者硬性要求（多生产者经队列汇聚）。</li>
+<li><strong>绕过 <code>[RingKey]</code> 直接继承开放泛型</strong>——封闭薄类是唯一消费面（分析器诊断不满足 unmanaged 约束的声明）。</li>
+<li><strong>为索引手搭 checkpoint 引擎/存储</strong>——HashIndex 走自建主存储（内置）；SortedIndex 走
+<code>ITransferPersistence</code> 注入。主存储/dump 机制见源码注释与设计稿。</li>
+<li><strong>给地址直达读加会话/索引</strong>——地址即句柄：<code>GetValue(addr)</code> 永久零税。</li>
+<li><strong>跨实例组合 DeleteOnClose=true</strong>——跨重启组合必须 <code>DeleteOnClose=false</code>（否则索引重建时真相源被清）。</li>
+<li><strong>增长后检查索引阈值</strong>——增长必须在<strong>插入之前</strong>检查（增长时刻表内条目必可经 KeyResolver 解析）。</li>
+</ol>
+<hr>
+<h2 id="5-想深入指路">5. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>meta 统一协议（opaque 搭车/块格式/自定义传输）</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+</tr>
+<tr>
+<td>Session 协调协议（写/读/检查点三 op、悬挂裁决、故障模型）</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+</tr>
+<tr>
+<td>引擎使用（读写/水位/恢复/Compact）</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a></td>
+</tr>
+<tr>
+<td>性能基线（点查/写/恢复/并发扩展）</td>
+<td><a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a></td>
+</tr>
+<tr>
+<td>帧格式/主存储机制/恢复细节</td>
+<td>源码注释（<code>Structures/</code> 各 partial）与设计稿（<code>docs/design/</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>机制级细节（8 水位全表、帧字节布局、dump 协议、2PC 内部状态机）按需从源码与设计稿查阅——使用面
+不需要这些细节；能力全集以类型 XML 注释为准。</p>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/structures.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

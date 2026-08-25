@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class RootSpaceImage | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class RootSpaceImage | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="根空间采集/还原管线（raw-medium-and-conversion-design &#167;5）——四态互转的唯一机构。 ★ 只依赖 /IFileHandle 接口平面：对根空间内部住着谁一无所知，   任意介质 ↔ 任意介质（含 Raw 载体——virtual 介质的 .raw 文件/块设备载体层，已落地点亮）。 ★ 采集契约：枚举（ 递归）→   Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（&#167;5.5）：    且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。 ★ 还原契约：目标根空间必须为空（非空即拒——显式失败优于静默合并，&#167;5.3）；目录（父先）→   文件（帧落位 → SetLength 定逻辑长度 → FileExtra 回填）→ 逐句柄 Flush（Remote 介质 Flush 即持久化）。 ★ Stat 时间戳仅入清单审计（ModifiedTicks），不承诺还原——IFileSystem 无时间戳写入平面（&#167;5.2 诚实表达）。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage">
+
+
+
+  <h1 id="TC_Tier_Core_IO_Image_RootSpaceImage" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage" class="text-break">Class RootSpaceImage</h1>
+  <div class="markdown level0 summary"><p>根空间采集/还原管线（raw-medium-and-conversion-design §5）——四态互转的唯一机构。</p>
+<p>★ 只依赖 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a>/IFileHandle 接口平面：对根空间内部住着谁一无所知，
+  任意介质 ↔ 任意介质（含 Raw 载体——virtual 介质的 .raw 文件/块设备载体层，已落地点亮）。</p>
+<p>★ 采集契约：枚举（<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_EnumerateEntries_System_String_System_String_System_Boolean_">EnumerateEntries(string, string, bool)</a> 递归）→
+  Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（§5.5）：
+  <a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html#TC_Tier_Core_IO_Image_ImageOptions_QuietSource">QuietSource</a> 且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。</p>
+<p>★ 还原契约：目标根空间必须为空（非空即拒——显式失败优于静默合并，§5.3）；目录（父先）→
+  文件（帧落位 → SetLength 定逻辑长度 → FileExtra 回填）→ 逐句柄 Flush（Remote 介质 Flush 即持久化）。</p>
+<p>★ Stat 时间戳仅入清单审计（<code>ModifiedTicks</code>），不承诺还原——IFileSystem 无时间戳写入平面（§5.2 诚实表达）。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">RootSpaceImage</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a>.<a class="xref" href="TC.Tier.Core.IO.Image.html">Image</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_IO_Image_RootSpaceImage_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class RootSpaceImage</code></pre>
+  </div>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_IO_Image_RootSpaceImage_Capture_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Capture*"></a>
+  <h4 id="TC_Tier_Core_IO_Image_RootSpaceImage_Capture_TC_Tier_Core_IO_IFileSystem_System_IO_Stream_TC_Tier_Core_IO_Image_ImageOptions_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Capture(TC.Tier.Core.IO.IFileSystem,System.IO.Stream,TC.Tier.Core.IO.Image.ImageOptions)">Capture(IFileSystem, Stream, ImageOptions?)</h4>
+  <div class="markdown level1 summary"><p>采集根空间 → TCA1 流。源须已静默（或 <a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html#TC_Tier_Core_IO_Image_ImageOptions_QuietSource">QuietSource</a> 自动门闩）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ImageSummary Capture(IFileSystem source, Stream output, ImageOptions? options = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">source</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
+        <td><span class="parametername">output</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html">ImageOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Image_RootSpaceImage_Restore_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Restore*"></a>
+  <h4 id="TC_Tier_Core_IO_Image_RootSpaceImage_Restore_System_IO_Stream_TC_Tier_Core_IO_IFileSystem_TC_Tier_Core_IO_Image_ImageOptions_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Restore(System.IO.Stream,TC.Tier.Core.IO.IFileSystem,TC.Tier.Core.IO.Image.ImageOptions)">Restore(Stream, IFileSystem, ImageOptions?)</h4>
+  <div class="markdown level1 summary"><p>从 TCA1 流还原到目标根空间（必须为空）。逐帧 CRC + 流尾对账（<a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html#TC_Tier_Core_IO_Image_ImageOptions_VerifyChecksums">VerifyChecksums</a> 可关）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ImageSummary Restore(Stream input, IFileSystem destination, ImageOptions? options = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
+        <td><span class="parametername">input</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">destination</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html">ImageOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Image_RootSpaceImage_Transfer_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Transfer*"></a>
+  <h4 id="TC_Tier_Core_IO_Image_RootSpaceImage_Transfer_TC_Tier_Core_IO_IFileSystem_TC_Tier_Core_IO_IFileSystem_TC_Tier_Core_IO_Image_ImageOptions_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Transfer(TC.Tier.Core.IO.IFileSystem,TC.Tier.Core.IO.IFileSystem,TC.Tier.Core.IO.Image.ImageOptions)">Transfer(IFileSystem, IFileSystem, ImageOptions?)</h4>
+  <div class="markdown level1 summary"><p>介质间转移（dd 快道路由入口——raw-medium-and-conversion-design §6.2）。</p>
+<p>★ 路由（能力位驱动，非按介质硬编码）：源与目标<b>均</b>置位
+  <a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html#TC_Tier_Core_IO_FileSystemCapabilities_ContiguousCapture">ContiguousCapture</a> 且实现 <span class="xref">TC.Tier.Core.IO.Image.IContiguousVolume</span>
+  → **字节直拷快道**：双侧维护租约内整卷原始字节顺序拷贝（真·dd，产物 = 整卷字节镜像）。
+  其余组合 → 结构化管线（TCA1 流经内存中转）。</p>
+<p>★ 快道契约：租约由本方法进出（源 WriteOperations 档、目标 AllOperations 档——写入端完全隔离）；
+  拷贝后长度对账（短读即 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_IOFailure">IOFailure</a>）。压缩选项对快道不生效
+  （字节镜像语义——压缩属结构化产物，§6.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ImageSummary Transfer(IFileSystem source, IFileSystem target, ImageOptions? options = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">source</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">target</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html">ImageOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>TC.Tier.Core 协调框架使用指南 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="TC.Tier.Core 协调框架使用指南 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="tctiercore-协调框架使用指南">TC.Tier.Core 协调框架使用指南</h1>
+
+<blockquote>
+<p>本文件是 <strong>Core 层协调积木的&quot;正确拼装&quot;指南</strong>：每个公共组件的职责、正确用法、以及反模式。
+它不重复每个类的 XML 注释，而是回答&quot;<strong>遇到 X 该用哪个积木、怎么用、什么绝对不要做</strong>&quot;。</p>
+<p><strong>Core 的范围</strong>（五层架构的第三层）：<code>LifecycleBase</code>/<code>RecoveryBase</code>（实现 <code>TC.Tier.Contracts</code> 的 <code>ILifecycle</code>/<code>IRecovery</code>——依赖倒置）+ 基础设施目录（Epochs/NativeInterop/Logging/Metrics/Tracing/Observability）+ <code>Primitives/</code>（底层叶子积木：<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>SectorAlignment</code>/<code>AlignmentConst</code>/<code>SpinLockScope</code>/<code>IKeyComparer</code>/<code>KeyComparer</code> + 原生内存/异步同步原语/计算计时叶子）+ <code>Collections/</code>（容器型复合体：队列/缓存/池）+ <code>Shared/</code> 非业务积木（<code>ResourceGroup</code>/<code>BackgroundWorkerLoop</code> 等）。接口/数据契约在 Contracts，源生成器特性在 <code>TC.Tier.CodeGen.Abstractions</code>。</p>
+<p>配合阅读（项目内深读）：</p>
+<ul>
+<li><a href="docs/lifecycle.html"><code>docs/lifecycle.md</code></a> —— 生命周期 前→中→后 三阶段正确拼装（<code>LifecycleBase</code>/<code>RecoveryBase</code>）</li>
+<li><a href="docs/resource-management.html"><code>docs/resource-management.md</code></a> —— 资源统一管理（<code>ResourceGroup</code>，强制）</li>
+<li><a href="docs/worker-loop.html"><code>docs/worker-loop.md</code></a> —— 后台循环统一设计（<code>BackgroundWorkerLoop</code>）</li>
+<li><a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> —— 互斥/回收/原子更新（<code>SpinRWLock</code>/<code>FairGate</code>/<code>LightEpoch</code>/<code>Atomic128</code>，epoch 易和锁混淆）</li>
+<li><a href="docs/version-scheme.html"><code>docs/version-scheme.md</code></a> —— 版本号协调状态机（<code>EpochProtectedVersionScheme</code>，epoch 保护下分阶段过渡版本；当前 Core 就绪、上层引擎未接入）</li>
+<li><a href="docs/memory.html"><code>docs/memory.md</code></a> —— 原生内存与对象池（<code>AlignedMemoryManager</code>/<code>NativeArena</code>/<code>PinnedBufferPool</code>/<code>OverflowPool</code>，⚠️ 全部非托管必须 Dispose）</li>
+<li><a href="docs/async-primitives.html"><code>docs/async-primitives.md</code></a> —— 异步同步原语与队列（<code>AsyncManualResetEvent</code>/<code>AsyncCountDown</code>/<code>AsyncQueue</code>；实测见 <a href="docs/perf/core-primitives-perf.html">docs/perf/core-primitives-perf.md</a>）</li>
+<li><a href="docs/priority-queues.html"><code>docs/priority-queues.md</code></a> —— 优先队列族（<code>BucketPriorityQueue</code>/<code>SkipListPriorityQueue</code>/<code>AsyncPriorityQueue</code>，Linux 完整验证；实测见 <a href="docs/perf/priority-queues-performance.html">docs/perf/priority-queues-performance.md</a>）</li>
+<li><a href="docs/cache-and-compute.html"><code>docs/cache-and-compute.md</code></a> —— 缓存/弱引用字典/CRC/计时/位运算/异常（<code>ClockCache</code>/<code>ShardLockWeakReference</code>/<code>UnifiedCrc</code>/<code>MicroTimer</code>/<code>Utility</code>/<code>ThrowHelper</code>）</li>
+<li><a href="docs/native-interop.html"><code>docs/native-interop.md</code></a> —— 原生 syscall facade（<code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code>，IO/预分配/打洞/刷盘/内存锁；★ Core.IO 的内部实现底座，<strong>不对外</strong>——能力已由 Core.IO 全部封口）</li>
+<li><a href="docs/io.html"><code>docs/io.md</code></a> —— 文件 IO 原语层（<code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>MemoryFileSystem</code>/<code>FaultInjectingFileSystem</code>，两平面×四介质×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）</li>
+<li><a href="docs/virtual-file-system.html"><code>docs/virtual-file-system.md</code></a> —— <strong>第四介质 Raw</strong>（<code>RawFileSystem</code>：<code>.raw</code> 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 <a href="docs/perf/io-performance.html">docs/perf/io-performance.md</a> §8）</li>
+<li><a href="../TC.Tier.Core.IO.S3/COORDINATION.html"><code>../TC.Tier.Core.IO.S3/COORDINATION.md</code></a> —— S3 兼容对象存储客户端层（<code>S3ObjectStore</code>：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；使用指南 <a href="../TC.Tier.Core.IO.S3/docs/network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a>）</li>
+<li><a href="docs/observability.html"><code>docs/observability.md</code></a> —— 可观测（<code>ObservabilityHub</code>/<code>IMetricsSink</code>/<code>ITracer</code>：视图全景/采样/零开销契约/测试场景）</li>
+<li><a href="docs/logging.html"><code>docs/logging.md</code></a> —— 日志（<code>ILogger</code>/<code>LoggerExtensions</code>：重载矩阵/热路径规则/与 Hub 的边界）</li>
+<li><a href="docs/dedicated-task-scheduler.html"><code>docs/dedicated-task-scheduler.md</code></a> —— 专用线程调度器（<code>IsolatedTaskScheduler</code>；性能实测见 <a href="docs/perf/dedicated-task-scheduler-perf.html"><code>docs/perf/dedicated-task-scheduler-perf.md</code></a>）</li>
+<li><a href="../TC.Tier.Contracts/COORDINATION.html"><code>../TC.Tier.Contracts/COORDINATION.md</code></a> —— 接口/数据契约（Core 实现它们的 <code>ILifecycle</code>/<code>IRecovery</code>）</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>Core 提供的协调积木都是对的、齐的。出问题的地方是上层（IO 引擎/数据结构）把积木拼错了。</strong>
+本文件的目的就是把&quot;正确拼法&quot;钉死，杜绝重蹈覆辙。</p>
+<hr>
+<h2 id="1-核心积木全景">1. 核心积木全景</h2>
+<table>
+<thead>
+<tr>
+<th>积木</th>
+<th>位置</th>
+<th>职责</th>
+<th>何时用</th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LifecycleBase&lt;THints&gt;</code></td>
+<td><code>Shared/LifecycleBase.cs</code></td>
+<td>生命周期骨架：Initialize/Dispose 模板、worker 启停编排、状态查询</td>
+<td><strong>所有</strong>有生命周期的对象（IO 引擎、数据结构）都继承它</td>
+<td></td>
+</tr>
+<tr>
+<td><code>RecoveryBase&lt;THints&gt;</code></td>
+<td><code>Shared/RecoveryBase.cs</code></td>
+<td>恢复模板：RecoverAsync 编排 + CAS 状态机 + 进度上报</td>
+<td>需要&quot;启动恢复&quot;的对象；继承后只 override <code>OnRecoveryCoreAsync</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ResourceGroup</code></td>
+<td><code>Shared/ResourceGroup.cs</code></td>
+<td>资源统一释放：按名注册、逆序释放、聚合异常</td>
+<td><code>LifecycleBase.Resources</code> 已内建一个；子类 <code>Resources.Add(...)</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>BackgroundWorkerLoop</code> / <code>BackgroundWorkerLoop&lt;T&gt;</code></td>
+<td><code>Shared/BackgroundWorkerLoop.cs</code></td>
+<td>后台执行：循环骨架（公共池/隔离调度器注入 + 多消费者）+ 内建优先级队列</td>
+<td><strong>所有</strong>后台循环/队列消费者——禁止 <code>new Thread</code> 自建</td>
+<td></td>
+</tr>
+<tr>
+<td><code>LightEpoch</code></td>
+<td><code>Epochs/LightEpoch.cs</code></td>
+<td>RCU 式延迟回收：epoch 保护 + 协作 drain</td>
+<td><strong>上层结构组件</strong>（index/metadata 回收）；存储读写互斥<strong>用 SpinRWLock</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>NativeAtomic128</code></td>
+<td><code>NativeInterop/NativeAtomic128.cs</code></td>
+<td><strong>128 位 CAS</strong>（x86 <code>lock cmpxchg16b</code> / ARM64 <code>ldaxp-stlxp</code>），解决 &gt;64 位载荷无 <code>Interlocked</code></td>
+<td>大载荷原子更新（指针+标志 / 水位+ABA version）；⚠️ <code>location</code> 须 <strong>16B 对齐</strong>；底层原语</td>
+<td></td>
+</tr>
+<tr>
+<td><code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code></td>
+<td><code>NativeInterop/</code></td>
+<td>跨平台 syscall facade（扇区探测/无缓冲 IO/预分配/打洞/刷盘/内存锁/扩展属性）</td>
+<td>🔒 <strong><code>internal</code>（编译期封堵，仅 Core.IO 消费）</strong>；需要 IO 的组件用 <code>TC.Tier.Core.IO</code>（<a href="docs/io.html"><code>docs/io.md</code></a>），外部业务经 <code>IStorageEngine</code>；syscall→Core.IO 映射表与仓内过渡 IVT 例外见 <a href="docs/native-interop.html"><code>docs/native-interop.md</code></a></td>
+<td></td>
+</tr>
+<tr>
+<td><code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>DiskFileSystem</code>/<code>MemoryFileSystem</code></td>
+<td><code>IO/</code>（单一命名空间 + 职责子目录 Disk/Mem/Shared/Testing——★ 本层目录≠命名空间，全仓唯一例外）</td>
+<td><strong>文件 IO 原语层</strong>（两平面 × 介质多态；能力协商、DIO 逐句柄探测对齐、文件级 Append 预留、字节范围锁、内存映射、memfs 双分配模式、池 Acquire/Release 归还协议）。<strong>公开面=契约+枚举+错误+池+两介质 fs 工厂；句柄实现/FaultInjecting/共享工具全部 internal</strong>（facade 纪律——FaultInjecting 是测试设施，生产禁用）</td>
+<td>需要文件级 IO 的所有组件；外部通常经 <code>IStorageEngine</code> 间接用，直接用先读 <a href="docs/io.html"><code>docs/io.md</code></a> 陷阱清单（⚠️ mem Dispose=拔盘方向差异置顶）</td>
+<td></td>
+</tr>
+<tr>
+<td><code>Atomic128&lt;T&gt;</code></td>
+<td><code>Primitives/Atomic128.cs</code></td>
+<td><strong>标准 128 位 CAS 单槽封装</strong>（16B 对齐背板 + 探测降级 + 裸读不撕裂）——<code>NativeAtomic128</code> 之上的易用层</td>
+<td><strong>优先用它</strong>（别裸调 <code>NativeAtomic128</code>）；<code>T</code> 须 16B blittable struct；标准范式见 <a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §3</td>
+<td></td>
+</tr>
+<tr>
+<td><code>SpinRWLock</code></td>
+<td><code>Primitives/SpinRWLock.cs</code></td>
+<td><strong>写偏向</strong> CAS 自旋 RW 锁原语（bit63 写持有 + <strong>bit62 写等待挡新读者</strong> + 读计数递增；下溢绊线 + Debug 值示波器）。任何需要 RW 互斥的对象挂一个 <code>SpinRWLock</code> 字段即获得协调锁——写者不被持续读者流饿死（2026-08-20 自 LockWord 重构，读优先→写偏向，Monitor 等待-通知职责删除）</td>
+<td>对象读写互斥：读 <code>AcquireShared</code>，写/销毁 <code>AcquireExclusive</code>（标准范式见 <a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §1）</td>
+<td></td>
+</tr>
+<tr>
+<td><code>FairGate</code></td>
+<td><code>Primitives/FairGate.cs</code></td>
+<td><strong>到达顺序公平门</strong>——重试循环获取资源的协调器：fast path 查 <code>HasWaiters</code> 让位、慢路径 <code>TryAcquireSlow</code>、资源可获取后 <code>Wake</code>（PulseAll + 5ms 让渡先手）</td>
+<td>多写者竞争同资源不插队（现使用方：AcquireExtent 区间占用）；见 <a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §1.5</td>
+<td></td>
+</tr>
+<tr>
+<td><code>CpuSampler</code></td>
+<td><code>Shared/CpuSampler.cs</code></td>
+<td>CPU 采样限流（进程口径 EMA + 三档 <code>ThrottleFactor</code>）</td>
+<td>写热路径 CPU 背压；用法见 <a href="docs/worker-loop.html"><code>docs/worker-loop.md</code></a> §7</td>
+<td></td>
+</tr>
+<tr>
+<td><code>IsolatedTaskScheduler</code></td>
+<td><code>Shared/IsolatedTaskScheduler.cs</code></td>
+<td>隔离线程 Task 调度器（M 私有线程 + watchdog + 死亡重启 + 指标）</td>
+<td>高频/关键 worker 的执行器（引擎 own 实例）；见 <a href="docs/dedicated-task-scheduler.html"><code>docs/dedicated-task-scheduler.md</code></a></td>
+<td></td>
+</tr>
+<tr>
+<td><code>InstanceTracker</code></td>
+<td><code>Shared/InstanceTracker.cs</code></td>
+<td>实例级泄漏跟踪</td>
+<td><code>LifecycleBase</code> 构造自动注册，无需手动</td>
+<td></td>
+</tr>
+<tr>
+<td><strong>— 可观测（见 §3）—</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ILogger</code> / <code>ILoggerFactory</code></td>
+<td><code>Logging/</code></td>
+<td>极简日志（去掉 M.E.Logging 的 <code>TState</code>/<code>formatter</code>）；全 36 重载 null 安全 + <code>IsEnabled</code> 短路；<code>NullLogger</code> 零开销默认</td>
+<td>上层注入 factory；用法见 <a href="docs/logging.html"><code>docs/logging.md</code></a></td>
+<td></td>
+</tr>
+<tr>
+<td><code>IMetricsSink</code></td>
+<td><code>Metrics/</code></td>
+<td>指标三原语 Counter/Histogram/Gauge（<code>ReadOnlySpan&lt;KeyValuePair&gt;</code> tags 零分配热路径）</td>
+<td>经 <code>ObservabilityHub</code> 视图走，<strong>不直接调</strong></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ITracer</code> / <code>ISpan</code></td>
+<td><code>Tracing/</code></td>
+<td>分布式追踪（<code>AsyncLocal</code> 父子 span）；<code>NullTracer</code> 默认；AOT 友好（无反射/Emit）</td>
+<td><code>if (TracingEnabled) BeginSpan</code>；<code>using</code> 自动收尾</td>
+<td></td>
+</tr>
+<tr>
+<td><code>ObservabilityHub</code></td>
+<td><code>Observability/</code></td>
+<td><strong>唯一可观测接入点</strong>：聚合 Metrics + Tracing（⚠️ <strong>不含 Logging</strong>），两级短路 + 采样 + 5 维度视图（Metrics/Storage/Log/Index/<strong>SegmentAllocator</strong>）</td>
+<td><code>ObservabilityHub.Create(sink, tracer, opts)</code> 或 <code>Disabled</code>；完整指南 <a href="docs/observability.html"><code>docs/observability.md</code></a></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>— 高性能工具集（见 §4，全部性能验证过）—</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Primitives/</code> 叶子工具 + <code>Collections/</code> 容器</td>
+<td><code>Primitives/</code> · <code>Collections/</code></td>
+<td>异步同步原语 / 原生内存 / 优先队列 / 内存池 / 缓存 / 计时 / CRC——零分配、无锁、池化、硬件加速</td>
+<td><strong>先查 §4.1 选型表，禁止自己造</strong>。叶子（原生内存/异步同步/计算计时）在 <code>Primitives/</code>，容器（队列/缓存/池）在 <code>Collections/</code></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>— 核心契约与原语（见 §6）—</strong></td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Primitives/</code></td>
+<td><code>Primitives/</code></td>
+<td><strong>Core 原语</strong>：<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>SectorAlignment</code>/<code>AlignmentConst</code>/<code>SpinLockScope</code>/<code>IKeyComparer</code>/<code>KeyComparer</code></td>
+<td>§5（<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>LightEpoch</code>）+ §6（<code>KeyComparer</code>/对齐/<code>SpinLockScope</code>）。⚠️ 接口/数据契约（<code>ILifecycle</code>/<code>IStorageEngine</code>/<code>LogicalAddress</code>…）在 Contracts，使用红线见 <a href="../TC.Tier.Contracts/COORDINATION.html"><code>../TC.Tier.Contracts/COORDINATION.md</code></a> §5</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-三大生命周期支柱的正确用法">2. 三大生命周期支柱的正确用法</h2>
+<h3 id="21-lifecyclebasethints--生命周期骨架">2.1 <code>LifecycleBase&lt;THints&gt;</code> —— 生命周期骨架</h3>
+<p><strong>契约</strong>：Initialize 是固定模板，子类<strong>不改流程、只 override 钩子</strong>：</p>
+<pre><code>Initialize(hints):
+  CAS 幂等闸门
+  → OnInitializeBegin()          // [前] 子类：引擎 init + Resources.Add 装配
+  → CreateRecovery()             // 工厂：子类返回 IRecovery（或 null=无需恢复）
+  → 后台 task:
+      await RecoverAsync(hints)  // [中] 恢复
+      OnInitializeComplete()     // [后] 仅恢复成功后串行执行
+      backgroundWorker.Start()   // worker 在 [后] 之后启动
+</code></pre>
+<p><strong>子类只碰这些</strong>（其余别动）：</p>
+<ul>
+<li><code>OnInitializeBegin()</code> —— 装配资源、初始化引擎、<code>Resources.Add(...)</code></li>
+<li><code>CreateRecovery()</code> —— <code>protected virtual</code>，返回 <code>new XxxRecovery(this)</code>（或 <code>null</code>）</li>
+<li><code>OnInitializeComplete()</code> —— 恢复成功后的装配（可安全读恢复产物）</li>
+<li><code>ConfigureBackgroundWorker(worker)</code> —— 在 Begin 或 Complete 里调，注册长生命周期 worker</li>
+<li><code>DisposeOverride(bool)</code> / <code>DisposeOverrideAsync(bool)</code> —— 额外清理（核心清理基类已做）</li>
+<li><code>EnsureReady()</code> —— 读写入口第一行守卫</li>
+</ul>
+<p><strong>铁律</strong>：</p>
+<ul>
+<li>❌ <strong>绝不</strong>自己写 <code>Initialize</code> / <code>Dispose</code>（它们是 <code>non-virtual</code> 模板，绕不过；<code>new</code> 隐藏也无效）。</li>
+<li>❌ <strong>绝不</strong>在构造器里启动线程/后台循环并把 <code>this</code> 暴露（构造未完成竞态）。</li>
+<li>✅ 长生命周期 worker 一定走 <code>ConfigureBackgroundWorker</code>——基类保证它在 <strong>恢复完成后</strong>才 Start，且 Dispose 时按正确顺序 Stop+WaitForExit。</li>
+</ul>
+<h3 id="22-recoverybasethints--恢复模板">2.2 <code>RecoveryBase&lt;THints&gt;</code> —— 恢复模板</h3>
+<p><strong>契约</strong>：<code>RecoverAsync</code> 是固定编排，子类<strong>不 override</strong>，只 override 钩子：</p>
+<pre><code>RecoverAsync(hints, ct):
+  CAS 闸门（Ready→no-op / Recovering→抛&quot;不可重入&quot;）
+  → WaitForDependenciesAsync(ct)   // virtual：层间 join（等子引擎就绪），默认空
+  → OnRecoveryStart()              // virtual：默认上报 Recovering/0%
+  → OnRecoveryCoreAsync(hints, ct) // ★ abstract：唯一必 override，真正恢复算法
+  → OnRecoveryComplete()           // virtual：默认上报 Completed/100%
+  → MarkReady()
+  （异常 → 置 Failed + 回退闸门 + 重抛）
+</code></pre>
+<p><strong>子类只 override</strong>：</p>
+<ul>
+<li><code>OnRecoveryCoreAsync(hints, ct)</code> —— <strong>唯一必 override</strong>：扫盘/读 meta/回放/重建。进度用 <code>RaiseProgress(percent, detail)</code>，取消检查用 <code>ct.ThrowIfCancellationRequested()</code>。</li>
+<li><code>WaitForDependenciesAsync(ct)</code> —— 需要等子层恢复完才读本层产物的，在此 <code>await owner._engine.WaitForReadyAsync(ct)</code>。</li>
+<li><code>CancelRecovery()</code> —— 需要&quot;显式取消清理&quot;（停扫盘、释放扫描资源）的 override；纯 ct 轮询的不用动。</li>
+</ul>
+<p><strong>铁律</strong>：</p>
+<ul>
+<li>❌ <strong>绝不</strong>自己维护 <code>_state</code> / CAS 闸门 / <code>MarkReady</code> 调用顺序——全在基类。</li>
+<li>✅ 状态查询一律用 <code>RecoveryState</code> / <code>IsReady</code>，<strong>不</strong>用&quot;Recovery 非 null&quot;判断是否就绪。</li>
+</ul>
+<h3 id="23-resourcegroup--资源统一管理强制">2.3 <code>ResourceGroup</code> —— 资源统一管理（<strong>强制</strong>）</h3>
+<p><strong>全部资源管理必须统一走 <code>ResourceGroup</code></strong>（<code>LifecycleBase.Resources</code> 已内建一个）——禁止自建 <code>_disposables</code>、禁止手动管释放顺序。它解决两个老大难：<strong>释放顺序</strong>（自动逆序）与<strong>泄漏</strong>（构造期/异常路径漏释放）。</p>
+<ul>
+<li><code>Owned</code>（默认）：本实例拥有的，Dispose 时组释放。</li>
+<li><code>Referenced</code>：外部注入的共享资源，只跟踪诊断、<strong>不释放</strong>（防双释放）。</li>
+</ul>
+<p>正确拼法、所有权判定、范式见 <a href="docs/resource-management.html"><code>docs/resource-management.md</code></a>。</p>
+<h3 id="24-backgroundworkerloop--后台执行唯一合法的后台循环">2.4 <code>BackgroundWorkerLoop</code> —— 后台执行（<strong>唯一</strong>合法的后台循环）</h3>
+<p>两层：</p>
+<ul>
+<li><strong><code>BackgroundWorkerLoop</code></strong>（第一层）：纯循环骨架。子类实现 <code>RunOneCycleAsync(ct)</code>（一个周期，返回 false 停止）。钩子：<code>OnLoopStart</code> / <code>OnLoopExitAsync</code> / <code>OnCycleError</code>。构造注入 <code>TaskScheduler? scheduler</code>（null=公共池 <code>Task.Run</code>，低频 worker；高频/关键 worker 注入 <code>IsolatedTaskScheduler</code>）。</li>
+<li><strong><code>BackgroundWorkerLoop&lt;T&gt;</code></strong>（第二层）：内建 5 档优先级队列。子类只实现 <code>ProcessItemAsync(item, ct)</code>，生产者 <code>Enqueue(item, priority)</code>，开箱即用。</li>
+</ul>
+<pre><code class="lang-csharp">// 标准后台任务（队列消费者）——只实现 ProcessItemAsync
+sealed class MyFlusher : BackgroundWorkerLoop&lt;FlushJob&gt;
+{
+    protected override async ValueTask ProcessItemAsync(FlushJob job, CancellationToken ct)
+    { /* ... */ }
+}
+// 在 OnInitializeBegin 或 OnInitializeComplete 里注册：
+ConfigureBackgroundWorker(new MyFlusher(scheduler: myScheduler, name: &quot;meta-flusher&quot;));
+// scheduler：null=公共池（低频）；高频/关键 worker 注入 IsolatedTaskScheduler（见 docs/worker-loop.md §2）
+</code></pre>
+<p><strong>铁律</strong>（后台循环的核心教训）：</p>
+<ul>
+<li>❌ <strong>绝不</strong> <code>new Thread(...)</code> 自建后台循环——自建循环生命周期分散、<code>Dispose</code> 不统一、异常无人接住、进程退出不干净。</li>
+<li>✅ <strong>所有</strong>后台循环继承 <code>BackgroundWorkerLoop</code>，经 <code>ConfigureBackgroundWorker</code> 注册——基类统一管 Start（恢复后）/ Stop / WaitForExit / Dispose 顺序。</li>
+<li>✅ 单周期异常<strong>不要</strong>杀 worker——基类已隔离（走 <code>OnCycleError</code>），循环自动继续。</li>
+</ul>
+<hr>
+<h2 id="3-可观测基础设施">3. 可观测基础设施</h2>
+<p>Core 的另一条线——<strong>不参与协调，但同样是所有上层共享的底层积木</strong>。
+核心原则：日志/指标/追踪<strong>三信号各自独立配置</strong>；指标 + 追踪经 <code>ObservabilityHub</code> 统一接入、两级短路。
+<strong>完整指南（视图方法清单 / 采样算法 / 零开销契约 / 测试场景 / 自定义 sink）：
+<a href="docs/observability.html"><code>docs/observability.md</code></a>（可观测）+ <a href="docs/logging.html"><code>docs/logging.md</code></a>（日志）。</strong></p>
+<h3 id="31-日志-ilogger独立不经-hub">3.1 日志 <code>ILogger</code>（独立，<strong>不经</strong> Hub）</h3>
+<ul>
+<li>极简接口（<code>Log</code> / <code>IsEnabled</code>），刻意去掉 <code>Microsoft.Extensions.Logging</code> 的 <code>TState</code>/<code>formatter</code>。</li>
+<li><strong>零开销</strong>：<code>LoggerExtensions</code> 每个重载先 <code>IsEnabled</code> 再格式化——<strong>调用方默认无需手写 IsEnabled</strong>；0/1/2/3 参用强类型重载避免装箱；<strong>超过 3 参</strong>走 <code>params</code> 兜底（数组+装箱在调用点发生，<strong>仅热路径</strong>才值得手动 <code>IsEnabled</code> 保护）。</li>
+<li>命名占位符 <code>{name}</code> 自动按顺序映射 <code>{0},{1},...</code>（源生成正则）。</li>
+<li><code>NullLogger</code>/<code>NullLoggerFactory</code> 单例——无注入时零开销。</li>
+<li>⚠️ <strong>Logging 不归 <code>ObservabilityHub</code> 管</strong>——由上层独立注入 <code>ILoggerFactory</code>，<code>ObservabilityOptions</code> 明确不控制日志级别。</li>
+<li>★ <strong>宿主桥接很简单</strong>：<code>LogLevel</code> 与 M.E.Logging 枚举值 1:1（直接强转），控制台 / MEL 全家桶 / 可观测后端十几行适配完——现成范例见 <a href="docs/logging.html"><code>docs/logging.md</code></a> §4。</li>
+</ul>
+<pre><code class="lang-csharp">logger.LogInformation(&quot;append ok entry={entry} size={size}&quot;, entryId, size);   // 命名占位
+if (logger.IsEnabled(LogLevel.Debug))                                         // 仅热路径 4+ 参需要手动保护
+    logger.LogDebug(&quot;...{a} {b} {c} {d}&quot;, a, b, c, d);                        // （params 调用点分配）
+</code></pre>
+<h3 id="32-指标-imetricssink经-hub不直接调">3.2 指标 <code>IMetricsSink</code>（经 Hub，<strong>不直接调</strong>）</h3>
+<ul>
+<li>三原语：<code>Counter</code>（单调累计）/ <code>Histogram</code>（分布，延迟/大小）/ <code>Gauge</code>（瞬时值，队列深度）。</li>
+<li>tags 用 <code>ReadOnlySpan&lt;KeyValuePair&lt;string,string&gt;&gt;</code>——零分配热路径。</li>
+<li>命名约定：点号分层 + 单位后缀（<code>device.read.latency_us</code>）。</li>
+<li><code>NullMetricsSink.Instance</code> 默认（<code>IsEnabled =&gt; false</code>）；真实实现（Prometheus/OTel/Datadog）由上层注入。</li>
+<li>❌ <strong>不要直接调 <code>IMetricsSink</code></strong>——经 <code>ObservabilityHub</code> 的维度视图走，才能拿到两级短路 + 采样。</li>
+</ul>
+<h3 id="33-追踪-itracer经-hubaot-友好">3.3 追踪 <code>ITracer</code>（经 Hub，AOT 友好）</h3>
+<ul>
+<li><code>BeginSpan</code> 返回 <code>ISpan</code>（<code>using</code> 自动收尾）；<code>Current</code> 走 <code>AsyncLocal</code> 父子链，子方法无需传参。</li>
+<li><code>NullTracer.BeginSpan</code> 返回<strong>非 null 的 <code>NullSpan.Instance</code></strong>（修复了&quot;返回 null 导致 <code>using</code> 块 NRE&quot;的缺陷——<code>NullTracer.cs:4-6</code>）。</li>
+<li><code>SpanKind</code>：Internal/Server/Client/Producer/Consumer；<code>SpanStatus</code>：Ok/Error（无 Unset）。</li>
+<li>纯接口 + 枚举 + AsyncLocal，<strong>无反射/Emit，AOT 友好</strong>。</li>
+<li>热路径先 <code>if (TracingEnabled)</code> 再 <code>BeginSpan</code>。</li>
+</ul>
+<h3 id="34-observabilityhub--唯一可观测接入点">3.4 <code>ObservabilityHub</code> —— 唯一可观测接入点</h3>
+<ul>
+<li><strong>聚合 Metrics + Tracing</strong>（⚠️ <strong>不含 Logging</strong>——见 §3.1）。</li>
+<li><strong>两级短路</strong>：<code>Options.Enabled × sink/tracer.IsEnabled × 维度开关</code> 三重 AND 在<strong>构造期折叠成单个 bool</strong>，热路径只读一个 bool（<code>ObservabilityHub.cs:47-53</code>）。</li>
+<li>维度视图（方法清单与指标名见 <a href="docs/observability.html"><code>docs/observability.md</code></a> §2）：
+<ul>
+<li><code>Metrics</code>——三原语透传（自定义指标走这）；</li>
+<li><code>Storage</code>——Read/Write/Flush/Compact/Reclaim/Throttle/QueueDepth（<code>storage.*</code>）；</li>
+<li><code>Log</code>——Append/Commit/Truncate/BufferFull/Recover（<code>log.*</code>）；</li>
+<li><code>Index</code>——Find/Insert/Upsert/Delete/Scan（<code>index.*</code>）；</li>
+<li><code>SegmentAllocator</code>——<strong>段表专用</strong>：Segment 分配/释放/FreeList 深度（<code>segment_allocator.*</code>；开关默认 false）。</li>
+</ul>
+<blockquote>
+<p>命名约定：文件名 = 类名（去 <code>View</code> 后缀）= Hub 属性名。⚠️ <code>SegmentAllocator</code> 是段表专用视图（非通用
+Allocator 原语——曾经的 <code>AllocatorView</code> 命名冒充了抽象角色，已正名）；需要新维度加独立 partial 视图，不泛化旧的。</p>
+</blockquote>
+</li>
+<li><strong>采样</strong>：每操作独立计数器取模（<code>ShouldSample</code>，<code>Interlocked</code> 线程安全）；<strong>背压/错误信号全采、不走采样</strong>（<code>OnThrottle</code>/<code>OnBufferFull</code>/<code>ReportError</code>）。</li>
+<li>工厂：<code>Create(sink, tracer, opts)</code>（null 参数 → Null 单例零开销）/ 高级 <code>Create(..., sampleRate)</code> / <code>Disabled</code> 全默认单例。</li>
+</ul>
+<pre><code class="lang-csharp">var hub = ObservabilityHub.Create(myMetricsSink, myTracer, opts);   // 注入真实实现
+var hub0 = ObservabilityHub.Disabled;                               // 零开销默认
+
+if (hub.Storage.IsEnabled) {
+    using var t = hub.Storage.BeginReadSample();   // MicroTimer，命中采样才计
+    /* do read */
+    hub.Storage.OnRead(bytes, t.Microseconds, errorCode);
+}
+using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // TracingEnabled=false → null
+</code></pre>
+<p>⚠️ <code>hub.BeginSpan</code> 返回 <code>ISpan?</code>（关闭时 null），与裸 <code>ITracer.BeginSpan</code>（非 null）不同——调用方须容忍 null 或先判 <code>TracingEnabled</code>。</p>
+<h3 id="35-可观测日志的测试场景组件测试怎么验证">3.5 可观测/日志的测试场景（组件测试怎么验证）</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>模式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>指标确实发了</td>
+<td>挂<strong>捕获 sink</strong>（并发安全集合——任务可能在私有线程上发）+ <code>MetricsConfig.Enabled=true</code>；执行侧指标用 <code>SpinWait.SpinUntil</code> 等待（入队/执行指标有时序差）</td>
+</tr>
+<tr>
+<td>关了就零发射</td>
+<td>sink 挂上但 <code>Metrics.Enabled=false</code> → 断言 sink 全空（验证构造期短路折叠）</td>
+</tr>
+<tr>
+<td>维度开关独立</td>
+<td><code>EnableSegmentAllocatorMetrics=false</code>（默认）→ 仅该视图 <code>IsEnabled=false</code></td>
+</tr>
+<tr>
+<td>采样确定性</td>
+<td><code>ShouldSample</code> 每 100 精确采 rate 个（单测锁 0/1/50/99/100 边界）；各视图 <code>ShouldSampleXxx</code> 计数独立</td>
+</tr>
+<tr>
+<td>背压/错误全采</td>
+<td><code>OnThrottle</code>/<code>OnBufferFull</code>/<code>ReportError</code> 不受 <code>SampleRate</code> 影响</td>
+</tr>
+<tr>
+<td>日志</td>
+<td>捕获 logger（<code>List&lt;string&gt;</code> + lock）断言消息；null logger 全链路无异常（36 重载 null 安全）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>Core 内现行范例：<code>ObservabilityHubTests</code>（89 测试）、<code>IsolatedTaskSchedulerTests.Metrics_*</code>、<code>CpuSamplerTests</code>。</p>
+</blockquote>
+<hr>
+<h2 id="4-高性能工具集选型指南">4. 高性能工具集（选型指南）</h2>
+<p>这些工具<strong>每一个都经过性能验证</strong>（零分配 / 无锁 / 池化 / 硬件加速）。<strong>优先用它们，禁止自己造</strong>——手写的替代品几乎必然更差（多一次堆分配、多一把全局锁、没硬件加速、没池化）。</p>
+<blockquote>
+<p><strong>物理位置</strong>：叶子积木（原生内存 / 异步同步原语 / 计算计时 / static helper）在 <code>Primitives/</code>（namespace <code>TC.Tier.Core.Primitives</code>）；容器型复合体（队列 / 缓存 / 池）在 <code>Collections/</code>（namespace <code>TC.Tier.Core.Collections</code>）。下文按<strong>功能</strong>分组讲选型，不按目录——选型时查 §4.1 表即可，定位时看类型所在的子节标注。</p>
+</blockquote>
+<h3 id="41-一页选型表需求--用哪个--替代什么">4.1 一页选型表（需求 → 用哪个 → 替代什么）</h3>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>用这个</th>
+<th>替代的 BCL / 手写</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>异步等事件（多 waiter 广播）</td>
+<td><code>AsyncManualResetEvent</code></td>
+<td><code>ManualResetEventSlim</code> / <code>SemaphoreSlim(1,1)</code> / 手写 TCS 广播</td>
+</tr>
+<tr>
+<td>等 N 个并行子任务全完成</td>
+<td><code>AsyncCountDown</code></td>
+<td><code>CountdownEvent</code> + <code>Task.WhenAll</code>（每次堆分配）</td>
+</tr>
+<tr>
+<td>异步生产-消费队列</td>
+<td><code>AsyncQueue</code></td>
+<td><code>Channel</code> / <code>BlockingCollection</code> / <code>ConcurrentQueue+SemaphoreSlim</code></td>
+</tr>
+<tr>
+<td><strong>离散枚举</strong>优先级队列（最快）</td>
+<td><code>BucketPriorityQueue&lt;TItem,TEnum&gt;</code></td>
+<td><code>PriorityQueue&lt;T,Enum&gt;</code> + 锁</td>
+</tr>
+<tr>
+<td><strong>任意 long</strong> 优先级队列</td>
+<td><code>SkipListPriorityQueue</code></td>
+<td><code>PriorityQueue&lt;T,long&gt;</code> + 全局锁</td>
+</tr>
+<tr>
+<td>极高并发 <strong>lock-free</strong> 优先队列</td>
+<td><code>AsyncPriorityQueue</code></td>
+<td>手写 lock-free PQ（极易写错）</td>
+</tr>
+<tr>
+<td>pinned / 对齐内存池</td>
+<td><code>PinnedBufferPool</code></td>
+<td><code>ArrayPool&lt;byte&gt;.Shared</code>（无 pinned/对齐）</td>
+</tr>
+<tr>
+<td>单块对齐原生内存（O_DIRECT/DMA）</td>
+<td><code>AlignedMemoryManager</code></td>
+<td><code>NativeMemory.AlignedAlloc</code> + 手 pin</td>
+</tr>
+<tr>
+<td>短生命周期 bump 分配</td>
+<td><code>NativeArena</code></td>
+<td><code>stackalloc</code>（不能跨方法）/ <code>Marshal.AllocHGlobal</code></td>
+</tr>
+<tr>
+<td>通用轻量对象池</td>
+<td><code>OverflowPool</code></td>
+<td>手写 <code>ConcurrentBag</code> 池 / <code>ObjectPool&lt;T&gt;</code></td>
+</tr>
+<tr>
+<td>高并发 LRU 缓存</td>
+<td><code>ClockCache</code></td>
+<td><code>MemoryCache</code>（重）/ <code>ConcurrentDictionary</code>（无淘汰）</td>
+</tr>
+<tr>
+<td>微秒级零分配计时</td>
+<td><code>MicroTimer</code></td>
+<td><code>Stopwatch.StartNew</code>（毫秒粒度 + 易装箱）</td>
+</tr>
+<tr>
+<td>校验和 CRC32C/CRC64</td>
+<td><code>UnifiedCrc</code></td>
+<td><code>System.IO.Hashing.Crc32</code>（无硬件加速）/ 手写表</td>
+</tr>
+<tr>
+<td>分片锁弱引用字典</td>
+<td><code>ShardLockWeakReference</code></td>
+<td><code>ConcurrentDictionary&lt;K,WeakReference&lt;V&gt;&gt;</code></td>
+</tr>
+<tr>
+<td>池化 awaitable（基础设施）</td>
+<td><code>PooledValueTaskSource</code></td>
+<td><code>TaskCompletionSource&lt;bool&gt;</code></td>
+</tr>
+<tr>
+<td>热路径抛异常</td>
+<td><code>ThrowHelper</code></td>
+<td>内联 <code>throw new</code>（阻碍 JIT 内联）</td>
+</tr>
+<tr>
+<td>位运算/哈希/单调 CAS</td>
+<td><code>Utility</code></td>
+<td><code>BitOperations</code> / 手写 CAS 循环</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-异步同步原语共享-pooledvaluetasksource-底座">4.2 异步同步原语（共享 <code>PooledValueTaskSource</code> 底座）</h3>
+<ul>
+<li><strong><code>PooledValueTaskSource</code></strong>：池化的一次性 <code>IValueTaskSource</code>，thread-local 栈 + global 回退 + 批量搬运，常规 Rent/Return <strong>零争用零堆分配</strong>。是多 waiter 异步原语（下面的 Event/Queue/PriorityQueue）的共同底座。</li>
+<li><strong><code>AsyncManualResetEvent</code></strong>：对标 <code>ManualResetEventSlim</code> 但暴露 <code>ValueTask</code> 等待 + 多 waiter 广播；已 set 时快速路径零分配。⚠️ 不能共享单一 <code>ManualResetValueTaskSourceCore</code>（单消费者），本类为每个 waiter 独立挂 source。</li>
+<li><strong><code>AsyncCountDown</code></strong>：<code>Add()</code>/<code>Remove()</code> 计数到 0 唤醒；纯 <code>Interlocked</code> 无锁。</li>
+<li><strong><code>AsyncQueue&lt;T&gt;</code></strong>：<code>ConcurrentQueue&lt;T&gt;</code> + 池化等待节点，队列非空时出队零分配。⚠️ <strong>不是通用 Channel</strong>——不支持 <code>Complete</code>/背压，适合&quot;持续运行永不关闭&quot;。</li>
+</ul>
+<h3 id="43-优先级队列三个递进选型完整指南-docspriority-queuesmd">4.3 优先级队列（三个递进选型；完整指南 <a href="docs/priority-queues.html"><code>docs/priority-queues.md</code></a>）</h3>
+<ul>
+<li><strong><code>BucketPriorityQueue</code></strong>：N 个 <code>ConcurrentQueue</code> 桶，离散枚举优先级，无锁入队，最快。约束 <code>TPriority : struct, Enum</code>。⚠️ 严格优先级 → 高优先级非空时低优先级<strong>饥饿</strong>。</li>
+<li><strong><code>SkipListPriorityQueue</code></strong>：任意 <code>long</code> 优先级，lazy skip-list + 细粒度 hand-over-hand SpinLock，<code>TryPeek</code> 完全不加锁，<code>[ThreadStatic]</code> xorshift PRNG。⚠️ SpinLock 不可重入。</li>
+<li><strong><code>AsyncPriorityQueue</code></strong>：lock-free 跳表（Fomitchev–Ruppert marker 删除协议——直接引用 + marker 节点 + GC 回收，单引用 64 位 CAS）。⚠️ 多消费者最小序竞争性；<code>LightEpoch</code> 构造参数兼容保留（Route A 后不使用）。</li>
+<li><strong>选型</strong>：枚举优先级 → <code>Bucket</code>；任意 long + 一般并发 → <code>SkipList</code>；极高并发 + 无锁 → <code>Async</code>。</li>
+</ul>
+<h3 id="44-内存与池化-非托管必须-dispose">4.4 内存与池化（⚠️ 非托管，必须 Dispose）</h3>
+<ul>
+<li><strong><code>PinnedBufferPool</code></strong>：旗舰内存池，纯数组索引分桶 + thread-local 栈热路径 + 批量搬运（与 <code>ArrayPool&lt;T&gt;</code> TLS 同构，多了 <strong>pinned + 对齐 + 池身份校验</strong>）。⚠️ size 向上取整到 2 的幂（最多 50% padding）；<strong>别和 <code>ArrayPool.Shared</code> 混用</strong>（归还非本池 buffer 会被静默忽略/Dispose）。</li>
+<li><strong><code>AlignedMemoryManager</code></strong>：单块对齐原生内存（<code>NativeMemory.AlignedAlloc</code>，可选锁定物理内存防 swap），hot path <code>GetSpanUnsafe</code>/<code>GetRefUnsafe</code> 零校验。O_DIRECT / DirectIO / DMA 必备。⚠️ 无 finalizer，不 Dispose = 真泄漏。</li>
+<li><strong><code>NativeArena</code></strong>：线性 bump 分配 + <code>Reset</code> 复用，O(1) 无碎片；适合批量/临时缓冲。⚠️ 只能前进分配（无单块 Free），非线程安全，有 finalizer 兜底但不保证时效。</li>
+<li><strong><code>OverflowPool&lt;T&gt;</code></strong>：轻量固定容量对象池（<code>ConcurrentQueue</code>），满则调 disposer 丢弃，带 hits/misses/overflows 指标。⚠️ 容量是软约束（高并发下瞬时可能超几个）。</li>
+<li><strong><code>NodeArena</code></strong>：变长节点的非托管驻留分配——4MB 块 CAS-bump（<strong>并发 Alloc 安全</strong>，无锁快路径）、块满建新块（lock 双检）、<strong>指针恒稳</strong>（块只增不减、永不搬移——上层缓存持有的裸指针跨块增长长命有效）；<strong>无释放单语义</strong>（块生命周期 = arena 生命周期，Dispose 全释放；并发竞争的重复分配 = 有界字节浪费，非泄漏）。单写者+并发读者契约，Dispose 由持有方 Resources 收口。与 <code>NativeArena</code> 分野：NativeArena=单线程线性 bump + <code>Reset</code> 复用（批量临时缓冲）；NodeArena=并发安全 + 只增不减 + 指针恒稳（长命驻留对象，如 SkipList 节点）。</li>
+</ul>
+<h3 id="45-缓存--计时--校验">4.5 缓存 / 计时 / 校验</h3>
+<ul>
+<li><strong><code>ClockCache&lt;TKey,TValue&gt;</code></strong>：CLOCK 近似 LRU，环形值类型数组 + 访问位 + 开放寻址，零分配热路径，无全局锁，命中率 90–95%。⚠️ capacity 必须 2 的幂；<code>TKey : struct, IEquatable</code> 且 <code>TValue : class</code>；tombstone 保探测链不断。</li>
+<li><strong><code>MicroTimer</code></strong>：<code>readonly struct</code> 微秒计时，整数换算无浮点；<code>active=false</code> 时 JIT <strong>自动消除整段计时逻辑</strong>。⚠️ <code>ElapsedReadable()</code> 会分配字符串，热路径用 <code>TryFormat(Span&lt;char&gt;)</code>。</li>
+<li><strong><code>UnifiedCrc</code></strong>：CRC32C（x86 走 <code>Sse42.X64.Crc32</code> 硬件加速 ~1GB/s，ARM 走 <code>Crc32</code>，否则软件表）+ CRC64（软件）。支持增量、零拷贝。⚠️ 硬件加速依赖平台；CRC64 实例非线程安全。</li>
+</ul>
+<h3 id="46-杂项">4.6 杂项</h3>
+<ul>
+<li><strong><code>ThrowHelper</code></strong>：<code>[DoesNotReturn]</code> + <code>NoInlining</code>，把 throw 隔离出热路径，让调用方法可被 JIT 内联（放在 <code>namespace System</code> 便于无 using 使用）。</li>
+<li><strong><code>ShardLockWeakReference&lt;TKey,TValue&gt;</code></strong>：16 分片独立锁（位运算定位），Value 弱引用不阻止 GC。⚠️ shardCount 须 2 的幂；需定期 <code>CleanupDeadReferences()</code>。</li>
+<li><strong><code>Utility</code></strong>：位运算/哈希通用工具（<code>PreviousPowerOf2</code>、<code>GetLogBase2</code> De Bruijn、<code>XorBytes</code> 8 字块、Knuth 哈希）、<code>ParseSize</code>/<code>PrettySize</code>、<code>MonotonicUpdate</code>（CAS 单调推进水位，拒回退）。</li>
+</ul>
+<hr>
+<h2 id="5-互斥回收与原子更新spinrwlock--fairgate--lightepoch--atomic128">5. 互斥、回收与原子更新（SpinRWLock / FairGate / LightEpoch / Atomic128）</h2>
+<p>这四者<strong>职责不同、不可互相替代</strong>，是 Core 里<strong>最易拼错的地方</strong>（epoch 和锁尤其易混）。完整决策矩阵、标准范式、反模式见 <a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a>——本节只给速查。</p>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>用</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>对象读写互斥（读共享 vs 写/销毁排他，写不饿死）</td>
+<td><code>SpinRWLock</code></td>
+<td>给对象挂一个 <code>SpinRWLock</code> 字段：读 <code>AcquireShared</code>，写/销毁 <code>AcquireExclusive</code>（写偏向）</td>
+</tr>
+<tr>
+<td>重试循环抢资源的到达顺序公平</td>
+<td><code>FairGate</code></td>
+<td>fast path 查 <code>HasWaiters</code> 让位 + 慢路径 <code>TryAcquireSlow</code> + 释放后 <code>Wake</code>（§1.5）</td>
+</tr>
+<tr>
+<td>对象/内存延迟回收（RCU）</td>
+<td><code>LightEpoch</code></td>
+<td>drain action <strong>只做轻量回收</strong>，绝不塞阻塞 IO</td>
+</tr>
+<tr>
+<td>&gt;64 位载荷原子更新（指针+标志 / 水位+ABA）</td>
+<td><code>Atomic128&lt;T&gt;</code></td>
+<td>16B 对齐背板 + CAS（<code>Interlocked</code> 做不到的 16B）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心准则</strong>：</p>
+<ol>
+<li><strong>对象读写互斥 → <code>SpinRWLock</code></strong>。排他锁即&quot;等所有共享读完成&quot; = 安全点——<strong>别再上 epoch</strong>。</li>
+<li><strong>延迟回收 → <code>LightEpoch</code></strong>（仅上层结构组件）。★ <strong>不该进 epoch 的绝不塞 epoch drain</strong>：阻塞 IO（PunchHole/fsync）、销毁排序都不行——该 IO 的投递 <code>BackgroundWorkerLoop</code> 或持锁直接做。drain 只回收、不 IO、不排序。</li>
+<li><strong>大载荷原子更新 → <code>Atomic128&lt;T&gt;</code></strong>（16B 对齐背板，热路径用 Unsafe 快路径）。</li>
+</ol>
+<hr>
+<h2 id="6-core-原语primitives">6. Core 原语（Primitives）</h2>
+<blockquote>
+<p><code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>LightEpoch</code>/<code>SpinLockScope</code> 见 §5 与 <a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a>。本节讲 <code>IKeyComparer</code>/<code>KeyComparer</code>、<code>SectorAlignment</code>。</p>
+</blockquote>
+<h3 id="61-索引-key-比较器-ikeycomparertkey--keycomparertkey">6.1 索引 key 比较器 <code>IKeyComparer&lt;TKey&gt;</code> / <code>KeyComparer&lt;TKey&gt;</code></h3>
+<ul>
+<li><strong>64 位 hash 是性能命脉</strong>：高位取 tag（14 位，熵充分），低位取 bucket index，两段独立——避免 32 位 hash 的生日碰撞。</li>
+<li><code>IKeyComparer&lt;in TKey&gt;</code>（<code>TKey : unmanaged</code>）：<code>GetHashCode64</code> / <code>Equals</code> / <code>Compare</code>（HashIndex 用 hash+判等；BTree/SkipList 用 Compare）。</li>
+<li>默认实现 <code>KeyComparer&lt;TKey&gt;</code>：XxHash64 over TKey 字节（unmanaged/blittable，零装箱，8 字节 key ~3ns）+ <code>Comparer</code>/<code>EqualityComparer.Default</code>。它是 <code>Primitives/</code> 的通用 hash64 原语，同 <code>SpinRWLock</code>/<code>Atomic128</code> 同级——可注入自定义（变长 key 前缀哈希、特定分布优化等）。</li>
+</ul>
+<h3 id="62-对齐-sectoralignment--alignmentconst强制使用禁止手写">6.2 对齐 <code>SectorAlignment</code> / <code>AlignmentConst</code>（<strong>强制使用，禁止手写</strong>）</h3>
+<ul>
+<li><strong>铁律：所有对齐运算一律用 <code>SectorAlignment</code>，所有对齐常量一律用 <code>AlignmentConst</code>——禁止手写 <code>(... + align - 1) &amp; ~(align - 1)</code> 之类位运算，禁止硬编码 <code>4096</code>/<code>512</code> 等对齐数值。</strong> 内置已覆盖全部场景（<code>AlignUp</code>/<code>AlignDown</code> 多重载 + <code>Alignment4K</code>/<code>Alignment64B</code>/<code>Alignment2G</code>… 常量）；手写只会引入错位/魔术数。</li>
+<li><code>SectorAlignment.AlignUp</code> / <code>AlignDown</code>：<strong>入口已强制校验 <code>BitOperations.IsPow2</code></strong>（非 2 幂 / ≤0 抛 <code>ArgumentOutOfRangeException</code>——防 <code>alignment=0</code> 静默返回 0 等错位）。</li>
+<li>⚠️ 两个 <code>long</code> 重载默认值不同（<code>(long,int)</code> 默认 4K，<code>(long,long)</code> 默认 2G），重载解析注意。</li>
+</ul>
+<hr>
+<h2 id="7-反模式我们踩过的坑禁止重蹈">7. 反模式（我们踩过的坑——禁止重蹈）</h2>
+<h3 id="-反模式-1new-thread-自建后台循环">❌ 反模式 1：<code>new Thread</code> 自建后台循环</h3>
+<ul>
+<li><strong>症状</strong>：自建 <code>new Thread</code> 后台循环；生命周期分散；<code>Dispose</code> 顺序各自管；进程退出不干净。</li>
+<li><strong>正解</strong>：继承 <code>BackgroundWorkerLoop</code>，经 <code>ConfigureBackgroundWorker</code> 注册。</li>
+</ul>
+<h3 id="-反模式-2把阻塞-io-塞进-epoch-drain-action">❌ 反模式 2：把阻塞 IO 塞进 epoch drain action</h3>
+<ul>
+<li><strong>症状</strong>：<code>PunchHole</code>（阻塞磁盘系统调用）、段提升（重操作）被注册为 <code>LightEpoch.BumpCurrentEpoch(action)</code> 或塞进 epoch drain worker 的队列。</li>
+<li><strong>为什么错</strong>：LightEpoch 的 drain 是<strong>协作</strong>式——action 由&quot;任意触发 drain 的线程&quot;（可能是读线程）顺手执行。把毫秒级 IO 塞进去 = IO 落在读热路径，违背&quot;纳秒级 epoch 不降吞吐&quot;的设计；且&quot;同步等 drain 完成&quot;和 epoch 的异步协作本性冲突，会死结。</li>
+<li><strong>正解</strong>：销毁 IO 持段排他锁直接执行（准则 3），或投递到 <code>BackgroundWorkerLoop</code>。</li>
+</ul>
+<h3 id="-反模式-3在未持-epoch-的线程调-bumpcurrentepoch">❌ 反模式 3：在未持 epoch 的线程调 <code>BumpCurrentEpoch</code></h3>
+<ul>
+<li><strong>症状</strong>：线程没 <code>Resume</code>/<code>Acquire</code> 就调 <code>Epoch.BumpCurrentEpoch(action)</code>。</li>
+<li><strong>后果</strong>：违反 LightEpoch 协议 → <strong>Debug 立即抛 <code>InvalidOperationException</code></strong>（绊线已从 <code>Debug.Assert</code> 升级为立即抛，异常携带线程/entry/epoch 状态 + 32 次协议操作示波器）；Release 下 <code>ProtectAndDrain</code> 写入保留 entry0（静默腐败）。</li>
+<li><strong>正解</strong>：<code>BumpCurrentEpoch</code> 的调用线程必须先 <code>Resume()</code>（= <code>Acquire + ProtectAndDrain</code>），用完 <code>Suspend()</code>（完整骨架见 <a href="docs/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §2.3）。</li>
+</ul>
+<h3 id="-反模式-4互斥双轨制同需求上-spinrwlock--epoch-两套">❌ 反模式 4：互斥&quot;双轨制&quot;——同需求上 SpinRWLock + epoch 两套</h3>
+<ul>
+<li><strong>症状</strong>（现状）：普通 <code>Read</code> 用 <code>SpinRWLock</code> 段共享锁，<code>DirtyRead</code> 用 <code>LightEpoch</code>，于是销毁方为同时和两条读路径互斥，被迫段排他 lease <strong>外加</strong> epoch drain 两套都上。</li>
+<li><strong>为什么错</strong>：互斥来源不单一；epoch drain 那套引出反模式 2/3。</li>
+<li><strong>正解方向</strong>：存储读写互斥<strong>统一用 SpinRWLock</strong>（含 DirtyRead 改持段共享锁）；<code>LightEpoch</code> 退出存储路径，只留上层结构组件。</li>
+</ul>
+<h3 id="-反模式-5绕过-lifecyclebase-自管-initializedispose">❌ 反模式 5：绕过 <code>LifecycleBase</code> 自管 Initialize/Dispose</h3>
+<ul>
+<li><strong>症状</strong>：子类 <code>new</code> 隐藏 <code>Initialize</code>/<code>Dispose</code>、自建 <code>_disposables</code>、自管 worker 启停。</li>
+<li><strong>正解</strong>：只 override 钩子；资源进 <code>Resources</code>；worker 进 <code>ConfigureBackgroundWorker</code>。</li>
+</ul>
+<h3 id="-反模式-6绕过-coreio-自造文件访问--手写-io-错误分类">❌ 反模式 6：绕过 Core/IO 自造文件访问 / 手写 IO 错误分类</h3>
+<ul>
+<li><strong>症状</strong>：直接 <code>File.*</code>/<code>FileStream</code> 做引擎文件 IO；或 catch 原生异常后自己 switch HResult 分类。</li>
+<li><strong>为什么错</strong>：丢掉能力协商（DIO 对齐/稀疏/回退语义）与统一 <code>FileIOException</code> 分类；两处维护同一平台矩阵必然漂移；实测陷阱——在运行时已绑定 IOCP 的 OVERLAPPED 句柄上裸调 <code>LockFileEx</code> 等 overlapped 型 API 会向完成端口投递伪造结构导致<strong>进程崩溃</strong>（Core/IO 已根治）。</li>
+<li><strong>正解</strong>：文件访问一律经 <code>TC.Tier.Core.IO</code>（<code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>）；错误分类直接消费 <code>FileIOException.Error</code>；故障测试用 <code>FaultInjectingFileSystem</code>。</li>
+</ul>
+<h3 id="-反模式-7直接调-imetricssink--绕过-observabilityhub">❌ 反模式 7：直接调 <code>IMetricsSink</code> / 绕过 <code>ObservabilityHub</code></h3>
+<ul>
+<li><strong>症状</strong>：业务代码直接 <code>sink.Counter(...)</code>，或热路径每次构造 tag 数组。</li>
+<li><strong>正解</strong>：经 <code>ObservabilityHub</code> 维度视图（<code>hub.Storage.OnRead</code> 等），享受构造期折叠的两级短路 + 采样；tag 用 <code>ObservabilityHub.Kv(k,v)</code> 零分配。</li>
+</ul>
+<h3 id="-反模式-8可观测热路径不短路">❌ 反模式 8：可观测热路径不短路</h3>
+<ul>
+<li><strong>症状</strong>：日志 <code>string.Format</code>/<code>$&quot;...&quot;</code> 插值后传参、追踪不判就 <code>BeginSpan</code>、指标不判视图 <code>IsEnabled</code> 就构造 tag 上报、<strong>热路径</strong> &gt;3 参 params 日志不手动保护（调用点数组+装箱白付）。</li>
+<li><strong>正解</strong>：日志用占位符重载（短路内建，<strong>无需手写 IsEnabled</strong>）；追踪先 <code>if (TracingEnabled)</code>；指标先 <code>if (hub.XxxView.IsEnabled)</code>。</li>
+</ul>
+<h3 id="-反模式-9以为-observabilityhub-管-logging">❌ 反模式 9：以为 <code>ObservabilityHub</code> 管 Logging</h3>
+<ul>
+<li><strong>症状</strong>：在 <code>ObservabilityOptions</code> 里找日志级别开关，或把 <code>ILogger</code> 塞进 Hub。</li>
+<li><strong>正解</strong>：Hub 只聚合 Metrics + Tracing；Logging 由上层独立注入 <code>ILoggerFactory</code>，级别由日志实现自决。</li>
+</ul>
+<h3 id="-反模式-10自己造-utility-轮子">❌ 反模式 10：自己造 utility 轮子</h3>
+<ul>
+<li><strong>症状</strong>：<code>new ConcurrentQueue</code> 当优先队列、手写 object pool、手写 CRC 表、<code>Stopwatch</code> 毫秒计时、<code>TaskCompletionSource</code> 做广播。</li>
+<li><strong>正解</strong>：先查 §4.1 选型表——<code>Primitives/</code>+<code>Collections/</code> 的工具全部性能验证过（零分配 / 无锁 / 池化 / 硬件加速），手写替代品几乎必然更差。内存类（<code>AlignedMemoryManager</code>/<code>NativeArena</code>/<code>PinnedBufferPool.RentAligned</code>）非托管，必须 Dispose。</li>
+</ul>
+<h3 id="-反模式-11spinrwlock-排他临界区内-await">❌ 反模式 11：SpinRWLock <strong>排他</strong>临界区内 await</h3>
+<ul>
+<li><strong>症状</strong>：持<strong>排他</strong>锁时调 <code>await</code>——线程切换后 <code>ReleaseExclusive</code> 线程 ID 不匹配，锁永久泄漏（Debug 释放线程校验会抓）。</li>
+<li><strong>根因</strong>：排他持有是线程关联的同步原语，不支持异步上下文跨越。</li>
+<li><strong>正解</strong>：<strong>排他</strong>临界区内绝对禁止 await；异步互斥用 <code>AsyncManualResetEvent</code> 等异步原语（见 <a href="docs/async-primitives.html"><code>docs/async-primitives.md</code></a>）。共享锁可长持/跨 await（计数语义无线程亲和——读计划锁持共享做 IO 即此用法），但持得越久写者与被挡读者等待越久，能锁外做的移到锁外。</li>
+</ul>
+<h3 id="-反模式-12恢复过程中直接修改运行时状态">❌ 反模式 12：恢复过程中直接修改运行时状态</h3>
+<ul>
+<li><strong>症状</strong>：<code>OnRecoveryCoreAsync</code> 中直接修改引擎共享字段、挂接数据结构——恢复失败回滚时状态无法复原 → 对象半可用。</li>
+<li><strong>正解</strong>：恢复中间结果存本地上下文，恢复成功后在 <code>OnInitializeComplete</code> 原子提交到运行时状态；失败则本地上下文丢弃，无副作用（见 <a href="docs/lifecycle.html"><code>docs/lifecycle.md</code></a>）。</li>
+</ul>
+<h3 id="-反模式-13跨组件直接调用-nativeinterop">❌ 反模式 13：跨组件直接调用 NativeInterop</h3>
+<ul>
+<li><strong>症状</strong>：上层结构组件 / 业务直接调 <code>DiskNative</code>/<code>FileNative</code>——绕开 IO 引擎的生命周期、错误处理、指标埋点。</li>
+<li><strong>正解</strong>：原生 syscall 仅 Core.IO 调用（NativeInterop 是其实现底座）；Core 内组件经 <code>TC.Tier.Core.IO</code>，外部业务再经 <code>IStorageEngine</code> 抽象（见 <a href="docs/native-interop.html"><code>docs/native-interop.md</code></a> §0 映射表）。</li>
+</ul>
+<h3 id="-反模式-14对齐计算使用硬编码常量">❌ 反模式 14：对齐计算使用硬编码常量</h3>
+<ul>
+<li><strong>症状</strong>：代码出现 <code>(size + 4095) &amp; ~4095</code> 手写对齐，或硬编码 <code>4096</code>/<code>512</code>。</li>
+<li><strong>根因</strong>：不同平台扇区大小不同，硬编码跨平台错位；手写位运算易出符号位/溢出问题。</li>
+<li><strong>正解</strong>：所有对齐运算统一走 <code>SectorAlignment</code>，所有对齐常量统一用 <code>AlignmentConst</code>——禁止任何手写实现（见 §6.2）。</li>
+</ul>
+<hr>
+<h2 id="8-决策树">8. 决策树</h2>
+<pre><code>我要做后台循环/队列消费？
+  → 继承 BackgroundWorkerLoop( + ConfigureBackgroundWorker)。绝不 new Thread。
+
+我有资源要随实例释放？
+  → Resources.Add(...)。绝不自建 _disposables。
+
+我要写一个有&quot;启动恢复&quot;的对象？
+  → 继承 LifecycleBase + 写一个 RecoveryBase 派生（CreateRecovery 返回它），
+    只 override OnRecoveryCoreAsync。
+
+我要做任意对象的读写互斥（段 / 区 / 任意协调对象）？
+  → 给它挂一个 SpinRWLock 字段：读 AcquireShared，写/销毁 AcquireExclusive（写偏向通用原语，写不饿死）。
+
+我要让多写者重试抢同一资源不插队（到达顺序公平）？
+  → Core.FairGate：fast path 查 HasWaiters 让位 + TryAcquireSlow + 释放后 Wake（AcquireExtent 同形）。
+
+我要做&quot;对象/内存延迟回收&quot;（RCU）？
+  → LightEpoch：drain action 只做轻量回收，绝不塞阻塞 IO。
+
+我要&quot;等读完成再销毁段/打洞&quot;？
+  → 持段 AcquireExclusive（=等所有共享读退出），然后直接执行物理动作。
+    不要用 epoch drain 排序销毁。
+
+我要记日志？
+  → ILogger（上层注入 factory）+ LogXxx 占位符重载（短路内建，无需手写 IsEnabled）。
+    热路径 &gt;3 参才手动保护。不经 ObservabilityHub。
+
+我要记指标 / 追踪？
+  → ObservabilityHub 维度视图（hub.Storage.OnRead 等）+ 先判 IsEnabled / TracingEnabled。
+
+我要内存缓冲 / 池化？
+  → PinnedBufferPool（pinned+对齐旗舰池）/ AlignedMemoryManager（单块对齐，O_DIRECT）/ NativeArena（bump，临时）。⚠️ 非托管必须 Dispose。
+
+我要优先队列？
+  → 枚举优先级 BucketPriorityQueue / 任意 long SkipListPriorityQueue / 极高并发 AsyncPriorityQueue（注入 epoch）。
+
+我要缓存 / 计时 / CRC / 异步信号？
+  → ClockCache（TKey 值类型, TValue 引用类型）/ MicroTimer（零分配微秒）/ UnifiedCrc（硬件加速）/ AsyncManualResetEvent·AsyncQueue。
+
+我要等实例恢复完成（阻塞）？
+  → 异步用 WaitForReadyAsync（⚠️ 禁在 UI/ASP.NET 同步上下文调 WaitForReady，死锁）。
+
+我要判 LogicalAddress 空值 / 算跨段距离 / 存储读上界（三水位）？
+  → 契约红线，见 [`../TC.Tier.Contracts/COORDINATION.md`](../TC.Tier.Contracts/COORDINATION.md) §5（`Empty`≠`Invalid` / `IsValid` / `GetDistance` / `CommittedTail`）。
+
+我要判断实例是否就绪（非阻塞）？
+  → IsReady / RecoveryState（绝不靠 &quot;Recovery 非 null&quot; 判断）。
+</code></pre>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/COORDINATION.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

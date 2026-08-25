@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>TC.Tier.Core.IO.S3 协调文档 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="TC.Tier.Core.IO.S3 协调文档 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="tctiercoreios3-协调文档">TC.Tier.Core.IO.S3 协调文档</h1>
+
+<blockquote>
+<p>本文件是 <strong>S3 客户端层的&quot;正确拼装&quot;指南</strong>：组件职责全景、正确用法、反模式。
+它不重复每个类的 XML 注释，而是回答&quot;<strong>遇到 X 该用哪个积木、怎么用、什么绝对不要做</strong>&quot;。</p>
+<p><strong>层的范围</strong>（五层架构的第三层·远程对象介质）：<code>IObjectStore</code> 的默认实现——SigV4 自写的
+S3 兼容客户端。<strong>零外部包</strong>（唯一引用 = <code>TC.Tier.Core</code>）；契约类型（<code>IObjectStore</code> /
+<code>ObjectStoreCapabilities</code> / 条件结构体等）在 Core/IO 定义，本层只做实现。</p>
+<p>配合阅读：</p>
+<ul>
+<li><a href="docs/network-file-system-s3.html"><code>docs/network-file-system-s3.md</code></a> —— 消费者使用指南（两部分自包含：对象层 §1-6 快速开始/全参数/凭证源/厂商矩阵/错误重试；<strong>统一远程 IO 协议 §7-9</strong>——RemoteFileSystem 构造/调参/核心语义/增量 Flush/恢复）</li>
+<li><a href="../TC.Tier.Core/docs/io.html"><code>../TC.Tier.Core/docs/io.md</code></a> —— <code>RemoteFileSystem</code> 桥（把本层升格为 <code>IFileSystem</code> 第三介质；差异表/池化 Flush 置顶警告）</li>
+<li><a href="../TC.Tier.Core/docs/sync-async-bridge.html"><code>docs/sync-async-bridge.md</code></a> —— 同步包装的桥接底座（<code>ObjectStoreExtensions</code> 内部使用）</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>一个客户端覆盖全部 S3 兼容云——换 endpoint/credentials 即达；厂商差异全部吸收在适配器内，永不上抛消费者。</strong></p>
+<hr>
+<h2 id="1-组件全景">1. 组件全景</h2>
+<table>
+<thead>
+<tr>
+<th>积木</th>
+<th>文件</th>
+<th>职责</th>
+<th>何时用 / 红线</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>S3ObjectStore</code></td>
+<td><code>S3ObjectStore.cs</code></td>
+<td><code>IObjectStore</code> 实现：六件套 / 条件写（客户端校验兜底）/ multipart（含会话治理）/ CopyRange 编排 / 流式 List / chunked 直传 / 重试矩阵</td>
+<td><strong>唯一公开工厂</strong> <code>S3ObjectStore.Create(options[, http])</code>；线程安全（HttpClient 并发共用）</td>
+</tr>
+<tr>
+<td><code>S3ClientOptions</code></td>
+<td><code>S3ClientOptions.cs</code></td>
+<td>全部配置：endpoint/bucket/region/凭证/超时/重试/寻址模式（vhost）/SigningHost/能力位声明</td>
+<td>构造期校验；改配置=换实例（record 语义）</td>
+</tr>
+<tr>
+<td><code>SigV4</code></td>
+<td><code>SigV4.cs</code></td>
+<td>签名核心：RFC3986 编码器 / canonical request / HMAC 链 / chunked 流式签名（链式 string-to-sign）</td>
+<td>🔒 internal——正确性由 AWS 官方黄金向量逐字节保底</td>
+</tr>
+<tr>
+<td><code>ChunkedSignedStream</code></td>
+<td><code>ChunkedSignedStream.cs</code></td>
+<td><code>STREAMING-AWS4-HMAC-SHA256-PAYLOAD</code> 分帧流（128KiB chunk 链签 + 终帧；<code>EncodedLength</code> 精确预计算设 Content-Length）</td>
+<td>🔒 internal；不可寻流直传的载体</td>
+</tr>
+<tr>
+<td><code>S3Xml</code></td>
+<td><code>S3Xml.cs</code></td>
+<td>XML 解析/构造（ListObjectsV2 / multipart / 错误体）——<strong>命名空间免疫</strong>（LocalName 匹配）</td>
+<td>🔒 internal；畸形响应容错（分页继续、条目跳过）</td>
+</tr>
+<tr>
+<td><code>ICredentialProvider</code> / <code>S3Credentials</code> / <code>StaticCredentials</code> / <code>EnvironmentCredentials</code></td>
+<td>同名文件（一类型一文件）</td>
+<td>凭证三源：静态 / 环境变量（每次重读——外部 STS 刷新生效）/ 自定义</td>
+<td>每次签名前取当前凭证；STS 会话 token 自动入签</td>
+</tr>
+</tbody>
+</table>
+<p><strong>目录形态</strong>：全部平铺本目录（9 文件）——层小不值得子目录；契约类型（<code>IObjectStore</code> 族，已按一类型族一文件拆分）在 <code>../TC.Tier.Core/IO/</code>（入口文档见 <a href="../TC.Tier.Core/docs/io.html"><code>../TC.Tier.Core/docs/io.md</code></a>）。</p>
+<h2 id="2-正确用法要点">2. 正确用法要点</h2>
+<ol>
+<li><strong>生命周期</strong>：<code>S3ObjectStore</code> 持有 <code>HttpClient</code>（连接池 10min 复用）——<strong>长生命周期单例</strong>，不要每请求建；<code>Dispose</code> 释放连接池。</li>
+<li><strong>寻址模式</strong>：默认 path-style（<code>{endpoint}/{bucket}/{key}</code>）；<strong>COS 必须</strong> <code>UseVirtualHostAddressing=true</code>（path-style 下 COS 把整段路径当 key——对象操作自洽失真、桶级/copy 穿帮，实测结论）。</li>
+<li><strong>条件写语义</strong>：本层做客户端前置 Head + 本地校验兜底（COS/MinIO 服务端强制力不足）——<strong>接受极小竞态</strong>，fencing 类强一致需求须在更高层（token/心跳校验）兜底。</li>
+<li><strong>multipart 三禁令</strong>：禁跳 part（对象=parts 顺序拼接，跳中段=错位）；<code>CreateMultipartUpload</code> 不重试（双开会话）；<code>Complete</code> 遇 NoSuchUpload→<code>NotFound</code>（调用方视为已 complete 回读校验）。</li>
+<li><strong>流式 PUT</strong>：不可寻流自动走 chunked 链签（单次发送）；未知长度（-1）自动 spool——<strong>单次消费</strong>，不要复用已失败的流重试。</li>
+<li><strong>超时</strong>：<code>Timeout</code> 是单请求粒度（默认 100s，大对象上传够用）——不要设成 HttpClient 全局。</li>
+<li><strong>连接池双防线不可关闭</strong>：<code>PooledConnectionIdleTimeout</code>（默认 60s）+ <code>PooledConnectionLifetime</code>
+（默认 10min）——防服务端断空闲连接后的死连接复用（Aliyun OSS 60-90s 断开、老 SDK 周期性 SSL
+抖动根因）。特殊端点可调，禁止调大 idle timeout 超过目标端点的服务端空闲阈值。</li>
+</ol>
+<h2 id="3-反模式">3. 反模式</h2>
+<h3 id="-反模式-1每请求-new-s3objectstore">❌ 反模式 1：每请求 new S3ObjectStore</h3>
+<p>连接池形同虚设、TLS 握手开销全额支付。<strong>单例 + Dispose 收尾</strong>。</p>
+<h3 id="-反模式-2对-cos-用-path-style">❌ 反模式 2：对 COS 用 path-style</h3>
+<p>对象操作&quot;看起来正常&quot;（自洽失真），桶级 List/会话枚举/Copy 一用就 NoSuchKey——<strong>最阴的坑</strong>，vhost 必开。</p>
+<h3 id="-反模式-3拿条件写当强一致">❌ 反模式 3：拿条件写当强一致</h3>
+<p>本层条件写有极小竞态窗口（客户端校验兜底的固有代价）。fencing 抢占的正确性兜底在锁协议层（token 校验释放 / 心跳超时接管二次校验），不在 HTTP 条件头。</p>
+<h3 id="-反模式-4createmultipartupload-失败后盲目重试">❌ 反模式 4：CreateMultipartUpload 失败后盲目重试</h3>
+<p>POST ?uploads 响应丢失时重发 = <strong>双开会话</strong>（孤儿碎片计费）。失败走 Abort/孤儿扫描清理，不盲目重发。</p>
+<h3 id="-反模式-5在热路径用同步包装">❌ 反模式 5：在热路径用同步包装</h3>
+<p><code>ObjectStoreExtensions</code>（<code>Put</code>/<code>Get</code>/<code>List</code>…）是低频便捷路径（SyncAsyncBridge 有界桥接）——高频路径直用异步族（HttpClient 本质异步）。</p>
+<h2 id="4-测试与验证基线">4. 测试与验证基线</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>验证内容</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>离线</td>
+<td>SigV4 黄金向量逐字节（AWS 官方向量）+ 假 S3 服务器（服务端重算签名/chunked 链逐帧校验/503 注入重试）</td>
+<td>全绿（每次 CI）</td>
+</tr>
+<tr>
+<td>容器</td>
+<td>MinIO 契约平权套（25 例）</td>
+<td>全绿</td>
+</tr>
+<tr>
+<td>真云</td>
+<td>腾讯 COS 全功能面（28 例——含会话治理/流式 List/chunked PUT/条件写）</td>
+<td>全绿（2026-08-18）</td>
+</tr>
+</tbody>
+</table>
+<p>覆盖矩阵：<a href="../TC.Tier.Core/docs/unit-test-coverage.html"><code>../TC.Tier.Core/docs/unit-test-coverage.md</code></a> §TC.Tier.Core.IO.S3。</p>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.IO.S3/COORDINATION.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

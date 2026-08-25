@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>TC.Tier.CodeGen.Abstractions 协调文档 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="TC.Tier.CodeGen.Abstractions 协调文档 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../index.html">
+                <img id="logo" class="svg" src="../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="tctiercodegenabstractions-协调文档">TC.Tier.CodeGen.Abstractions 协调文档</h1>
+
+<blockquote>
+<p>五层架构最底层。定义源生成器识别的<strong>特性形状</strong>，<strong>并文档化源生成器的核心用法</strong>——零依赖、零逻辑、零 abstract。
+源生成器（<code>TC.Tier.CodeGen</code>，独立项目）靠 FQN 识别这里的特性；本文件讲&quot;特性怎么标、生成什么、注意什么&quot;。</p>
+</blockquote>
+<hr>
+<h2 id="1-这个项目是什么">1. 这个项目是什么</h2>
+<ul>
+<li><strong>项目类型</strong>：普通 <code>net8.0</code> 类库（不是 analyzer、不是生成器）。</li>
+<li><strong>依赖</strong>：<strong>无</strong>（零 ProjectReference、零 PackageReference）——这是它在依赖链最底端的根本原因。</li>
+<li><strong>namespace</strong>：<code>TC.Tier.CodeGen</code>（⚠️ 特殊：项目名是 <code>...CodeGen.Abstractions</code>，但 namespace 用 <code>TC.Tier.CodeGen</code>——为对齐源生成器的 FQN 识别，消费方 <code>global using TC.Tier.CodeGen;</code> 即用）。</li>
+<li><strong>内容</strong>：6 个特性（<code>[BinaryLayout]</code> + <code>[Valid*]</code> 族），是源生成器 <code>TC.Tier.CodeGen</code> 识别特性的&quot;形状定义&quot;。</li>
+</ul>
+<hr>
+<h2 id="2-文件清单6-个特性">2. 文件清单（6 个特性）</h2>
+<table>
+<thead>
+<tr>
+<th>文件</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BinaryLayoutAttribute.cs</code></td>
+<td><code>[BinaryLayout(Features = BinaryLayoutFeatures.*)]</code>——标记 <code>[StructLayout]</code> struct 触发生成 <code>XxxCodec</code></td>
+</tr>
+<tr>
+<td><code>BinaryLayoutFeatures.cs</code></td>
+<td>生成开关 flags：<code>StructSize</code> / <code>FieldConstants</code> / <code>FieldReaders</code> / <code>FieldWriters</code></td>
+</tr>
+<tr>
+<td><code>LayoutValidationAttributes.cs</code></td>
+<td><code>[ValidEquals(const)]</code>（== 常量，Magic/Version/Flags）——字段校验族基类</td>
+</tr>
+<tr>
+<td><code>ValidHasFlagsAttribute.cs</code></td>
+<td><code>[ValidHasFlags(mask)]</code>——位掩码包含基线位</td>
+</tr>
+<tr>
+<td><code>ValidNonDefaultAttribute.cs</code></td>
+<td><code>[ValidNonDefault]</code>——字段非默认零值</td>
+</tr>
+<tr>
+<td><code>ValidRangeAttribute.cs</code></td>
+<td><code>[ValidRange(min,max)]</code>——字段在区间内（PayloadLength 等）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-如何使用源生成器核心用法">3. 如何使用源生成器（核心用法）</h2>
+<h3 id="31-标记--生成什么">3.1 标记 → 生成什么</h3>
+<p>在 <code>[StructLayout(LayoutKind.Explicit, Size = N)]</code> struct 上标 <code>[BinaryLayout]</code>，源生成器（<code>TC.Tier.CodeGen</code> 的 <code>IIncrementalGenerator</code>）产出 <code>XxxCodec</code>，按 <code>BinaryLayoutFeatures</code> 可选生成：</p>
+<ul>
+<li><code>StructSize</code>——<code>XxxCodec.StructSize</code> 常量；</li>
+<li><code>FieldConstants</code>——每个字段的 <code>Offset_*</code> / <code>Size_*</code> 常量；</li>
+<li><code>FieldReaders</code> / <code>FieldWriters</code>——按偏移零拷贝读写的 <code>Read</code> / <code>Write</code>；</li>
+<li>校验——<code>Validate</code>（综合字段校验特性）；</li>
+<li><strong>默认值——<code>Create()</code></strong>（2026-08-24 新增）：<code>[ValidEquals(const)]</code> 字段自动填常量（默认值 = 约束常量，无需独立 DefaultValue 特性——双声明重复）。写侧范式：<code>var h = XxxCodec.Create(); h.变化字段 = ...; XxxCodec.Write(dest, in h)</code>——规范字段（Magic/Version/Flags）零手填。</li>
+</ul>
+<blockquote>
+<p>这<strong>不是反射/runtime 校验</strong>——是编译期源生成，零运行时开销、AOT 友好。</p>
+</blockquote>
+<h3 id="32-字段校验特性故意不用-systemcomponentmodeldataannotations">3.2 字段校验特性（故意不用 <code>System.ComponentModel.DataAnnotations</code>）</h3>
+<p>struct 不可 null、<code>Required</code> 对值类型语义不对，且 DataAnnotations 面向反射式运行时校验——故自造校验特性（见 <code>LayoutValidationAttributes.cs</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>语义</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[ValidEquals(const)]</code></td>
+<td>字段 == 常量（<strong>默认值同此常量——生成 <code>Create()</code></strong>）</td>
+<td>Magic / Version / Flags</td>
+</tr>
+<tr>
+<td><code>[ValidRange(min,max)]</code></td>
+<td>字段在区间内</td>
+<td>PayloadLength</td>
+</tr>
+<tr>
+<td><code>[ValidHasFlags(mask)]</code></td>
+<td>位掩码包含基线位（运行时可叠加动态位）</td>
+<td>Flags 位基线</td>
+</tr>
+<tr>
+<td><code>[ValidNonDefault]</code></td>
+<td>字段非默认零值</td>
+<td>PageId 等必填</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>★ <code>Write(..., validate: true)</code> 语义 = <strong>防御性补全</strong>（非抛异常）：<code>[ValidEquals]</code> 字段不信任入参、强制写常量——调用方可传 <code>default</code>（如 <code>MetaPolicy.WriteHeader(default)</code>），布局层保证规范字段合法。<code>Validate(in h)</code> 保留纯检查语义（读侧/外部验证）。</p>
+</blockquote>
+<h3 id="33-诊断">3.3 诊断</h3>
+<ul>
+<li><strong>TCSG001</strong>：<code>[StructLayout].Size</code> 与字段偏移和不符。</li>
+<li><strong>TCSG002</strong>：嵌套 struct 字段未标 <code>[BinaryLayout]</code>。</li>
+</ul>
+<h3 id="34-支持的字段类型">3.4 支持的字段类型</h3>
+<p>基元 + 同底层 enum + 嵌套 <code>[BinaryLayout]</code> struct。</p>
+<h3 id="35-范式">3.5 范式</h3>
+<pre><code class="lang-csharp">[BinaryLayout(Features = BinaryLayoutFeatures.StructSize | BinaryLayoutFeatures.FieldConstants)]
+[StructLayout(LayoutKind.Explicit, Size = 16)]
+internal struct MyHeader
+{
+    [FieldOffset(0)] [ValidEquals(MyHeader.Magic)]  public uint   MagicValue;
+    [FieldOffset(4)] [ValidRange(0, MaxEntrySize)]  public ushort PayloadLength;
+    [FieldOffset(6)] [ValidHasFlags(DefaultFlags)]   public ushort Flags;
+    [FieldOffset(8)] [ValidNonDefault]               public ulong  PageId;
+}
+// 编译期生成 MyHeaderCodec（Write/Read/Validate/StructSize/Offset_*/Size_*）
+</code></pre>
+<h3 id="36--注意事项">3.6 ⚠️ 注意事项</h3>
+<ul>
+<li>标记点的 struct <strong>必须</strong> 同时有 <code>[StructLayout(LayoutKind.Explicit, Size = N)]</code>——<code>Size</code> 必须准确（否则 TCSG001）。</li>
+<li>嵌套 struct 字段必须也标 <code>[BinaryLayout]</code>（否则 TCSG002）。</li>
+<li><strong>谁会标记</strong>：当前标记点在 <code>TC.Tier.Contracts</code>（<code>LogicalAddress</code> / <code>Crc32Footer</code> / <code>Crc64Footer</code> / <code>RecordFlags</code>）；<code>TC.Tier.Core</code> 自身零 <code>[BinaryLayout]</code>。新增布局 struct 放 Contracts 并标记即可。</li>
+<li><strong>验证生成生效</strong>：编译后查 <code>obj/.../generated/TC.Tier.CodeGen/TC.Tier.CodeGen.BinaryLayoutGenerator/*.g.cs</code> 有产物；缺失说明消费项目的 Analyzer 引用（<code>TC.Tier.CodeGen</code> 以 <code>OutputItemType=Analyzer</code> 引用）未配置。</li>
+</ul>
+<hr>
+<h2 id="4-为什么独立成项目铁律">4. 为什么独立成项目（铁律）</h2>
+<ol>
+<li><strong>生成器零引用</strong>：<code>TC.Tier.CodeGen</code> 生成器项目不引用任何项目（否则循环依赖），只靠 FQN 识别特性。特性若放在某个被引用的项目里，生成器就得引用它 → 破坏&quot;生成器纯 FQN&quot;原则。</li>
+<li><strong>Contracts 零业务依赖</strong>：Contracts 层需要用 <code>[BinaryLayout]</code>（标 <code>LogicalAddress</code>/<code>CrcFooter</code>/<code>RecordFlags</code>），但不能引 Core。特性独立成最底层项目后，Contracts 只引本抽象层 → 依赖链无环。</li>
+<li><strong>namespace 与生成器 FQN 对齐</strong>：生成器 <code>BinaryLayoutGenerator.cs</code> 内 <code>CodeGenNamespace = &quot;TC.Tier.CodeGen&quot;</code>。本项目 namespace 必须与之<strong>完全一致</strong>，否则生成器识别不到特性。</li>
+</ol>
+<hr>
+<h2 id="5-依赖链位置">5. 依赖链位置</h2>
+<pre><code>TC.Tier.CodeGen.Abstractions   ← 你在这里（零依赖，最底端）
+        ↑
+TC.Tier.Contracts              （标 [BinaryLayout] 于 LogicalAddress/CrcFooter/RecordFlags）
+        ↑
+TC.Tier.Core → TC.Tier.Runtime → TC.Tier.Products
+</code></pre>
+<ul>
+<li>谁引用它：<code>Contracts</code>（直接）、<code>Core</code>/<code>Runtime</code>/<code>Products</code>/Tests/Benchmarks（经 transitive，并以 <code>global using TC.Tier.CodeGen;</code> 兜底）。</li>
+<li>改它 = 动整条链的地基，必须全解重新编译，并确认源生成器仍触发（<code>generated/*.g.cs</code> 有产物）。</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen.Abstractions/COORDINATION.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

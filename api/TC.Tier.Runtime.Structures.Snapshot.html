@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Runtime.Structures.Snapshot | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Runtime.Structures.Snapshot | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.Snapshot">
+
+  <h1 id="TC_Tier_Runtime_Structures_Snapshot" data-uid="TC.Tier.Runtime.Structures.Snapshot" class="text-break">Namespace TC.Tier.Runtime.Structures.Snapshot</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a></h4>
+      <section><p>核心机制 partial：append/Overwrite/读 + 截断 + 2PC + 会话工厂。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotSettings.html">SnapshotSettings</a></h4>
+      <section><p>SnapshotBase 配置基类。</p>
+<p>★ 引擎配置走 <a class="xref" href="TC.Tier.Runtime.Structures.Settings.html#TC_Tier_Runtime_Structures_Settings_MainEngine">MainEngine</a>（StorageEngineOptions，构造 = 配置）——
+  snapshot 是 GB/TB 追加流，便捷构造默认**分段开启**（大数据跨段扩容，与 Metadata/Mirror 单段不同）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamFrameFooterCodec.html">StreamFrameFooterCodec</a></h4>
+      <section></section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamFrameHeaderCodec.html">StreamFrameHeaderCodec</a></h4>
+      <section></section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamSnapshot.html">StreamSnapshot</a></h4>
+      <section><p>StreamSnapshot——GB/TB 大数据流的流式帧实现（原 StreamBlockBlob 的 LifecycleBase 化继任者）。</p>
+<p>帧格式：[Header 14B][Data][Footer 28B（Magic+TotalLength+EntryCount+Crc64）]；
+多帧支持（Complete 后 ResetFrame 可再开新帧）。帧写入器 CRC64 增量流式累积（边写边算，不驻内存整块）。</p>
+<p>★ 生命周期：new + Initialize()（后台恢复）+ WaitForReady()。详见 src/TC.Tier.Core/docs/lifecycle.md。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamSnapshot.StreamFrameReader.html">StreamSnapshot.StreamFrameReader</a></h4>
+      <section><p>流式帧读取器。ReadDataAsync 读 data 至 EOF；footer CRC64 增量校验（读多少算多少，不驻内存整块）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamSnapshot.StreamFrameWriter.html">StreamSnapshot.StreamFrameWriter</a></h4>
+      <section><p>流式帧写入器。[Header 14B][Data][Footer 28B（Magic+TotalLength+EntryCount+Crc64）]。
+CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积，Complete 收官）。
+多帧：Complete 后 ResetFrame，可再开新帧。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamSnapshotSettings.html">StreamSnapshotSettings</a></h4>
+      <section><p>StreamSnapshot 专属配置——流式帧几何。</p>
+</section>
+    <h3 id="structs">
+Structs
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamSnapshot.StreamFrameFooter.html">StreamSnapshot.StreamFrameFooter</a></h4>
+      <section><p>流式帧 Footer（28B = Magic + TotalLength + EntryCount + Crc64）。</p>
+<p>★ FooterMagic 供 Backward 扫描定位帧尾（恢复取真尾）。CRC64 覆盖
+Header + Data + Footer 前 20B（CRC 自身 8B 不参与）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.StreamSnapshot.StreamFrameHeader.html">StreamSnapshot.StreamFrameHeader</a></h4>
+      <section><p>流式帧 Header（14B 仅规范字段，无独有字段——TotalLength/EntryCount 放 Footer：流式 writer 末尾才知道）。</p>
+<p>flags = CRC64 | PAYLOAD_4B | CRC_IN_FOOTER | FOOTER_MAGIC。对齐粒度：扇区。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

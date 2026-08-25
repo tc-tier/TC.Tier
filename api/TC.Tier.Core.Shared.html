@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.Shared | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.Shared | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared">
+
+  <h1 id="TC_Tier_Core_Shared" data-uid="TC.Tier.Core.Shared" class="text-break">Namespace TC.Tier.Core.Shared</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></h4>
+      <section><p>通用长生命周期后台循环骨架（第一层——循环骨架，无队列）。与业务无关。</p>
+<p>★ 封装：执行器（注入 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler">TaskScheduler</a>（如 IsolatedTaskScheduler.Shared）或 null=公共池 +
+  <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_ConsumerCount">ConsumerCount</a> 多消费者扇出——消费者是协作跑在调度器线程上的循环 Task，不是线程数）+ 幂等启停 +
+  超时等待退出 + CAS 防双 Dispose + 单周期异常隔离。</p>
+<p>★ 子类实现 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>（一个工作周期）+ 信号源选择（见 worker-loop-unified-design.md §5）。</p>
+<p>★ 自身 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>——<a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a> 内建持有时，
+  Dispose 统一编排 Stop + WaitForExit（见 worker-loop-unified-design.md §4）。</p>
+<p>★ 多消费者：<a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_ConsumerCount">ConsumerCount</a> 个执行体共跑同一循环（各自 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>），
+  常用于事件驱动队列的多消费者 drain（<a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html">BackgroundWorkerLoop&lt;T&gt;</a> 内建优先级队列 + counting-semaphore
+  逐项公平唤醒，见 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a>）。默认 1 = 向后兼容。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html">BackgroundWorkerLoop&lt;T&gt;</a></h4>
+      <section><p>事件驱动 + 队列的后台循环骨架（第二层——内建 5 档优先级队列）。</p>
+<p>★ 继承 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>（循环骨架 + 启停 Dispose + <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_ConsumerCount">多消费者</a>），追加：
+  内建 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a> + 统一 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Shared_WorkerPriority_">Enqueue(T, WorkerPriority)</a> 入队 +
+  abstract <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a> + virtual <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>（出队分发）。</p>
+<p>★ <b>开箱即用</b>（标准后台任务模式）：子类只实现 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a>，
+  基类默认 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 从队列出队分发。入队统一 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Shared_WorkerPriority_">Enqueue(T, WorkerPriority)</a>。</p>
+<p>★ <b>多消费者</b>：构造传 <code>consumerCount &gt; 1</code>，N 个消费者共 drain 同一优先级队列（counting-semaphore
+  逐项公平唤醒，见 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html#TC_Tier_Core_Collections_BucketPriorityQueue_2_DequeueAsync_System_Threading_CancellationToken_">DequeueAsync(CancellationToken)</a>）。</p>
+<p>★ <b>需要重写</b>：子类 override <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 自定义循环逻辑
+  （如 Lifecycle 的 fire-and-forget 并发内核）。内建队列仍在。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.CpuSampler.html">CpuSampler</a></h4>
+      <section><p>通用 CPU 利用率采样 + 限流系数计算（Core/Shared）。继承 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>——
+PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。</p>
+<p>★ <b>计算模型（明确，不靠概念）</b>：采样<b>本进程</b> CPU——
+  <code>raw = ΔProcess.TotalProcessorTime / (Δ实际墙钟 × ProcessorCount)</code>，归一化 0~1
+  （1.0 = 本进程跑满所有核）。是<b>进程口径</b>而非整机口径：其它进程造成的系统饱和本采样器看不见
+  （整机口径需性能计数器，跨平台不可用，故明确取进程口径）。</p>
+<p>★ 平滑：EMA——<code>ema' = α·raw + (1−α)·ema</code>，<b>首样本标志位</b>初始化（不拿 ema==0 当哨兵：
+  旧实现空闲→高载第一个样本直接跳变，无平滑——"不平稳过渡"的根因）。</p>
+<p>★ 限流系数 <a class="xref" href="TC.Tier.Core.Shared.CpuSampler.html#TC_Tier_Core_Shared_CpuSampler_ThrottleFactor">ThrottleFactor</a>：分段线性——CPU ≤ lowCutoff → 0（不限流）；
+  lowCutoff~highCutoff → 线性 0→1（软降速）；≥ highCutoff → 1（强阻塞）。
+  系数计算是纯函数（<span class="xref">TC.Tier.Core.Shared.CpuSampler.MapThrottleFactor(System.Double,System.Double,System.Double)</span>，internal 可测）。</p>
+<p>★ Hub 折叠：注入 <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a> 后每采样发布
+  <code>cpu.utilization</code> / <code>cpu.throttle_factor</code> Gauge，档位切换（正常→限流→强阻塞→恢复）打日志——
+  限流判断进可观测视图，不再隐形。</p>
+<p>★ 热路径零开销：读 <a class="xref" href="TC.Tier.Core.Shared.CpuSampler.html#TC_Tier_Core_Shared_CpuSampler_CpuUtilization">CpuUtilization</a> / <a class="xref" href="TC.Tier.Core.Shared.CpuSampler.html#TC_Tier_Core_Shared_CpuSampler_ThrottleFactor">ThrottleFactor</a> 走 Volatile.Read；
+  Hub 未注入（默认 Disabled）时指标短路零开销。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.IsolatedSchedulerOptions.html">IsolatedSchedulerOptions</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a> 的构造选项（集中所有旋钮）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Shared">Shared</a> 用全默认；<a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Create_TC_Tier_Core_Shared_IsolatedSchedulerOptions_">Create(IsolatedSchedulerOptions?)</a> 传自定义。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></h4>
+      <section><p>隔离线程 TaskScheduler——在 M 个<b>私有</b>线程上执行任务，与公共线程池（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.default">Default</a>）完全隔离。</p>
+<p>★ 用途：高频 / 关键路径的 worker（如引擎建段 worker）需要线程隔离——其异步 continuation 不与公共池上的
+  其它任务（写者、其它池工作）争抢池线程，避免饥饿/抖动。</p>
+<p>★ <b>真·异步友好</b>：任务在私有线程上执行时 <code>TaskScheduler.Current</code> = 本调度器，任务内 <code>await</code> 的
+  continuation 自动回到本调度器的私有线程（不经公共池）——既得「专用线程」隔离，又无 <code>GetAwaiter().GetResult()</code>
+  sync-over-async（高频路径禁区）。</p>
+<p>★ <b>阻塞等待模型</b>：私有线程在 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1">BlockingCollection&lt;T&gt;</a> 上阻塞等任务（空闲不占 CPU）。</p>
+<p>★ <b>稀缺资源·受控创建</b>：每实例开 M 个真实 OS 线程（栈 ~1MB/线程）。<b>禁止</b>直接 <code>new</code>——ctor 为
+  <code>internal</code>，经 <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Shared">Shared</a>（进程级全局单例）或 <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Create_TC_Tier_Core_Shared_IsolatedSchedulerOptions_">Create(IsolatedSchedulerOptions?)</a>（工厂 + 防扩散护栏）获取，
+  使用指南见 §2（使用指南：docs/dedicated-task-scheduler.md，文档站）（选型/旋钮/注意事项/故障排查）。</p>
+<p>★ 释放：调用方须在所有任务结束后（worker 的 WaitForExit 之后）调 <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Dispose">Dispose()</a>——
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1.completeadding">CompleteAdding()</a> + Join 线程。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase.html">LifecycleBase</a></h4>
+      <section><p>通用生命周期骨架基类（Core 层）——无恢复 hints struct 版本。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a></h4>
+      <section><p>通用生命周期骨架基类（Core 层）。数据结构基类与 IO 引擎基类共同继承本类，获得统一的</p>
+<p>★ 实现 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>——统一"同步 void Initialize 启动后台恢复 + 观测/等待"模型，
+  详见 src/TC.Tier.Core/docs/lifecycle.md。★ <b>Initialize 是类面方法（不在 ILifecycle 接口面）</b>——
+  设计决策接口面消除：启动入口由各持有者自己的装配面提供（引擎 = StorageEngineBuilder.Start），
+  接口只保留观测/等待；结构层内部组合面仍经具体类型调用。</p>
+<p>★ 内建 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">Resources</a>（<a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html">ResourceGroup</a>）——统一资源释放，
+  子类构造期/钩子里 <code>Resources.Add(...)</code>，Dispose 自动统一转发（消灭各基类 _owner/_disposables 样板）。</p>
+<p>★ Initialize 是固定模板（IO 引擎与数据结构共用同一套 On 钩子模式）：
+  CAS 闸门 → <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeBegin">OnInitializeBegin()</a> → <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CreateRecovery">CreateRecovery()</a> → 订阅进度事件 → 后台恢复 task。
+  子类只 override 钩子，不改流程。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html">RecoveryBase&lt;THints&gt;</a></h4>
+      <section><p>★ 通用恢复模板基类（Core 层）——模板方法模式：钉死 <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_RecoverAsync__0_System_Threading_CancellationToken_">RecoverAsync(THints, CancellationToken)</a> 编排，
+子类只 override <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryCoreAsync__0_System_Threading_CancellationToken_">OnRecoveryCoreAsync(THints, CancellationToken)</a>（真正的恢复算法）。</p>
+<p>与 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a> 对称：<code>LifecycleBase</code> 钉死 Initialize 的
+  前→中→后三阶段，<code>RecoveryBase</code> 钉死 RecoverAsync 的五步编排
+  （TryEnter → WaitForDependencies → Start → Core → Complete → MarkReady）。两者合起来构成
+  "生命周期 + 恢复" 的完整通用骨架——继承 <code>LifecycleBase</code> + 注入 <code>RecoveryBase</code> 派生实例即可。</p>
+<p>★ 消灭各 <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery&lt;TRecoveryHints&gt;</a> 实现复制粘贴的状态机样板：
+  CAS 三态闸门 + <code>_state</code> + <code>MarkReady</code>/<code>Reset</code>/<code>RaiseProgress</code>/
+  <code>TryEnterRecovering</code> + Start/Complete 钩子 + RecoverAsync 编排 + 失败置 Failed——全部收进基类。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryStart">OnRecoveryStart()</a>/<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html#TC_Tier_Core_Shared_RecoveryBase_1_OnRecoveryComplete">OnRecoveryComplete()</a> 由本模板在 RecoverAsync 内
+  <b>保证调用</b>（串行接在 Core 前后），不再是各实现手动调的"伪钩子"。当前为 <code>public virtual</code> 以满足
+  <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html">IRecovery</a> 接口契约；待接口瘦身（移除这两个方法）后收为 <code>protected virtual</code>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html">ResourceGroup</a></h4>
+      <section><p>资源组——引擎/设备资源的生命周期管理器（组合持有，非继承）。</p>
+<ul><li><span class="term">按名注册/查询</span>去掉旧 <code>this[int]</code> 下标索引（隐式契约脆弱）；用 <a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html#TC_Tier_Core_Shared_ResourceGroup_Add__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_">Add&lt;TResource&gt;(TResource, string?, ResourceOwnership)</a> / <a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html#TC_Tier_Core_Shared_ResourceGroup_Get__1_System_String_">Get&lt;T&gt;(string)</a> 显式按名。</li><li><span class="term">后期添加</span>支持构造期 <code>params</code> + 运行期 <a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html#TC_Tier_Core_Shared_ResourceGroup_Add__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_">Add&lt;TResource&gt;(TResource, string?, ResourceOwnership)</a>（解决旧版一次性传死、meta engine 等后期资源只能靠各基类自建 <code>_disposables</code> 列表的分裂）。</li><li><span class="term">所有权二态</span><a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a> 区分 Owned（我释放）/ Referenced（外部管，只跟踪）。注入引擎等用 Referenced——泄漏可见但不被 Dispose。</li><li><span class="term">object 单存储</span>资源可能是 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>、<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a> 或两者都实现（如 <code>IStorageEngine</code>）。
+  ★ <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a> 不继承 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>，只异步的资源（如 <code>IReadSession</code>）也收；不实现两者其一的资源在 Add 时直接抛。</li><li><span class="term">聚合异常</span>Dispose 逐个释放、收集异常，全部尝试完后聚合抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.aggregateexception">AggregateException</a>（不因单个失败跳过其余，也不静默吞）。</li></ul>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.ResourceInfo.html">ResourceInfo</a></h4>
+      <section><p>资源组内单个资源的信息（对齐 <code>LeaseInfo</code>）——ResourceGroup.GetResources 返回。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html">SyncAsyncBridge</a></h4>
+      <section><p>同步-异步桥（docs/sync-async-bridge.md §6）——&quot;写路径必须同步转异步&quot;的统一出口。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>：在独立池上发起异步工作，<b>立即</b>返回 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a> 状态句柄
+  （返回时状态已同步置 Running——可见性原则）。调用方继续本地逻辑，最后时刻才 <code>Wait</code>（"Start 早、Wait 晚"）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Run__1_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask___0___TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Run&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;, SyncBridgeOptions?, CancellationToken)</a>：一次性便捷入口（Start + 有界 Wait + 失败重抛）——
+  同步 API 桥接的常规形态，替代裸 <code>GetAwaiter().GetResult()</code>。</p>
+<p>★ 死锁拆解：异步工作跑 <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_DefaultScheduler">DefaultScheduler</a>（IsolatedTaskScheduler 私有线程，
+  continuation 回流私有线程）——推进<b>不依赖公共池可用性</b>；同步等待者 park 在事件上（非 Task.Wait），
+  无同步上下文回流、无完成边缘内联续体语义模糊。</p>
+<p>★ 再入防护：桥 work 体内再经<b>同一池</b>同步等待 = 池自锁（M 线程全 park 等嵌套 work）→
+  <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a> 快速失败（InvalidOperationException）。嵌套场景注入独立 <code>Scheduler</code> 分池豁免；
+  跨池嵌套等待必须无环（DAG，对齐 WaitForDependenciesAsync 纪律）。</p>
+<p>★ work 契约：<b>协作式异步</b>——<code>await</code> 让出、不阻塞（M 很小，阻塞任务直接饿死同池操作，
+  对齐 dedicated-task-scheduler.md §7.2 教训）。真正无法异步化的同步重 IO 由调用方注入 own 单线程实例。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.SyncBridgeOptions.html">SyncBridgeOptions</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html">SyncAsyncBridge</a> 的调用选项（docs/sync-async-bridge.md §6.1）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.TrackedInstanceInfo.html">TrackedInstanceInfo</a></h4>
+      <section><p>跟踪实例信息（对齐 <code>LeaseInfo</code>）——诊断/泄漏报告用。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a></h4>
+      <section><p>资源所有权模式——区分&quot;我释放&quot;与&quot;外部管，只跟踪诊断&quot;。</p>
+<p>对齐 lease 范式（Active vs Referenced）：<a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Owned">Owned</a> 资源由 ResourceGroup Dispose 释放；
+  <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Referenced">Referenced</a> 资源是外部注入（调用方自管），进组只为诊断/泄漏可见，Dispose 时跳过。</p>
+<p>★ 典型场景：注入引擎（<code>_ownsEngine=false</code>）用 <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Referenced">Referenced</a>——
+  进组泄漏可见，但不被 Dispose（避免双释放，引擎调用方还在用）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.SchedulerRestartPolicy.html">SchedulerRestartPolicy</a></h4>
+      <section><p>专用线程死亡重启策略（§4）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Shared.WorkerPriority.html">WorkerPriority</a></h4>
+      <section><p>后台循环的 5 档优先级（值小者先出）。内建队列固定 5 档，覆盖全部底层 worker 场景。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

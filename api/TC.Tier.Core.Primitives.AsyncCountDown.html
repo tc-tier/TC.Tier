@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class AsyncCountDown | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class AsyncCountDown | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。 底层基于 （ManualResetValueTaskSourceCore&amp;lt;TResult&amp;gt;）， 常规等待路径零堆分配（传统  方案每次等待有一次堆分配， 且 nextTcs 赋值非原子存在竞态；本实现消除分配并修复竞态）。 语义：初始/计数归零时事件 set（等待立即返回）； 使计数 &amp;gt; 0， 事件 reset（等待阻塞）。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Primitives.AsyncCountDown">
+
+
+
+  <h1 id="TC_Tier_Core_Primitives_AsyncCountDown" data-uid="TC.Tier.Core.Primitives.AsyncCountDown" class="text-break">Class AsyncCountDown</h1>
+  <div class="markdown level0 summary"><p>异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。</p>
+<p>底层基于 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a>（ManualResetValueTaskSourceCore&lt;TResult&gt;），
+常规等待路径零堆分配（传统 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskcompletionsource-1">TaskCompletionSource&lt;TResult&gt;</a> 方案每次等待有一次堆分配，
+且 <code>nextTcs</code> 赋值非原子存在竞态；本实现消除分配并修复竞态）。</p>
+<p>语义：初始/计数归零时事件 set（等待立即返回）；<a class="xref" href="TC.Tier.Core.Primitives.AsyncCountDown.html#TC_Tier_Core_Primitives_AsyncCountDown_Add">Add()</a> 使计数 &gt; 0，
+事件 reset（等待阻塞）。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">AsyncCountDown</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Primitives_AsyncCountDown_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class AsyncCountDown</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_AsyncCountDown__ctor_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.#ctor*"></a>
+  <h4 id="TC_Tier_Core_Primitives_AsyncCountDown__ctor" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.#ctor">AsyncCountDown()</h4>
+  <div class="markdown level1 summary"><p>创建倒计时器（唤醒默认线程池异步调度——安全）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public AsyncCountDown()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Primitives_AsyncCountDown__ctor_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.#ctor*"></a>
+  <h4 id="TC_Tier_Core_Primitives_AsyncCountDown__ctor_System_Boolean_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.#ctor(System.Boolean)">AsyncCountDown(bool)</h4>
+  <div class="markdown level1 summary"><p>创建倒计时器并指定唤醒调度模式（false = Remove 内联唤醒等待者，仅限调用点不持锁场景）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public AsyncCountDown(bool runContinuationsAsynchronously)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">runContinuationsAsynchronously</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_AsyncCountDown_IsEmpty_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.IsEmpty*"></a>
+  <h4 id="TC_Tier_Core_Primitives_AsyncCountDown_IsEmpty" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.IsEmpty">IsEmpty</h4>
+  <div class="markdown level1 summary"><p>计数器是否为零。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsEmpty { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_AsyncCountDown_Add_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.Add*"></a>
+  <h4 id="TC_Tier_Core_Primitives_AsyncCountDown_Add" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.Add">Add()</h4>
+  <div class="markdown level1 summary"><p>计数加 1。计数从 0 → 1 时事件 reset。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Add()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Primitives_AsyncCountDown_Remove_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.Remove*"></a>
+  <h4 id="TC_Tier_Core_Primitives_AsyncCountDown_Remove" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.Remove">Remove()</h4>
+  <div class="markdown level1 summary"><p>计数减 1。计数降到 0 时事件 set，唤醒所有等待者。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Remove()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Primitives_AsyncCountDown_WaitUntilEmptyAsync_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.WaitUntilEmptyAsync*"></a>
+  <h4 id="TC_Tier_Core_Primitives_AsyncCountDown_WaitUntilEmptyAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncCountDown.WaitUntilEmptyAsync(System.Threading.CancellationToken)">WaitUntilEmptyAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>当计数为 0 时同步返回（可复用等待：计数再次 &gt;0 后会重新阻塞）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask WaitUntilEmptyAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

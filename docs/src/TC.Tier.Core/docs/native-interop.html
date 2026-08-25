@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>原生互操作 facade（DiskNative / FileNative / MemoryNative） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="原生互操作 facade（DiskNative / FileNative / MemoryNative） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="原生互操作-facadedisknative--filenative--memorynative">原生互操作 facade（DiskNative / FileNative / MemoryNative）</h1>
+
+<blockquote>
+<p>平台 syscall 的 P/Invoke 封装——文件 IO、预分配、打洞、刷盘、内存锁定、扇区探测。
+★ <strong>本层是 <a href="io.html"><code>TC.Tier.Core.IO</code></a> 的内部实现底座，不对外</strong>——上述能力 Core.IO 已<strong>全部</strong>封口
+（句柄生命周期 / 能力协商 / DIO 对齐基准 / 池化 / 预分配 / 打洞 / 扩展属性 / 耐久 rename·删除，映射表见 §0）。
+🔒 <strong><code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code> 已声明 <code>internal</code>——编译期封堵</strong>，任何外部程序集直调直接 CS0122；
+单测/性能测试经 <code>InternalsVisibleTo</code> 照常可用。仓内仅两条<strong>过渡</strong> IVT 例外（<code>TC.Tier.Runtime</code> 及其
+Benchmarks——自带 Storage/IO 句柄层未迁 Core.IO，迁移完成即删，见 <code>TC.Tier.Core.csproj</code> 注释）。
+<strong>任何代码（含 Core 内其它组件）不得直接调本层</strong>：要 IO 用 Core.IO（<a href="io.html"><code>io.md</code></a>），外部业务再经
+<code>IStorageEngine</code>（Contracts）。唯一例外：Core.IO 自身扩新 syscall 时在本层加 P/Invoke。
+本文档的读者因此只有两种——维护 Core.IO 的人（查 syscall 语义/平台差异）与给本层加新能力的人。
+完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-定位">0. 定位</h2>
+<p>这三个 static class 是<strong>跨平台 syscall facade</strong>（Windows 走 Kernel32/AdvApi32，Linux/macOS 走 LibC），把存储相关的原生能力统一成托管 API。它们：</p>
+<ul>
+<li>不持有状态（纯 P/Invoke 包装 + 错误码转异常）。</li>
+<li>处理跨平台差异（如 <code>FILE_FLAG_NO_BUFFERING</code> vs Linux <code>O_DIRECT</code>）。</li>
+<li><strong>唯一消费方是 <code>TC.Tier.Core.IO</code></strong>——本层能力与 Core.IO 公开 API 一一对应（外部永远用右列）：</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>本层能力</th>
+<th>Core.IO 对应（用这些）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GetSectorSize</code></td>
+<td><code>IFileSystem.Volume</code>（SectorSize / AllocationUnit 独立探测）</td>
+</tr>
+<tr>
+<td><code>OpenHandle</code>（无缓冲 / DIO）</td>
+<td><code>IFileSystem.Open</code>（<code>FileOpenOptions</code> + 能力协商 + 逐句柄 DIO 探测）</td>
+</tr>
+<tr>
+<td><code>FlushToDisk</code> / fdatasync</td>
+<td><code>IFileHandle.Flush()</code> / <code>FlushData()</code></td>
+</tr>
+<tr>
+<td><code>MoveFileDurably</code> / <code>DeleteFileDurably</code></td>
+<td><code>IFileSystem.Move</code> / <code>Delete</code>（耐久语义，能力位 DurableRename）</td>
+</tr>
+<tr>
+<td><code>PreallocateFile</code> / <code>PunchHole</code> / <code>EnumerateAllocatedRanges</code></td>
+<td><code>IFileHandle.Preallocate()</code>（或 open 传 <code>PreallocateSize</code> 即幂等预分配）/ <code>PunchHole()</code> / <code>EnumerateAllocatedRanges()</code></td>
+</tr>
+<tr>
+<td><code>WriteFileMeta</code> / <code>ReadFileMeta</code> / <code>DeleteFileMeta</code></td>
+<td><code>IFileHandle.WriteExtendedAttribute</code> / <code>ReadExtendedAttribute</code>（不支持文件系统 no-op / 返回 null；内存文件系统字典模拟）</td>
+</tr>
+<tr>
+<td><code>LockMemory</code> / <code>UnlockMemory</code></td>
+<td><code>AlignedMemoryManager(lockPhysicalMemory: true)</code>（见 <a href="memory.html"><code>memory.md</code></a> §1）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>硬性要求</strong>：<strong>禁止直接调本层</strong>——Core 内其它组件与所有外部代码一律经 Core.IO（<a href="io.html"><code>io.md</code></a>）；外部业务再经
+<code>IStorageEngine</code>（Contracts，<a href="../../TC.Tier.Contracts/COORDINATION.html"><code>../../TC.Tier.Contracts/COORDINATION.md</code></a> §5.3）。
+给 Core.IO 加新原生能力是本层的唯一改动场景（新 P/Invoke + Core.IO 封口 + 双平台测试，缺一不可）。</p>
+<hr>
+<h2 id="1-disknative--磁盘信息">1. <code>DiskNative</code> —— 磁盘信息</h2>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GetSectorSize(string path)</code> → <code>uint</code></td>
+<td>查路径所在磁盘的扇区大小（DirectIO 对齐基准）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-filenative--文件-io--空间回收--元数据大头">2. <code>FileNative</code> —— 文件 IO / 空间回收 / 元数据（大头）</h2>
+<h3 id="句柄与打开">句柄与打开</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OpenHandle(path, mode, access, options, share, disableBuffering, enableLinuxDirectIo, logger)</code> → <code>SafeFileHandle</code></td>
+<td>打开文件句柄；<code>disableBuffering</code>（Win <code>FILE_FLAG_NO_BUFFERING</code>）/ <code>enableLinuxDirectIo</code>（Linux <code>O_DIRECT</code>）控制无缓冲 IO</td>
+</tr>
+<tr>
+<td><code>GetFileSize(handle, logger)</code> → <code>long</code></td>
+<td>文件大小</td>
+</tr>
+<tr>
+<td><code>GetFileAllocatedDiskSize(handle, logger)</code> → <code>long</code></td>
+<td>实际分配的磁盘大小（含打洞后的空洞回收）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="持久化与刷盘">持久化与刷盘</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>FlushToDisk(handle, logger)</code></td>
+<td>刷盘（Win <code>FlushFileBuffers</code> / Unix <code>fsync</code>）</td>
+</tr>
+<tr>
+<td><code>FlushParentDirectory(path)</code></td>
+<td>刷父目录（保证 rename/crash 一致）</td>
+</tr>
+<tr>
+<td><code>MoveFileDurably(source, dest, overwrite)</code></td>
+<td>持久化 rename（rename + 刷目录）</td>
+</tr>
+<tr>
+<td><code>DeleteFileDurably(path)</code></td>
+<td>持久化删除</td>
+</tr>
+<tr>
+<td><code>WriteThroughImpliesFlushed</code> → <code>bool</code></td>
+<td>平台是否「WriteThrough 即已刷盘」（决定 WriteThrough 模式要不要额外 fsync）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="预分配与空间回收-compact-wa10-的底座">预分配与空间回收（★ Compact WA=1.0 的底座）</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PreallocateFile(handle, size, logger)</code> → <code>PreallocateResult</code></td>
+<td>预分配（<code>RealAlloc</code> 真实分配 / <code>SparseFallback</code> 稀疏回退 / <code>Failed</code>）</td>
+</tr>
+<tr>
+<td><code>PunchHole(handle, offset, length, logger)</code> → <code>PunchResult</code></td>
+<td>打洞回收空间（<code>Punched</code> 成功 / <code>ZeroFilled</code> 平台用填零替代 / <code>Failed</code>）</td>
+</tr>
+<tr>
+<td><code>EnumerateAllocatedRanges(handle, logger)</code> → <code>List&lt;(long Start, long End)&gt;</code></td>
+<td>枚举实际分配的区间（含打洞后的空洞）</td>
+</tr>
+<tr>
+<td><code>ProbeUnbufferedIo(handle, filePath, disableBuffering, enableLinuxDirectIo, logger)</code> → <code>UnbufferedIoSupport</code></td>
+<td>探测平台无缓冲 IO 支持度</td>
+</tr>
+</tbody>
+</table>
+<h3 id="扩展属性文件元数据如-magic-标记">扩展属性（文件元数据，如 magic 标记）</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WriteFileMeta(filePath, data, attName, logger)</code> → <code>bool</code></td>
+<td>写扩展属性（Win 备用数据流 / Linux xattr）</td>
+</tr>
+<tr>
+<td><code>ReadFileMeta(filePath, attName, logger)</code> → <code>byte[]?</code></td>
+<td>读</td>
+</tr>
+<tr>
+<td><code>DeleteFileMeta(filePath, attName, logger)</code></td>
+<td>删</td>
+</tr>
+<tr>
+<td><code>ProbeFileMetaSupport(probeFilePath, attName, logger)</code> → <code>FileMetaSupport</code></td>
+<td>探测支持度</td>
+</tr>
+</tbody>
+</table>
+<h3 id="结果-enum">结果 enum</h3>
+<table>
+<thead>
+<tr>
+<th>enum</th>
+<th>值</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PreallocateResult</code></td>
+<td><code>RealAlloc</code> / <code>SparseFallback</code> / <code>Failed</code></td>
+<td>预分配结果</td>
+</tr>
+<tr>
+<td><code>PunchResult</code></td>
+<td><code>Punched</code> / <code>ZeroFilled</code> / <code>Failed</code></td>
+<td>打洞结果</td>
+</tr>
+<tr>
+<td><code>UnbufferedIoSupport</code></td>
+<td><code>NotRequested</code> / <code>Supported</code> / <code>BestEffort</code> / <code>Ignored</code></td>
+<td>无缓冲 IO 支持度</td>
+</tr>
+<tr>
+<td><code>FileMetaSupport</code></td>
+<td><code>NotProbed</code> / <code>Supported</code> / <code>Unsupported</code></td>
+<td>扩展属性支持度</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-注意">⚠️ 注意</h3>
+<ul>
+<li><strong>错误处理</strong>：多数方法失败时抛异常（带 P/Invoke 错误码）；返回 bool/enum 的（<code>LockMemory</code>/<code>Preallocate</code>/<code>PunchHole</code>）失败不抛，调用方查 <code>Marshal.GetLastPInvokeError()</code> 或看返回 enum。</li>
+<li><strong><code>PunchHole</code> 不可回退</strong>——Failed 时调用方须据返回值决定重试区间（见 Contracts <code>IAsyncOperation.Failed</code>）。</li>
+<li><strong>DirectIO 对齐</strong>：<code>disableBuffering</code>/<code>O_DIRECT</code> 要求 buffer + offset + size 都按扇区对齐（用 <code>SectorAlignment</code> + <code>AlignedMemoryManager</code>，见 <a href="memory.html"><code>memory.md</code></a>）。</li>
+</ul>
+<hr>
+<h2 id="3-memorynative--内存锁定">3. <code>MemoryNative</code> —— 内存锁定</h2>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LockMemory(void* address, nuint size)</code> → <code>bool</code></td>
+<td>锁定物理内存（禁 swap）：Win <code>VirtualLock</code> / Unix <code>mlock</code>。失败返回 false（查 <code>Marshal.GetLastPInvokeError</code>；Linux 需 <code>CAP_IPC_LOCK</code> 或调高 <code>RLIMIT_MEMLOCK</code>）</td>
+</tr>
+<tr>
+<td><code>UnlockMemory(void* address, nuint size)</code> → <code>bool</code></td>
+<td>解锁</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>勿直调——<code>AlignedMemoryManager(lockPhysicalMemory: true)</code> 已封装（见 <a href="memory.html"><code>memory.md</code></a> §1）。</p>
+</blockquote>
+<hr>
+<h2 id="4-决策速查答案全部是-coreio本层仅标注底层对应">4. 决策速查（答案全部是 Core.IO——本层仅标注底层对应）</h2>
+<pre><code>我要查扇区大小（DirectIO 对齐基准）？
+  → IFileSystem.Volume（SectorSize / AllocationUnit）。          ← DiskNative.GetSectorSize
+
+我要打开无缓冲/DIO 句柄、fsync、持久 rename、耐久删除？
+  → IFileSystem.Open（无缓冲/DIO 选项）+ IFileHandle.Flush/FlushData；
+    IFileSystem.Move / Delete（耐久语义）。                       ← FileNative.OpenHandle/FlushToDisk/MoveFileDurably
+
+我要预分配 / 打洞回收空间（Compact 的底座）？
+  → IFileHandle.Preallocate()（或 open 传 PreallocateSize）/ PunchHole()。
+    不可回退，失败按返回语义重试。                                ← FileNative.PreallocateFile/PunchHole
+
+我要锁定物理内存（防 swap）？
+  → AlignedMemoryManager(lockPhysicalMemory: true)。             ← MemoryNative.LockMemory
+
+我要写文件扩展属性（magic 标记）？
+  → IFileHandle.WriteExtendedAttribute / ReadExtendedAttribute。 ← FileNative.WriteFileMeta/ReadFileMeta
+</code></pre>
+<blockquote>
+<p>任何一条都不该以直接调本层结尾——需求在 Core.IO 找不到对应 API 时，正确动作是<strong>给 Core.IO 提能力</strong>
+（本层加 P/Invoke + Core.IO 封口 + 双平台测试），不是绕过 Core.IO 直调。</p>
+</blockquote>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/native-interop.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

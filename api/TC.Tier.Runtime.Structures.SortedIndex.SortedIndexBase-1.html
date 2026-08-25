@@ -1,0 +1,1134 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class SortedIndexBase&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class SortedIndexBase&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="比较族基类（族 A：BTreeIndex/SkipListIndex）——条目物化 (TKey, 地址)，比较即路由，支持有序遍历。 ★ 族器官（设计稿 &#167;3.2，从旧 IndexBase 收编）：AllocateNode/WriteNode/ReadNode/ReclaimNode   （引擎节点持久化原语——BTree 叶子/跳表节点的引擎寄生形态）。 ★ 不持有探测族器官（判等 tag/CAS 桶/GrowIndex）；判等在条目内完成。   KeyResolver 可选注入——判等不需要（key 物化条目内），恢复重放需要（设计稿 &#167;4 两族共需接口）：   有重放窗口而无 resolver 者，恢复核心 fail-fast。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1">
+
+
+
+  <h1 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1" class="text-break">Class SortedIndexBase&lt;TKey&gt;</h1>
+  <div class="markdown level0 summary"><p>比较族基类（族 A：BTreeIndex/SkipListIndex）——条目物化 (TKey, 地址)，比较即路由，支持有序遍历。</p>
+<p>★ 族器官（设计稿 §3.2，从旧 IndexBase 收编）：AllocateNode/WriteNode/ReadNode/ReclaimNode
+  （引擎节点持久化原语——BTree 叶子/跳表节点的引擎寄生形态）。</p>
+<p>★ 不持有探测族器官（判等 tag/CAS 桶/GrowIndex）；判等在条目内完成。
+  KeyResolver 可选注入——判等不需要（key 物化条目内），恢复重放需要（设计稿 §4 两族共需接口）：
+  有重放窗口而无 resolver 者，恢复核心 fail-fast。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints.html">SortedIndexRecoveryHints</a>&gt;</div>
+    <div class="level2"><span class="xref">SortedIndexBase&lt;TKey&gt;</span></div>
+      <div class="level3"><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex-1.html">BTreeIndex&lt;TKey&gt;</a></div>
+      <div class="level3"><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SkipListIndex-1.html">SkipListIndex&lt;TKey&gt;</a></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints.html">SortedIndexRecoveryHints</a>&gt;</div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></div>
+    <div><a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html">IEpochProtected</a></div>
+    <div><a class="xref" href="TC.Tier.Contracts.Structures.IIndex-1.html">IIndex</a>&lt;TKey&gt;</div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Logger">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Logger</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.GetAliveInstances(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.EnsureReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Initialize(SortedIndexRecoveryHints)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Shared_BackgroundWorkerLoop_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.ThrowIfDisposed()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.DisposeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Resources</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Recovery</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.IsDisposed</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.HasBackgroundWorker</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Structures.html">Structures</a>.<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.html">SortedIndex</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
+  <h5 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class SortedIndexBase&lt;TKey&gt; : LifecycleBase&lt;SortedIndexRecoveryHints&gt;, ILifecycle&lt;SortedIndexRecoveryHints&gt;, IDisposable, IAsyncDisposable, ITransactionParticipant, IEpochProtected, IIndex&lt;TKey&gt; where TKey : unmanaged, IEquatable&lt;TKey&gt;</code></pre>
+  </div>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">TKey</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1__ctor_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.#ctor*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1__ctor_TC_Tier_Runtime_Structures_SortedIndex_Contracts_ISortedIndexCodec_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_SortedIndex_SortedIndexSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Core_Primitives_IKeyComparer__0__TC_Tier_Contracts_Structures_IKeyResolver__0__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.#ctor(TC.Tier.Runtime.Structures.SortedIndex.Contracts.ISortedIndexCodec,TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.SortedIndex.SortedIndexSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Core.Primitives.IKeyComparer{`0},TC.Tier.Contracts.Structures.IKeyResolver{`0})">SortedIndexBase(ISortedIndexCodec, IFileSystem, SortedIndexSettings, LightEpoch?, IKeyComparer&lt;TKey&gt;?, IKeyResolver&lt;TKey&gt;?)</h4>
+  <div class="markdown level1 summary"><p>★ 基类注入标准顺序（对齐 LogBase/RingBase/MirrorBase/ProbingIndexBase）：codec → fs → settings → 族特有。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected SortedIndexBase(ISortedIndexCodec codec, IFileSystem fs, SortedIndexSettings settings, LightEpoch? epoch = null, IKeyComparer&lt;TKey&gt;? keyComparer = null, IKeyResolver&lt;TKey&gt;? keyResolver = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.Contracts.ISortedIndexCodec.html">ISortedIndexCodec</a></td>
+        <td><span class="parametername">codec</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">fs</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexSettings.html">SortedIndexSettings</a></td>
+        <td><span class="parametername">settings</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></td>
+        <td><span class="parametername">epoch</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Primitives.IKeyComparer-1.html">IKeyComparer</a>&lt;TKey&gt;</td>
+        <td><span class="parametername">keyComparer</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver</a>&lt;TKey&gt;</td>
+        <td><span class="parametername">keyResolver</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+</h3>
+
+
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_PersistBodyChunk" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.PersistBodyChunk">PersistBodyChunk</h4>
+  <div class="markdown level1 summary"><p>体分片（帧写/CRC/读共用——零分配流式）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected const int PersistBodyChunk = 32768</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_BeginAddress_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.BeginAddress*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_BeginAddress" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.BeginAddress">BeginAddress</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public LogicalAddress BeginAddress { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CurrentEntryCount_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CurrentEntryCount*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CurrentEntryCount" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CurrentEntryCount">CurrentEntryCount</h4>
+  <div class="markdown level1 summary"><p>当前条目数（后台策略触发用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract long CurrentEntryCount { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EntryCount_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EntryCount*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EntryCount" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EntryCount">EntryCount</h4>
+  <div class="markdown level1 summary"><p>条目数。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract long EntryCount { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_IndexSize_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.IndexSize*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_IndexSize" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.IndexSize">IndexSize</h4>
+  <div class="markdown level1 summary"><p>索引内存占用（字节）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract long IndexSize { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ComputeBodyLength_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ComputeBodyLength*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ComputeBodyLength" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ComputeBodyLength">ComputeBodyLength()</h4>
+  <div class="markdown level1 summary"><p>体长（头 BodyLength 字段——写头时先知：几何 + 结构内容）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract long ComputeBodyLength()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CreateRecovery_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CreateRecovery*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CreateRecovery" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CreateRecovery">CreateRecovery()</h4>
+  <div class="markdown level1 summary"><p>virtual 工厂：子类 override 返回恢复算法（默认实现/注入实例）。</p>
+<pre><code>        &lt;p&gt;对齐 &lt;code&gt;StorageEngineBase.RecoverAndBuildReader&lt;/code&gt; 的 virtual 模式。
+        在 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.OnInitializeBegin&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 后由 Initialize 调用，返回值由基类持有。&lt;/p&gt;
+        &lt;p&gt;默认返回 null——null 语义：跳过后台恢复、直接置 Ready（无需恢复的结构）。
+          需恢复的结构子类 override 返回 &lt;code&gt;new DefaultXxxRecovery(this)&lt;/code&gt;。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IRecovery&lt;SortedIndexRecoveryHints&gt;? CreateRecovery()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints.html">SortedIndexRecoveryHints</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">TC.Tier.Core.Shared.LifecycleBase&lt;TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints&gt;.CreateRecovery()</span></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CreateScanCursor_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CreateScanCursor*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CreateScanCursor_TC_Tier_Contracts_Storage_ReadDirection_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CreateScanCursor(TC.Tier.Contracts.Storage.ReadDirection)">CreateScanCursor(ReadDirection)</h4>
+  <div class="markdown level1 summary"><p>有序遍历游标（比较族独有能力——range scan）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract IIndexScanCursor&lt;TKey&gt; CreateScanCursor(ReadDirection direction)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.ReadDirection.html">ReadDirection</a></td>
+        <td><span class="parametername">direction</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.Contracts.IIndexScanCursor-1.html">IIndexScanCursor</a>&lt;TKey&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Delete_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Delete*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Delete__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Delete(`0)">Delete(TKey)</h4>
+  <div class="markdown level1 summary"><p>删除条目。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract bool Delete(TKey key)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverride_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverride*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
+  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void DisposeOverride(bool disposing)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">disposing</span></td>
+        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
+本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.DisposeOverride(bool)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverrideAsync_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverrideAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
+  <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override ValueTask DisposeOverrideAsync(bool disposing)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">disposing</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.DisposeOverrideAsync(bool)</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterEpoch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EnterEpoch*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterEpoch" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EnterEpoch">EnterEpoch()</h4>
+  <div class="markdown level1 summary"><p>★ epoch 读保护协议实现（IEpochProtected——Session 读 scope 聚合入口；IndexScope 转发此真源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void EnterEpoch()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterScope_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EnterScope*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterScope" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EnterScope">EnterScope()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SortedIndexBase&lt;TKey&gt;.IndexScope EnterScope()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html">SortedIndexBase</a>&lt;TKey&gt;.<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.IndexScope.html">IndexScope</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ExitEpoch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ExitEpoch*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ExitEpoch" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ExitEpoch">ExitEpoch()</h4>
+  <div class="markdown level1 summary"><p>退出 epoch 读保护（与 <a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html#TC_Tier_Contracts_Transactions_IEpochProtected_EnterEpoch">EnterEpoch()</a> 同线程配对）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ExitEpoch()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Find_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Find*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Find__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Find(`0)">Find(TKey)</h4>
+  <div class="markdown level1 summary"><p>点查 key → value 的逻辑地址（Empty = 不存在）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract LogicalAddress Find(TKey key)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindBatch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindBatch*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindBatch_System_ReadOnlySpan__0__System_Span_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindBatch(System.ReadOnlySpan{`0},System.Span{TC.Tier.Contracts.Storage.LogicalAddress})">FindBatch(ReadOnlySpan&lt;TKey&gt;, Span&lt;LogicalAddress&gt;)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void FindBatch(ReadOnlySpan&lt;TKey&gt; keys, Span&lt;LogicalAddress&gt; results)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;TKey&gt;</td>
+        <td><span class="parametername">keys</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
+        <td><span class="parametername">results</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindNoEpoch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindNoEpoch*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindNoEpoch__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindNoEpoch(`0)">FindNoEpoch(TKey)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract LogicalAddress FindNoEpoch(TKey key)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_InitializeIndex_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.InitializeIndex*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_InitializeIndex" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.InitializeIndex">InitializeIndex()</h4>
+  <div class="markdown level1 summary"><p>建空索引结构（建空表/head 节点）——恢复核心第一步（主存储不可用时）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void InitializeIndex()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Insert_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Insert*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Insert__0_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Insert(`0,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">Insert(TKey, LogicalAddress, LogicalAddress)</h4>
+  <div class="markdown level1 summary"><p>插入条目（key → valueAddress），返回插入后地址。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">valueAddress</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">beginAddress</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeBegin_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnInitializeBegin*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeBegin" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnInitializeBegin">OnInitializeBegin()</h4>
+  <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子——this 构造完后、后台恢复启动前。</p>
+<pre><code>        &lt;p&gt;子类在此：① &lt;code&gt;_engine.Initialize(...)&lt;/code&gt;（Runtime 层引擎 init）
+          ② &lt;code&gt;Resources.Add(_engine)&lt;/code&gt;（注册主引擎到资源组）
+          ③ 创建 MetaPolicy（按 MetaPolicyKind）
+          ④ 后期资源 &lt;code&gt;Resources.Add(metaEngine/overflowEngine, ...)&lt;/code&gt;&lt;/p&gt;
+        &lt;p&gt;此时 this 已完全构造，虚方法安全；&lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.CreateRecovery&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 紧随其后被基类调用。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void OnInitializeBegin()</code></pre>
+  </div>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">TC.Tier.Core.Shared.LifecycleBase&lt;TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints&gt;.OnInitializeBegin()</span></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeComplete_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnInitializeComplete*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeComplete" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnInitializeComplete">OnInitializeComplete()</h4>
+  <div class="markdown level1 summary"><p>恢复完成 + 装配就绪后启动后台 dump worker（LifecycleBase 编排：Complete 后 Start）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void OnInitializeComplete()</code></pre>
+  </div>
+  <h5 class="overrides">Overrides</h5>
+  <div><span class="xref">TC.Tier.Core.Shared.LifecycleBase&lt;TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints&gt;.OnInitializeComplete()</span></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnMaterialized_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnMaterialized*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnMaterialized_System_Int64_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnMaterialized(System.Int64)">OnMaterialized(long)</h4>
+  <div class="markdown level1 summary"><p>物化后回调（子类设置条目计数）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void OnMaterialized(long entryCount)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">entryCount</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ReadBodyChunk_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ReadBodyChunk*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ReadBodyChunk_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__System_Int32__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ReadBodyChunk(TC.Tier.Contracts.Storage.LogicalAddress,System.Span{System.Byte},System.Int32@)">ReadBodyChunk(LogicalAddress, Span&lt;byte&gt;, out int)</h4>
+  <div class="markdown level1 summary"><p>读体分片（子类物化用——整读/分段读 helper）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected bool ReadBodyChunk(LogicalAddress at, Span&lt;byte&gt; dst, out int got)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">at</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
+        <td><span class="parametername">dst</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">got</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_TryMaterializeFrame_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.TryMaterializeFrame*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_TryMaterializeFrame_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_System_Int64__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.TryMaterializeFrame(TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean,System.Int64@)">TryMaterializeFrame(LogicalAddress, bool, out long)</h4>
+  <div class="markdown level1 summary"><p>物化锚点帧（读几何 → 重建结构 → 重数实收）。
+<code class="paramref">recountNeeded</code> = 重放窗口非空（W&lt;End）——dump 后插入混入树才需重数；
+W==End（零增量）无混入 → 几何计数直接可信，跳过 O(n) 遍历（实测 SkipList 物化 72.9ms 大头）。
+返回 true 且 <code class="paramref">entryCount</code> 给出物化后条目数。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract bool TryMaterializeFrame(LogicalAddress head, bool recountNeeded, out long entryCount)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">head</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">recountNeeded</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">entryCount</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_WriteBody_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.WriteBody*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_WriteBody" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.WriteBody">WriteBody()</h4>
+  <div class="markdown level1 summary"><p>写体内容（几何 + 结构内容全在体内——比较族=32B 几何，分片经 <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_WriteBodyChunk_System_ReadOnlySpan_System_Byte__">WriteBodyChunk(ReadOnlySpan&lt;byte&gt;)</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract void WriteBody()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_WriteBodyChunk_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.WriteBodyChunk*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_WriteBodyChunk_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.WriteBodyChunk(System.ReadOnlySpan{System.Byte})">WriteBodyChunk(ReadOnlySpan&lt;byte&gt;)</h4>
+  <div class="markdown level1 summary"><p>写体分片（子类 WriteBody 内调用——CRC 边写边累积，帧长任意边界）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected void WriteBodyChunk(ReadOnlySpan&lt;byte&gt; chunk)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
+        <td><span class="parametername">chunk</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html">IEpochProtected</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Structures.IIndex-1.html">IIndex&lt;TKey&gt;</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

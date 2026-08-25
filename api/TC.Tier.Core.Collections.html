@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.Collections | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.Collections | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Collections">
+
+  <h1 id="TC_Tier_Core_Collections" data-uid="TC.Tier.Core.Collections" class="text-break">Namespace TC.Tier.Core.Collections</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.AsyncPriorityQueue-1.html">AsyncPriorityQueue&lt;T&gt;</a></h4>
+      <section><p>异步优先队列——基于 lock-free 跳表（Fomitchev–Ruppert marker 删除协议）。</p>
+<p>★ 高并发入队/出队 O(log n) 平均复杂度；出队时队列为空则异步等待或取消。</p>
+<p>★ <b>Route A 正确性基线（根因档案决策）</b>：回归论文前提世界——
+  边存<b>直接对象引用</b> + <b>marker 节点</b>表达逻辑删除（单引用 64 位 CAS，无 128 位打包）、
+  节点 fresh 分配交 GC 回收（不池化、不 epoch、不 Id 寻址）。论文不变式 I1~I5 由构造消除，
+  不再自证回收协议。性能代价：每次入队一次 Gen0 分配（LOH 无压力）。详见
+  <a class="xref" href="TC.Tier.Core.Collections.SkipListPriorityQueue-1.html">SkipListPriorityQueue&lt;T&gt;</a>（锁基变体）与 docs/async-priority-queue-root-cause.md。</p>
+<p><b>marker 协议要点</b>：victim 的 <code>Forward[L]</code> 被 CAS 成 <a class="xref" href="TC.Tier.Core.Collections.AsyncPriorityQueue-1.html">AsyncPriorityQueue&lt;T&gt;.Marker</a>
+  （marker.Next 持真实后继）即"已逻辑删除"；物理摘除 = 前驱边 CAS 绕过 victim 直连
+  marker.Next。marker 永不被改写，victim 摘除后整体交给 GC——并发读者永不会读到回收后的节点。</p>
+<p>★ 并发语义：多生产者安全；多消费者不丢不重，但并发出队时"最小元素"判定是
+  竞争性的（各出队以各自 mark CAS 为线性化点），严格最小序需要单消费者（或
+  <a class="xref" href="TC.Tier.Core.Collections.SkipListPriorityQueue-1.html">SkipListPriorityQueue&lt;T&gt;</a> 的持锁 DeleteMin）。</p>
+<p>★ DEBUG 构建内置链校验器（key 严格递增 + 成环护栏），每 64 次操作自动巡检，
+  测试可显式调 <span class="xref">TC.Tier.Core.Collections.AsyncPriorityQueue`1.ValidateInvariants</span> 定点取证。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.AsyncQueue-1.html">AsyncQueue&lt;T&gt;</a></h4>
+      <section><p>异步生产-消费队列。基于 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a> + 池化等待节点，
+常规路径（队列非空时出队、入队唤醒）零堆分配。
+出队发现队列为空时，租用独立完成源挂入等待链；入队时唤醒链首一个等待者。</p>
+<p><b>注意</b>：本类不是通用 Channel，不支持单消费者背压 / 完成（Complete）等高级语义。
+适合内核 IO 响应队列等"持续运行、永不关闭"的场景。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a></h4>
+      <section><p>离散枚举优先级队列——N 个 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a> 桶，每桶对应一个枚举优先级。</p>
+<p>★ 严格优先级：按枚举值升序扫描桶（值小先出），同优先级桶内 FIFO。</p>
+<p>★ 无锁入队：<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a> 内部无锁实现。</p>
+<p>★ lock-free 出队：扫桶 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1.trydequeue">TryDequeue(out T)</a>，单消费者接近 wait-free。</p>
+<p>★ 适用场景：优先级是少量离散枚举值（如 4~16 级）。任意可比优先级用 <a class="xref" href="TC.Tier.Core.Collections.SkipListPriorityQueue-1.html">SkipListPriorityQueue&lt;T&gt;</a>。</p>
+<p>★ 零分配：入队复用 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a> 的分段池；等待复用 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a> 池化 source。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.ClockCacheV2-2.html">ClockCacheV2&lt;TKey, TValue&gt;</a></h4>
+      <section><p>★ CLOCK 近似 LRU 缓存 V2——组相联存储（set-associative，CPU 缓存教科书结构）。</p>
+<p>★ 算法：容量拆为 sets × ways（默认 8 路）的固定槽组；查找/插入只扫描组内 ways 槽——miss 恒 ≤8 次读，
+    与负载因子无关（V1 开放寻址满载 miss 探测链发散至 681ns，V2 结构上不存在该悬崖）。</p>
+<p>★ 淘汰：组内 CLOCK 二次机会（访问位 Interlocked CAS），≤2×ways 次操作，O(1)。</p>
+<p>★ 命中率 90-99%（8 路组相联 ≈ 全表 CLOCK 的 90-99%，Zipf 实测 99.9% vs 100%）。</p>
+<p>★ 线程安全：无全局锁，读路径纯无锁（Interlocked CAS 写路径）；并发语义与 V1 一致（尽力而为 Put）。</p>
+<p>★ 热路径（hit/miss/update）零分配；Slot 数组 = capacity（内存 1×）。</p>
+<p>★ 与 ClockCache（V1 开放寻址）并列：V1 甜区 = 铁律配置下（容量 ≥2× 工作集）极致热路径
+    （hit 3.7ns / update 2.9ns）；V2 = 任意负载延迟恒定、全路径反超 ConcurrentDictionary 基线
+    （hit 5ns / miss 7ns / 驱逐 70ns）。组偏斜会提前淘汰（均匀负载实际驻留 ≈ 容量 85-90%）。</p>
+<p>参见 src/TC.Tier.Core/docs/cache-and-compute.md。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.ClockCache-2.html">ClockCache&lt;TKey, TValue&gt;</a></h4>
+      <section><p>★ CLOCK 近似 LRU 缓存——高性能、零分配热路径、线程安全（Interlocked CAS，无全局锁）。</p>
+<p>★ 算法：环形数组 + 访问位 + 开放寻址法哈希（线性探测）。Redis/PostgreSQL/Windows 内存管理都用 CLOCK。</p>
+<p>★ 命中率 90-95%（近似 LRU，工程足够）；淘汰 O(1) amortized（时钟扫描）。</p>
+<p>★ 对齐 OverflowPool/PinnedBufferPool 的"底层组件+性能指标"范式。</p>
+<p>可复用：Ring 冷页缓存（ClockCache&lt;long, AlignedMemoryManager&gt;）、任意 key→value LRU 场景。</p>
+<p>参见 src/TC.Tier.Core/docs/cache-and-compute.md。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.OverflowPool-1.html">OverflowPool&lt;T&gt;</a></h4>
+      <section><p>固定大小溢出对象池。并发安全（基于 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a>）。</p>
+<p>★ 指标：hits/misses/overflows 计数 + <a class="xref" href="TC.Tier.Core.Collections.OverflowPool-1.html#TC_Tier_Core_Collections_OverflowPool_1_GetStats">GetStats()</a>（对齐 PinnedBufferPool 覆盖度）。</p>
+<p>容量上限为软约束（Soft cap）：高并发 TryAdd 下可能瞬时超出 <code>size</code> 几个，
+因 ConcurrentQueue 的 Count 快照与 Enqueue 非原子。这对当前调用方（disposer 为 no-op，
+超出项被丢弃）无正确性影响；如需硬上限须改用自旋锁或 CAS 容量跟踪。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.PinnedBufferPool.html">PinnedBufferPool</a></h4>
+      <section><p>高性能固定内存池，提供 pinned 数组与对齐原生内存两类池。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.ShardLockWeakReference-2.html">ShardLockWeakReference&lt;TKey, TValue&gt;</a></h4>
+      <section><p>分片锁集合，Value存WeakReference&lt;TValue&gt;
+TKey 支持 int / long / uint / ulong / Guid / string 等；</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.SkipListPriorityQueue-1.html">SkipListPriorityQueue&lt;T&gt;</a></h4>
+      <section><p>通用并发优先队列——基于细粒度锁 skip-list（Herlihy 2006 lazy 版本）。</p>
+<p>★ 任意可比优先级：支持任意 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> 优先级值（值小者先出）。</p>
+<p>★ 严格优先级 + 同优先级 FIFO：key = (priority, sequence)，sequence 单调递增保证同优先级 FIFO。</p>
+<p>★ 细粒度锁：每节点一把 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.spinlock">SpinLock</a>，hand-over-hand 加锁，不同区间操作并行。</p>
+<p>★ lazy validation：Peek/Find 不加锁（读 marked 字段）；Insert/DeleteMin 加锁后 validate（全层级——
+  标记即完整摘除，marked 节点永为瞬态）。</p>
+<p>★ 内存回收简单：unlink + 解锁后节点安全可回收（无需 epoch/hazard pointer）。</p>
+<p>★ 定位：细分锁实现——任意 long 优先级 + 消费者较少的场景。严格优先级+FIFO 语义使同优先级尾插与
+  min 头摘是两个串行热点，吞吐上限由热点决定；无锁高吞吐场景用 <a class="xref" href="TC.Tier.Core.Collections.AsyncPriorityQueue-1.html">AsyncPriorityQueue&lt;T&gt;</a>
+  （Route A 生产基线），离散枚举优先级用 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a>。</p>
+<p>算法依据：Herlihy, Lev, Luchangco, Shavit. "A Simple Optimistic Skip-List Algorithm" (DISC 2006)。</p>
+</section>
+    <h3 id="structs">
+Structs
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.ClockCacheStats.html">ClockCacheStats</a></h4>
+      <section><p>ClockCache 指标快照。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Collections.ClockCacheV2Stats.html">ClockCacheV2Stats</a></h4>
+      <section><p>ClockCacheV2 指标快照。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

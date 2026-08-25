@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Core 基础原语性能报告（异步原语 / 队列 / 池 / 缓存） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Core 基础原语性能报告（异步原语 / 队列 / 池 / 缓存） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="core-基础原语性能报告异步原语--队列--池--缓存">Core 基础原语性能报告（异步原语 / 队列 / 池 / 缓存）</h1>
+
+<blockquote>
+<p>覆盖：<code>AsyncManualResetEvent</code> · <code>AsyncCountDown</code> · <code>AsyncQueue&lt;T&gt;</code> · <code>PooledValueTaskSource</code> ·
+<code>OverflowPool&lt;T&gt;</code> · <code>ClockCache&lt;TKey,TValue&gt;</code>（优先队列族单独成文，见 async-primitives.md §4）。
+使用指南：<a href="../async-primitives.html"><code>../async-primitives.md</code></a> / <a href="../memory.html"><code>../memory.md</code></a> / <a href="../cache-and-compute.html"><code>../cache-and-compute.md</code></a></p>
+<p>⚠️ 指示值（单机开发环境实测；Artifacts 不入库，本文即存档）；机器/负载不同会变，§1 命令复跑取真值。</p>
+</blockquote>
+<h2 id="1-复跑命令">1. 复跑命令</h2>
+<pre><code class="lang-bash">dotnet run -c Release --project benchmarks/TC.Tier.Core.Benchmarks -- --filter &quot;*AsyncPrimitivesBench*&quot;
+# 同理：*AsyncQueueBench* / *OverflowPoolBench* / *ClockCacheBench* / *SyncModesBench*（同步模式非争用）
+# 并发伸缩/写偏向落地（非 BDN，独立探针）：--sync-probe [秒]
+# （★ BDN 0.13.12 单个 --filter 不支持 '|' 多模式——逐类跑或多次 --filter）
+</code></pre>
+<h2 id="2-环境">2. 环境</h2>
+<p>2026-08-17 ｜ Linux 6.8（Ubuntu）｜ AMD Ryzen 9 6900HX（8C/16T）｜ .NET 8.0.420 ｜ BenchmarkDotNet 0.13.12（warmup 3 / iteration 5）</p>
+<h2 id="3-异步原语asyncprimitivesbench基线semaphoreslim-等价用法">3. 异步原语（AsyncPrimitivesBench，基线=SemaphoreSlim 等价用法）</h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th style="text-align: right;">本组件</th>
+<th style="text-align: right;">SemaphoreSlim 基线</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AsyncManualResetEvent.WaitAsync</code>（已 set 快路径）</td>
+<td style="text-align: right;"><strong>15.2 ns，0 分配</strong></td>
+<td style="text-align: right;">25.7 ns</td>
+<td><strong>1.7× 快</strong>——非 async 快路径直接返回，不进状态机</td>
+</tr>
+<tr>
+<td><code>AsyncMRE</code> Set+Wait 周期（已 set 快路径往返）</td>
+<td style="text-align: right;"><strong>18.3 ns，0 分配</strong></td>
+<td style="text-align: right;">25.9 ns</td>
+<td><strong>1.4× 快</strong>（修前 66.7ns——Set 曾无条件 Monitor.PulseAll，现已按需）</td>
+</tr>
+<tr>
+<td><code>AsyncMRE</code> 真实唤醒 1:1（挂起 waiter，<strong>默认异步调度</strong>）</td>
+<td style="text-align: right;">843 ns / 333 B</td>
+<td style="text-align: right;"><strong>37.3 ns</strong> / 88 B</td>
+<td>⚠️ 默认模式为&quot;Set 可持锁&quot;安全语义付一次线程池往返（状态机装箱 + 调度）——本机首测真实唤醒数字</td>
+</tr>
+<tr>
+<td><code>AsyncMRE</code> 真实唤醒 1:1（<strong>内联模式</strong> opt-in）</td>
+<td style="text-align: right;"><strong>93.1 ns / 80 B</strong></td>
+<td style="text-align: right;">37.3 ns / 88 B</td>
+<td>2.5× 慢但<strong>分配少 8 B</strong>；内联模式限制 Set 调用点不持锁（持 SpinLock 会自死锁）——单槽快路径 + GetResult 清理钩子零装箱</td>
+</tr>
+<tr>
+<td><code>PooledValueTaskSource</code> Rent+SetResult+Return</td>
+<td style="text-align: right;">42.5 ns，0 分配</td>
+<td style="text-align: right;">—（底座自证）</td>
+<td>池化闭环纳秒级、零分配</td>
+</tr>
+<tr>
+<td>广播 N=1 / 4 / 16 waiter（µs 级）</td>
+<td style="text-align: right;">1.96 / 3.88 / 10.6 µs</td>
+<td style="text-align: right;">1.85 / 3.73 / 11.2 µs</td>
+<td>多 waiter 广播两者<strong>相当</strong>，分配相近</td>
+</tr>
+<tr>
+<td><code>AsyncCountDown</code> Add+Wait+Remove 稳态（默认 / 内联）</td>
+<td style="text-align: right;">846 / <strong>135 ns</strong>，341 / 112 B</td>
+<td style="text-align: right;">—</td>
+<td>原 1005ns/430B 的构成实测是<strong>唤醒调度</strong>（默认线程池往返），非构造——旧基准每轮 <code>new</code>+<code>.AsTask()</code> 的构造成本仅 ~30ns，原文档归因已修正；纯计数 Add/Remove 仍是 Interlocked 纳秒级</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>★ 变更：① <code>Set()</code> 按需 Pulse（<code>_syncWaiters</code> 计数，异步场景免白付）；② 单槽快路径</p>
+<ul>
+<li>内联唤醒模式（<code>runContinuationsAsynchronously: false</code>，构造参数 opt-in）；③ 完成先于注册安全协议
+（<code>MarkOrComplete</code>/<code>MarkOrFault</code>）——修复了 Set/取消与注册竞态在 <code>ManualResetValueTaskSourceCore</code>
+CompletionSentinel 上的进程级崩溃类（回归测试：<code>SetVsRegistrationRace_NoCompletionSentinelCrash</code> 等）。</li>
+</ul>
+</blockquote>
+<h2 id="4-asyncqueueasyncqueuebench基线semaphoreslimconcurrentqueue-版">4. AsyncQueue（AsyncQueueBench，基线=SemaphoreSlim+ConcurrentQueue 版）</h2>
+<table>
+<thead>
+<tr>
+<th>操作（ItemCount=100）</th>
+<th style="text-align: right;">AsyncQueue</th>
+<th style="text-align: right;">基线</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Enq+Deq（item ready）</td>
+<td style="text-align: right;"><strong>74.8 ns</strong></td>
+<td style="text-align: right;">98.9 ns</td>
+<td>1.3× 快</td>
+</tr>
+<tr>
+<td>串行生产-消费 100 项</td>
+<td style="text-align: right;"><strong>7.76 µs / 2.0 KB</strong></td>
+<td style="text-align: right;">12.06 µs / 8.4 KB</td>
+<td><strong>1.55× 快 + 分配 4.2× 少</strong>——稳态循环优势最大</td>
+</tr>
+<tr>
+<td>空队等待→唤醒（1:1）</td>
+<td style="text-align: right;">1.57 µs / 1.1 KB</td>
+<td style="text-align: right;"><strong>1.39 µs</strong> / 1.0 KB</td>
+<td>真实唤醒路径基线略快（同 MRE 结论）；差距小</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-overflowpooloverflowpoolbenchpoolsize64256-两组结果一致">5. OverflowPool（OverflowPoolBench，PoolSize=64/256 两组结果一致）</h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th style="text-align: right;">耗时</th>
+<th style="text-align: right;">分配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TryAdd+TryGet 命中往返</td>
+<td style="text-align: right;"><strong>16.7 ns</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>TryGet 空（miss）</td>
+<td style="text-align: right;">11.4 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>串行 fill+drain 1000 项</td>
+<td style="text-align: right;">16.8 µs（~17 ns/项）</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>溢出路径（TryAdd 超容量，disposer 回收）</td>
+<td style="text-align: right;">6.9 µs/1000</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>并发生产-消费 1000 项</td>
+<td style="text-align: right;">145.6 µs（~146 ns/项，含跨核同步）</td>
+<td style="text-align: right;">576 B</td>
+</tr>
+</tbody>
+</table>
+<p>结论：命中/未命中/吞吐全零分配、纳秒~十几纳秒级——轻量池目标完全达成；溢出路径有 disposer 调用但依旧 ~7 ns/项。</p>
+<h2 id="6-clockcache--clockcachev2clockcachebench基线concurrentdictionarylinkedlist-lru">6. ClockCache / ClockCacheV2（ClockCacheBench，基线=ConcurrentDictionary+LinkedList LRU）</h2>
+<p>⚠️ 本节&quot;每 op&quot;= 表值 ÷ 循环项数（基准整循环跑 N=Capacity/100 个 key）。</p>
+<blockquote>
+<p>★ 新增 <code>ClockCacheV2</code>（组相联），与 V1（开放寻址）并列。两个组件同台对照：
+V1 甜区 = 标准配置（容量 ≥2× 工作集）下极致热路径；V2 = 任意负载延迟恒定。</p>
+</blockquote>
+<h3 id="61-clockcache-v1开放寻址基线对照">6.1 ClockCache V1（开放寻址，基线对照）</h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th style="text-align: right;">V1 每 op</th>
+<th style="text-align: right;">基线每 op</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TryGet <strong>命中</strong>（128 / 1024 容量）</td>
+<td style="text-align: right;"><strong>3.6 / 3.7 ns</strong></td>
+<td style="text-align: right;">29.6 / 29.7 ns</td>
+<td><strong>~8× 快</strong>，零分配、无锁读</td>
+</tr>
+<tr>
+<td>Put <strong>更新</strong>（128 / 1024）</td>
+<td style="text-align: right;"><strong>2.8 / 2.9 ns，0 分配</strong></td>
+<td style="text-align: right;">58.1 / 53.7 ns，7 KB GC</td>
+<td><strong>~19× 快 + 零分配</strong>（基线每次 LinkedList 摘链+挂链）</td>
+</tr>
+<tr>
+<td>TryGet <strong>未命中</strong>（128 / 1024）</td>
+<td style="text-align: right;">90.5 / <strong>668.7 ns</strong></td>
+<td style="text-align: right;"><strong>11.8 / 12.2 ns</strong></td>
+<td>⚠️ <strong>miss 显著慢</strong>——满载开放寻址探测链 + 随机访存；容量越大越贵</td>
+</tr>
+<tr>
+<td>Put 驱逐（单 op）</td>
+<td style="text-align: right;">152.1 / <strong>996.4 ns</strong> / 48 B</td>
+<td style="text-align: right;"><strong>119.6 / 129.4 ns</strong> / 152 B</td>
+<td>⚠️ 当前 785~996 ns（多次复测波动）；构成 = 满载下存在性检查全表扫描 + 时钟扫描，仍 ~6-8× 慢于基线</td>
+</tr>
+<tr>
+<td>混合 80% 命中（128 / 1024）</td>
+<td style="text-align: right;">35.6 µs / <strong>181.9 µs</strong>（每千次）</td>
+<td style="text-align: right;">35.2 / 37.4 µs</td>
+<td>⚠️ 128 容量持平；<strong>1024 容量混合落后 4.9×</strong>——miss 路径拖垮</td>
+</tr>
+</tbody>
+</table>
+<p><strong>负载因子曲线（探针实测，capacity=1024）</strong>：miss 随负载非线性发散——50% → <strong>49 ns</strong>、75% → 110 ns、
+90% → 462 ns、100% → 681 ns。⚠️ 触发悬崖的是**负载因子（工作集/容量）**而非命中率：80% 命中率 +
+容量 ≥ 2× 工作集时 miss 仍是 49 ns，无悬崖。基准的 miss/混合行是在 100% 满载下测的，对&quot;标准配置&quot;不公平。</p>
+<h3 id="62-clockcachev2组相联sets--8-ways">6.2 ClockCacheV2（组相联，sets × 8 ways）</h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th style="text-align: right;">V2 每 op</th>
+<th style="text-align: right;">基线每 op</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TryGet <strong>命中</strong>（128 / 1024 容量）</td>
+<td style="text-align: right;"><strong>5.0 / 5.1 ns</strong></td>
+<td style="text-align: right;">29.6 / 29.7 ns</td>
+<td><strong>5.8~5.9× 快</strong>，零分配、无锁读</td>
+</tr>
+<tr>
+<td>Put <strong>更新</strong>（128 / 1024）</td>
+<td style="text-align: right;"><strong>18.6 / 17.7 ns，0 分配</strong></td>
+<td style="text-align: right;">58.1 / 53.7 ns，7 KB GC</td>
+<td><strong>~3× 快 + 零分配</strong></td>
+</tr>
+<tr>
+<td>TryGet <strong>未命中</strong>（128 / 1024）</td>
+<td style="text-align: right;"><strong>7.0 / 7.0 ns</strong></td>
+<td style="text-align: right;"><strong>11.8 / 12.2 ns</strong></td>
+<td><strong>反超基线 1.7×</strong>——任意负载恒定 8 路扫描，无探测链</td>
+</tr>
+<tr>
+<td>Put 驱逐（单 op）</td>
+<td style="text-align: right;"><strong>66.5 / 67.7 ns</strong> / 48 B</td>
+<td style="text-align: right;"><strong>119.6 / 129.4 ns</strong> / 152 B</td>
+<td><strong>反超基线 ~1.8×</strong>——组内 CLOCK ≤16 次操作，无全表扫描</td>
+</tr>
+<tr>
+<td>混合 80% 命中（128 / 1024）</td>
+<td style="text-align: right;"><strong>12.5 / 12.5 µs</strong>（每千次）</td>
+<td style="text-align: right;">35.2 / 37.4 µs</td>
+<td><strong>反超基线 ~3×</strong>（V1 满载时 181.9 µs 落后 4.9×）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>V1 → V2 对比（同机同基准）</strong>：miss 90.5/668.7 ns → <strong>7.0/7.0 ns（~95×）</strong>；驱逐 152.1/996.4 ns →
+<strong>66.5/67.7 ns（~15×）</strong>；混合 35.6/181.9 → <strong>12.5/12.5 µs/千次（~14.6×）</strong>。代价：hit 3.7 → 5.0 ns
+（fmix 终混 + 固定 8 路扫描，仍 5.9× 快于基线）、update 2.9 → 17.7 ns（仍 3× 快于基线、达标 spec ≤50ns）。</p>
+<h3 id="63-选型结论">6.3 选型结论</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>选谁</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>工作集已知且容量 ≥ 2× 工作集可保证、热路径极致（hit/update 最高频）</td>
+<td><strong>ClockCache（V1）</strong>：hit 3.7 / update 2.9ns 无出其右</td>
+</tr>
+<tr>
+<td>容量接近/等于工作集、命中率不可控、miss 延迟不可发散、Core 库对外默认推荐</td>
+<td><strong>ClockCacheV2</strong>：全路径反超基线、任意负载恒定</td>
+</tr>
+<tr>
+<td>V2 注意事项</td>
+<td>组偏斜会提前淘汰（均匀负载实际驻留 ≈ 容量 85-90%，<code>ways=16</code> 可减半损失）；调 <code>ways</code>（默认 8）适配负载</td>
+</tr>
+</tbody>
+</table>
+<p>Ring/Metadata 当前沿用 V1（miss 代价被 I/O 遮盖，热路径 hit 更快）。</p>
+<h2 id="7-同步模式syncmodesbench-非争用----sync-probe-并发伸缩2026-08-20">7. 同步模式（SyncModesBench 非争用 + --sync-probe 并发伸缩，2026-08-20）</h2>
+<p>选型指南主表见 <a href="../locking-and-epoch.html"><code>../locking-and-epoch.md</code></a> §0.2。本节存档原始数字。</p>
+<h3 id="71-非争用bdn-shortrun每方法-100-次循环表值为整循环每-op--100">7.1 非争用（BDN ShortRun，每方法 100 次循环——表值为整循环，每 op = ÷100）</h3>
+<table>
+<thead>
+<tr>
+<th>方法（100 次循环）</th>
+<th style="text-align: right;">整循环</th>
+<th style="text-align: right;"><strong>每 op</strong></th>
+<th style="text-align: right;">分配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SpinRWLock 共享 Acquire+Release</td>
+<td style="text-align: right;">1,627 ns</td>
+<td style="text-align: right;"><strong>16.3 ns</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>SpinRWLock 排他 Acquire+Release</td>
+<td style="text-align: right;">2,609 ns</td>
+<td style="text-align: right;"><strong>26.1 ns</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>SpinRWLock TryShared（成功）</td>
+<td style="text-align: right;">1,636 ns</td>
+<td style="text-align: right;">16.4 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>SpinRWLock TryExclusive（成功）</td>
+<td style="text-align: right;">1,700 ns</td>
+<td style="text-align: right;">17.0 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>Monitor lock</td>
+<td style="text-align: right;">1,677 ns</td>
+<td style="text-align: right;">16.8 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>RWLS 读</td>
+<td style="text-align: right;">1,789 ns</td>
+<td style="text-align: right;">17.9 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>RWLS 写</td>
+<td style="text-align: right;">2,002 ns</td>
+<td style="text-align: right;">20.0 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>LightEpoch Resume+Suspend</td>
+<td style="text-align: right;">957 ns</td>
+<td style="text-align: right;"><strong>9.6 ns</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>COW 快照读（volatile 引用+5 标量拷贝）</td>
+<td style="text-align: right;">70.5 ns</td>
+<td style="text-align: right;"><strong>0.7 ns</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>COW 快照发布（new 5 标量对象+volatile 写）</td>
+<td style="text-align: right;">499.8 ns</td>
+<td style="text-align: right;">5.0 ns</td>
+<td style="text-align: right;">48 B/op</td>
+</tr>
+<tr>
+<td>seqlock 读（版本双读+复验）</td>
+<td style="text-align: right;">60.1 ns</td>
+<td style="text-align: right;"><strong>0.6 ns</strong></td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td>seqlock 写（奇偶翻转+2 字段）</td>
+<td style="text-align: right;">56.2 ns</td>
+<td style="text-align: right;">0.6 ns</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+<p>结论：①共享锁进出对与 Monitor 相当、比 epoch 贵 1.7×（两次 interlocked 打同一字 vs 本线程行两次普通写）；
+②排他比共享贵 60%（进门 Or pending + 释放清双位，三次 locked op——写偏向的固定代价）；
+③COW/seqlock 读比任何锁便宜 <strong>20-50×</strong>——热读路径选型的硬数字；④COW 写侧 48B/op 分配——高频发布会产 GC 压力，
+写频繁的场景选 seqlock/原地 CAS 而非 COW。</p>
+<h3 id="72-并发伸缩--sync-probe-15s--3-轮取中位同机">7.2 并发伸缩（--sync-probe 1.5s × 3 轮取中位，同机）</h3>
+<p>读者伸缩（N 线程纯读锤击聚合吞吐 ops/s，×n = 相对 1T 倍数）：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th style="text-align: right;">1T</th>
+<th style="text-align: right;">2T</th>
+<th style="text-align: right;">4T</th>
+<th style="text-align: right;">6T</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SpinRWLock 共享</td>
+<td style="text-align: right;">89.7M</td>
+<td style="text-align: right;">44.3M（×0.5）</td>
+<td style="text-align: right;">20.5M（×0.2）</td>
+<td style="text-align: right;">18.6M（×0.2）</td>
+</tr>
+<tr>
+<td><strong>LightEpoch 周期</strong></td>
+<td style="text-align: right;">167.5M</td>
+<td style="text-align: right;">301.3M（×1.8）</td>
+<td style="text-align: right;">527.0M（×3.1）</td>
+<td style="text-align: right;"><strong>787.7M（×4.7）</strong></td>
+</tr>
+<tr>
+<td>Monitor</td>
+<td style="text-align: right;">90.8M</td>
+<td style="text-align: right;">71.3M（×0.8）</td>
+<td style="text-align: right;">22.9M（×0.3）</td>
+<td style="text-align: right;">20.3M（×0.2）</td>
+</tr>
+<tr>
+<td>RWLS 读</td>
+<td style="text-align: right;">70.0M</td>
+<td style="text-align: right;">67.2M（×1.0）</td>
+<td style="text-align: right;">58.8M（×0.8）</td>
+<td style="text-align: right;">52.1M（×0.7）</td>
+</tr>
+</tbody>
+</table>
+<p>结论：<strong>单字共享锁（SpinRWLock/Monitor）聚合吞吐随并发反降</strong>（缓存行乒乓主导，6T 落到 1T 的 20%）；
+LightEpoch 每线程独占缓存行，<strong>近线性伸缩，6T 聚合 = SpinRWLock 的 42×</strong>——&quot;热读路径不该用共享锁&quot;的实测铁证；
+RWLS 内部读者计数聚拢，伸缩缓降但仍远逊 epoch。SpinRWLock 共享的正确定位：<strong>低并发协调 + 结构性互斥</strong>
+（段锁/Gate/读计划锁），不是高并发读吞吐工具。</p>
+<p>写偏向落地（N 读者锤击 + 1 写者排他循环，1.5s）：</p>
+<table>
+<thead>
+<tr>
+<th>读者数</th>
+<th style="text-align: right;">写者落地次数</th>
+<th style="text-align: right;">平均</th>
+<th style="text-align: right;">最大</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td style="text-align: right;">12.0M</td>
+<td style="text-align: right;"><strong>0.1 µs</strong></td>
+<td style="text-align: right;">16.4 ms</td>
+</tr>
+<tr>
+<td>3</td>
+<td style="text-align: right;">10.8M</td>
+<td style="text-align: right;"><strong>0.1 µs</strong></td>
+<td style="text-align: right;">16.8 ms</td>
+</tr>
+<tr>
+<td>5</td>
+<td style="text-align: right;">9.0M</td>
+<td style="text-align: right;"><strong>0.1 µs</strong></td>
+<td style="text-align: right;">16.0 ms</td>
+</tr>
+<tr>
+<td>11</td>
+<td style="text-align: right;">7.6M</td>
+<td style="text-align: right;"><strong>0.1 µs</strong></td>
+<td style="text-align: right;">16.7 ms</td>
+</tr>
+</tbody>
+</table>
+<p>结论：写偏向兑现——pending 挡新读者后写者只等在途读者，<strong>平均落地 0.1µs 且不随读者数恶化</strong>（读优先语义下
+此数字无界，LockWord 时代 ChaseCompaction/ConcurrentReadWrite 的饿死形态即源于此）；max ~16ms 为 OS
+调度毛刺（SpinWait 退化 Yield/Sleep 的定时器量子），非锁协议成本。</p>
+<h2 id="8-汇总一页">8. 汇总一页</h2>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>甜区</th>
+<th>已知短板（选型时看这列）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AsyncManualResetEvent</code></td>
+<td>已 set 快路径 15.2ns（反超基线）/ 广播相当 / 内联真实唤醒 93ns</td>
+<td>默认模式真实唤醒 843ns（Set 可持锁的安全语义付线程池往返）；内联模式限制 Set 不持锁</td>
+</tr>
+<tr>
+<td><code>AsyncCountDown</code></td>
+<td>纯计数（Interlocked）；内联稳态 135ns</td>
+<td>默认稳态 846ns（唤醒调度）；等待注册有分配（等待者少/静态等待场景无所谓）</td>
+</tr>
+<tr>
+<td><code>AsyncQueue&lt;T&gt;</code></td>
+<td>稳态生产-消费（1.55× 快、分配 4.2× 少）</td>
+<td>空转→唤醒路径基线略快</td>
+</tr>
+<tr>
+<td><code>PooledValueTaskSource</code></td>
+<td>31ns 零分配闭环（底座）</td>
+<td>—（自定义原语才直用）</td>
+</tr>
+<tr>
+<td><code>OverflowPool&lt;T&gt;</code></td>
+<td>全路径零分配、命中 17ns</td>
+<td>溢出走 disposer（仍 ~7ns/项）</td>
+</tr>
+<tr>
+<td><code>ClockCache</code>（V1）</td>
+<td>标准配置下极致热路径（hit 3.7ns / update 2.9ns、0 分配）</td>
+<td><strong>miss 探测链</strong>：满载 681ns@1024、驱逐 785ns——须守&quot;容量 ≥2× 工作集&quot;</td>
+</tr>
+<tr>
+<td><code>ClockCacheV2</code></td>
+<td>任意负载恒定（hit 5 / miss 7 / 驱逐 70ns）、全路径反超基线</td>
+<td>组偏斜损失 ~10-15% 有效容量；hit/update 比 V1 略慢</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/perf/core-primitives-perf.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

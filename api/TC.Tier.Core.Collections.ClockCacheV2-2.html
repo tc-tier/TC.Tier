@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class ClockCacheV2&lt;TKey, TValue&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class ClockCacheV2&lt;TKey, TValue&gt; | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="★ CLOCK 近似 LRU 缓存 V2——组相联存储（set-associative，CPU 缓存教科书结构）。 ★ 算法：容量拆为 sets &#215; ways（默认 8 路）的固定槽组；查找/插入只扫描组内 ways 槽——miss 恒 ≤8 次读，     与负载因子无关（V1 开放寻址满载 miss 探测链发散至 681ns，V2 结构上不存在该悬崖）。 ★ 淘汰：组内 CLOCK 二次机会（访问位 Interlocked CAS），≤2&#215;ways 次操作，O(1)。 ★ 命中率 90-99%（8 路组相联 ≈ 全表 CLOCK 的 90-99%，Zipf 实测 99.9% vs 100%）。 ★ 线程安全：无全局锁，读路径纯无锁（Interlocked CAS 写路径）；并发语义与 V1 一致（尽力而为 Put）。 ★ 热路径（hit/miss/update）零分配；Slot 数组 = capacity（内存 1&#215;）。 ★ 与 ClockCache（V1 开放寻址）并列：V1 甜区 = 铁律配置下（容量 ≥2&#215; 工作集）极致热路径     （hit 3.7ns / update 2.9ns）；V2 = 任意负载延迟恒定、全路径反超 ConcurrentDictionary 基线     （hit 5ns / miss 7ns / 驱逐 70ns）。组偏斜会提前淘汰（均匀负载实际驻留 ≈ 容量 85-90%）。 参见 src/TC.Tier.Core/docs/cache-and-compute.md。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2">
+
+
+
+  <h1 id="TC_Tier_Core_Collections_ClockCacheV2_2" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2" class="text-break">Class ClockCacheV2&lt;TKey, TValue&gt;</h1>
+  <div class="markdown level0 summary"><p>★ CLOCK 近似 LRU 缓存 V2——组相联存储（set-associative，CPU 缓存教科书结构）。</p>
+<p>★ 算法：容量拆为 sets × ways（默认 8 路）的固定槽组；查找/插入只扫描组内 ways 槽——miss 恒 ≤8 次读，
+    与负载因子无关（V1 开放寻址满载 miss 探测链发散至 681ns，V2 结构上不存在该悬崖）。</p>
+<p>★ 淘汰：组内 CLOCK 二次机会（访问位 Interlocked CAS），≤2×ways 次操作，O(1)。</p>
+<p>★ 命中率 90-99%（8 路组相联 ≈ 全表 CLOCK 的 90-99%，Zipf 实测 99.9% vs 100%）。</p>
+<p>★ 线程安全：无全局锁，读路径纯无锁（Interlocked CAS 写路径）；并发语义与 V1 一致（尽力而为 Put）。</p>
+<p>★ 热路径（hit/miss/update）零分配；Slot 数组 = capacity（内存 1×）。</p>
+<p>★ 与 ClockCache（V1 开放寻址）并列：V1 甜区 = 铁律配置下（容量 ≥2× 工作集）极致热路径
+    （hit 3.7ns / update 2.9ns）；V2 = 任意负载延迟恒定、全路径反超 ConcurrentDictionary 基线
+    （hit 5ns / miss 7ns / 驱逐 70ns）。组偏斜会提前淘汰（均匀负载实际驻留 ≈ 容量 85-90%）。</p>
+<p>参见 src/TC.Tier.Core/docs/cache-and-compute.md。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">ClockCacheV2&lt;TKey, TValue&gt;</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Collections.html">Collections</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Collections_ClockCacheV2_2_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class ClockCacheV2&lt;TKey, TValue&gt; : IDisposable where TKey : struct, IEquatable&lt;TKey&gt;</code></pre>
+  </div>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">TKey</span></td>
+        <td><p>键类型（值类型，须 IEquatable）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><span class="parametername">TValue</span></td>
+        <td><p>值类型（引用类型，nullable）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2__ctor_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.#ctor*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2__ctor_System_Int32_System_Action__0__1__System_Int32_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.#ctor(System.Int32,System.Action{`0,`1},System.Int32)">ClockCacheV2(int, Action&lt;TKey, TValue&gt;?, int)</h4>
+  <div class="markdown level1 summary"><p>创建组相联 CLOCK 缓存。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClockCacheV2(int capacity, Action&lt;TKey, TValue&gt;? onEvict = null, int ways = 8)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">capacity</span></td>
+        <td><p>容量（须 2 的幂；缓存可容纳的 entry 上限，语义与 V1 相同）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-2">Action</a>&lt;TKey, TValue&gt;</td>
+        <td><span class="parametername">onEvict</span></td>
+        <td><p>淘汰回调（可选，caller 在淘汰时释放资源）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">ways</span></td>
+        <td><p>组内路数（须 2 的幂，默认 8；超过 capacity 时自动减半钳制）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
+        <td><p>capacity 或 ways 非 2 的幂。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="fields">Fields
+</h3>
+
+
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_DefaultWays" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.DefaultWays">DefaultWays</h4>
+  <div class="markdown level1 summary"><p>默认组内路数（8 路 ≈ 全相联 90-99% 命中率，扫描恒定）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int DefaultWays = 8</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Capacity_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Capacity*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Capacity" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Capacity">Capacity</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Capacity { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Count_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Count*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Count" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Count">Count</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Count { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Evictions_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Evictions*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Evictions" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Evictions">Evictions</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Evictions { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_HitRate_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.HitRate*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_HitRate" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.HitRate">HitRate</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public double HitRate { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Hits_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Hits*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Hits" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Hits">Hits</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Hits { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Misses_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Misses*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Misses" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Misses">Misses</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Misses { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Ways_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Ways*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Ways" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Ways">Ways</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Ways { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Clear_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Clear*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Clear" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Clear">Clear()</h4>
+  <div class="markdown level1 summary"><p>★ 清空缓存（调淘汰回调释放所有值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Clear()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Dispose_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Dispose*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Dispose" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Dispose">Dispose()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_GetStats_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.GetStats*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_GetStats" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.GetStats">GetStats()</h4>
+  <div class="markdown level1 summary"><p>指标快照。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClockCacheV2Stats GetStats()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Collections.ClockCacheV2Stats.html">ClockCacheV2Stats</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Put_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Put*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Put__0__1_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Put(`0,`1)">Put(TKey, TValue)</h4>
+  <div class="markdown level1 summary"><p>★ 插入/更新——组内无空槽时触发组内 CLOCK 淘汰。尽力而为（并发冲突重扫一次）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Put(TKey key, TValue value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TValue</span></td>
+        <td><span class="parametername">value</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_Remove_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Remove*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_Remove__0_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.Remove(`0)">Remove(TKey)</h4>
+  <div class="markdown level1 summary"><p>★ 移除指定键（手动淘汰）。返回是否成功。
+★ CORE-08：置 tombstone 后<b>不清 Key/Value</b>——清场会抹掉并发 Put 已 CAS 抢槽写入的新条目
+（条目丢失 + _count 漂移）；tombstone 槽被复用（Put CAS 0/tombstone→新值）时新值覆盖旧引用——
+引用滞留 = 已删条目数（≤ 容量，有界），复用即释放。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Remove(TKey key)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Collections_ClockCacheV2_2_TryGet_" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.TryGet*"></a>
+  <h4 id="TC_Tier_Core_Collections_ClockCacheV2_2_TryGet__0__1__" data-uid="TC.Tier.Core.Collections.ClockCacheV2`2.TryGet(`0,`1@)">TryGet(TKey, out TValue)</h4>
+  <div class="markdown level1 summary"><p>★ 查找——命中返回 true + value（设访问位），未命中返回 false。热路径零分配。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGet(TKey key, out TValue value)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">TKey</span></td>
+        <td><span class="parametername">key</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><span class="xref">TValue</span></td>
+        <td><span class="parametername">value</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

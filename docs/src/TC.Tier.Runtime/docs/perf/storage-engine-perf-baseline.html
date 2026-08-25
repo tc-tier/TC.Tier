@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>StorageEngine / 段表 性能基线（Linux） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="StorageEngine / 段表 性能基线（Linux） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="storageengine--段表-性能基线linux">StorageEngine / 段表 性能基线（Linux）</h1>
+
+<blockquote>
+<p><strong>日期</strong>：2026-08-21　<strong>环境</strong>：Ubuntu 24.04（Linux 6.8，ext4 on /tmp），AMD Ryzen 9 6900HX 12C/12T，.NET 8.0.26，BenchmarkDotNet 0.13.12
+<strong>性质</strong>：绝对值随硬件浮动，<strong>相对比较（比值列）是稳定结论</strong>。
+<strong>文件系统定位</strong>：内存文件系统不只用于测试——它是<strong>极速运行时</strong>文件系统（Append ~0.5 µs/op，本地文件系统 2.75 µs），
+数据可随时经 <code>RootSpaceImage.Capture/Restore/Transfer</code> 导出镜像或转化为任意文件系统（本地/虚拟/网络，
+见 Core io.md §10）。本文内存文件系统数据同时是&quot;极速模式的生产基线&quot;与各文件系统的对照下界。
+<strong>复现</strong>（<code>benchmarks/TC.Tier.Runtime.Benchmarks</code>，文件系统由 <code>TC_BENCH_FS_SPEC</code> 切换、零重编译）：</p>
+<pre><code class="lang-bash">dotnet build benchmarks/TC.Tier.Runtime.Benchmarks -c Release
+B=benchmarks/TC.Tier.Runtime.Benchmarks/bin/Release/net8.0/TC.Tier.Runtime.Benchmarks.dll
+dotnet $B --filter '*LeaseLayerLatencyBench*'      # 段表/lease 分层延迟（纯内存）
+dotnet $B --filter '*LeaseProtocolBench*'          # lease 协议五动词（Default vs Pooled）
+dotnet $B --filter '*StorageEngineIoBenchmarks*'   # 引擎端到端（mem 缺省）
+TC_BENCH_FS_SPEC=local:///tmp/tc-bench dotnet $B --filter '*NewLocalStorageEngineBench*'   # 本地文件系统（真盘）
+dotnet $B --filter '*SegmentCreationBench*'        # 建段吞吐
+dotnet $B --filter '*SpaceReclaimBench*'           # 回收/Compact
+</code></pre>
+<p><strong>配套</strong>：引擎用法见 <code>src/TC.Tier.Runtime/docs/storage-engine.md</code>；段表机制见
+<code>src/TC.Tier.Runtime/docs/segment-table.md</code>；lease 协议见 <code>lease-protocol.md</code>；
+底层 IO（文件系统/DIO/fsync）见 <code>src/TC.Tier.Core/docs/perf/io-performance.md</code>。</p>
+</blockquote>
+<hr>
+<h2 id="0-结论速查">0. 结论速查</h2>
+<p><strong>核心场景 = 预分配 + 复写（推荐模式，§2.0）</strong>：<code>Allocate</code> 大区一次（无 lease，256MB 仅 ~6 µs）→
+址上 <code>Write</code> 复写（lease 协议）。Append 只是 WAL 顺序写便利路径（降低水位线管理复杂度）。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>数据支撑</th>
+<th>结论</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>页预留成本</strong></td>
+<td>一次性 Allocate 256MB = <strong>~6 µs</strong>（纯 CAS 推水位，无 lease）</td>
+<td>页缓冲模型的预留近免费，摊到字节≈0</td>
+</tr>
+<tr>
+<td><strong>核心模式·稳态复写</strong></td>
+<td>532 ns/op（64B）/ 754 ns（4KB）/ 5.7 µs（64KB，<strong>11.5 GB/s</strong>）</td>
+<td>复写的 lease 协议成本 µs 级（并发修复批次+微优化后：单线程小包 +6~10% 税，并行/大块持平或更快，见 §6）</td>
+</tr>
+<tr>
+<td><strong>核心模式·并行复写</strong></td>
+<td>4T 不相交区 <strong>2.55× 扩展</strong>（64B 213 ns/op；64KB 20.4 GB/s）</td>
+<td>lease 区间所有权给真并行——核心模式受益（扩展比不因修复退化）</td>
+</tr>
+<tr>
+<td><strong>复写 vs Append</strong></td>
+<td>64B 同量级（544 vs 600 ns）；64KB 处 <strong>5.6×</strong>（11.1 vs 2.0 GB/s）</td>
+<td>大粒度下核心模式全面占优；Append 地址只进不退</td>
+</tr>
+<tr>
+<td><strong>复写·同址反复</strong></td>
+<td>单址 10 万次复写<strong>恒 2.3-2.8 µs/op 平稳</strong>；extent 记录恒 1 条；BDN Write_Memory <strong>4.73 ms</strong></td>
+<td>覆写 Commit 归并被覆盖旧记录——见 §2.0</td>
+</tr>
+<tr>
+<td>关心 lease 协议的入场费</td>
+<td>纯尾 CAS 221 ns vs 完整 AppendLease 1.52 µs/op（6.9×，1952 B/op）</td>
+<td>并发安全的代价在 lease 对象与段表占位，不在 CAS 本身</td>
+</tr>
+<tr>
+<td>Append（WAL 路径）</td>
+<td>mem 511 ns/op（64B）</td>
+<td>日志型补充；端到端被 lease 层主导，内存搬运税 ~3%</td>
+</tr>
+<tr>
+<td>本地文件系统 Append（ext4，512B）</td>
+<td>2.75 µs vs 内存文件系统 1.1 µs（<strong>2.5×</strong>）</td>
+<td>syscall 税显著但可控；换文件系统零代码改动</td>
+</tr>
+<tr>
+<td><strong>极速吞吐选内存文件系统</strong></td>
+<td>内存文件系统 511 ns vs 本地文件系统 2.75 µs（<strong>5.4×</strong>，64B）；内存文件系统数据可经 <code>RootSpaceImage</code> 导出/转任意文件系统</td>
+<td>进程内极速运行时 + 随时落盘自由度——内存文件系统是生产选项，非仅测试</td>
+</tr>
+<tr>
+<td>异步 Append</td>
+<td>比同步 <strong>+23%</strong>（631 vs 511 ns）</td>
+<td>内存文件系统上 async 纯开销；异步价值在真 IO 文件系统</td>
+</tr>
+<tr>
+<td>并发 Append（mem，64B）</td>
+<td>4T ≈ 1.09× / 16T ≈ 0.87× 单线程</td>
+<td><strong>Append 小包并发反扩展</strong>（全局尾 CAS 串行）——要并行用核心模式的分区复写</td>
+</tr>
+<tr>
+<td>纯段表并发（4KB 单元）</td>
+<td>8T 最好 <strong>~2×</strong>（656K→1.30M ops/s），Lock 争用 0→195</td>
+<td>同上：争用界约 2×；生产路径 IO 占比大，实际扩展更好</td>
+</tr>
+<tr>
+<td>建段成本</td>
+<td>预备池命中后 Append <strong>零建段等待</strong>；连续建段 ~235 µs/段（mem）</td>
+<td>建段全部在 worker/池后台化，写者不付这笔钱</td>
+</tr>
+<tr>
+<td>回收/Compact</td>
+<td>ReclaimHead 整段 122 ms / Compact 127 ms（16MB 段 × 预填）</td>
+<td>威胁操作量级（整段搬迁），同步入口必带 timeout</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-段表--lease-层纯内存-segmenttablehandlernull隔离-io">1. 段表 / lease 层（纯内存 <code>SegmentTable</code>，handler=null——隔离 IO）</h2>
+<h3 id="11-分层延迟leaselayerlatencybench单笔与-10k-批均值">1.1 分层延迟（LeaseLayerLatencyBench，单笔与 10K 批均值）</h3>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th style="text-align: right;">单笔 Mean</th>
+<th style="text-align: right;">10K 批均摊</th>
+<th style="text-align: right;">分配/op</th>
+<th style="text-align: right;">vs 纯 CAS（均摊）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. 纯尾 CAS（Atomic128）</td>
+<td style="text-align: right;">221 ns</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">736 B</td>
+<td style="text-align: right;">1×</td>
+</tr>
+<tr>
+<td>2. AllocateLease（CAS+段表+MarkWasted）</td>
+<td style="text-align: right;">3.83 µs</td>
+<td style="text-align: right;"><strong>443 ns</strong></td>
+<td style="text-align: right;">1448 B</td>
+<td style="text-align: right;">2.0×</td>
+</tr>
+<tr>
+<td>3. AppendLease（完整 lease）</td>
+<td style="text-align: right;">9.44 µs</td>
+<td style="text-align: right;"><strong>1.52 µs</strong></td>
+<td style="text-align: right;">1952 B</td>
+<td style="text-align: right;">6.9×</td>
+</tr>
+<tr>
+<td>4. AppendLease.NoCommit（创建+Dispose）</td>
+<td style="text-align: right;">6.83 µs</td>
+<td style="text-align: right;">683 ns</td>
+<td style="text-align: right;">1952 B</td>
+<td style="text-align: right;">3.1×</td>
+</tr>
+<tr>
+<td>6. Batch.AppendLease</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">1.52 µs</td>
+<td style="text-align: right;">168 B*</td>
+<td style="text-align: right;">6.9×</td>
+</tr>
+<tr>
+<td>7. Batch.WriteLease（Allocate 大空间+10K 写）</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;"><strong>1.08 µs</strong></td>
+<td style="text-align: right;">168 B*</td>
+<td style="text-align: right;">4.9×</td>
+</tr>
+<tr>
+<td>8. Batch.Allocate+Write</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">1.65 µs</td>
+<td style="text-align: right;">168 B*</td>
+<td style="text-align: right;">7.5×</td>
+</tr>
+</tbody>
+</table>
+<p>*批模式下 lease 对象复用，均摊分配从 ~2 KB/op 降到 ~168 B/op（ExtentLease 数组摊薄）。</p>
+<ul>
+<li><strong>单笔 vs 批均摊差 ~6×</strong>：单笔路径含冷缓存/未内联的 lease 构造；稳态消费（上层连续写）取批均摊列。- lease 完整协议 ≈ 1.5 µs/op 是内存文件系统的协议地板——引擎端到端（§2）几乎全部叠在其上。</li>
+</ul>
+<h3 id="12-lease-协议五动词leaseprotocolbenchdefault-vs-pooled-工厂">1.2 lease 协议五动词（LeaseProtocolBench，Default vs Pooled 工厂）</h3>
+<table>
+<thead>
+<tr>
+<th>动词</th>
+<th style="text-align: right;">Default</th>
+<th style="text-align: right;">Pooled</th>
+<th style="text-align: right;">分配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>AppendLease.Create+Commit</td>
+<td style="text-align: right;">6.53 µs</td>
+<td style="text-align: right;">7.99 µs</td>
+<td style="text-align: right;">1.21 KB</td>
+</tr>
+<tr>
+<td>AllocateLease.CAS</td>
+<td style="text-align: right;">2.10 µs</td>
+<td style="text-align: right;">2.25 µs</td>
+<td style="text-align: right;">1.05 KB</td>
+</tr>
+<tr>
+<td>WriteLease.Overwrite</td>
+<td style="text-align: right;">6.67 µs</td>
+<td style="text-align: right;">6.50 µs</td>
+<td style="text-align: right;">1.21 KB</td>
+</tr>
+<tr>
+<td>ReclaimLease.PunchHole</td>
+<td style="text-align: right;">8.00 µs</td>
+<td style="text-align: right;">8.42 µs</td>
+<td style="text-align: right;">1.38 KB</td>
+</tr>
+<tr>
+<td>ReclaimTail+ReAppend</td>
+<td style="text-align: right;">12.10 µs</td>
+<td style="text-align: right;">9.73 µs</td>
+<td style="text-align: right;">1.38 KB</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Pooled 与 Default 同量级</strong>（±20% 噪声带内）：池化收益在均摊分配（见 1.1 批模式），不在单笔延迟。</li>
+<li>ReclaimTail 最贵（双尾回退 + 版本 CAS + 段偏移回退三步）。</li>
+</ul>
+<h3 id="13-纯段表并发扩展4kb-单元--10k线程">1.3 纯段表并发扩展（4KB 单元 × 10K/线程）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">线程</th>
+<th style="text-align: right;">总耗时</th>
+<th style="text-align: right;">吞吐</th>
+<th style="text-align: right;">vs 1T</th>
+<th style="text-align: right;">Lock 争用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">15.2 ms</td>
+<td style="text-align: right;">656 K ops/s</td>
+<td style="text-align: right;">1.0×</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">19.8 ms</td>
+<td style="text-align: right;">1.01 M ops/s</td>
+<td style="text-align: right;">1.5×</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">42.2 ms</td>
+<td style="text-align: right;">948 K ops/s</td>
+<td style="text-align: right;">1.4×</td>
+<td style="text-align: right;">20</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">61.6 ms</td>
+<td style="text-align: right;"><strong>1.30 M ops/s</strong></td>
+<td style="text-align: right;"><strong>2.0×</strong></td>
+<td style="text-align: right;">195</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>扩展上限 ~2×</strong>：双尾 128-bit CAS 是单一串行点，8 线程已现锁争用（195 次）。</li>
+<li>这是&quot;纯分配&quot;的最坏视角：生产写路径叠上 IO（syscall/拷贝）后 CAS 占比下降，端到端并发表现更好（§2）。</li>
+<li>提吞吐的正道是<strong>加大单笔</strong>（摊薄每 op 协议成本），不是加线程。</li>
+</ul>
+<h2 id="2-引擎端到端内存文件系统storageengineiobenchmarks64b--10k-ops">2. 引擎端到端——内存文件系统（StorageEngineIoBenchmarks，64B × 10K ops）</h2>
+<h3 id="20-核心场景地址分配--复写页缓冲模型推荐模式">2.0 核心场景：地址分配 + 复写（页缓冲模型）——推荐模式</h3>
+<p><strong>定位（决策）</strong>：预分配+复写是引擎的<strong>推荐核心使用模式</strong>（地址分配无 lease 协议——纯 CAS 推水位；
+复写才付 lease 协议成本）；Append 只是降低水位线管理复杂度的 WAL 顺序写便利路径。</p>
+<p><strong>CorePatternBench</strong>（预分配 256MB 区一次 + 址上复写，内存文件系统；复现
+<code>dotnet $B --filter '*CorePattern*'</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">64B 记录</th>
+<th style="text-align: right;">4KB 页</th>
+<th style="text-align: right;">64KB 大块</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一次性 Allocate 256MB</td>
+<td style="text-align: right;"><strong>6.6 µs/区</strong></td>
+<td style="text-align: right;">5.8 µs/区</td>
+<td style="text-align: right;">6.0 µs/区（摊到字节≈0）</td>
+</tr>
+<tr>
+<td>稳态复写（单线程）</td>
+<td style="text-align: right;"><strong>500 ns/op</strong>（2.0M ops/s）</td>
+<td style="text-align: right;">822 ns/op（1.2M ops/s）</td>
+<td style="text-align: right;">6.26 µs/op（<strong>10.5 GB/s</strong>）</td>
+</tr>
+<tr>
+<td>稳态复写（4T 不相交区）</td>
+<td style="text-align: right;"><strong>198 ns/op（2.5×扩展）</strong></td>
+<td style="text-align: right;">327 ns/op（2.5×）</td>
+<td style="text-align: right;">3.17 µs/op（2.0×，<strong>20.7 GB/s</strong>）</td>
+</tr>
+<tr>
+<td>Append 对照（同 payload）</td>
+<td style="text-align: right;">548 ns/op</td>
+<td style="text-align: right;">5.0 µs/op</td>
+<td style="text-align: right;">40 µs/op（1.6 GB/s）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>页预留近免费</strong>：256MB 一次 Allocate 仅 ~6 µs（纯 CAS 推水位，无 lease 对象）。</li>
+<li><strong>复写 vs Append</strong>：小粒度同量级（500 vs 548 ns）；<strong>粒度越大差距越大</strong>——64KB 处复写 10.5 GB/s
+vs Append 1.6 GB/s（<strong>6.6×</strong>）：Append 每笔付完整 lease+双尾管理且不可覆写（地址空间只进不退）。</li>
+<li><strong>并行复写真扩展（4T 2.5×）</strong>：lease 区间所有权让不相交区并行写——与 Append 的小包并发退化
+（16T 0.87×，全局尾 CAS 串行）形成对照。多页缓冲并发写者的核心模式受益直接。</li>
+<li>文件系统提示：以上为内存文件系统（协议成本裸值）；本地文件系统叠加 syscall 税（§3：512B 处 ~2.5×）。</li>
+</ul>
+<p><strong>✅ 同址反复复写退化已修</strong>：纯段表探针实锤——每复写一次
+<code>_extentList</code> 净 +1（10 万次 = 10 万条），根因是<strong>段表 extent 泄漏</strong>：WriteLease 占位的
+<code>SplitOverlappingExtents</code> 只拆边界不齐的旧 Committed（完全重合的不删），Commit 的 Eager
+合并又只认严格相接（<code>prev.End==start</code>/<code>next.Start==end</code>）——同区间重合条永不归并。单 op
+O(记录数) → 总 O(n²)。修复：<code>CompleteAndMergeEager</code> 收口清理被最终区间完全覆盖的旧条目
+（原仅 sparse 模式清理，放开为无条件；在途态不删——排他保证无重叠）。验证：extent 恒 1 条、
+10 万次恒 2.3-2.8 µs/op、BDN Write_Memory <strong>1.37s → 4.73ms（290×）</strong>、mem/local 全量 644 双绿。
+验证：<code>test_out/repro</code>（反射计数）/<code>repro2</code>（引擎曲线）。</p>
+<h3 id="21-全动词表">2.1 全动词表</h3>
+<table>
+<thead>
+<tr>
+<th>动词</th>
+<th style="text-align: right;">总耗时</th>
+<th style="text-align: right;">每 op</th>
+<th style="text-align: right;">分配/op</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Allocate_Null（纯分配下界）</td>
+<td style="text-align: right;">780 µs</td>
+<td style="text-align: right;">78 ns</td>
+<td style="text-align: right;">63 B</td>
+</tr>
+<tr>
+<td>Allocate_Memory</td>
+<td style="text-align: right;">763 µs</td>
+<td style="text-align: right;">76 ns</td>
+<td style="text-align: right;">&lt;1 B</td>
+</tr>
+<tr>
+<td>Append_Null（分配+零搬运）</td>
+<td style="text-align: right;">4.96 ms</td>
+<td style="text-align: right;">496 ns</td>
+<td style="text-align: right;">313 B</td>
+</tr>
+<tr>
+<td><strong>Append_Memory（端到端）</strong></td>
+<td style="text-align: right;">5.12 ms</td>
+<td style="text-align: right;"><strong>511 ns</strong></td>
+<td style="text-align: right;">297 B</td>
+</tr>
+<tr>
+<td>AppendAsync_Memory</td>
+<td style="text-align: right;">6.30 ms</td>
+<td style="text-align: right;">631 ns</td>
+<td style="text-align: right;">360 B</td>
+</tr>
+<tr>
+<td>ConcurrentAppend 4T</td>
+<td style="text-align: right;">4.70 ms</td>
+<td style="text-align: right;">470 ns</td>
+<td style="text-align: right;">291 B</td>
+</tr>
+<tr>
+<td>ConcurrentAppend 16T</td>
+<td style="text-align: right;">5.86 ms</td>
+<td style="text-align: right;">586 ns</td>
+<td style="text-align: right;">285 B</td>
+</tr>
+<tr>
+<td>Read_Memory</td>
+<td style="text-align: right;">2.37 ms</td>
+<td style="text-align: right;">237 ns</td>
+<td style="text-align: right;">539 B</td>
+</tr>
+<tr>
+<td>Write_Memory（200 址轮复·含退化）</td>
+<td style="text-align: right;">1.37 s</td>
+<td style="text-align: right;">~137 µs</td>
+<td style="text-align: right;">242 B</td>
+</tr>
+<tr>
+<td>PageBuffer_AllocateThenWrite</td>
+<td style="text-align: right;">5.05 ms</td>
+<td style="text-align: right;">505 ns</td>
+<td style="text-align: right;">359 B</td>
+</tr>
+<tr>
+<td>SegmentCreation（4KB 段连续建）</td>
+<td style="text-align: right;">2.48 ms</td>
+<td style="text-align: right;">2.5 µs/op</td>
+<td style="text-align: right;">154 B</td>
+</tr>
+<tr>
+<td>ConcurrentSegmentCreation 4T</td>
+<td style="text-align: right;">3.04 ms</td>
+<td style="text-align: right;">3.0 µs/op</td>
+<td style="text-align: right;">155 B</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Null vs Memory 差 ~3%</strong>：小 payload 下内存搬运近免费，端到端延迟 ≈ lease 协议地板（§1.1）。</li>
+<li><strong>并发不扩展</strong>（4T 1.09× / 16T 0.87×）：与 §1.3 同根——64B 太小，协议成本全暴露在尾 CAS 串行点上。</li>
+<li>Read 比 Append 便宜（无 lease 提交、双游标直读）；分配差异主要来自读缓冲租借。</li>
+<li>Write_Memory 的 137 µs 是 200 址 × 8 迭代累积退化后的均值（核心成本见 §2.0 净表行）。</li>
+<li>建段路径（4KB 段 = 每 64 op 跨段）只让 Append 均摊 +0（预备池命中），连续建段速率 ~2.5 µs/op 内消化。</li>
+</ul>
+<h2 id="3-引擎端到端本地文件系统-vs-内存文件系统newlocalstorageenginebenchext4-tmp">3. 引擎端到端——本地文件系统 vs 内存文件系统（NewLocalStorageEngineBench，ext4 /tmp）</h2>
+<table>
+<thead>
+<tr>
+<th>动词</th>
+<th style="text-align: right;">payload</th>
+<th style="text-align: right;">内存</th>
+<th style="text-align: right;">本地(ext4)</th>
+<th style="text-align: right;">本地税</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Append</td>
+<td style="text-align: right;">512 B</td>
+<td style="text-align: right;">1.10 µs</td>
+<td style="text-align: right;">2.75 µs</td>
+<td style="text-align: right;">2.5×</td>
+</tr>
+<tr>
+<td>Append+Read</td>
+<td style="text-align: right;">512 B</td>
+<td style="text-align: right;">2.70 µs</td>
+<td style="text-align: right;">5.48 µs</td>
+<td style="text-align: right;">2.0×</td>
+</tr>
+<tr>
+<td>Allocate+Write+Read</td>
+<td style="text-align: right;">512 B</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">5.46 µs</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td>Append</td>
+<td style="text-align: right;">4 KB</td>
+<td style="text-align: right;">4.70 µs</td>
+<td style="text-align: right;">5.46 µs</td>
+<td style="text-align: right;">1.2×</td>
+</tr>
+<tr>
+<td>Append+Read</td>
+<td style="text-align: right;">4 KB</td>
+<td style="text-align: right;">13.9 µs</td>
+<td style="text-align: right;">16.6 µs</td>
+<td style="text-align: right;">1.2×</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>syscall 税随 payload 摊薄</strong>：512B 时 2.5×，4KB 时 1.2×——小写密集场景文件系统差异最大。</li>
+<li>Write 走 <code>Allocate</code>+<code>Write</code> 正位写法（Write 契约：目标 ≤ CommittedTail）。</li>
+</ul>
+<h2 id="35-dio-vs-非-dio-模式矩阵本地文件系统真盘-ext4128mb-顺序modeblocksize">3.5 DIO vs 非 DIO 模式矩阵（本地文件系统真盘 ext4，128MB 顺序，Mode×BlockSize）</h2>
+<p>Mode（methodology.md §1）：<strong>A</strong>=缓存写 / <strong>B</strong>=缓存+写透(O_DSYNC) / <strong>C</strong>=DIO 绕缓存 / <strong>D</strong>=DIO+写透。
+复现：<code>dotnet $B --filter '*NewDeviceModeMatrixBench*'</code>（写）／<code>--filter '*NewDeviceReadMatrixBench*'</code>（读），配 <code>TC_BENCH_FS_SPEC=local:///…</code>。</p>
+<h3 id="写吞吐-mbs">写（吞吐 MB/s）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">块大小</th>
+<th style="text-align: right;">A 缓存</th>
+<th style="text-align: right;">B 缓存+写透</th>
+<th style="text-align: right;">C DIO</th>
+<th style="text-align: right;">D DIO+写透</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">4K</td>
+<td style="text-align: right;">722</td>
+<td style="text-align: right;">14</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">16</td>
+</tr>
+<tr>
+<td style="text-align: right;">64K</td>
+<td style="text-align: right;">1,109</td>
+<td style="text-align: right;">146</td>
+<td style="text-align: right;">746</td>
+<td style="text-align: right;">260</td>
+</tr>
+<tr>
+<td style="text-align: right;">256K</td>
+<td style="text-align: right;">1,600</td>
+<td style="text-align: right;">366</td>
+<td style="text-align: right;"><strong>1,907</strong></td>
+<td style="text-align: right;">807</td>
+</tr>
+<tr>
+<td style="text-align: right;">1M</td>
+<td style="text-align: right;">1,581</td>
+<td style="text-align: right;">572</td>
+<td style="text-align: right;"><strong>2,932</strong></td>
+<td style="text-align: right;">2,008</td>
+</tr>
+<tr>
+<td style="text-align: right;">4M</td>
+<td style="text-align: right;">1,621</td>
+<td style="text-align: right;">821</td>
+<td style="text-align: right;"><strong>7,045</strong></td>
+<td style="text-align: right;">5,356</td>
+</tr>
+</tbody>
+</table>
+<h3 id="读热读吞吐-gbsbuffered页缓存命中dio盘直读">读（热读吞吐 GB/s——Buffered=页缓存命中，DIO=盘直读）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">块大小</th>
+<th style="text-align: right;">Buffered（页缓存）</th>
+<th style="text-align: right;">DIO（直读）</th>
+<th style="text-align: right;">缓存增益</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">4K</td>
+<td style="text-align: right;">1.9</td>
+<td style="text-align: right;">1.2</td>
+<td style="text-align: right;">1.6×</td>
+</tr>
+<tr>
+<td style="text-align: right;">64K</td>
+<td style="text-align: right;">6.2</td>
+<td style="text-align: right;">1.9</td>
+<td style="text-align: right;">3.3×</td>
+</tr>
+<tr>
+<td style="text-align: right;">1M</td>
+<td style="text-align: right;">7.4</td>
+<td style="text-align: right;">2.6</td>
+<td style="text-align: right;">2.9×</td>
+</tr>
+<tr>
+<td style="text-align: right;">4M</td>
+<td style="text-align: right;">9.0</td>
+<td style="text-align: right;">2.5</td>
+<td style="text-align: right;">3.6×</td>
+</tr>
+</tbody>
+</table>
+<h3 id="结论">结论</h3>
+<ul>
+<li><strong>写交叉点 ~256K</strong>：小块缓存写快（page cache 聚合后异步刷盘）；≥256K 后 DIO 反超（免双缓冲
+拷贝 + 免内核 writeback 线程竞争），4M 处 <strong>DIO = 缓存写的 4.3×</strong>。大块顺序写密集负载应开 DIO。</li>
+<li><strong>写透（WT）小块是灾难</strong>（4K 处 14-16 MB/s，钉在 fsync 地板）；且 <strong>DIO+WT 全面快于缓存+WT</strong>
+（1M 处 2,008 vs 572 = 3.5×）——每写必落盘的场景直接选 Mode D。</li>
+<li><strong>读走缓存</strong>：页缓存命中比 DIO 直读快 1.6-3.6×——常规读不开 DIO；DIO 读留给自管缓存/大扫描。</li>
+<li>引擎开关：<code>.WithHints(FileOpenHints.NoBuffering / WriteThrough)</code>；内存文件系统等不吃 DIO
+（<code>UnbufferedSupport=Ignored</code> 自动降级，无分支代码）。</li>
+<li>基准修复留痕：旧读基准把 128MB 预填写算进读计时（WT 模式被污染 40×）——已拆
+<code>NewDeviceReadMatrixBench</code>，预填全部进 <code>IterationSetup</code>（计时外）。</li>
+<li>并发梯度矩阵（Mode × BlockSize × 1/6/12/24 线程）用 <code>NewDeviceIoParallelBench</code>：
+<code>dotnet $B --filter '*NewDeviceIoParallelBench*'</code>。</li>
+</ul>
+<h2 id="36-虚拟文件系统virtual-单文件卷vs-本地文件系统目录local">3.6 虚拟文件系统（virtual: 单文件卷）vs 本地文件系统目录（local:）</h2>
+<p><code>TC_BENCH_FS_SPEC=virtual:///…</code>（BenchVolume 自动每卷唯一 .raw 文件）零重编译切换，同套基准。</p>
+<h3 id="小-ionewlocalstorageenginebenchappendroundtrip">小 IO（NewLocalStorageEngineBench，Append/roundtrip）</h3>
+<table>
+<thead>
+<tr>
+<th>动词</th>
+<th style="text-align: right;">payload</th>
+<th style="text-align: right;">mem</th>
+<th style="text-align: right;">local 目录</th>
+<th style="text-align: right;">virtual 单文件卷</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Append</td>
+<td style="text-align: right;">512 B</td>
+<td style="text-align: right;">1.10 µs</td>
+<td style="text-align: right;">2.75 µs</td>
+<td style="text-align: right;"><strong>1.74 µs</strong></td>
+</tr>
+<tr>
+<td>Append+Read</td>
+<td style="text-align: right;">512 B</td>
+<td style="text-align: right;">2.70 µs</td>
+<td style="text-align: right;">5.48 µs</td>
+<td style="text-align: right;"><strong>3.80 µs</strong></td>
+</tr>
+<tr>
+<td>Append</td>
+<td style="text-align: right;">4 KB</td>
+<td style="text-align: right;">4.70 µs</td>
+<td style="text-align: right;">5.46 µs</td>
+<td style="text-align: right;"><strong>5.02 µs</strong></td>
+</tr>
+<tr>
+<td>Append+Read</td>
+<td style="text-align: right;">4 KB</td>
+<td style="text-align: right;">13.9 µs</td>
+<td style="text-align: right;">16.6 µs</td>
+<td style="text-align: right;"><strong>17.8 µs</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="mode-矩阵128mb-顺序吞吐-mbs">Mode 矩阵（128MB 顺序，吞吐 MB/s）</h3>
+<p>写：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">块</th>
+<th style="text-align: right;">local A</th>
+<th style="text-align: right;">local C(DIO)</th>
+<th style="text-align: right;">virtual A</th>
+<th style="text-align: right;">virtual C(DIO)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">4K</td>
+<td style="text-align: right;">722</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">251</td>
+<td style="text-align: right;"><strong>268</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">64K</td>
+<td style="text-align: right;">1,109</td>
+<td style="text-align: right;">746</td>
+<td style="text-align: right;">300</td>
+<td style="text-align: right;">353</td>
+</tr>
+<tr>
+<td style="text-align: right;">256K</td>
+<td style="text-align: right;">1,600</td>
+<td style="text-align: right;">1,907</td>
+<td style="text-align: right;">415</td>
+<td style="text-align: right;">226</td>
+</tr>
+<tr>
+<td style="text-align: right;">1M</td>
+<td style="text-align: right;">1,581</td>
+<td style="text-align: right;">2,932</td>
+<td style="text-align: right;">312</td>
+<td style="text-align: right;">241</td>
+</tr>
+<tr>
+<td style="text-align: right;">4M</td>
+<td style="text-align: right;">1,621</td>
+<td style="text-align: right;">7,045</td>
+<td style="text-align: right;">228</td>
+<td style="text-align: right;">339</td>
+</tr>
+</tbody>
+</table>
+<p>读（热读，Buffered=页缓存 / DIO=直读，GB/s）：</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">块</th>
+<th style="text-align: right;">local Buffered</th>
+<th style="text-align: right;">local DIO</th>
+<th style="text-align: right;">virtual Buffered</th>
+<th style="text-align: right;">virtual DIO</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">4K</td>
+<td style="text-align: right;">1.9</td>
+<td style="text-align: right;">1.2</td>
+<td style="text-align: right;">1.3</td>
+<td style="text-align: right;">1.2</td>
+</tr>
+<tr>
+<td style="text-align: right;">64K</td>
+<td style="text-align: right;">6.2</td>
+<td style="text-align: right;">1.9</td>
+<td style="text-align: right;">7.5</td>
+<td style="text-align: right;">9.9</td>
+</tr>
+<tr>
+<td style="text-align: right;">1M</td>
+<td style="text-align: right;">7.4</td>
+<td style="text-align: right;">2.6</td>
+<td style="text-align: right;">9.4</td>
+<td style="text-align: right;"><strong>13.5</strong></td>
+</tr>
+<tr>
+<td style="text-align: right;">4M</td>
+<td style="text-align: right;">9.0</td>
+<td style="text-align: right;">2.5</td>
+<td style="text-align: right;">10.0</td>
+<td style="text-align: right;"><strong>10.4</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="结论-1">结论</h3>
+<ul>
+<li><strong>virtual 单文件卷的小 IO 优于本地文件系统目录</strong>：512B Append 1.74 vs 2.75 µs（<strong>快 37%</strong>）——
+Raw 卷内自管元数据（页缓存直址），少一层目录文件系统开销。极速运行时（mem+导出）/嵌入式/单工件分发场景收益直接。</li>
+<li><strong>virtual 的 Buffered 大块写是弱项</strong>（≤415 MB/s，仅 local 的 1/4）：Raw 卷写日志 + 元数据
+双写路径；<strong>但 virtual 的 DIO 读反超一切</strong>（64K-1M 处 9.9-13.5 GB/s vs local DIO 1.9-2.6）——
+Raw 页缓存 64MB 自管命中路径更短。大块写密集选 local 目录 + DIO；读密集/单工件选 virtual。</li>
+<li><strong>virtual 对 WT（每写落盘）不友好</strong>（Mode B/D 全面慢于 local：写透钉在卷日志双 fsync）——
+每写必稳的 WAL 类负载当前文件系统选 local。</li>
+<li>与 Core 侧结论一致（io-performance.md §9：本地三类文件系统数据面带内持平、差异在元数据面与
+一致性语义）——引擎层叠加后：<strong>按语义选文件系统——极速吞吐内存文件系统（随时 Capture/Transfer 转出）、小 IO/读密集虚拟文件系统、大块写/写透本地文件系统</strong>。</li>
+</ul>
+<h2 id="4-段生命周期操作mem16mb-段--1mb-段">4. 段生命周期操作（mem，16MB 段 / 1MB 段）</h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th style="text-align: right;">Mean</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>连续建段（1MB × 8，无预分配）</td>
+<td style="text-align: right;">1.89 ms</td>
+<td><strong>~235 µs/段</strong>，全部在 worker/预备池路径</td>
+</tr>
+<tr>
+<td>连续建段（1MB × 8，预分配）</td>
+<td style="text-align: right;">2.63 ms</td>
+<td>预分配多 ~30%（真实写文件 vs 稀疏）</td>
+</tr>
+<tr>
+<td>纯水位推进（无建段）</td>
+<td style="text-align: right;">24–33 µs</td>
+<td>Allocate.Watermark——建段成本与水位成本比 ~10×</td>
+</tr>
+<tr>
+<td>ReclaimHead 整段（预填后）</td>
+<td style="text-align: right;">123 ms</td>
+<td>含预填摊销；回收本体 = 删段+水位推进</td>
+</tr>
+<tr>
+<td>Reclaim 打洞</td>
+<td style="text-align: right;">66 ms</td>
+<td>区间级 PunchHole</td>
+</tr>
+<tr>
+<td>Compact 迁移</td>
+<td style="text-align: right;">127 ms</td>
+<td>整段搬迁（威胁操作量级，同步入口必带 timeout）</td>
+</tr>
+<tr>
+<td>Compact 后续写</td>
+<td style="text-align: right;">131 ms</td>
+<td>Compact+Append——Compact 不中断写入路径</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-本轮修复记录压测挖出">5. 本轮修复记录（压测挖出）</h2>
+<ol>
+<li><strong>AppendLease 并发校验误判（引擎正确性 bug）</strong>：多线程 Append 撞段边界随机抛
+<code>AppendLease: [segN@0xF80, segN@0x1000) 超过上界 segN@0x80</code>。根因：<code>AppendLease</code> 在
+CAS 成功后重读 <code>AllocatedTail</code> 做防御校验，<code>Atomic128.ReadUnsafe</code> 无屏障裸读被 JIT
+CSE 成循环内旧快照，校验拿 stale 值误判越界。修复：校验上界改用 CAS 确定值
+（<code>src/TC.Tier.Runtime/AddressSpace/SegmentTable.Lease.cs</code> <code>AppendLease</code>）。
+验证：18 组合 × 300 轮并发探针 508 败 → 0；全量测试 mem 644/644、local 644/644、
+Core 1657/1657 绿。</li>
+<li><strong>基准腐烂修复</strong>：17 处 <code>Initialize()</code> 后缺 <code>WaitForReady()</code>（V2 异步恢复残留）；
+<code>WriteAndRead</code> 基准违反 Write 契约（全新引擎直写 (0,0)）改 <code>Allocate</code>+<code>Write</code> 正位写法。</li>
+<li><strong>文件系统统一</strong>：全部基准/探针改 <code>TierFs</code> + spec（<code>BenchVolume</code>），<code>TC_BENCH_FS_SPEC</code>
+环境变量切文件系统零重编译——本档 §2/§3 同一二进制产出。</li>
+<li><strong>核心场景基准补齐</strong>：新增 <code>Write_Memory</code>（复写）/<code>PageBuffer_AllocateThenWrite</code>（页缓冲
+端到端）；CPU 采样节流对秒级满载微基准的干扰用 <code>Optimization.SampleInterval=1h</code> 关闭
+（节流是设计内&quot;高负载让路&quot;，测协议成本须排除）。</li>
+<li><strong>发现同址复写线性退化</strong>（净表 0.5 µs → 10 万次后 299 µs，O(n²) 总成本）——extent 记录
+随复写累积，覆写路径合并不彻底。详见 §2.0；裸读 CSE 残余风险。</li>
+</ol>
+<h2 id="6-热路径性能税当前口径">6. 热路径性能税（当前口径）</h2>
+<p>热路径微优化：AcquireExtent 段重取移到重试路径（首轮引用本就新鲜）+ 版本只在锁内/
+FairGate 捕获点读——快路径仅 +1 volatile 读。两轮复测（方差 ±3%）：</p>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">当前（两轮）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Allocate 256MB</td>
+<td style="text-align: right;">5.7 µs</td>
+</tr>
+<tr>
+<td>复写 64B 单线程</td>
+<td style="text-align: right;">532–549 ns（<strong>+6~10%</strong>——唯一税格）</td>
+</tr>
+<tr>
+<td>复写 64B 4T</td>
+<td style="text-align: right;">176–177 ns（扩展比 <strong>3.1×</strong>）</td>
+</tr>
+<tr>
+<td>复写 4KB</td>
+<td style="text-align: right;">753–755 ns</td>
+</tr>
+<tr>
+<td>复写 4KB 4T</td>
+<td style="text-align: right;">316 ns</td>
+</tr>
+<tr>
+<td>复写 64KB</td>
+<td style="text-align: right;">5.70–5.95 µs（<strong>11.5 GB/s</strong>）</td>
+</tr>
+<tr>
+<td>Append 64B</td>
+<td style="text-align: right;">536–602 ns（噪声带内持平，该行方差 ±10%）</td>
+</tr>
+<tr>
+<td>Append 64KB</td>
+<td style="text-align: right;">40.7 µs</td>
+</tr>
+<tr>
+<td>每 op 分配（复写）</td>
+<td style="text-align: right;">187 B</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>：性能税只在&quot;单线程小包&quot;一格（~30-45ns = 版本哨兵 + 保守投影 + 物化后校验的必要
+正确性成本）；核心模式的主力形态（并行复写、大块）不降反升。真实负载（多写者/大记录）
+不受税，纯单写者微记录场景 +6~10%。</p>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

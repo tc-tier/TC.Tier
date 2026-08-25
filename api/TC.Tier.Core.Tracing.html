@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.Tracing | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.Tracing | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Tracing">
+
+  <h1 id="TC_Tier_Core_Tracing" data-uid="TC.Tier.Core.Tracing" class="text-break">Namespace TC.Tier.Core.Tracing</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.NullSpan.html">NullSpan</a></h4>
+      <section><p>零开销空 Span —— NullTracer.BeginSpan 返回此单例。</p>
+<p>所有方法空实现，Dispose 空操作。可安全用于 <code>using var span = tracer.BeginSpan(...)</code>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.NullTracer.html">NullTracer</a></h4>
+      <section><p>零开销空 Tracer —— 默认实现。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Tracing.NullTracer.html#TC_Tier_Core_Tracing_NullTracer_BeginSpan_System_String_TC_Tier_Core_Tracing_SpanKind_">BeginSpan(string, SpanKind)</a> 返回 <a class="xref" href="TC.Tier.Core.Tracing.NullSpan.html#TC_Tier_Core_Tracing_NullSpan_Instance">Instance</a>（非 null，避免 <code>using</code> 块 NRE —— 修复原 NullTracer 返回 null 的缺陷）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Tracing.NullTracer.html#TC_Tier_Core_Tracing_NullTracer_Current">Current</a> 恒返回 null（不维护 AsyncLocal 栈，零开销）。生产路径默认用此实现。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.TracingConfig.html">TracingConfig</a></h4>
+      <section><p>链路追踪配置（独立于指标/日志，对齐 OTel TracerProvider）。</p>
+<p>★ 三信号各自独立配置 —— 追踪、指标、日志是完全不同的可观测信号，
+  不应共用一个开关。每个信号有自己的 Enabled + 策略。</p>
+<p>★ 默认 Enabled=false（零开销）：热路径只读 1 个 volatile bool（IsEnabled），false 时
+  不调 BeginSpan、不分配 span、不调 Dispose。</p>
+<p>★ 采样策略：即便启用追踪，高吞吐热路径（每秒数十万次 Append）全采 span 会拖垮性能。
+  SampleRate 控制采样频率（100=全采，10=采10%，0=不采）。</p>
+</section>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.ISpan.html">ISpan</a></h4>
+      <section><p>链路 span 契约 —— 一次操作的执行上下文（参照 OpenTelemetry ISpan / Datadog IScope）。</p>
+<p>由 <a class="xref" href="TC.Tier.Core.Tracing.ITracer.html#TC_Tier_Core_Tracing_ITracer_BeginSpan_System_String_TC_Tier_Core_Tracing_SpanKind_">BeginSpan(string, SpanKind)</a> 创建，<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">Dispose()</a> 结束 span（= EndSpan）。</p>
+<p>典型用法：<code>using var span = _tracer.BeginSpan("wal.append", SpanKind.Producer);</code></p>
+<p>★ AOT 友好：纯接口 + 枚举，无反射/Emit。NullSpan 是零开销空实现。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.ITracer.html">ITracer</a></h4>
+      <section><p>链路追踪器契约 —— 完整 span 体系（从零设计）。</p>
+<p>★ 完整 span 体系（参照 OpenTelemetry/Datadog），从零设计，非修补：</p>
+<p>- <a class="xref" href="TC.Tier.Core.Tracing.ITracer.html#TC_Tier_Core_Tracing_ITracer_BeginSpan_System_String_TC_Tier_Core_Tracing_SpanKind_">BeginSpan(string, SpanKind)</a> 创建 span，返回 <a class="xref" href="TC.Tier.Core.Tracing.ISpan.html">ISpan</a>（Dispose=EndSpan）；</p>
+<p>- <a class="xref" href="TC.Tier.Core.Tracing.ITracer.html#TC_Tier_Core_Tracing_ITracer_Current">Current</a> 暴露 AsyncLocal 当前 span（Datadog 模式，避免层层传参，子 span 自动关联父 span）；</p>
+<p>- public（与 <a class="xref" href="TC.Tier.Core.Metrics.IMetricsSink.html">IMetricsSink</a> / <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a> 一致，供上层注入）。</p>
+<p>★ 默认实现 <a class="xref" href="TC.Tier.Core.Tracing.NullTracer.html">NullTracer</a>：<a class="xref" href="TC.Tier.Core.Tracing.ITracer.html#TC_Tier_Core_Tracing_ITracer_BeginSpan_System_String_TC_Tier_Core_Tracing_SpanKind_">BeginSpan(string, SpanKind)</a> 返回 <a class="xref" href="TC.Tier.Core.Tracing.NullSpan.html#TC_Tier_Core_Tracing_NullSpan_Instance">Instance</a>（非 null，避免 using NRE），零开销。</p>
+<p>★ AOT 友好：纯接口 + 枚举 + AsyncLocal，无反射/Emit。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.SpanKind.html">SpanKind</a></h4>
+      <section><p>Span 类型 —— 参照 OpenTelemetry/Datadog，标识 span 在分布式链路中的角色。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Tracing.SpanStatus.html">SpanStatus</a></h4>
+      <section><p>Span 状态 —— 参照 OpenTelemetry。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

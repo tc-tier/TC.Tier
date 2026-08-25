@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class PooledValueTaskSource | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class PooledValueTaskSource | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="池化的单次完成 ——每次 Rent 一个独立实例，  /  后归还复用。 多 waiter 广播的正确做法：每个 waiter 持有独立的  实例 （而非共享一个 core），由发起方在全部完成时逐个 Set。这与  的共享 core 语义互补：本类型面向&quot;一次性、单消费者&quot;的高频 IO 唤醒场景。 双层池化（thread-local  热路径 +  全局回退 + 批量搬运）， 常规 Rent/Return 往返零争用、零堆分配。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource">
+
+
+
+  <h1 id="TC_Tier_Core_Primitives_PooledValueTaskSource" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource" class="text-break">Class PooledValueTaskSource</h1>
+  <div class="markdown level0 summary"><p>池化的单次完成 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.ivaluetasksource">IValueTaskSource</a>——每次 Rent 一个独立实例，
+<a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html#TC_Tier_Core_Primitives_PooledValueTaskSource_SetResult">SetResult()</a> / <a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html#TC_Tier_Core_Primitives_PooledValueTaskSource_SetException_System_Exception_">SetException(Exception)</a> 后归还复用。</p>
+<p>多 waiter 广播的正确做法：每个 waiter 持有独立的 <a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a> 实例
+（而非共享一个 core），由发起方在全部完成时逐个 Set。这与 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a>
+的共享 core 语义互补：本类型面向"一次性、单消费者"的高频 IO 唤醒场景。</p>
+<p>双层池化（thread-local <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.stack-1">Stack&lt;T&gt;</a> 热路径 + <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentstack-1">ConcurrentStack&lt;T&gt;</a> 全局回退 + 批量搬运），
+常规 Rent/Return 往返零争用、零堆分配。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">PooledValueTaskSource</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.ivaluetasksource">IValueTaskSource</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Primitives_PooledValueTaskSource_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class PooledValueTaskSource : IValueTaskSource</code></pre>
+  </div>
+  <h3 id="fields">Fields
+</h3>
+
+
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_CleanupState" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.CleanupState">CleanupState</h4>
+  <div class="markdown level1 summary"><p>★ 完成时清理钩子（无 async 包装的归还逻辑用）：awaiter 的 GetResult 完成态时调用一次
+（正常/异常路径都调）。静态委托 + 租用者已有对象做 state，零分配。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public object? CleanupState</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_OnCleanup" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.OnCleanup">OnCleanup</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Action&lt;object?, PooledValueTaskSource&gt;? OnCleanup</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-2">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>, <a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_Version_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.Version*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_Version" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.Version">Version</h4>
+  <div class="markdown level1 summary"><p>当前 core 的版本号，供构造 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public short Version { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int16">short</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_AttachCancellation_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.AttachCancellation*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_AttachCancellation_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.AttachCancellation(System.Threading.CancellationToken)">AttachCancellation(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>附加 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>：token 触发时以 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a> 完成源。</p>
+<p>必须在构造 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a> 之前调用。每个实例只能附加一次。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void AttachCancellation(CancellationToken cancellationToken)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_MarkOrComplete_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.MarkOrComplete*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_MarkOrComplete" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.MarkOrComplete">MarkOrComplete()</h4>
+  <div class="markdown level1 summary"><p>★ 完成先于注册的安全完成入口（#PERF-002）：标记&quot;发起方已完成&quot;；若 continuation 已注册则立即
+SetResult，否则留待 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.ivaluetasksource.oncompleted">OnCompleted(Action&lt;object&gt;, object, short, ValueTaskSourceOnCompletedFlags)</a> 转发处兜底完成。</p>
+<p>替代裸 SetResult——裸 SetResult 在未注册时触发 BCL 的 CompletionSentinel，后者在
+continuation 缺席/core 已 Reset 归还后抛 InvalidOperationException（进程级崩溃）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void MarkOrComplete()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_MarkOrFault_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.MarkOrFault*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_MarkOrFault_System_Exception_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.MarkOrFault(System.Exception)">MarkOrFault(Exception)</h4>
+  <div class="markdown level1 summary"><p>★ 异常版的 MarkOrComplete（取消路径）：先标记再按注册状态完成——未注册时暂存异常，
+注册（OnCompleted 转发处）即补完。与 MarkOrComplete 竞争同一标记，先到者胜（单次完成语义）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void MarkOrFault(Exception error)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
+        <td><span class="parametername">error</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_Rent_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.Rent*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_Rent_System_Boolean_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.Rent(System.Boolean)">Rent(bool)</h4>
+  <div class="markdown level1 summary"><p>从池中租用一个实例：优先 thread-local 栈（无锁），其次全局并发栈，最后 new。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static PooledValueTaskSource Rent(bool runContinuationsAsynchronously = true)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><span class="parametername">runContinuationsAsynchronously</span></td>
+        <td><p>完成时是否异步调度 continuation（默认 true）。false = 内联执行（Set/SetException 调用者线程）
+——对齐 SemaphoreSlim 唤醒语义，省一次线程池往返；代价是完成方栈上执行等待方续体（重入语义自负）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_Return_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.Return*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_Return_TC_Tier_Core_Primitives_PooledValueTaskSource_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.Return(TC.Tier.Core.Primitives.PooledValueTaskSource)">Return(PooledValueTaskSource)</h4>
+  <div class="markdown level1 summary"><p>归还实例到池中：先尝试 thread-local 栈，满了则批量搬运一半到全局栈。</p>
+<p>归还前自动 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.manualresetvaluetasksourcecore-1.reset">Reset()</a>，恢复为可复用状态。
+★ 先置归还态（state=2）再 Reset——之后任何残留的迟到完成（如 Set 广播遍历晚到）被守卫拒绝。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void Return(PooledValueTaskSource source)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a></td>
+        <td><span class="parametername">source</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_SetException_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.SetException*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_SetException_System_Exception_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.SetException(System.Exception)">SetException(Exception)</h4>
+  <div class="markdown level1 summary"><p>完成源（异常）。单次完成：已完成后/已归还后再调为 no-op（防取消/Set 竞态双触发）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetException(Exception exception)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
+        <td><span class="parametername">exception</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Primitives_PooledValueTaskSource_SetResult_" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.SetResult*"></a>
+  <h4 id="TC_Tier_Core_Primitives_PooledValueTaskSource_SetResult" data-uid="TC.Tier.Core.Primitives.PooledValueTaskSource.SetResult">SetResult()</h4>
+  <div class="markdown level1 summary"><p>完成源（成功）。单次完成：已完成后/已归还后再调为 no-op（防取消/Set 竞态双触发）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetResult()</code></pre>
+  </div>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.ivaluetasksource">IValueTaskSource</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

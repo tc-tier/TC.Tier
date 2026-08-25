@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class PagedMirror | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class PagedMirror | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="PagedMirror——per-page 多链 checkpoint 镜像（统一帧格式，PerKey 链）。 ★ 子类实现面（COORDINATION &#167;4 铁律 10）：codec（PMVH/PMFT、CRC32C）+ 页门面   （WritePage/ReadPage——每页一个帧，走基类帧三拍）+ per-page 字典钩子。   机制（帧写入/走链恢复/嵌入 meta/N=2/2PC）全部在 。 ★ v2 帧化：页 record 从定长整块（头存长度+padding）改为同族帧（双魔术值推导长度、   padding 退役、帧长任意字节边界）——两种镜像一套格式一套机制。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror">
+
+
+
+  <h1 id="TC_Tier_Runtime_Structures_Mirror_PagedMirror" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror" class="text-break">Class PagedMirror</h1>
+  <div class="markdown level0 summary"><p>PagedMirror——per-page 多链 checkpoint 镜像（统一帧格式，PerKey 链）。</p>
+<p>★ 子类实现面（COORDINATION §4 铁律 10）：codec（PMVH/PMFT、CRC32C）+ 页门面
+  （WritePage/ReadPage——每页一个帧，走基类帧三拍）+ per-page 字典钩子。
+  机制（帧写入/走链恢复/嵌入 meta/N=2/2PC）全部在 <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html">MirrorBase</a>。</p>
+<p>★ v2 帧化：页 record 从定长整块（头存长度+padding）改为同族帧（双魔术值推导长度、
+  padding 退役、帧长任意字节边界）——两种镜像一套格式一套机制。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorRecoveryHints.html">MirrorRecoveryHints</a>&gt;</div>
+    <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html">MirrorBase</a></div>
+    <div class="level3"><span class="xref">PagedMirror</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorRecoveryHints.html">MirrorRecoveryHints</a>&gt;</div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_ReclaimOldVersions">MirrorBase.ReclaimOldVersions()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_Prepare_System_Int64_">MirrorBase.Prepare(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_PrepareAsync_System_Int64_System_Threading_CancellationToken_">MirrorBase.PrepareAsync(long, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_ConfirmCommitted_System_Int64_">MirrorBase.ConfirmCommitted(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_Abort_System_Int64_">MirrorBase.Abort(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_AbortAsync_System_Int64_System_Threading_CancellationToken_">MirrorBase.AbortAsync(long, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_OnCommitted_System_Int64_System_Action_">MirrorBase.OnCommitted(long, Action)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_SetOpaqueMeta_System_ReadOnlySpan_System_Byte__">MirrorBase.SetOpaqueMeta(ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_ReadOpaqueMeta">MirrorBase.ReadOpaqueMeta()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_HighestVersionAddress">MirrorBase.HighestVersionAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_HasCommittedVersion">MirrorBase.HasCommittedVersion</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_LowestVersionAddress">MirrorBase.LowestVersionAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_CurrentVersion">MirrorBase.CurrentVersion</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;MirrorRecoveryHints&gt;.GetAliveInstances(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;MirrorRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;MirrorRecoveryHints&gt;.Initialize(MirrorRecoveryHints)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;MirrorRecoveryHints&gt;.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;MirrorRecoveryHints&gt;.DisposeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;MirrorRecoveryHints&gt;.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;MirrorRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;MirrorRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;MirrorRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Structures.html">Structures</a>.<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.html">Mirror</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
+  <h5 id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class PagedMirror : MirrorBase, ILifecycle&lt;MirrorRecoveryHints&gt;, IDisposable, IAsyncDisposable, ITransactionParticipant</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Mirror_PagedMirror__ctor_" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.#ctor*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Mirror_PagedMirror__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Mirror_PagedMirrorSettings_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Mirror_Contracts_MirrorRecoveryHints__TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Mirror_Contracts_MirrorMetaHeader_TC_Tier_Runtime_Structures_Mirror_Contracts_MirrorMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Mirror.PagedMirrorSettings,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorRecoveryHints},TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorMetaHeader,TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport)">PagedMirror(IFileSystem, PagedMirrorSettings, IRecovery&lt;MirrorRecoveryHints&gt;?, MetaPolicyFactory&lt;MirrorMetaHeader, MirrorMetaPayload&gt;?, IMetaTransport?)</h4>
+  <div class="markdown level1 summary"><p>初始化一个新的<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.PagedMirror.html">PagedMirror</a>实例。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public PagedMirror(IFileSystem fileSystem, PagedMirrorSettings settings, IRecovery&lt;MirrorRecoveryHints&gt;? recovery = null, MetaPolicyFactory&lt;MirrorMetaHeader, MirrorMetaPayload&gt;? metaPolicyFactory = null, IMetaTransport? metaTransport = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">fileSystem</span></td>
+        <td><p>组合根文件系统（TierFs 构造的 IFileSystem）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Mirror.PagedMirrorSettings.html">PagedMirrorSettings</a></td>
+        <td><span class="parametername">settings</span></td>
+        <td><p>分页镜像设置。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorRecoveryHints.html">MirrorRecoveryHints</a>&gt;</td>
+        <td><span class="parametername">recovery</span></td>
+        <td><p>可选的恢复算法实例。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorMetaHeader.html">MirrorMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorMetaPayload.html">MirrorMetaPayload</a>&gt;</td>
+        <td><span class="parametername">metaPolicyFactory</span></td>
+        <td><p>可选的 meta 策略工厂。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></td>
+        <td><span class="parametername">metaTransport</span></td>
+        <td><p>可选的 meta 传输（Transport 模式用）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_PageSize_" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.PageSize*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_PageSize" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.PageSize">PageSize</h4>
+  <div class="markdown level1 summary"><p>页大小（PageSize = 1 &lt;&lt; LogPageSizeBits，与源结构页对齐）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int PageSize { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_ReadPage_" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.ReadPage*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_ReadPage_System_Int64_System_Int64_System_Span_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.ReadPage(System.Int64,System.Int64,System.Span{System.Byte})">ReadPage(long, long, Span&lt;byte&gt;)</h4>
+  <div class="markdown level1 summary"><p>读一页（该页 committed 链头）：帧几何推导 payload 长 → 读 payload → 全帧 CRC 验证。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public (int bytesRead, bool isValid) ReadPage(long page, long startPage, Span&lt;byte&gt; dest)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">page</span></td>
+        <td><p>页标识。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">startPage</span></td>
+        <td><p>会话起始页（语义锚点，不参与寻址）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
+        <td><span class="parametername">dest</span></td>
+        <td><p>目标缓冲。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.boolean-.bytesread">bytesRead</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.boolean-.isvalid">isValid</a>)</td>
+        <td><p>(实际读取字节数, CRC 是否有效)。无该页/空链/帧损毁返回 (0, false)。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_WritePage_" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.WritePage*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Mirror_PagedMirror_WritePage_System_Int64_System_Int64_System_ReadOnlySpan_System_Byte__System_Int64_" data-uid="TC.Tier.Runtime.Structures.Mirror.PagedMirror.WritePage(System.Int64,System.Int64,System.ReadOnlySpan{System.Byte},System.Int64)">WritePage(long, long, ReadOnlySpan&lt;byte&gt;, long)</h4>
+  <div class="markdown level1 summary"><p>写一页（追加该页版本链新帧）。首个写入自动开启 checkpoint 会话。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public LogicalAddress WritePage(long page, long startPage, ReadOnlySpan&lt;byte&gt; pageBytes, long logicalAddress = 0)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">page</span></td>
+        <td><p>页标识（per-page 链键）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">startPage</span></td>
+        <td><p>会话起始页（调用方页区间语义锚点——链模型按 PageId 寻址，不参与地址计算）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
+        <td><span class="parametername">pageBytes</span></td>
+        <td><p>页数据（&gt; PageSize 截断；&lt; PageSize 记 FLAG_LAST_PARTIAL）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">logicalAddress</span></td>
+        <td><p>源页逻辑地址（随页透传）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><p>帧头地址。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

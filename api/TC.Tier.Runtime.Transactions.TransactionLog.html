@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class TransactionLog | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class TransactionLog | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="默认事务日志实现——独立 commit record 文件 + DirectIO + 4K 对齐 + Magic/Crc + Flush 落盘 + 链式触发。 ★ 设计（见 transaction-design.md &#167;5）： - 物理：独立文件 + DisableFileBuffering(DirectIO) + 4K 对齐固定覆盖写 - Commit：seq+1 → 算 Crc → DirectIO 写 + Flush（这一次 Write+Flush = 原子点）→ 链式触发参与者 - Load：读固定块 → 校验 Magic/Crc → 返回 seq（空/损坏 = 0） 开箱即用，上层 new 即可；或注入自定义 ITransactionLog 替换。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Transactions.TransactionLog">
+
+
+
+  <h1 id="TC_Tier_Runtime_Transactions_TransactionLog" data-uid="TC.Tier.Runtime.Transactions.TransactionLog" class="text-break">Class TransactionLog</h1>
+  <div class="markdown level0 summary"><p>默认事务日志实现——独立 commit record 文件 + DirectIO + 4K 对齐 + Magic/Crc + Flush 落盘 + 链式触发。</p>
+<p>★ 设计（见 transaction-design.md §5）：</p>
+<p>- 物理：独立文件 + DisableFileBuffering(DirectIO) + 4K 对齐固定覆盖写</p>
+<p>- Commit：seq+1 → 算 Crc → DirectIO 写 + Flush（这一次 Write+Flush = 原子点）→ 链式触发参与者</p>
+<p>- Load：读固定块 → 校验 Magic/Crc → 返回 seq（空/损坏 = 0）</p>
+<p>开箱即用，上层 new 即可；或注入自定义 ITransactionLog 替换。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">TransactionLog</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionLog.html">ITransactionLog</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Transactions.html">Transactions</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
+  <h5 id="TC_Tier_Runtime_Transactions_TransactionLog_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TransactionLog : ITransactionLog, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog__ctor_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.#ctor*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog__ctor_TC_Tier_Contracts_Storage_IStorageEngine_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.#ctor(TC.Tier.Contracts.Storage.IStorageEngine)">TransactionLog(IStorageEngine)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransactionLog(IStorageEngine engine)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html">IStorageEngine</a></td>
+        <td><span class="parametername">engine</span></td>
+        <td><p>注入的 commit record 引擎（外部管生命周期）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_LastCommittedSeq_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LastCommittedSeq*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LastCommittedSeq" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LastCommittedSeq">LastCommittedSeq</h4>
+  <div class="markdown level1 summary"><p>当前全局已提交序号（恢复/运行时读）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long LastCommittedSeq { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_ParticipantNames_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.ParticipantNames*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_ParticipantNames" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.ParticipantNames">ParticipantNames</h4>
+  <div class="markdown level1 summary"><p>当前注册的参与者名称集合（诊断用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyCollection&lt;string&gt; ParticipantNames { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_Abort_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Abort*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Abort" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Abort">Abort()</h4>
+  <div class="markdown level1 summary"><p>★ Abort：对所有 LastPreparedSeq &gt; LastCommittedSeq 的参与者调 Abort（丢弃悬干）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Abort()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_Commit_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Commit*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Commit" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Commit">Commit()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Commit()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_CommitAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.CommitAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_CommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.CommitAsync(System.Threading.CancellationToken)">CommitAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 真正两阶段提交（本次改造）：Phase 1 foreach Prepare → 任一失败 → foreach Abort；
+全部成功 → persist commit record（原子点）→ Phase 2 foreach ConfirmCommitted。</p>
+<p>落盘分层：参与者 Prepare 各自 flush 数据+meta；协调者只持久化 commit record（原子点）。</p>
+<p>返回新 seq。Phase 1 失败抛异常（已 Prepare 的全部 Abort）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; CommitAsync(CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_Dispose_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Dispose*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Dispose" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Dispose">Dispose()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_DisposeAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.DisposeAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_DisposeAsync" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.DisposeAsync">DisposeAsync()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_Load_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Load*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Load" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Load">Load()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Load()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcile_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcile*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcile" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcile">LoadAndReconcile()</h4>
+  <div class="markdown level1 summary"><p>★ 恢复协调（本次改造为双向分支）：Load commit record + 对每个参与者裁决。</p>
+<p>- committedSeq == 0（空盘/损坏）：所有有悬干数据的参与者 Abort</p>
+<p>- LastCommittedSeq &lt; committedSeq → ConfirmCommitted(committedSeq)（正向：未同步推进）</p>
+<p>- LastPreparedSeq &gt; committedSeq → Abort(LastPreparedSeq)（反向：超前悬干丢弃）</p>
+<p>调用方须在调用本方法前 Register 所有参与者（按依赖顺序：底层先，上层后）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long LoadAndReconcile()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcileAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcileAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcileAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcileAsync(System.Threading.CancellationToken)">LoadAndReconcileAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; LoadAndReconcileAsync(CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAsync(System.Threading.CancellationToken)">LoadAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>启动时从磁盘加载 commit record（读 lastCommittedSeq）。返回 lastCommittedSeq（无 record = 0）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; LoadAsync(CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_Register_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Register*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Register_System_String_TC_Tier_Contracts_Transactions_ITransactionParticipant_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Register(System.String,TC.Tier.Contracts.Transactions.ITransactionParticipant)">Register(string, ITransactionParticipant)</h4>
+  <div class="markdown level1 summary"><p>★ 注册参与者（带名称标识，用于诊断/按名称查找）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Register(string name, ITransactionParticipant participant)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></td>
+        <td><span class="parametername">participant</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Transactions_TransactionLog_Unregister_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Unregister*"></a>
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Unregister_System_String_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Unregister(System.String)">Unregister(string)</h4>
+  <div class="markdown level1 summary"><p>按名称取消注册（可选，子系统销毁时调）。返回是否找到并移除。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Unregister(string name)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="events">Events
+</h3>
+
+
+  <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_OnCommitted" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.OnCommitted">OnCommitted</h4>
+  <div class="markdown level1 summary"><p>★ 协调者提交事件：每次 Commit 成功（全局 seq 推进 + Flush 落盘）后触发，传新 seq。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;long&gt;? OnCommitted</code></pre>
+  </div>
+  <h5 class="eventType">Event Type</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionLog.html">ITransactionLog</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

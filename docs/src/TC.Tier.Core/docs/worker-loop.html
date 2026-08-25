@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>后台循环使用指南（BackgroundWorkerLoop / BackgroundWorkerLoop&lt;T&gt;） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="后台循环使用指南（BackgroundWorkerLoop / BackgroundWorkerLoop&lt;T&gt;） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="后台循环使用指南backgroundworkerloop--backgroundworkerloopt">后台循环使用指南（BackgroundWorkerLoop / BackgroundWorkerLoop&lt;T&gt;）</h1>
+
+<blockquote>
+<p>定位：本仓库<strong>唯一</strong>合法的后台循环 / 队列消费者积木。任何「周期做事」「消费队列」「事件驱动后台处理」的需求
+都基于它构建，<strong>禁止 <code>new Thread</code> 自建循环</strong>（§0）。本文覆盖：两层 API 全貌、执行器与并发度选型、
+生命周期编排、全部钩子、背压、仓库真实范例（§6）、同类型内置组件 <strong>CpuSampler</strong>（§7）、硬性要求（§8）。
+生命周期编排细节见 <a href="lifecycle.html"><code>lifecycle.md</code></a>；专用线程调度器见 <a href="dedicated-task-scheduler.html"><code>dedicated-task-scheduler.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-铁律禁止-new-thread-自建后台循环">0. 铁律：禁止 <code>new Thread</code> 自建后台循环</h2>
+<p>任何&quot;周期做事 / 消费队列 / 事件驱动后台处理&quot;的需求都基于 <code>BackgroundWorkerLoop</code> 构建——
+它内建<strong>执行器</strong>（公共池 / 隔离调度器注入）、<strong>幂等启停</strong>、<strong>超时等待退出</strong>、<strong>CAS 防双 Dispose</strong>、
+<strong>单周期异常隔离</strong>（§4）——子类只写业务钩子，生命周期与异常全由基类管。</p>
+<hr>
+<h2 id="1-两层选型">1. 两层选型</h2>
+<h3 id="11-第一层-backgroundworkerloop纯循环骨架无队列">1.1 第一层 <code>BackgroundWorkerLoop</code>（纯循环骨架，无队列）</h3>
+<p>子类实现 <strong>一个周期</strong> <code>RunOneCycleAsync(ct)</code>，返回 <code>false</code> 停止。适合<strong>时间驱动 / 信号驱动</strong>：</p>
+<pre><code class="lang-csharp">sealed class MyPoller : BackgroundWorkerLoop
+{
+    public MyPoller(TaskScheduler? scheduler = null, ILogger? logger = null)
+        : base(scheduler, name: &quot;MyPoller&quot;, logger: logger) { }
+
+    protected override async ValueTask&lt;bool&gt; RunOneCycleAsync(CancellationToken ct)
+    {
+        await Task.Delay(TimeSpan.FromSeconds(5), ct);   // 时间驱动（也可 PeriodicTimer / 等信号源）
+        DoWork();
+        return true;                                     // false = 本消费者停止
+    }
+}
+</code></pre>
+<p>构造参数（两层同签名）：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TaskScheduler? scheduler</code></td>
+<td><code>null</code></td>
+<td>执行器：<code>null</code>=公共池（<code>Task.Run</code>，低频 worker）；非 null=注入调度器（高频/关键 worker，见 §2.1）。<strong>本类不 own 调度器</strong>——生命周期归注入方。</td>
+</tr>
+<tr>
+<td><code>int consumerCount</code></td>
+<td>1</td>
+<td>消费者（循环 Task）数——协作跑在调度器线程上，<strong>不是线程数</strong>。范围 [1, <code>MaxConsumerCount</code>=max(核数×4,16)]，超界 throw。建议 N ≈ 调度器线程数 M（§2.2）。</td>
+</tr>
+<tr>
+<td><code>string? name</code></td>
+<td>类名</td>
+<td>诊断标识（日志 / Start 时打印有效配置）。</td>
+</tr>
+<tr>
+<td><code>TimeSpan? exitTimeout</code></td>
+<td>5s</td>
+<td>Dispose/WaitForExit 等退出超时。超时仅 LogWarning <strong>不抛</strong>（worker 卡死不挡进程退出）。须 &gt; 0。</td>
+</tr>
+<tr>
+<td><code>ILogger? logger</code></td>
+<td>null</td>
+<td>日志（启停配置 / 异常 / 超时告警）。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="12-第二层-backgroundworkerloopt内建-5-档优先级队列">1.2 第二层 <code>BackgroundWorkerLoop&lt;T&gt;</code>（内建 5 档优先级队列）</h3>
+<p>继承第一层全部能力，追加内建 <code>BucketPriorityQueue&lt;WorkerPriority, T&gt;</code>。<strong>标准后台任务模式开箱即用</strong>——
+子类只实现 <code>ProcessItemAsync</code>，生产者 <code>Enqueue</code>：</p>
+<pre><code class="lang-csharp">sealed class MyFlusher : BackgroundWorkerLoop&lt;FlushJob&gt;
+{
+    public MyFlusher(TaskScheduler? scheduler = null, int consumerCount = 1, ILogger? logger = null)
+        : base(scheduler, consumerCount, name: &quot;MyFlusher&quot;, logger: logger) { }
+
+    protected override async ValueTask ProcessItemAsync(FlushJob job, CancellationToken ct)
+    { /* 处理一个 job；抛异常不杀 worker（走 OnCycleError） */ }
+}
+
+// 生产者（任意线程）：
+flusher.Enqueue(job);                       // 默认 WorkerPriority.Normal = FIFO
+flusher.Enqueue(urgent, WorkerPriority.Critical);
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Enqueue(item, priority = Normal)</code></td>
+<td>统一入队入口（无锁 + 异步唤醒等待的消费者）。<strong>不阻塞、不拒绝</strong>——背压见 §5。</td>
+</tr>
+<tr>
+<td><code>QueueCount</code></td>
+<td>队列近似元素数（诊断用，并发下非精确）。</td>
+</tr>
+<tr>
+<td><code>Queue</code>（protected）</td>
+<td>内建队列本体——子类 override <code>RunOneCycleAsync</code> 或需要 <code>TryDequeue</code> 清队（见 §6.3 DrainPending）时直接用。</td>
+</tr>
+<tr>
+<td><code>RunOneCycleAsync</code>（virtual）</td>
+<td>默认实现 = <code>DequeueAsync</code> → <code>ProcessItemAsync</code> → 继续。需要自定义循环逻辑（如 fire-and-forget 并发内核 + in-flight 限流）才 override；内建队列仍在。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="13-选型">1.3 选型</h3>
+<pre><code>纯周期轮询 / 定时任务 / 等单一信号源 → 第一层 BackgroundWorkerLoop
+生产-消费队列（事件驱动批处理）       → 第二层 BackgroundWorkerLoop&lt;T&gt;
+</code></pre>
+<hr>
+<h2 id="2-执行器与并发度">2. 执行器与并发度</h2>
+<h3 id="21-scheduler-三选决定你的循环跑在哪">2.1 <code>scheduler</code> 三选（决定你的循环跑在哪）</h3>
+<table>
+<thead>
+<tr>
+<th>选择</th>
+<th>消费者跑在</th>
+<th>适用</th>
+<th>例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>null</code>（默认）</td>
+<td>公共线程池（<code>Task.Run</code>）</td>
+<td><strong>低频</strong>周期 worker（秒级间隔）——不值得开专用线程</td>
+<td>CpuSampler（1s 采样，§7）、定时 flusher（§6.2）</td>
+</tr>
+<tr>
+<td><code>IsolatedTaskScheduler.Shared</code></td>
+<td>进程级共享的 M 个私有线程</td>
+<td>单引擎 / 轻量，所有专用 worker 共池</td>
+<td>简单宿主</td>
+</tr>
+<tr>
+<td><code>IsolatedTaskScheduler.Create(...)</code> + <code>Resources.Add(...)</code></td>
+<td>引擎 own 的 M 个私有线程</td>
+<td><strong>引擎默认</strong>：高频/关键 worker（建段、compact）；多引擎互不干扰；同步/异步 worker 分池</td>
+<td>高频事件 worker（§6.4）、同步整理 worker（§6.3）</td>
+</tr>
+</tbody>
+</table>
+<p>隔离调度器的完整旋钮（线程数/队列容量/watchdog/指标）、获取方式与注意事项见
+<a href="dedicated-task-scheduler.html"><code>dedicated-task-scheduler.md</code></a>——<strong>高频 worker 禁止打公共池</strong>（污染全局池，
+拖垮无关异步工作）。</p>
+<h3 id="22-consumercountn与调度器线程数m解耦">2.2 <code>consumerCount</code>（N）与调度器线程数（M）解耦</h3>
+<ul>
+<li>N 个消费者 = N 个<strong>循环 Task</strong>，协作跑在 M 个调度器线程上（<code>await</code> 让出时线程服务下一个）——不是 N 个线程。</li>
+<li><strong>N ≈ M 最优</strong>；N ≫ M 只增内存/调度开销不增吞吐（Start 时自动 WARN 提示）。</li>
+<li>需要更高并行度：<strong>加大 <code>IsolatedSchedulerOptions.ThreadCount</code>（M）</strong>，不是 consumerCount。</li>
+<li>N 超过 <code>MaxConsumerCount</code>（=max(核数×4,16)）ctor 直接 throw（fail-fast，防&quot;外部传巨大 N → 静默卡死无人知因&quot;）。</li>
+</ul>
+<hr>
+<h2 id="3-生命周期">3. 生命周期</h2>
+<h3 id="31-方法表">3.1 方法表</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Start()</code></td>
+<td>启动 N 个消费者。幂等（CAS，重复调只首次生效）。已 Dispose 则 throw。Start 时打印有效配置一行（scheduler/M/N——治&quot;卡死无人知因&quot;）。</td>
+</tr>
+<tr>
+<td><code>Stop()</code></td>
+<td>设停止标志 + <code>cts.Cancel()</code>（唤醒在 ct 上等待的周期）。<strong>不等待</strong>退出；幂等。</td>
+</tr>
+<tr>
+<td><code>WaitForExit()</code></td>
+<td>同步等全部消费者退出（每个带 <code>exitTimeout</code>，超时仅 WARN 不抛）。⚠️ <strong>禁止在异步上下文调用</strong>（同步阻塞 task 死锁）——用 <code>WaitForExitAsync()</code>。</td>
+</tr>
+<tr>
+<td><code>WaitForExitAsync()</code></td>
+<td>异步版，同超时语义。</td>
+</tr>
+<tr>
+<td><code>Dispose()</code> / <code>DisposeAsync()</code></td>
+<td>CAS 防双 + Stop + WaitForExit(+Async) + cts.Dispose。<strong>不释放注入的调度器</strong>（归注入方：Shared 进程级 / 引擎 own 经 Resources）。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-经-lifecyclebase-编排推荐">3.2 经 <code>LifecycleBase</code> 编排（推荐）</h3>
+<pre><code class="lang-csharp">// 在 LifecycleBase 派生的 OnInitializeBegin / OnInitializeComplete 里（⚠️ 不要在构造器里——this 未就绪）：
+ConfigureBackgroundWorker(new MyFlusher(scheduler: WorkerScheduler, consumerCount: 2, logger: Logger));
+</code></pre>
+<p>注册后基类保证：</p>
+<ul>
+<li><strong>Start 时机</strong>：恢复完成<strong>之后</strong>才 Start（不与恢复竞态），装配就绪后一定跑。</li>
+<li><strong>Dispose 顺序</strong>：先 Stop → WaitForExit → worker.Dispose，<strong>再</strong> <code>Resources.Dispose()</code>——注入的 own 调度器
+在所有任务结束后才释放（满足 <code>IsolatedTaskScheduler.Dispose</code> 的前置条件）。</li>
+<li>⚠️ <code>ConfigureBackgroundWorker</code> 只挂 <strong>一个</strong> worker（再次调用会把新传入的直接 Dispose）——多个后台职责
+用一个 <code>BackgroundWorkerLoop&lt;T&gt;</code> + 优先级队列表达，不要拆多个 worker。</li>
+</ul>
+<h3 id="33-自管模式">3.3 自管模式</h3>
+<p>不经 LifecycleBase 的宿主（工具/测试/独立组件）自己按 <strong>Stop → WaitForExit → Dispose</strong> 顺序调即可；
+CpuSampler 在引擎里即此模式：进 <code>Resources</code> 统一释放、恢复完成后手动 <code>Start()</code>（§7）。</p>
+<hr>
+<h2 id="4-钩子全表两层通用">4. 钩子全表（两层通用）</h2>
+<table>
+<thead>
+<tr>
+<th>钩子</th>
+<th>调用时机 / 默认行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RunOneCycleAsync(ct)</code>（第一层 abstract / 第二层 virtual）</td>
+<td>一个工作周期。第一层必须实现；第二层默认实现 = <code>DequeueAsync</code> → <code>ProcessItemAsync</code> → 继续。返回 <code>false</code> = 本消费者停止（多消费者下不影响其它消费者）。<strong>抛异常不杀 worker</strong>——异常走 <code>OnCycleError</code>，循环继续。收到 <code>Stop</code> 触发的 <code>OperationCanceledException</code> = 正常退出（不进 OnCycleError）。</td>
+</tr>
+<tr>
+<td><code>OnLoopStart()</code>（virtual）</td>
+<td>启动前一次（多消费者仅 <code>Start()</code> 调用线程跑一次）。初始化资源/状态。</td>
+</tr>
+<tr>
+<td><code>OnLoopExitAsync(ct)</code>（virtual）</td>
+<td>退出后 drain/flush（残留处理、最后落盘）。多消费者下仅<strong>末位退出者</strong>执行一次；<code>ct</code> 恒为 <code>None</code>（退出清理不应被再次取消）；异常被捕获记 WARN。见 §6.2（退出前最后 flush）。</td>
+</tr>
+<tr>
+<td><code>OnCycleError(ex)</code>（virtual）</td>
+<td>单周期异常钩子，默认 LogWarning 后继续。子类可 override 做重试/告警/计数/熔断。<code>OperationCanceledException</code> 不进此钩子。</td>
+</tr>
+<tr>
+<td><code>OnCycleCompleted(elapsedMicros)</code>（virtual）</td>
+<td>每周期完成耗时（含 await 等待）。默认 &gt;10ms LogDebug；<strong>推荐 override 接 <code>ObservabilityHub.Metrics.Histogram</code></strong>——慢循环是后台 worker 最常见的性能问题，接上即默认可观测。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-优先级队列与背压">5. 优先级队列与背压</h2>
+<h3 id="51-workerpriority-5-档值小者先出">5.1 <code>WorkerPriority</code> 5 档（值小者先出）</h3>
+<table>
+<thead>
+<tr>
+<th>档</th>
+<th>值</th>
+<th>场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Critical</code></td>
+<td>0</td>
+<td>强制/紧急（如 Allocate 缺段强制建段）</td>
+</tr>
+<tr>
+<td><code>High</code></td>
+<td>1</td>
+<td>正常优先任务（如普通建段）</td>
+</tr>
+<tr>
+<td><code>Normal</code></td>
+<td>2</td>
+<td><strong>默认</strong>（段满事件、管道消息——多数场景 FIFO）</td>
+</tr>
+<tr>
+<td><code>Low</code></td>
+<td>3</td>
+<td>可延迟（如区间表压缩）</td>
+</tr>
+<tr>
+<td><code>Background</code></td>
+<td>4</td>
+<td>空闲时清理/维护</td>
+</tr>
+</tbody>
+</table>
+<h3 id="52--内建队列无界背压必须自己设计">5.2 ⚠️ 内建队列<strong>无界</strong>——背压必须自己设计</h3>
+<p><code>Enqueue</code> 不阻塞、不拒绝、队列无容量上限。生产者持续快于消费者 → backlog 无限增长 → <strong>OOM</strong>。
+仅适用于「生产速度可控、峰值可消化」的场景。需要背压的三种做法：</p>
+<ol>
+<li><strong>上游限流</strong>（首选）：生产侧天然有限（如引擎写者的 in-flight 上限）。</li>
+<li><strong>入队前查水位</strong>：<code>QueueCount</code> 超阈值时拒绝/降级/阻塞生产者（调用方语义自定义）。</li>
+<li><strong>CPU 背压</strong>：挂 <code>CpuSampler</code>，按 <code>ThrottleFactor</code> 三档放行/降速/报过载（§7.3）。</li>
+</ol>
+<blockquote>
+<p>⚠️ 不要把阻塞 IO 塞进 <code>LightEpoch</code> 的 drain action 来&quot;借用&quot;它的线程——epoch drain 是协作式、由读线程顺手
+执行，塞毫秒级 IO 会降吞吐/死结（见 <code>../COORDINATION.md</code> §5）。阻塞重操作（PunchHole、段提升等）<strong>可以</strong>
+投递给 <code>BackgroundWorkerLoop</code> 执行。</p>
+</blockquote>
+<hr>
+<h2 id="6-典型用法范例自包含可直接套用">6. 典型用法范例（自包含，可直接套用）</h2>
+<blockquote>
+<p>本文档是 Core 组件文档，范例全部自包含——每个模式给完整可编译骨架 + 一句「学什么」。</p>
+</blockquote>
+<h3 id="61-cpusampler时间驱动--公共池core-内置7-详述">6.1 <code>CpuSampler</code>——时间驱动 + 公共池（Core 内置，§7 详述）</h3>
+<p><code>PeriodicTimer</code> 驱动采样，不传 scheduler（低频走公共池），单消费者。第一层最简形态的代表，也是 Core 唯一
+开箱即用的 worker 组件（直接 new，不用继承）。</p>
+<h3 id="62-定时-flusher动态间隔--退出前-flush时间驱动公共池">6.2 定时 flusher——动态间隔 + 退出前 flush（时间驱动，公共池）</h3>
+<pre><code class="lang-csharp">sealed class AdaptiveFlusher : BackgroundWorkerLoop
+{
+    public AdaptiveFlusher(ILogger? logger = null)
+        : base(name: &quot;AdaptiveFlusher&quot;, exitTimeout: TimeSpan.FromSeconds(10), logger: logger) { }
+        //      ↑ 低频刷盘走公共池（不传 scheduler）    ↑ 重 IO 退出清理宽限到 10s（默认 5s）
+
+    protected override async ValueTask&lt;bool&gt; RunOneCycleAsync(CancellationToken ct)
+    {
+        var sleepMs = ScheduleNextFlushMs();                  // 动态间隔（如按脏数据率自适应）
+        await Task.Delay(sleepMs, ct).ConfigureAwait(false);  // ★ Stop → ct.Cancel 唤醒 Delay，正常退出
+        if (HasDirty()) Flush();
+        return true;
+    }
+
+    protected override ValueTask OnLoopExitAsync(CancellationToken ct)   // 退出前最后刷一次（不丢脏数据）
+    {
+        Flush();
+        return ValueTask.CompletedTask;
+    }
+}
+</code></pre>
+<p>学什么：<code>Task.Delay(ms, ct)</code> 传 ct——Stop 即醒不卡 <code>exitTimeout</code>；<code>OnLoopExitAsync</code> 做退出前落盘；
+重 IO 清理给更大的 <code>exitTimeout</code>。</p>
+<h3 id="63-同步整理-worker队列模式--own-调度器--清队第二层">6.3 同步整理 worker——队列模式 + own 调度器 + 清队（第二层）</h3>
+<pre><code class="lang-csharp">sealed class CompactionWorker : BackgroundWorkerLoop&lt;CompactionJob&gt;
+{
+    public CompactionWorker(IsolatedTaskScheduler scheduler, ILogger? logger)
+        : base(scheduler, name: &quot;compaction&quot;, logger: logger) { }
+        //      ↑ own 注入的隔离调度器：同步整理任务与异步建段 worker 分池，互不饿死
+        //        （同步任务霸占共享池的 M 线程会饿死异步 worker——见 dedicated-task-scheduler.md §2）
+
+    protected override ValueTask ProcessItemAsync(CompactionJob job, CancellationToken ct)
+    {
+        RunJobSafe(job);              // ★ 只实现单项处理——队列/唤醒/异常隔离/多消费者全由基类
+        return ValueTask.CompletedTask;
+    }
+
+    public void DrainPending()        // Queue 属性直用：外部清理状态时清空待处理队列
+        { while (Queue.TryDequeue(out _)) { } }
+}
+</code></pre>
+<p>学什么：标准后台任务模式只写 <code>ProcessItemAsync</code>；同步 worker 用<strong>单线程 own 调度器</strong>分池；
+<code>Queue.TryDequeue</code> 做清队。</p>
+<h3 id="64-高频事件-worker多消费者--own-调度器第二层引擎级标准姿势">6.4 高频事件 worker——多消费者 + own 调度器（第二层，引擎级标准姿势）</h3>
+<pre><code class="lang-csharp">sealed class SegmentEventWorker : BackgroundWorkerLoop&lt;SegmentEvent&gt;
+{
+    public SegmentEventWorker(IsolatedTaskScheduler scheduler, int consumerCount, ILogger? logger)
+        : base(scheduler, consumerCount, name: &quot;segment-events&quot;, logger: logger) { }
+        //        ↑ N 个消费者 Task 协作跑调度器 M 个私有线程（N ≈ M，与 M 解耦，§2.2）
+
+    protected override async ValueTask ProcessItemAsync(SegmentEvent evt, CancellationToken ct)
+        =&gt; await HandleAsync(evt, ct);
+}
+
+// 装配（LifecycleBase 派生的 OnInitializeBegin / OnInitializeComplete 里）：
+WorkerScheduler = IsolatedTaskScheduler.Create(new IsolatedSchedulerOptions { Name = &quot;worker&quot; });
+Resources.Add(WorkerScheduler);                       // 随引擎 Dispose 释放（先停 worker 后释放调度器，§3.2）
+ConfigureBackgroundWorker(new SegmentEventWorker(WorkerScheduler,
+    consumerCount: WorkerScheduler.ThreadCount, logger: Logger));
+
+// 生产者（任意线程）：
+worker.Enqueue(evt);                                  // 默认 Normal = FIFO
+worker.Enqueue(urgent, WorkerPriority.Critical);      // 紧急插队
+</code></pre>
+<p>学什么：高频/关键路径 worker 的完整装配链——own 调度器 + Resources + ConfigureBackgroundWorker +
+多消费者（N=M）；continuation 回流私有线程不与写者争公共池。</p>
+<hr>
+<h2 id="7-同类型内置组件cpusamplercpu-采样--限流系数">7. 同类型内置组件：<code>CpuSampler</code>（CPU 采样 + 限流系数）</h2>
+<p><code>Core/Shared</code> 内置的<strong>可复用</strong>组件（非抽象骨架，直接 new 即用）：本进程 CPU 利用率采样 + 分段限流系数计算，
+继承 <code>BackgroundWorkerLoop</code>（公共池、1s 周期、启停 Dispose 全由基类）。</p>
+<h3 id="71-计算模型">7.1 计算模型</h3>
+<ul>
+<li><strong>进程口径</strong>：<code>raw = ΔProcess.TotalProcessorTime / (Δ墙钟 × ProcessorCount)</code>，归一化 0~1（1.0 = 跑满所有核）。
+其它进程造成的系统饱和<strong>看不见</strong>（整机口径需性能计数器，跨平台不可用，故明确取进程口径）。</li>
+<li><strong>EMA 平滑</strong>：<code>ema' = α·raw + (1−α)·ema</code>，首样本直接取 raw（标志位初始化，不拿 0 当哨兵——空闲→高载第一个
+样本直接跳变是旧实现的根因）。</li>
+<li><strong>限流系数 <code>ThrottleFactor</code>（0~1）</strong>：分段线性——CPU ≤ lowCutoff → 0（不限流）；low~high → 线性 0→1（软降速）；
+≥ highCutoff → 1（强阻塞）。纯函数映射，数学契约由单测锁定。</li>
+</ul>
+<h3 id="72-旋钮ctor-全量校验-fail-fast非法即-throw">7.2 旋钮（ctor 全量校验 fail-fast，非法即 throw）</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sampleInterval</code></td>
+<td>1s</td>
+<td>采样周期，须 &gt; 0</td>
+</tr>
+<tr>
+<td><code>emaAlpha</code></td>
+<td>0.5</td>
+<td>平滑系数 ∈ (0,1]——大=跟手、小=平滑</td>
+</tr>
+<tr>
+<td><code>throttleLowCutoff</code></td>
+<td>0.70</td>
+<td>不限流阈值；须 0 ≤ low &lt; high ≤ 1（倒挂 throw——否则斜率为负/除零，反向限流）</td>
+</tr>
+<tr>
+<td><code>throttleHighCutoff</code></td>
+<td>0.90</td>
+<td>强阻塞阈值</td>
+</tr>
+<tr>
+<td><code>hub</code></td>
+<td>Disabled</td>
+<td>每采样发布 <code>cpu.utilization</code> / <code>cpu.throttle.factor</code> Gauge</td>
+</tr>
+<tr>
+<td><code>name</code> / <code>logger</code></td>
+<td>&quot;CpuSampler&quot; / null</td>
+<td>档位切换（正常→限流→强阻塞→恢复）打 WARN 日志</td>
+</tr>
+</tbody>
+</table>
+<h3 id="73-消费模式写热路径限流的典型接法">7.3 消费模式（写热路径限流的典型接法）</h3>
+<pre><code class="lang-csharp">// Start 后任意线程读（Volatile，热路径零开销）：
+if (sampler.ThrottleFactor &lt;= 0.0) return;    // 档 0：正常——放行
+// 档 1（0&lt;factor&lt;1）：软降速——短暂自旋/让出等 CPU 回落（配尝试上限）
+// 档 2（factor&gt;=1）：强阻塞——自旋超时后报过载错误（拒绝本次操作）
+</code></pre>
+<h3 id="74-生命周期">7.4 生命周期</h3>
+<p>两种接法（<code>CpuSampler</code> 无组件依赖，怎么挂都安全）：</p>
+<ul>
+<li><strong>经 <code>ConfigureBackgroundWorker</code> 注册</strong>：恢复完成后自动 Start，随基类 Dispose 统一停（§3.2）；</li>
+<li><strong>自管</strong>（独立组件/工具场景）：实例进 <code>Resources</code> 统一释放，装配完成后手动 <code>Start()</code>（幂等）。</li>
+</ul>
+<p>读端 <code>CpuUtilization</code> / <code>ThrottleFactor</code> 热路径 <code>Volatile.Read</code>，Hub 未注入时零开销。</p>
+<hr>
+<h2 id="8-硬性要求禁止清单">8. 硬性要求（禁止清单）</h2>
+<ul>
+<li>❌ <strong>绝不</strong> <code>new Thread(...)</code> 自建后台循环——所有后台循环继承 <code>BackgroundWorkerLoop</code>（两层之一）。</li>
+<li>❌ <strong>绝不</strong>在构造器里 <code>ConfigureBackgroundWorker</code> 或 <code>Start</code>（构造未完成、<code>this</code> 未就绪）——放 <code>OnInitializeBegin</code>/<code>OnInitializeComplete</code>。</li>
+<li>❌ <strong>绝不</strong>高频/关键 worker 打公共池（不传 scheduler）——污染全局池，拖垮全进程异步工作（§2.1）。</li>
+<li>❌ <strong>绝不</strong>同步重 IO worker 与异步 worker 共用一个调度器实例——同步任务霸占 M 线程饿死异步（见 dedicated-task-scheduler.md §2）。</li>
+<li>❌ <strong>绝不</strong>在异步上下文调 <code>WaitForExit()</code>（同步阻塞死锁）——用 <code>WaitForExitAsync()</code>。</li>
+<li>❌ <strong>绝不</strong>把无界队列裸奔上线——<code>BackgroundWorkerLoop&lt;T&gt;</code> 队列<strong>默认无界</strong>，生产者快于消费者 = OOM；背压三招见 §5.2。</li>
+<li>❌ <strong>绝不</strong>在 <code>LightEpoch</code> drain action 里塞阻塞 IO（协作式，读线程顺手执行）——投给 worker 循环。</li>
+<li>✅ 单周期异常<strong>不要</strong>杀 worker——基类已隔离（异常走 <code>OnCycleError</code>），循环自动继续；确需致命退出才在 <code>OnCycleError</code> 里返回停止。</li>
+<li>✅ 所有后台 worker 经 <code>ConfigureBackgroundWorker</code> 注册（单实例；多职责用优先级队列表达）——统一 Start 时机 / Dispose 顺序。</li>
+<li>✅ 推荐override <code>OnCycleCompleted</code> 接 Hub Histogram——慢循环默认可观测。</li>
+</ul>
+<hr>
+<h2 id="9-一句话决策">9. 一句话决策</h2>
+<pre><code>我要做后台循环 / 队列消费？
+  → 时间/信号驱动：BackgroundWorkerLoop；生产-消费队列：BackgroundWorkerLoop&lt;T&gt;
+  → 低频（秒级）不传 scheduler 走公共池；高频/关键注入 IsolatedTaskScheduler（引擎 own）
+  → 经 ConfigureBackgroundWorker 注册（或 Resources 自管），绝不 new Thread
+我要 CPU 背压 / 降速？
+  → 直接用内置 CpuSampler（§7），读 ThrottleFactor 三档消费
+</code></pre>
+<hr>
+<h2 id="关联文档">关联文档</h2>
+<ul>
+<li>生命周期编排（Start 时机/Dispose 顺序/恢复流程）：<a href="lifecycle.html"><code>lifecycle.md</code></a></li>
+<li>专用线程调度器（隔离执行器）：<a href="dedicated-task-scheduler.html"><code>dedicated-task-scheduler.md</code></a>｜性能：<a href="perf/dedicated-task-scheduler-perf.html"><code>perf/dedicated-task-scheduler-perf.md</code></a></li>
+<li>积木全景：<a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>｜单测：<code>BackgroundWorkerLoopTests.cs</code> / <code>CpuSamplerTests.cs</code>（矩阵见 <a href="unit-test-coverage.html">unit-test-coverage.md</a>）</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/worker-loop.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

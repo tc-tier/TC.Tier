@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class FairGate | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class FairGate | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="公平门——围绕「重试循环获取资源」的到达顺序协调器。资源本身不属于本门（占用/释放由调用方的 tryAcquire/业务逻辑负责），门只做两件事：让后来者不插队、唤醒并让渡先手。 ★ 协议（三方角色）：   获取方 fast path：先查 ——有等待者时不走快路径（否则零间隙   复占者永远插队，被唤醒者的调度延迟 &amp;gt; 让渡窗口时持续失手——实测 3/8 残余超时根因）。   获取方 slow path：——登记等待者，持门锁内执行 tryAcquire，   成功返回 true；失败 park 等待唤醒（带超时防丢失唤醒），返回 false 由调用方重试。   释放方：资源变为可获取后调 ——PulseAll + 让渡 5ms 先手（唤醒者随后的   复占是热自旋 &#181;s 级，刚被唤醒的竞争者若无先手则每次 Pulse 后仍被抢回——实测 4/8 超时残余）。 ★ 演进自 SegmentTable 手搓公平门（AcquireExtent 双写者长持锁窗口饥饿根治，   7a9685aa），行为保持式下沉——50ms park / 5ms 让渡为当时调优值，常量不做配置项。 ★ 成本：无等待者时 fast path 仅一次 volatile 读（~1ns），Wake 零阻塞直返；有等待者走   Monitor（&#181;s 级）——用于「临界区外就是 IO」的场景足够，不做队列自旋（无真实调用点）。 ★ 约束：tryAcquire 在门锁内执行——其中不得再获取与本门逆序的锁（锁序由调用方保证）；   tryAcquire 必须纯内存、无异常、快速返回。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Primitives.FairGate">
+
+
+
+  <h1 id="TC_Tier_Core_Primitives_FairGate" data-uid="TC.Tier.Core.Primitives.FairGate" class="text-break">Class FairGate</h1>
+  <div class="markdown level0 summary"><p>公平门——围绕「重试循环获取资源」的到达顺序协调器。资源本身不属于本门（占用/释放由调用方的
+tryAcquire/业务逻辑负责），门只做两件事：<b>让后来者不插队</b>、<b>唤醒并让渡先手</b>。</p>
+<p>★ 协议（三方角色）：</p>
+<p>  获取方 fast path：先查 <a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_HasWaiters">HasWaiters</a>——有等待者时<b>不走快路径</b>（否则零间隙
+  复占者永远插队，被唤醒者的调度延迟 &gt; 让渡窗口时持续失手——实测 3/8 残余超时根因）。</p>
+<p>  获取方 slow path：<a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_TryAcquireSlow_System_Func_System_Boolean__">TryAcquireSlow(Func&lt;bool&gt;)</a>——登记等待者，持门锁内执行 tryAcquire，
+  成功返回 true；失败 park 等待唤醒（带超时防丢失唤醒），返回 false 由调用方重试。</p>
+<p>  释放方：资源变为可获取后调 <a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_Wake">Wake()</a>——PulseAll + 让渡 5ms 先手（唤醒者随后的
+  复占是热自旋 µs 级，刚被唤醒的竞争者若无先手则每次 Pulse 后仍被抢回——实测 4/8 超时残余）。</p>
+<p>★ 演进自 SegmentTable 手搓公平门（AcquireExtent 双写者长持锁窗口饥饿根治，
+  7a9685aa），行为保持式下沉——50ms park / 5ms 让渡为当时调优值，常量不做配置项。</p>
+<p>★ 成本：无等待者时 fast path 仅一次 volatile 读（~1ns），Wake 零阻塞直返；有等待者走
+  Monitor（µs 级）——用于「临界区外就是 IO」的场景足够，不做队列自旋（无真实调用点）。</p>
+<p>★ 约束：tryAcquire 在门锁内执行——其中不得再获取与本门逆序的锁（锁序由调用方保证）；
+  tryAcquire 必须纯内存、无异常、快速返回。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">FairGate</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Primitives_FairGate_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class FairGate</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_FairGate__ctor_" data-uid="TC.Tier.Core.Primitives.FairGate.#ctor*"></a>
+  <h4 id="TC_Tier_Core_Primitives_FairGate__ctor" data-uid="TC.Tier.Core.Primitives.FairGate.#ctor">FairGate()</h4>
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FairGate()</code></pre>
+  </div>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_FairGate_HasWaiters_" data-uid="TC.Tier.Core.Primitives.FairGate.HasWaiters*"></a>
+  <h4 id="TC_Tier_Core_Primitives_FairGate_HasWaiters" data-uid="TC.Tier.Core.Primitives.FairGate.HasWaiters">HasWaiters</h4>
+  <div class="markdown level1 summary"><p>是否存在慢路径等待者——fast path 据此让位（新到者不插队）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HasWaiters { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Primitives_FairGate_TryAcquireSlow_" data-uid="TC.Tier.Core.Primitives.FairGate.TryAcquireSlow*"></a>
+  <h4 id="TC_Tier_Core_Primitives_FairGate_TryAcquireSlow_System_Func_System_Boolean__" data-uid="TC.Tier.Core.Primitives.FairGate.TryAcquireSlow(System.Func{System.Boolean})">TryAcquireSlow(Func&lt;bool&gt;)</h4>
+  <div class="markdown level1 summary"><p>慢路径尝试：登记等待者 → 持门锁内执行 <code class="paramref">tryAcquire</code> → 成功返回 true；
+失败 park 等待 <a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_Wake">Wake()</a>（超时 <span class="xref">TC.Tier.Core.Primitives.FairGate.ParkTimeoutMs</span> 防丢失唤醒），返回 false 由调用方重试。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryAcquireSlow(Func&lt;bool&gt; tryAcquire)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-1">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
+        <td><span class="parametername">tryAcquire</span></td>
+        <td><p>占用尝试（门锁内执行）——成功即已占用资源，必须纯内存、无异常。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
+        <td><p>true = 已占用（调用方停止重试）；false = 未占用（调用方回到协议循环）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Primitives_FairGate_Wake_" data-uid="TC.Tier.Core.Primitives.FairGate.Wake*"></a>
+  <h4 id="TC_Tier_Core_Primitives_FairGate_Wake" data-uid="TC.Tier.Core.Primitives.FairGate.Wake">Wake()</h4>
+  <div class="markdown level1 summary"><p>唤醒全部等待者并让渡先手。无等待者时立即返回（零阻塞）。</p>
+<p>★ 时机：资源已变为可获取之后再调（唤醒过早 = 被唤醒者双检必败，白烧一次调度）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Wake()</code></pre>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

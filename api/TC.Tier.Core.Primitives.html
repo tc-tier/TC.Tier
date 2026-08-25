@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.Primitives | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.Primitives | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Primitives">
+
+  <h1 id="TC_Tier_Core_Primitives" data-uid="TC.Tier.Core.Primitives" class="text-break">Namespace TC.Tier.Core.Primitives</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.html">AlignedMemoryManager</a></h4>
+      <section><p>对齐原生内存管理器，适配 O_DIRECT 等硬件对齐要求。
+继承 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.buffers.memorymanager-1">MemoryManager&lt;T&gt;</a> 以兼容 .NET 异步 IO 生态。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AlignmentConst.html">AlignmentConst</a></h4>
+      <section><p>对齐常量</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AsyncCountDown.html">AsyncCountDown</a></h4>
+      <section><p>异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。</p>
+<p>底层基于 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a>（ManualResetValueTaskSourceCore&lt;TResult&gt;），
+常规等待路径零堆分配（传统 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskcompletionsource-1">TaskCompletionSource&lt;TResult&gt;</a> 方案每次等待有一次堆分配，
+且 <code>nextTcs</code> 赋值非原子存在竞态；本实现消除分配并修复竞态）。</p>
+<p>语义：初始/计数归零时事件 set（等待立即返回）；<a class="xref" href="TC.Tier.Core.Primitives.AsyncCountDown.html#TC_Tier_Core_Primitives_AsyncCountDown_Add">Add()</a> 使计数 &gt; 0，
+事件 reset（等待阻塞）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a></h4>
+      <section><p>基于 <a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a> 的可复用异步手动重置事件。</p>
+<p>语义对标 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.manualreseteventslim">ManualResetEventSlim</a>，但暴露 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>
+异步等待入口，常规等待路径零堆分配。</p>
+<p><b>多 waiter 广播</b>：<a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html#TC_Tier_Core_Primitives_AsyncManualResetEvent_Set">Set()</a> 唤醒当前所有等待者；事件保持 set 状态，
+后续 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html#TC_Tier_Core_Primitives_AsyncManualResetEvent_WaitAsync_System_Threading_CancellationToken_">WaitAsync(CancellationToken)</a> 立即返回，直到显式 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html#TC_Tier_Core_Primitives_AsyncManualResetEvent_Reset">Reset()</a>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a></h4>
+      <section><p>一次性后台操作的状态句柄（无结果变体）——把&quot;同步线程原地阻塞等异步操作&quot;改造为
+「异步信号 + 可轮询状态机」的 Core 原语（docs/sync-async-bridge.md §4，SyncAsyncBridge 消费方）。</p>
+<p>★ API 与既有 AsyncOperation 全兼容（构造/状态/Report*/Wait*/ThrowIfFailed/Describe）——
+  拆基座改造零回归；新增 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Progress">Progress</a>、<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Failed">Failed</a>、<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Cancel">Cancel()</a>、
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>（后台操作通用契约）。</p>
+<p>★ 后台操作统一用法：<code>new AsyncOperation(name, logger, externalCancel)</code> →
+  worker 检查 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_CancellationToken">CancellationToken</a> → <code>ReportProgress/ReportSucceeded/ReportFailed</code>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html">AsyncOperationBase</a></h4>
+      <section><p>一次性后台操作状态句柄的<b>机制基座</b>——<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a> / <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html">AsyncOperation&lt;TResult&gt;</a>
+共用（docs/sync-async-bridge.md §4）。</p>
+<p>★ 通用后台操作原语（升级）：取代 Storage 层 IReclaimOperation/ICompactOperation
+  两套同构句柄的手写实现（TCS + 事件 + 时序对齐三层各写一遍）——事件/取消/进度/结果/等待
+  一套契约一处实现，后台操作统一 <code>new AsyncOperation(...)</code> + <code>Report*</code>。</p>
+<p>★ 实现 <a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a>（Contracts）——消费面全集见接口（含
+  <a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html">AsyncOperationStatus</a> 状态轮询 / <see>
+      <cref>IAsyncOperation.Wait(int, CancellationToken)</cref>
+  </see>
+  同步兜底 / <a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html#TC_Tier_Contracts_Common_IAsyncOperation_ThrowIfFailed">ThrowIfFailed()</a> 终态取异常）。</p>
+<p>★ 三种消费模式：① 轮询 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Status">Status</a>/<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_IsCompleted">IsCompleted</a>（多消费者安全）；
+  ② <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_System_Threading_CancellationToken_">WaitAsync(CancellationToken)</a>（异步一等公民，失败/取消重抛）；
+  ③ <see>
+      <cref>Wait(int, CancellationToken)</cref>
+  </see>
+  （同步兜底——内嵌 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a> 的
+  「自旋 → park 分片」分层等待，全程有界，<b>绝不</b>裸 <code>Task.Wait()</code>）。</p>
+<p>★ 事件：<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Progress">Progress</a>（进度）+ <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Failed">Failed</a>（失败/取消终态，含订阅者异常隔离）；
+  成功终态事件由子类经 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_OnSucceeded">OnSucceeded()</a> 触发（无结果变体无 Completed 事件——await 等价）。</p>
+<p>★ 取消：<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Cancel">Cancel()</a> 触发内部链接令牌（构造可链接外部取消——引擎 Dispose 自动取消在途操作）；
+  <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_CancellationToken">CancellationToken</a> 供后台 worker 在检查点响应。</p>
+<p>★ 状态机：构造即 <a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html#TC_Tier_Contracts_Common_AsyncOperationStatus_Running">Running</a>（可见性原则）；终态经 CAS 单次转移、
+  不可逆；首个 <code>Report</code> 生效，后续幂等 no-op（对齐 RecoveryBase"Failed 销毁重建"哲学——重试 = 新建操作）。</p>
+<p>★ 事件时序契约（Storage 历史 flaky 根因区收口）：终态事件先于完成信号置位——等待者
+  （<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_System_Threading_CancellationToken_">WaitAsync(CancellationToken)</a> 唤醒）苏醒时事件必已投递；订阅竞态经 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_IsCompleted">IsCompleted</a> 兜底。</p>
+<p>★ 泄漏绊线：终态 Failed/Canceled 且从未被任何消费模式观察 → 终结器告警（无 logger 静默，
+  对齐 LifecycleBase 泄漏探测哲学）。</p>
+<p>★ <code>#if DEBUG</code>：状态转移环形记录（最近 16 次：时间戳/线程/方向），
+  <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Describe">Describe()</a> 自动携带——对齐 SpinRWLock 值示波器。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html">AsyncOperation&lt;TResult&gt;</a></h4>
+      <section><p>一次性后台操作的状态句柄（有结果变体，仿 <code>Task{T}</code>）——后台操作携带结果（如 CompactResult）。</p>
+<p>★ 用法：<code>new AsyncOperation{TResult}(name, logger, externalCancel)</code> →
+  worker 完成时 <code>ReportSucceeded(result)</code>；消费方 <code>await op.WaitAsync()</code> 拿结果（失败/取消重抛）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html#TC_Tier_Core_Primitives_AsyncOperation_1_Completed">Completed</a> 事件（携带结果）先于 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html#TC_Tier_Core_Primitives_AsyncOperation_1_WaitAsync_System_Threading_CancellationToken_">WaitAsync(CancellationToken)</a> 唤醒（时序契约见基类）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.Atomic128-1.html">Atomic128&lt;T&gt;</a></h4>
+      <section><p>标准 128 位 CAS 单槽封装——16B 对齐背板 + 能力探测降级 + 裸读不撕裂。</p>
+<p>★ 消除各处（<code>TailWatermarkSlot</code>/<code>IndexBase</code>/<code>AsyncPriorityQueue</code>）重写的
+  128 CAS 样板：16B 对齐分配 + <code>Unsafe.As&lt;T,Int128&gt;</code> reinterpret +
+  <a class="xref" href="TC.Tier.Core.NativeInterop.NativeAtomic128.html#TC_Tier_Core_NativeInterop_NativeAtomic128_CompareExchange_TC_Tier_Core_NativeInterop_Int128__TC_Tier_Core_NativeInterop_Int128_TC_Tier_Core_NativeInterop_Int128_">CompareExchange(ref Int128, Int128, Int128)</a> + 能力探测 + lock 降级。</p>
+<p>★ 统一对齐保证：托管数组（<code>T[]</code>）只保证 8B 对齐，<b>无 16B 对齐保证</b>——
+  <code>lock cmpxchg16b</code> 要求 16B 对齐，未对齐会 #GP（硬件异常）。本封装用
+  <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.html">AlignedMemoryManager</a>（64B 对齐 ⊃ 16B，且独占缓存行避 false sharing）做背板，
+  从根上消除"碰巧 GC 分配对齐"的定时炸弹。</p>
+<p>★ 标准用法（参考 <code>TailWatermarkSlot</code>）：CAS 循环 = <a class="xref" href="TC.Tier.Core.Primitives.Atomic128-1.html#TC_Tier_Core_Primitives_Atomic128_1_Read">Read()</a> 裸读当前 →
+  业务条件检查 → 算新值（含 ABA version）→ <a class="xref" href="TC.Tier.Core.Primitives.Atomic128-1.html#TC_Tier_Core_Primitives_Atomic128_1_TryCompareExchange__0__0_">TryCompareExchange(T, T)</a> →
+  失败 <code>SpinWait.SpinOnce()</code> 重试。</p>
+<p>★ 能力探测 + 降级：native 128-bit CAS 不可用时（生产永不触发）退化到 <code>lock</code>，
+  行为与 native 路径完全一致（位精确）。测试钩子 <code>_casEnabledForTesting</code> 反射改写触发降级分支
+  （沿用 <code>TailWatermarkSlot</code> 旧约定）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.FairGate.html">FairGate</a></h4>
+      <section><p>公平门——围绕「重试循环获取资源」的到达顺序协调器。资源本身不属于本门（占用/释放由调用方的
+tryAcquire/业务逻辑负责），门只做两件事：<b>让后来者不插队</b>、<b>唤醒并让渡先手</b>。</p>
+<p>★ 协议（三方角色）：</p>
+<p>  获取方 fast path：先查 <a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_HasWaiters">HasWaiters</a>——有等待者时<b>不走快路径</b>（否则零间隙
+  复占者永远插队，被唤醒者的调度延迟 &gt; 让渡窗口时持续失手——实测 3/8 残余超时根因）。</p>
+<p>  获取方 slow path：<a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_TryAcquireSlow_System_Func_System_Boolean__">TryAcquireSlow(Func&lt;bool&gt;)</a>——登记等待者，持门锁内执行 tryAcquire，
+  成功返回 true；失败 park 等待唤醒（带超时防丢失唤醒），返回 false 由调用方重试。</p>
+<p>  释放方：资源变为可获取后调 <a class="xref" href="TC.Tier.Core.Primitives.FairGate.html#TC_Tier_Core_Primitives_FairGate_Wake">Wake()</a>——PulseAll + 让渡 5ms 先手（唤醒者随后的
+  复占是热自旋 µs 级，刚被唤醒的竞争者若无先手则每次 Pulse 后仍被抢回——实测 4/8 超时残余）。</p>
+<p>★ 演进自 SegmentTable 手搓公平门（AcquireExtent 双写者长持锁窗口饥饿根治，
+  7a9685aa），行为保持式下沉——50ms park / 5ms 让渡为当时调优值，常量不做配置项。</p>
+<p>★ 成本：无等待者时 fast path 仅一次 volatile 读（~1ns），Wake 零阻塞直返；有等待者走
+  Monitor（µs 级）——用于「临界区外就是 IO」的场景足够，不做队列自旋（无真实调用点）。</p>
+<p>★ 约束：tryAcquire 在门锁内执行——其中不得再获取与本门逆序的锁（锁序由调用方保证）；
+  tryAcquire 必须纯内存、无异常、快速返回。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.KeyComparer-1.html">KeyComparer&lt;TKey&gt;</a></h4>
+      <section><p>默认 key 比较器：XxHash64 哈希 + Comparer/EqualityComparer.Default 比较。</p>
+<p>★ XxHash64 是 .NET 内置高性能非加密哈希（System.IO.Hashing），同款用于上层 HashKV。</p>
+<p>★ 对 unmanaged TKey 按 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.runtime.compilerservices.unsafe.sizeof">SizeOf&lt;T&gt;()</a> 字节做 hash，分布均匀。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.NativeArena.html">NativeArena</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Core.Primitives.NativeArena.html">NativeArena</a> 是一个简单的非托管内存分配器，提供类似竞技场（arena）的内存管理方式。
+它在初始化时分配一块固定大小的非托管内存，并允许在该内存块中进行快速的线性分配。适用于需要高性能、低开销的内存分配场景，例如临时缓冲区、批量数据处理等。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.NodeArena.html">NodeArena</a></h4>
+      <section><p>节点指针竞技场——变长节点的非托管驻留内存分配原语（上层节点形态的基座，如 SkipList arena 化节点）。</p>
+<p>★ 分块 CAS-bump：4MB 块内 Interlocked 递增分配（<b>读者侧 admit 也安全</b>——无锁快路径），
+  块满建新块（lock 下双重检查）。块只增不减、<b>指针恒稳</b>（永不重分配搬移）——缓存进
+  上层缓存映射表持有的裸节点指针跨块增长长命有效。</p>
+<p>★ 无释放单语义：块内存生命周期=arena 生命周期（Dispose 全释放）——索引节点缓存不逐出
+  （节点即数据教义），无需 per-node free。并发 admit 竞争的重复节点=有界字节浪费，非泄漏。</p>
+<p>★ 单写者+并发读者契约（同索引缓存族）：Alloc 可并发；Dispose 由结构层 Resources 收口
+  （确定性先于读者终结——读者经索引生命周期闸门保证）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a></h4>
+      <section><p>池化的单次完成 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.ivaluetasksource">IValueTaskSource</a>——每次 Rent 一个独立实例，
+<a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html#TC_Tier_Core_Primitives_PooledValueTaskSource_SetResult">SetResult()</a> / <a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html#TC_Tier_Core_Primitives_PooledValueTaskSource_SetException_System_Exception_">SetException(Exception)</a> 后归还复用。</p>
+<p>多 waiter 广播的正确做法：每个 waiter 持有独立的 <a class="xref" href="TC.Tier.Core.Primitives.PooledValueTaskSource.html">PooledValueTaskSource</a> 实例
+（而非共享一个 core），由发起方在全部完成时逐个 Set。这与 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a>
+的共享 core 语义互补：本类型面向"一次性、单消费者"的高频 IO 唤醒场景。</p>
+<p>双层池化（thread-local <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.stack-1">Stack&lt;T&gt;</a> 热路径 + <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentstack-1">ConcurrentStack&lt;T&gt;</a> 全局回退 + 批量搬运），
+常规 Rent/Return 往返零争用、零堆分配。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.SectorAlignment.html">SectorAlignment</a></h4>
+      <section><p>提供对齐操作的扩展方法，用于将值向上或向下对齐到指定的倍数。默认对齐到 4K 或 2G。</p>
+<p>★ <code class="paramref">alignment</code> 必须是 2 的幂且为正——底层位运算 <code>(value + mask) &amp; ~mask</code>
+  仅对 2 幂成立：传 0 会静默返回 0、传非 2 幂/负数会静默产生错位对齐值，极难排查
+  （IO 对齐错误会引发 O_DIRECT 失败、数据错位等连锁问题）。</p>
+<p>★ 入口用 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.numerics.bitoperations.ispow2#system-numerics-bitoperations-ispow2(system-int32)">IsPow2(int)</a> 校验（单条 CPU intrinsic，纳秒级，分支预测下几乎零开销）+
+  Utilities.ThrowHelper（<code>[DoesNotReturn]</code> + <code>NoInlining</code>）隔离冷 throw 路径，
+  热路径内联不受影响。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.html">SpinRWLock</a></h4>
+      <section><p>写偏向自旋读写锁——单 64 位字 CAS，读共享 / 写排他，等待中的写者挡住新读者（写不饿死）。</p>
+<p>★ 64-bit 位布局：bit63=写持有，bit62=写等待（pending），bits61..32=读计数，bits31..0 保留。</p>
+<p>★ <b>写偏向协议</b>：写者进门即置 pending，读者 fast path 检查 Writer|Pending 任一置位即退避——
+  写者最多等「在途读者」退出，不被持续读者流饿死。读者 fast path 仍是一次 CAS。</p>
+<p>★ 临界区约束：排他临界区必须短（纯内存、禁 await——Debug 释放线程校验会抓）；共享可长持/跨 await
+  （计数语义无线程亲和，读计划锁跨 IO 持有是合法用法）。跨 await 持有越久，写者与被挡读者等待越久。</p>
+<p>★ 演进自 LockWord（终态替代，读优先→写偏向；Monitor Wait/PulseAll 职责删除——生产零调用）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.ThrowHelper.html">ThrowHelper</a></h4>
+      <section><p>ThrowHelper 用于集中处理异常抛出，避免在调用点重复编写 throw 语句，提高代码可读性和维护性。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.UnifiedCrc.html">UnifiedCrc</a></h4>
+      <section><p>统一 CRC 计算工具——全部类型共用（unified-binary-layout.md §2 FLAG_CRC32C / FLAG_CRC64）。</p>
+<p><b>CRC32C</b>（Castagnoli 0x1EDC6F41）：硬件加速。x86 走 <code>Sse42.Crc32</code>（每 cycle 8B），
+ARM 走 <code>Crc32.ComputeCrc32C</code>。用于 DeltaLog / FixedBlock / PageMirror / Meta。</p>
+<p><b>CRC64</b>（ECMA-92）：软件实现。用于 EntryLog / StreamBlock / IndexMirror 常驻文件抗位衰减。</p>
+<p>★ 线程局部复用 Crc64 实例，避免热路径 GC 压力。CRC32C 走内建指令无对象分配。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.Utility.html">Utility</a></h4>
+      <section><p>通用工具类。提供字节大小解析、2 的幂运算、哈希计算、单调更新、blittable 判定等通用工具方法。</p>
+</section>
+    <h3 id="structs">
+Structs
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.MicroTimer.html">MicroTimer</a></h4>
+      <section><p>微秒计时器 —— 封装 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.diagnostics.stopwatch.gettimestamp">GetTimestamp()</a> 的零分配计时。</p>
+<p>★ 零分配：readonly struct，栈上分配，无GC压力。</p>
+<p>★ 采样门控：active=false 时完全零开销，JIT自动消除计时逻辑。</p>
+<p>★ 整数换算：全程无浮点运算，全量程无精度损失。</p>
+<p>使用方式：</p>
+<pre><code class="lang-csharp">var s = MicroTimer.Start(_hub.Wal.ShouldSampleAppend());
+// ... 执行业务逻辑 ...
+if (s.IsActive) _hub.Wal.OnAppend(s.ElapsedMicros(), entry.Length);</code></pre>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.MonitorScope.html">MonitorScope</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Core.Primitives.MonitorScope.html">MonitorScope</a>——using 块自动获取/释放 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.monitor">Monitor</a>（与 <a class="xref" href="TC.Tier.Core.Primitives.SpinLockScope.html">SpinLockScope</a>
+同构的 RAII 面板，锁对象版）。</p>
+<p>★ 取代 no-tracking <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.spinlock">SpinLock</a> 的场景（挂起取证定案）：SpinLock 的
+  复合锁字（持锁位 | 等待计数 | 跟踪禁用位）在 Sleep 型重竞争交错下可被孤立——实测 dump 中
+  <code>_owner=0x80000003</code>（持锁+1 登记等待者）而全进程零持有线程，等待者 Sleep(1) 循环永等
+  持锁位清零（ConcurrentReadWrite WriteThrough 挂起 60s+，fsync 0.1ms 洗清磁盘延迟）。
+  Monitor：owner 跟踪健壮 + 竞争者 futex park（内核精确唤醒）+ 无外部可腐蚀状态。</p>
+<p>★ 契约：Enter/Exit 同线程配对（临界区内不跨 await/线程交接）；可重入（Monitor 语义）。
+  零分配（ref struct + 装箱过的锁对象由持有方常驻）。</p>
+<p>★ C# 12 兼容：ref struct 不实现 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>（C# 13），pattern-based using。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.SpinLockScope.html">SpinLockScope</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Core.Primitives.SpinLockScope.html">SpinLockScope</a>——using 块自动获取/释放 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.spinlock">SpinLock</a>（避免忘记释放锁）。</p>
+<p>★ C# 12 兼容：ref struct 不实现 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>（ref struct interfaces 是 C# 13），
+  靠 pattern-based using 自动调用公开的 <a class="xref" href="TC.Tier.Core.Primitives.SpinLockScope.html#TC_Tier_Core_Primitives_SpinLockScope_Dispose">Dispose()</a>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.ExclusiveScope.html">SpinRWLock.ExclusiveScope</a></h4>
+      <section><p>排他锁 scope——using 自动释放。构造时 AcquireExclusive，Dispose 时 ReleaseExclusive。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.SharedScope.html">SpinRWLock.SharedScope</a></h4>
+      <section><p>共享锁 scope——using 自动释放。构造时 AcquireShared，Dispose 时 ReleaseShared。</p>
+</section>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Primitives.IKeyComparer-1.html">IKeyComparer&lt;TKey&gt;</a></h4>
+      <section><p>索引 key 比较器 + 64 位哈希抽象（公共，跨结构）。</p>
+<p>★ 对齐 base.md §2.8「统一 IKeyComparer 比较器 + 哈希函数抽象」。</p>
+<p>★ 64 位 hash 是性能命脉：高位取 tag（14 位，熵充分），低位取 bucket index，两段独立。</p>
+<p>★ 默认实现 <a class="xref" href="TC.Tier.Core.Primitives.KeyComparer-1.html">KeyComparer&lt;TKey&gt;</a>：XxHash64 over TKey 字节（unmanaged，blittable）。</p>
+<p>★ 可注入：自定义 key 类型可提供专用比较器（如变长 key 的前缀哈希、特定分布优化）。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

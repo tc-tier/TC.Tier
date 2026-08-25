@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class BackgroundWorkerLoop&lt;T&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class BackgroundWorkerLoop&lt;T&gt; | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="事件驱动 + 队列的后台循环骨架（第二层——内建 5 档优先级队列）。 ★ 继承 （循环骨架 + 启停 Dispose + ），追加：   内建  + 统一  入队 +   abstract  + virtual （出队分发）。 ★ 开箱即用（标准后台任务模式）：子类只实现 ，   基类默认  从队列出队分发。入队统一 。 ★ 多消费者：构造传 consumerCount &amp;gt; 1，N 个消费者共 drain 同一优先级队列（counting-semaphore   逐项公平唤醒，见 ）。 ★ 需要重写：子类 override  自定义循环逻辑   （如 Lifecycle 的 fire-and-forget 并发内核）。内建队列仍在。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1">
+
+
+
+  <h1 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1" class="text-break">Class BackgroundWorkerLoop&lt;T&gt;</h1>
+  <div class="markdown level0 summary"><p>事件驱动 + 队列的后台循环骨架（第二层——内建 5 档优先级队列）。</p>
+<p>★ 继承 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>（循环骨架 + 启停 Dispose + <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_ConsumerCount">多消费者</a>），追加：
+  内建 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a> + 统一 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Shared_WorkerPriority_">Enqueue(T, WorkerPriority)</a> 入队 +
+  abstract <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a> + virtual <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>（出队分发）。</p>
+<p>★ <b>开箱即用</b>（标准后台任务模式）：子类只实现 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a>，
+  基类默认 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 从队列出队分发。入队统一 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Shared_WorkerPriority_">Enqueue(T, WorkerPriority)</a>。</p>
+<p>★ <b>多消费者</b>：构造传 <code>consumerCount &gt; 1</code>，N 个消费者共 drain 同一优先级队列（counting-semaphore
+  逐项公平唤醒，见 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html#TC_Tier_Core_Collections_BucketPriorityQueue_2_DequeueAsync_System_Threading_CancellationToken_">DequeueAsync(CancellationToken)</a>）。</p>
+<p>★ <b>需要重写</b>：子类 override <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 自定义循环逻辑
+  （如 Lifecycle 的 fire-and-forget 并发内核）。内建队列仍在。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></div>
+    <div class="level2"><span class="xref">BackgroundWorkerLoop&lt;T&gt;</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_OnLoopStart">BackgroundWorkerLoop.OnLoopStart()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_OnLoopExitAsync_System_Threading_CancellationToken_">BackgroundWorkerLoop.OnLoopExitAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_OnCycleError_System_Exception_">BackgroundWorkerLoop.OnCycleError(Exception)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_OnCycleCompleted_System_Int64_">BackgroundWorkerLoop.OnCycleCompleted(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_Start">BackgroundWorkerLoop.Start()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_Stop">BackgroundWorkerLoop.Stop()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_WaitForExit">BackgroundWorkerLoop.WaitForExit()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_WaitForExitAsync">BackgroundWorkerLoop.WaitForExitAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_Dispose">BackgroundWorkerLoop.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_DisposeAsync">BackgroundWorkerLoop.DisposeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_ConsumerCount">BackgroundWorkerLoop.ConsumerCount</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_MaxConsumerCount">BackgroundWorkerLoop.MaxConsumerCount</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class BackgroundWorkerLoop&lt;T&gt; : BackgroundWorkerLoop, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td><p>队列元素类型。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1__ctor_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.#ctor*"></a>
+  <h4 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1__ctor_System_Threading_Tasks_TaskScheduler_System_Int32_System_String_System_Nullable_System_TimeSpan__TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.#ctor(System.Threading.Tasks.TaskScheduler,System.Int32,System.String,System.Nullable{System.TimeSpan},TC.Tier.Core.Logging.ILogger)">BackgroundWorkerLoop(TaskScheduler?, int, string?, TimeSpan?, ILogger?)</h4>
+  <div class="markdown level1 summary"><p>构造——转发基类（执行器/启停/Dispose/多消费者全继承）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected BackgroundWorkerLoop(TaskScheduler? scheduler = null, int consumerCount = 1, string? name = null, TimeSpan? exitTimeout = null, ILogger? logger = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler">TaskScheduler</a></td>
+        <td><span class="parametername">scheduler</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">consumerCount</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
+        <td><span class="parametername">name</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</td>
+        <td><span class="parametername">exitTimeout</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
+        <td><span class="parametername">logger</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Queue_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.Queue*"></a>
+  <h4 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Queue" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.Queue">Queue</h4>
+  <div class="markdown level1 summary"><p>内建队列（子类 override RunOneCycleAsync 时可直接访问）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected BucketPriorityQueue&lt;WorkerPriority, T&gt; Queue { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue</a>&lt;<a class="xref" href="TC.Tier.Core.Shared.WorkerPriority.html">WorkerPriority</a>, T&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_QueueCount_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.QueueCount*"></a>
+  <h4 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_QueueCount" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.QueueCount">QueueCount</h4>
+  <div class="markdown level1 summary"><p>队列近似元素数（并发下非精确，诊断用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int QueueCount { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.Enqueue*"></a>
+  <h4 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Shared_WorkerPriority_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.Enqueue(`0,TC.Tier.Core.Shared.WorkerPriority)">Enqueue(T, WorkerPriority)</h4>
+  <div class="markdown level1 summary"><p>入队——统一入口，所有生产者经此方法。</p>
+<p>★ 内建 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a> 无锁入队 + 异步唤醒等待的消费者。</p>
+<p>★ 默认优先级 <a class="xref" href="TC.Tier.Core.Shared.WorkerPriority.html#TC_Tier_Core_Shared_WorkerPriority_Normal">Normal</a>（多数场景不关心优先级 = FIFO）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Enqueue(T item, WorkerPriority priority = WorkerPriority.Normal)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">item</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Shared.WorkerPriority.html">WorkerPriority</a></td>
+        <td><span class="parametername">priority</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.ProcessItemAsync*"></a>
+  <h4 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.ProcessItemAsync(`0,System.Threading.CancellationToken)">ProcessItemAsync(T, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 处理一个出队元素（子类核心实现——标准后台任务模式只需实现此方法）。</p>
+<p>★ 基类默认 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 从内建队列出队后调此方法。</p>
+<p>★ 抛异常不杀 worker——异常走 OnCycleError 钩子。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected abstract ValueTask ProcessItemAsync(T item, CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td><span class="parametername">item</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.RunOneCycleAsync*"></a>
+  <h4 id="TC_Tier_Core_Shared_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.BackgroundWorkerLoop`1.RunOneCycleAsync(System.Threading.CancellationToken)">RunOneCycleAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 一个工作周期——override 基类 abstract，提供 virtual 默认实现：从内建队列出队 → 调 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a>。</p>
+<p>★ <b>开箱即用</b>：子类不 override 时，自动从队列取任务分发。标准后台任务模式。</p>
+<p>★ <b>多消费者</b>：<code>consumerCount &gt; 1</code> 时多个执行体并发调本方法，各自出队分发（<a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a> counting-semaphore 保证逐项公平）。</p>
+<p>★ <b>需要重写</b>：子类 override 自定义循环逻辑（如 Lifecycle 的 fire-and-forget
+  并发内核 + in-flight 限流）。内建队列仍在，仍可用 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop-1.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Shared_WorkerPriority_">Enqueue(T, WorkerPriority)</a>。</p>
+<p>★ 返回 false 则停止循环（如 EOF / 显式终止条件）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override ValueTask&lt;bool&gt; RunOneCycleAsync(CancellationToken ct)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_RunOneCycleAsync_System_Threading_CancellationToken_">BackgroundWorkerLoop.RunOneCycleAsync(CancellationToken)</a></div>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

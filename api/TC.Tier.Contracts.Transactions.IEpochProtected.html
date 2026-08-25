@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Interface IEpochProtected | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Interface IEpochProtected | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="★ epoch 读保护协议（Session 读 scope 的聚合入口）——结构把&amp;quot;epoch 进出对&amp;quot;提升为可发现协议， 供 SessionManager 会话读 scope（SessionReadScope）统一进/出域内可读结构， 防组合层漏进单结构 scope（零拷贝 span 生命周期护栏由各结构 epoch 保障）。 与各结构自带 EnterReadScope()/EnterScope()（ref struct 栈护栏）语义等价、 单一真源（ref struct 版转发本协议）；差异仅在形态：本接口可被非泛型侧多态聚合。 ★ 保护区纪律（结构形态决定）： ① 区内只做无自保护的零拷贝读（如 Ring GetValueSpan 族——不内部持 epoch， 正是聚合协议的目标消费者）； ② 区内禁止调用自带 epoch 进出的 API（Ring 写路径、Index/Hash 的 Find/Insert 逐次形态、 逐次 EnterScope）——同实例重入 = LightEpoch 协议违反（Debug 绊线立即抛）； 此类操作要么在保护区外做，要么用各自&quot;scope 内单查&quot;形态（IndexScope.Find 等）； ③ 成对调用（Enter→Exit，同线程）；同实例不可重入；跨实例可并发持有 （同线程对多结构各自 Enter——Session 聚合域形态）； ④ 保护区严禁跨 await/跨线程（thread-static 语义）。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Contracts.Transactions.IEpochProtected">
+
+
+
+  <h1 id="TC_Tier_Contracts_Transactions_IEpochProtected" data-uid="TC.Tier.Contracts.Transactions.IEpochProtected" class="text-break">Interface IEpochProtected</h1>
+  <div class="markdown level0 summary"><p>★ epoch 读保护协议（Session 读 scope 的聚合入口）——结构把&quot;epoch 进出对&quot;提升为可发现协议，
+供 <code>SessionManager</code> 会话读 scope（SessionReadScope）统一进/出域内可读结构，
+防组合层漏进单结构 scope（零拷贝 span 生命周期护栏由各结构 epoch 保障）。</p>
+<p>与各结构自带 <code>EnterReadScope()</code>/<code>EnterScope()</code>（ref struct 栈护栏）语义等价、
+单一真源（ref struct 版转发本协议）；差异仅在形态：本接口可被非泛型侧多态聚合。</p>
+<p>★ 保护区纪律（结构形态决定）：</p>
+<p>① 区内只做<b>无自保护的零拷贝读</b>（如 Ring <code>GetValueSpan</code> 族——不内部持 epoch，
+正是聚合协议的目标消费者）；</p>
+<p>② 区内<b>禁止</b>调用自带 epoch 进出的 API（Ring 写路径、Index/Hash 的 Find/Insert 逐次形态、
+逐次 <code>EnterScope</code>）——同实例重入 = LightEpoch 协议违反（Debug 绊线立即抛）；
+此类操作要么在保护区外做，要么用各自"scope 内单查"形态（IndexScope.Find 等）；</p>
+<p>③ 成对调用（Enter→Exit，同线程）；同实例不可重入；跨实例可并发持有
+（同线程对多结构各自 Enter——Session 聚合域形态）；</p>
+<p>④ 保护区严禁跨 await/跨线程（thread-static 语义）。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Contracts.html">Contracts</a>.<a class="xref" href="TC.Tier.Contracts.Transactions.html">Transactions</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Contracts.dll</h6>
+  <h5 id="TC_Tier_Contracts_Transactions_IEpochProtected_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IEpochProtected</code></pre>
+  </div>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Contracts_Transactions_IEpochProtected_EnterEpoch_" data-uid="TC.Tier.Contracts.Transactions.IEpochProtected.EnterEpoch*"></a>
+  <h4 id="TC_Tier_Contracts_Transactions_IEpochProtected_EnterEpoch" data-uid="TC.Tier.Contracts.Transactions.IEpochProtected.EnterEpoch">EnterEpoch()</h4>
+  <div class="markdown level1 summary"><p>进入 epoch 读保护（本线程）——持保护期间本结构页驱逐/回收被排水阻塞。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void EnterEpoch()</code></pre>
+  </div>
+
+
+  <a id="TC_Tier_Contracts_Transactions_IEpochProtected_ExitEpoch_" data-uid="TC.Tier.Contracts.Transactions.IEpochProtected.ExitEpoch*"></a>
+  <h4 id="TC_Tier_Contracts_Transactions_IEpochProtected_ExitEpoch" data-uid="TC.Tier.Contracts.Transactions.IEpochProtected.ExitEpoch">ExitEpoch()</h4>
+  <div class="markdown level1 summary"><p>退出 epoch 读保护（与 <a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html#TC_Tier_Contracts_Transactions_IEpochProtected_EnterEpoch">EnterEpoch()</a> 同线程配对）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ExitEpoch()</code></pre>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

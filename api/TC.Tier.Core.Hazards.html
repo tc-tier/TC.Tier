@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.Hazards | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.Hazards | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Hazards">
+
+  <h1 id="TC_Tier_Core_Hazards" data-uid="TC.Tier.Core.Hazards" class="text-break">Namespace TC.Tier.Core.Hazards</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html">HazardDomain</a></h4>
+      <section><p>HazardPointers 原语——无锁结构的<b>退休安全</b>回收层（与 <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a> 同层级的通用机制）。</p>
+<p>语义：读者在解引用前 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_TryProtect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64__System_Int64__">TryProtect(HazardRegistration, int, ref long, out long)</a>（发布 + 验证来源未变）取得对<b>具体句柄</b>的保护；
+删除者物理摘除后 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_Retire_System_Int64_System_Action_System_Int64__">Retire(long, Action&lt;long&gt;)</a>；<a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_Scan">Scan()</a> 快照全部 hazard 槽，无指向者的退休项执行
+reclaim（结构性恰好一次）并复用。</p>
+<p>★ 获取纪律（设计 §3.3，正确性核心）：只发布不验证保护不了任何东西——扫描可能在发布前已过。
+TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞态以新值重试，<b>不构成错误</b>。</p>
+<p>★ 活性契约（设计 §3.4）：水位顺带扫描是策略非保证——依赖回收前进的调用方（槽池等）必须在
+资源耗尽路径显式 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_Scan">Scan()</a>（本原语在退休记录池耗尽时自动强制）。</p>
+<p>★ reclaim 契约：恰好执行一次（结构性保证，<b>禁止调用方假设幂等</b>）；必须纯内存、无异常、
+不阻塞。reclaim 内允许 Retire（扫描互斥可重入 + 分层快照缓冲，不自锁）。</p>
+<p>★ 生命周期：.NET 无线程退出回调——长线程负责 Register/Dispose 配对；瞬态线程漏注销的后果是
+<b>退休滞留</b>（悬挂 hazard，非内存损坏），由水位看门狗检测。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></h4>
+      <section><p>线程在 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html">HazardDomain</a> 的注册句柄——线程身份的载体（域内线程表条目索引）。</p>
+<p>★ Register 幂等：同线程同域重复调用返回<b>同一实例</b>（canonical 实例取代引用计数——
+  Dispose 一次即配对，无需嵌套计数）。Dispose 必须在注册线程调用（同线程注册链仅属主线程访问）。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

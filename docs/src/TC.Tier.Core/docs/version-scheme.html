@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>版本号协调状态机使用指南（EpochProtectedVersionScheme） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="版本号协调状态机使用指南（EpochProtectedVersionScheme） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="版本号协调状态机使用指南epochprotectedversionscheme">版本号协调状态机使用指南（EpochProtectedVersionScheme）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要&quot;整体过渡到新版本&quot;的组件作者（index 扩容、checkpoint 分阶段切换）。
+<strong>回答什么</strong>：EPVS 解决什么问题、读者怎么写、版本怎么推进、自定义多步状态机怎么用。
+<strong>前置</strong>：epoch 基础设施 <code>LightEpoch</code> 见 <a href="locking-and-epoch.html"><code>locking-and-epoch.md</code></a>（EPVS 是它之上的
+<strong>版本协调</strong>层）。完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-它解决什么">0. 它解决什么</h2>
+<p>经典两难：<strong>写过渡</strong>要&quot;没人再用旧版本&quot;才能动数据结构（否则读者看到半成品）；但<strong>不能全局锁</strong>
+（读吞吐全没了）。</p>
+<p>EPVS 的做法：用 <code>LightEpoch</code> 做&quot;版本保护&quot; + 一个<strong>状态机</strong>驱动&quot;从旧版本分步过渡到新版本&quot;。
+读者 <code>Enter()</code> 拿到一个<strong>保证不变的版本状态</strong>，保护期内该版本不会被改；写方跑状态机，每个中间态
+等所有旧 epoch 读者退出后再推进（临界区互斥执行）。读者让出后，版本才真正前进。</p>
+<blockquote>
+<p>当前 Core 已就绪、有测试；上层引擎尚未接入（checkpoint/index 扩容等过渡场景待接入）。</p>
+</blockquote>
+<hr>
+<h2 id="1-读者协议enter--leave--refresh">1. 读者协议（Enter / Leave / Refresh）</h2>
+<pre><code class="lang-csharp">var epoch = new LightEpoch();
+var epvs  = new EpochProtectedVersionScheme(epoch);
+
+// 进入保护——返回&quot;截至进入时刻&quot;的状态（保证在此保护期内不变，不会处于中间态）
+VersionSchemeState state = epvs.Enter();
+try
+{
+    /* 按 state.Version 读数据结构——此期间版本不会前进 */
+
+    state = epvs.Refresh();   // 长临界区内刷新到当前版本（等价 Leave+Enter 但更快）
+}
+finally
+{
+    epvs.Leave();             // 必须同一线程释放（thread-static epoch）
+}
+</code></pre>
+<ul>
+<li><code>Enter</code> 返回的 state 在保护期内有效——EPVS 保证你<strong>不会观察到中间态</strong>（<code>IsIntermediate()</code> 必为
+false，会自旋等过渡完成）。</li>
+<li><code>Leave</code> 必须同线程；<code>Refresh</code> 用于长循环周期刷新（让版本能前进 + 重新拿当前 state）。</li>
+</ul>
+<hr>
+<h2 id="2-版本推进单步最常见">2. 版本推进（单步——最常见）</h2>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>阻塞？</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AdvanceVersionWithCriticalSection(criticalSection, targetVersion?, spin?)</code></td>
+<td><code>spin:true</code> 阻塞到完成 / <code>false</code> 仅发起</td>
+<td>期望&quot;推进完成&quot;的同步调用</td>
+</tr>
+<tr>
+<td><code>TryAdvanceVersionWithCriticalSection(...)</code></td>
+<td>非阻塞，返回 <code>OK/RETRY/FAIL</code></td>
+<td>并发发起、自行处理结果</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">bool ok = epvs.AdvanceVersionWithCriticalSection(
+    (fromVersion, toVersion) =&gt;          // 临界区：互斥执行，旧版本所有读者已退出
+    {
+        /* 搬数据 / 切指针 */
+    },
+    spin: true);                          // 自旋等到过渡完成
+
+// ok==true：成功（版本 +1）；ok==false：目标版本已被超过（FAIL）
+</code></pre>
+<ul>
+<li><strong>临界区参数</strong> <code>(fromVersion, toVersion) =&gt; ...</code>——在互斥、旧读者已退出的条件下执行真正的数据搬迁。</li>
+<li><strong><code>targetVersion</code></strong>：默认 <code>-1</code> = 推进到&quot;当前+1&quot;；指定正数 = 推进到具体版本；目标 ≤ 当前返回 <code>FAIL</code>
+（不会回退）。</li>
+<li><strong>安全保护</strong>：在保护区内（<code>Enter</code> 后）调 <code>Advance</code> → 抛 <code>InvalidOperationException</code>（不能在保护下
+又驱动过渡）。</li>
+</ul>
+<hr>
+<h2 id="3-自定义多步状态机checkpoint-式">3. 自定义多步状态机（checkpoint 式）</h2>
+<p>多阶段过渡（如 <code>Prepare → Commit → Rest</code>）：继承 <code>VersionSchemeStateMachine</code>，实现
+<code>GetNextStep</code>/<code>OnEnteringState</code>/<code>AfterEnteringState</code>，用 <code>ExecuteStateMachine</code>/<code>TryExecuteStateMachine</code>
+驱动。</p>
+<p>每步过渡 = 「一次 drain + 一次临界区」：<code>MakeTransition(旧态 → 中间态)</code> 后，drain action 在旧 epoch
+所有读者退出后执行 <code>OnEnteringState</code>（互斥）+ 推进到新态。多步机器靠<strong>步骤自动链接</strong>走完全程——
+链接点刻意安排在 bump 之外（读者线程可顺手接力推进，机器不依赖外部驱动也能走完），<strong>绝不嵌套
+bump</strong>（<code>LightEpoch</code> 嵌套守卫禁止 drain action 内二次 bump）。</p>
+<hr>
+<h2 id="4-api-速查">4. API 速查</h2>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>API</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>进入版本保护</td>
+<td><code>var state = epvs.Enter();</code>（返回非中间态 state）</td>
+</tr>
+<tr>
+<td>释放保护</td>
+<td><code>epvs.Leave();</code>（同线程）</td>
+</tr>
+<tr>
+<td>长临界区刷新</td>
+<td><code>state = epvs.Refresh();</code></td>
+</tr>
+<tr>
+<td>单步推进+临界区（阻塞）</td>
+<td><code>epvs.AdvanceVersionWithCriticalSection((from,to)=&gt;..., spin:true)</code></td>
+</tr>
+<tr>
+<td>单步推进+临界区（非阻塞）</td>
+<td><code>epvs.TryAdvanceVersionWithCriticalSection(...)</code> → <code>OK/RETRY/FAIL</code></td>
+</tr>
+<tr>
+<td>查当前状态</td>
+<td><code>epvs.CurrentState()</code> → <code>VersionSchemeState{Phase, Version, IsIntermediate()}</code></td>
+</tr>
+<tr>
+<td>自定义多步（checkpoint 式）</td>
+<td>继承 <code>VersionSchemeStateMachine</code> + <code>ExecuteStateMachine</code>/<code>TryExecuteStateMachine</code>（§3）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-想深入指路">5. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>类型全貌（<code>VersionSchemeState</code> 位布局/<code>StateMachineExecutionStatus</code>）</td>
+<td>类型 XML 注释</td>
+</tr>
+<tr>
+<td>步骤自动链接三情形（内联/推迟/无关 bump 内触发）</td>
+<td>源码注释（<code>Epochs/EpochProtectedVersionScheme.cs</code>）</td>
+</tr>
+<tr>
+<td>验证过的行为（单步/并发/自定义机器）</td>
+<td><code>EpochProtectedVersionSchemeTests</code> / <code>...CustomMachineTests</code></td>
+</tr>
+<tr>
+<td>epoch 基础设施（Resume/Suspend/Bump/drain 契约）</td>
+<td><a href="locking-and-epoch.html"><code>locking-and-epoch.md</code></a> §3</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/version-scheme.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

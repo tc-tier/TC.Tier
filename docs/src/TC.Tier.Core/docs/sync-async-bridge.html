@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>同步-异步桥接（AsyncOperation / SyncAsyncBridge / 分层等待策略） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="同步-异步桥接（AsyncOperation / SyncAsyncBridge / 分层等待策略） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="同步-异步桥接asyncoperation--syncasyncbridge--分层等待策略">同步-异步桥接（AsyncOperation / SyncAsyncBridge / 分层等待策略）</h1>
+
+<blockquote>
+<p>状态：<strong>P0/P1/P2 已交付（本仓库 Core 层）</strong>——P3（生命周期链，需 Contracts 变更）与 Runtime 层接入
+留待下一阶段统一实施（决策：先只改 Core 层）。
+定位：<strong>Core 级公共协调组件</strong>——把&quot;同步线程原地阻塞等异步操作&quot;统一改造为
+「<strong>异步信号 + 可轮询状态句柄 + 分层等待 + 独立执行池</strong>」的通用基建。
+关联：<a href="async-primitives.html"><code>async-primitives.md</code></a>（AsyncManualResetEvent 等底座）｜
+<a href="dedicated-task-scheduler.html"><code>dedicated-task-scheduler.md</code></a>（独立池）｜<a href="lifecycle.html"><code>lifecycle.md</code></a>（生命周期链）｜<a href="io.html"><code>io.md</code></a>（网络文件系统同步 API）。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话结论">0. 一句话结论</h2>
+<p><strong>要做，但不是三件全新的事，而是&quot;一件新抽象 + 两处复用&quot;：</strong></p>
+<ol>
+<li><strong>新抽象</strong>：<code>AsyncOperation</code>——发起即返回的状态句柄（可轮询 / 可异步等 / 可同步兜底等），把散落各处的 <code>Task</code> + <code>.Wait()</code> / <code>GetAwaiter().GetResult()</code> 收敛成一个有状态机契约、有诊断、有超时规范的类型；</li>
+<li><strong>复用一</strong>：同步等待策略 = <code>AsyncManualResetEvent.Wait(timeout)</code> 已实现的「自旋 → park 分片」分层等待（<strong>不是</strong>裸 <code>Thread.Yield()</code> 循环，见 §5 的修正理由）；</li>
+<li><strong>复用二</strong>：独立池 = <code>IsolatedTaskScheduler</code>（桥默认持有一个进程级 well-known 实例），<strong>不重造线程池</strong>。</li>
+</ol>
+<hr>
+<h2 id="1-背景现状的三条-sync-over-async-链">1. 背景：现状的三条 sync-over-async 链</h2>
+<p>调研（src/ 全量）结论——真正的同步等待热点集中在三条链：</p>
+<table>
+<thead>
+<tr>
+<th>链</th>
+<th>热点（文件:行）</th>
+<th>现状</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>① IO 同步 API 桥</strong></td>
+<td><code>IO/IObjectStore.cs:214-251</code>（9 个同步便捷包装）、<code>IO/Remote/RemoteFileHandle.cs:113,135,360,401,500,524</code>（同步 IFileHandle over 异步 staging）、<code>RemoteFileHandle.cs:574-605</code>（multipart：<code>throttle.Wait()</code> + <code>Task.WhenAll(...).GetAwaiter().GetResult()</code>）、<code>IO/Remote/RemoteFileSystem.cs:121-211</code> + <code>:298-373</code>（fencing 锁同步 Head/Get/Put + <code>Thread.Sleep(15)</code> 轮询）</td>
+<td>调用线程（可能是公共池线程）原地阻塞等异步对象存储操作</td>
+</tr>
+<tr>
+<td><strong>② Runtime 屏障</strong></td>
+<td><code>LogBase.Write.cs:204,224,296,490</code>（同步 Flush 等 <code>_inFlightFlush</code>）、<code>BlobBase.WriteSession.cs:261</code>、<code>CompactorBase.cs:182</code>（现 <code>DefaultCompactor.cs</code>）、<code>EntryLog.cs:333</code>（<strong>名义异步实为锁内 <code>Monitor.Wait(10)</code></strong>）</td>
+<td>同步 flush/compact 轨阻塞等异步页落盘</td>
+</tr>
+<tr>
+<td><strong>③ 生命周期链</strong></td>
+<td><code>Shared/LifecycleBase.cs:145,155</code>（<code>WaitForReady</code> → <code>_recoverTask.Wait()</code>）、<code>:247</code>（重试守卫 <code>priorTask.Wait()</code>）、<code>:449</code>（Dispose 等 recover task）；<code>StorageEngineFactory.cs:50,86</code>（<code>engine.WaitForReady()</code> 兜底）；结构层 <code>BlobBase.cs:148</code> 等 5 处 <code>_engine.WaitForReady()</code></td>
+<td>同步等待后台恢复 task</td>
+</tr>
+</tbody>
+</table>
+<p><strong>（本提案的直接动因）</strong>：引擎恢复实质同步、<code>Task.Factory.StartNew(LongRunning)</code> 调度延迟，
+导致 <code>Initialize</code> 已返回而 <code>RecoveryState</code> 停在 <code>NotStarted</code>——<code>WaitGuardPreCheck</code>
+（<code>LifecycleBase.cs:179-188</code>）抛&quot;恢复任务尚未启动&quot;。根因归类为
+<strong>「状态转移依赖了被调度」：发起线程返回时，连'已受理'这个事实都观测不到。</strong></p>
+<hr>
+<h2 id="2-目标--非目标">2. 目标 / 非目标</h2>
+<p><strong>目标：</strong></p>
+<ol>
+<li>提供通用操作句柄 <code>AsyncOperation</code>：发起 → 立即返回句柄；三种消费模式（轮询 / 异步等 / 同步兜底等）；</li>
+<li>同步等待一律走<strong>分层策略</strong>（自旋 → park 分片），全程<strong>有界</strong>（强制超时）；</li>
+<li>&quot;写路径必须同步转异步&quot;的场景（IO 同步 API 桥）由<strong>桥专用独立池</strong>承载，异步工作的推进<strong>不依赖公共池可用性</strong>；</li>
+<li>状态机<strong>可见性原则</strong>：发起线程在返回前同步完成&quot;受理&quot;状态转移（消灭 NotStarted 窗口）；</li>
+<li>全链路诊断：等待计数、等待时长、超时现场（对齐 SpinRWLock 值示波器哲学）。</li>
+</ol>
+<p><strong>非目标（明确不做）：</strong></p>
+<ul>
+<li>❌ 不重造线程池 / 信号量 / MRES——复用 <code>IsolatedTaskScheduler</code> + <code>AsyncManualResetEvent</code>；</li>
+<li>❌ 不改造内存序屏障类等待（SpinRWLock / epoch drain / freeze / 段表双尾水位，见 §9 不改清单）；</li>
+<li>❌ 不消灭 Dispose 终局 join——Dispose 需要确定性结束，只加超时与诊断；</li>
+<li>❌ 不做&quot;任务编排框架&quot;（DAG / 重试 / 级联取消）——那是 RecoveryBase / worker-loop 的领地。</li>
+</ul>
+<hr>
+<h2 id="3-总体设计三层">3. 总体设计（三层）</h2>
+<pre><code>┌────────────────────────────────────────────────────────────┐
+│ 消费层（调用方）                                             │
+│   轮询 op.Status / IsCompleted        —— 多消费者安全        │
+│   await op.WaitAsync(ct)              —— 异步一等公民        │
+│   op.Wait(timeoutMs)                  —— 同步兜底（有界）    │
+├────────────────────────────────────────────────────────────┤
+│ 句柄层  AsyncOperation（Core.Primitives，新）                 │
+│   状态机: Running → Succeeded | Failed | Canceled（CAS 单次）│
+│   内嵌 AsyncManualResetEvent（复用）作完成信号                │
+│   异常槽 + 诊断环形缓冲（#if DEBUG）                          │
+├────────────────────────────────────────────────────────────┤
+│ 桥接层  SyncAsyncBridge（Core.Shared，新）                    │
+│   Start(work) → 独立池执行 work → 完成/异常/取消 → ReportX   │
+│   独立池 = IsolatedTaskScheduler（进程级 well-known 实例）    │
+│   再入防护（AsyncLocal 深度计数）+ 强制有界默认超时            │
+└────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>三层职责一句话：<strong>桥负责&quot;去哪跑&quot;，句柄负责&quot;怎么样了&quot;，等待策略负责&quot;怎么等&quot;。</strong></p>
+<hr>
+<h2 id="4-asyncoperation-契约句柄层">4. AsyncOperation 契约（句柄层）</h2>
+<blockquote>
+<p>★ <strong>通用后台操作原语（升级）</strong>：AsyncOperation 从&quot;同步桥专用&quot;升级为全库后台操作句柄基座——
+Storage 层 IReclaimOperation/ICompactOperation 两套同构句柄合一为 <strong>Contracts.IAsyncOperation /
+IAsyncOperation{TResult}</strong>（依赖方向：Contracts 定义接口、Core 实现；公开 API 返回接口，
+运行时对象即 AsyncOperation 实例），Reclaim/Compact 后台操作统一 <code>new AsyncOperation(...)</code> + <code>Report*</code>，
+不再手写 TCS/事件/时序包装。新增契约：<strong>事件</strong>（Progress/Failed + 成功钩子 OnSucceeded）、
+<strong>取消</strong>（Cancel + CancellationToken，构造可链接外部取消——引擎 Dispose 自动取消在途操作）、
+<strong>进度</strong>（ReportProgress）、<strong>结果</strong>（泛型变体 AsyncOperation{TResult}）。
+★ <strong>接口消费面 = 类消费面全集</strong>（补全）：IAsyncOperation 含轮询
+（Status/IsCompleted/Exception——AsyncOperationStatus 枚举迁入 Contracts.Storage）、
+异步等（WaitAsync）、同步兜底等（Wait(int, ct)）、终态取异常（ThrowIfFailed）——调用方只看接口，
+无需查类 API。完成侧（Report*）不进接口（实现类成员）。</p>
+</blockquote>
+<h3 id="41-api">4.1 API</h3>
+<pre><code class="lang-csharp">namespace TC.Tier.Core.Primitives;   // ★ 枚举 AsyncOperationStatus 在 TC.Tier.Contracts.Storage（迁入）
+
+public enum AsyncOperationStatus
+{
+    Running,     // 已受理并在途（★ 发起线程返回前同步置位——可见性原则，见 §7）
+    Succeeded,
+    Failed,
+    Canceled,
+}
+
+public abstract class AsyncOperationBase : IAsyncOperation   // 机制基座（事件/取消/进度/状态机）
+{
+    // === 状态查询（多消费者安全；全部 volatile / Interlocked 实现）===
+    public AsyncOperationStatus Status { get; }
+    public bool IsCompleted { get; }              // 终态短路（Succeeded/Failed/Canceled）
+    public Exception? Exception { get; }          // Failed/Canceled 的异常（观察不重抛）
+
+    // === 事件（后台操作通用契约）===
+    public event EventHandler&lt;double&gt;? Progress;       // 进度（ReportProgress 触发，订阅者异常隔离）
+    public event EventHandler&lt;Exception&gt;? Failed;     // 失败/取消终态（取消回滚完成 = Failed 语义）
+    public void ReportProgress(double progress);
+
+    // === 取消（后台操作通用契约）===
+    public CancellationToken CancellationToken { get; }  // 操作取消令牌（worker 检查点响应）
+    public void Cancel();                                // 触发取消（幂等；构造可链接外部取消）
+
+    // === 完成侧（CAS 单次生效，后续 Report 为 no-op）===
+    public virtual void ReportSucceeded();
+    public void ReportFailed(Exception ex);
+    public void ReportCanceled(OperationCanceledException oce);
+
+    // === 消费侧：三种模式 ===
+    // ① 异步等（一等公民——零分配，委托内嵌 AsyncManualResetEvent.WaitAsync）
+    public ValueTask WaitAsync(CancellationToken ct = default);
+
+    // ② 同步兜底等：分层等待（§5），全程有界
+    //    完成（含失败）→ true / 抛失败异常；超时 → false；取消 → OCE
+    public bool Wait(int timeoutMs, CancellationToken ct = default);
+
+    // ③ 轮询方终态取异常（IsCompleted 后调；Failed/Canceled 重抛，Succeeded no-op）
+    public void ThrowIfFailed();
+}
+
+// 无结果变体（原 AsyncOperation——API 全保留，SyncAsyncBridge 消费方零回归）
+public sealed class AsyncOperation : AsyncOperationBase
+{
+    public AsyncOperation(string? name = null, ILogger? logger = null,
+        CancellationToken externalCancellation = default);
+}
+
+// 有结果变体（仿 Task{T}，如 CompactResult；实现 IAsyncOperation{TResult}）
+public sealed class AsyncOperation&lt;TResult&gt; : AsyncOperationBase
+{
+    public event EventHandler&lt;TResult&gt;? Completed;     // 成功事件（携带结果，先于 WaitAsync 唤醒）
+    public void ReportSucceeded(TResult result);       // ★ 必须带结果（无参版 override 防御）
+    public TResult Result { get; }                     // 终态后读（失败/取消重抛）
+    public new ValueTask&lt;TResult&gt; WaitAsync(CancellationToken ct = default);   // 等完成拿结果
+}
+</code></pre>
+<p><strong>★ 事件时序契约</strong>：终态事件（Failed / 泛型 Completed）
+在完成信号置位（AsyncManualResetEvent.Set）<strong>之前</strong>同步触发（订阅者异常隔离）——<code>WaitAsync</code>
+等待者苏醒时事件必已投递；订阅竞态经 <code>IsCompleted</code> 兜底（先订阅后查，true = 完成早于订阅）。</p>
+<p><strong>★ 命名规范</strong>：<code>Async</code> 后缀只留给可 await 的方法（返回 Task/ValueTask）；
+启动后台操作并返回句柄的方法用 Start 动词（<code>StartReclaim</code>/<code>StartCompact</code>），等待走句柄的
+<code>WaitAsync</code>。</p>
+<h3 id="42-状态机语义表">4.2 状态机语义表</h3>
+<table>
+<thead>
+<tr>
+<th>转移</th>
+<th>执行者</th>
+<th>时机</th>
+<th>契约</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>→ <code>Running</code></td>
+<td><strong>发起线程</strong></td>
+<td>句柄对外可见<strong>之前</strong>（同步）</td>
+<td>可见性原则（§7）：调用方拿到句柄时状态必为 Running，绝无&quot;句柄已到手但状态未知&quot;窗口</td>
+</tr>
+<tr>
+<td>→ <code>Succeeded</code>/<code>Failed</code>/<code>Canceled</code></td>
+<td>完成侧（桥 worker / 手工）</td>
+<td>work 结束</td>
+<td><strong>CAS 单次</strong>：首个终态生效；后续 Report 幂等 no-op（防御重复完成）</td>
+</tr>
+<tr>
+<td>终态</td>
+<td>—</td>
+<td>—</td>
+<td><strong>不可逆</strong>。需要重试 = 新建操作，不改状态机（对齐 RecoveryBase&quot;Failed 实例销毁重建&quot;哲学）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-实现要点">4.3 实现要点</h3>
+<ul>
+<li>内嵌一个 <code>AsyncManualResetEvent</code>（默认构造，Set 调用点不持锁 → 也可选内联模式）作完成信号；
+<code>WaitAsync</code> 直通 <code>event.WaitAsync</code>，<code>Wait(timeout)</code> 直通 <code>event.Wait(timeout)</code>——<strong>等待机制零新代码</strong>；</li>
+<li>状态用 <code>int</code> + <code>Interlocked.CompareExchange</code>（状态枚举压 int），<code>Exception</code> 槽 volatile 写；</li>
+<li><strong>池化预留</strong>：对齐 <code>PooledValueTaskSource</code> 的归还协议设计，但首版用普通 sealed class（池化是
+优化级改动，等基准证明需要再做——避免过早设计）；</li>
+<li><code>#if DEBUG</code>：状态转移环形记录（最近 16 次：时间戳 + 线程 id + 转移方向 + 等待者计数），
+超时 / 异常自动携带历史（对齐 SpinRWLock 值示波器）。</li>
+</ul>
+<hr>
+<h2 id="5-分层等待策略对短周期自旋让步的修正">5. 分层等待策略（对&quot;短周期自旋+让步&quot;的修正）</h2>
+<h3 id="51-为什么不是裸-threadyield-循环">5.1 为什么<strong>不是</strong>裸 <code>Thread.Yield()</code> 循环</h3>
+<p>提案原稿设想&quot;必要时短周期自旋 + 让步（Thread.Yield）而不是直接 .Wait()&quot;。<strong>方向对，形态要修正：</strong></p>
+<table>
+<thead>
+<tr>
+<th>方案</th>
+<th>问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无界 <code>while (!done) Thread.Yield();</code></td>
+<td>① 等待 &gt;1ms 时纯烧 CPU（每次 Yield 一个完整调度周期）；② <strong>Yield 不保证完成者获得 CPU</strong>——单核 / 超订 / 完成者需要池线程而池被同步等待者占满时，Yield 循环和 <code>.Wait()</code> 一样死锁，还多烧一个核；③ 无超时 = 无界楔死，违反有界规范</td>
+</tr>
+<tr>
+<td><code>SpinWait.SpinOnce()</code> 循环</td>
+<td>✅ 自带 CPU 自旋 → <strong>自动升级 Yield</strong> → 偶发 <code>Sleep(1)</code> 的完整阶梯；<code>NextSpinWillYield</code> 给出明确的阶段切换点</td>
+</tr>
+<tr>
+<td>park（<code>Monitor.Wait</code> 分片）</td>
+<td>✅ 真正让出核；分片自醒兜底丢脉冲</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>：同步兜底等待 = <strong><code>SpinWait</code> 自旋段（微秒级）→ park 分片（50ms 自醒 + 完成侧 Pulse）→ 全程超时上限</strong>。
+这正是 <code>AsyncManualResetEvent.Wait(int, CancellationToken)</code>（<code>Primitives/AsyncManualResetEvent.cs:232-268</code>）
+已实现并验收过的轨道——<strong>直接复用，不新写</strong>。</p>
+<h3 id="52-与-wait--getawaitergetresult-的本质区别">5.2 与 <code>.Wait()</code> / <code>GetAwaiter().GetResult()</code> 的本质区别</h3>
+<p>同步桥真正的死锁根源不是 <code>Task.Wait()</code> 这个调用形式，而是三个结构性条件（本设计逐一拆解）：</p>
+<table>
+<thead>
+<tr>
+<th>死锁条件</th>
+<th>本设计的拆法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(a) 等待者占公共池线程，完成者也需要公共池 → 池饿死互等</td>
+<td>异步工作跑<strong>独立池</strong>（IsolatedTaskScheduler，continuation 回流私有线程），推进不依赖公共池（§6）</td>
+</tr>
+<tr>
+<td>(b) UI/ASP.NET 同步上下文，continuation 要回流等待线程</td>
+<td>等待者 park 在事件上（无 continuation）；完成侧 Set 默认 <code>runContinuationsAsynchronously: true</code>，不内联</td>
+</tr>
+<tr>
+<td>(c) 等待者持有完成者需要的锁</td>
+<td>契约禁止（§8 硬性要求 3）+ 独立池让&quot;锁的持有者&quot;与&quot;完成者&quot;大概率不同线程池，冲突更早暴露为超时而非静默死锁</td>
+</tr>
+</tbody>
+</table>
+<p>另有两点工程收益：<strong>事件等待不依赖 Task 调度器内部行为</strong>（无完成边缘内联续体的语义模糊）；
+<strong>多消费者可轮询</strong>（Task 是单消费者模型，<code>IsCompleted</code> 轮询 + 二次 <code>Wait</code> 会消耗结果）。</p>
+<hr>
+<h2 id="6-syncasyncbridge桥接层">6. SyncAsyncBridge（桥接层）</h2>
+<h3 id="61-api-与执行模型">6.1 API 与执行模型</h3>
+<pre><code class="lang-csharp">namespace TC.Tier.Core.Shared;
+
+public static class SyncAsyncBridge
+{
+    /// &lt;summary&gt;在桥独立池上发起异步工作，立即返回状态句柄。
+    /// ★ 句柄返回时状态已同步置 Running（可见性原则）。&lt;/summary&gt;
+    public static AsyncOperation Start(
+        Func&lt;CancellationToken, ValueTask&gt; work,
+        SyncBridgeOptions? options = null,
+        CancellationToken ct = default);
+}
+
+public sealed class SyncBridgeOptions
+{
+    public string Name { get; init; } = &quot;sync-bridge&quot;;  // 诊断名（对齐调度器命名规范）
+    public TaskScheduler? Scheduler { get; init; }      // null = 默认桥池；可注入 own 实例
+    public int DefaultTimeoutMs { get; init; } = 15_000; // 同步 Wait 默认上限（★ 强制有界）
+}
+</code></pre>
+<p>执行模型（时序）：</p>
+<pre><code>同步调用线程                          桥独立池线程（IsolatedTaskScheduler）
+────────────                         ──────────────────────────────
+op = new AsyncOperation()            （Start 内）
+op → Running（同步 CAS）
+StartNew(Wrapper, scheduler)   ───►  await work(ct)   ←—— continuation 回流池私有线程
+return op     ←—— 立即              │ 成功 → op.ReportSucceeded() → event.Set()
+                                     │ OCE   → op.ReportCanceled(oce)
+                                     │ 异常  → op.ReportFailed(ex)
+...调用方继续干别的（轮询/其他逻辑）...
+op.Wait(timeout)   ←—— 最后时刻才等（park，事件唤醒）
+</code></pre>
+<p><strong>关键点：work 是协作式异步契约</strong>（<code>await</code> 让出、不阻塞）。work 内部禁止同步阻塞——独立池的
+M 很小（§6.2），阻塞任务直接饿死同池操作（对齐 dedicated-task-scheduler.md §7.2）。
+真正无法异步化的同步重 IO，由调用方注入 own 单线程实例（<code>Scheduler = IsolatedTaskScheduler.Create(ThreadCount=1, ...)</code>）。</p>
+<h3 id="62-默认桥池选型">6.2 默认桥池选型</h3>
+<table>
+<thead>
+<tr>
+<th>决策</th>
+<th>值</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>池类型</td>
+<td><code>IsolatedTaskScheduler.Create(...)</code>，进程级 well-known 单例（<code>SyncAsyncBridge.DefaultScheduler</code>，惰性创建，不 Dispose——进程意图资源，对齐 <code>Shared</code>）</td>
+<td>桥是&quot;写必须同步转异步&quot;的统一出口，值得一个专属分区；不占用 <code>Shared</code>（那是高频关键 worker 的）</td>
+</tr>
+<tr>
+<td>M（线程数）</td>
+<td><code>Clamp(ProcessorCount, 2, 4)</code></td>
+<td>work 是协作式异步，少量线程即可高并发；对齐 <code>Shared</code> 默认</td>
+</tr>
+<tr>
+<td>Watchdog</td>
+<td>开（<code>TaskTimeout</code> 下调至 5s）</td>
+<td>桥操作应有界；慢任务告警是超时诊断的先导信号</td>
+</tr>
+<tr>
+<td>防扩散</td>
+<td>桥自身 1 个实例 + 调用方注入受 <code>Create</code> 现有护栏（&gt;4 实例 WARN）管控</td>
+<td>不新增护栏机制</td>
+</tr>
+</tbody>
+</table>
+<h3 id="63-再入防护自死锁防御">6.3 再入防护（自死锁防御）</h3>
+<p><strong>死锁场景</strong>：work（跑在桥池的 M 个线程之一）内部又调了同步 API → 该同步 API 再走桥 →
+<code>Start</code> 把新 work 入队 → 新 work 需要空闲桥池线程 → M 个线程全在 park 等待嵌套 work → <strong>池自锁</strong>。</p>
+<p>防护：<code>AsyncLocal&lt;int&gt; _bridgeDepth</code>——Wrapper 执行 work 前置 1（随 await 流动），<code>Start</code> 时检测：</p>
+<pre><code>_bridgeDepth &gt; 0 且 Scheduler == 同一池（默认池或同实例）
+  → throw InvalidOperationException(&quot;桥工作体内禁止再经同一桥同步等待——注入独立 Scheduler 或改异步&quot;)
+</code></pre>
+<p>显式注入<strong>不同的</strong> Scheduler（分池）即豁免——这是嵌套场景的正解（对齐&quot;compact 同步 worker 与异步建段分池&quot;）。</p>
+<h3 id="64-诊断">6.4 诊断</h3>
+<ul>
+<li><strong>指标</strong>（挂 Hub 才发，默认零开销——对齐调度器哲学）：<code>bridge.op.started</code> / <code>bridge.op.completed</code> /
+<code>bridge.wait.parked</code>（同步等待进入 park 的次数）/ <code>bridge.wait.timeout</code> / <code>bridge.op.duration_us</code>；</li>
+<li><strong>日志</strong>：超时 WARN（含 op 名、年龄、状态、当前等待者数 + DEBUG 环形历史）；</li>
+<li><strong>泄漏绊线</strong>：终态为 Failed/Canceled 且从未被任何消费模式观察的操作，finalizer 告警
+（对齐 LifecycleBase 终结器泄漏探测）。</li>
+</ul>
+<hr>
+<h2 id="7-状态机可见性原则">7. 状态机可见性原则</h2>
+<blockquote>
+<p><strong>发起线程在把句柄/对象交给调用方之前，必须同步完成&quot;受理&quot;状态转移；完成状态归完成侧线程。</strong></p>
+</blockquote>
+<p>这是 NotStarted 问题（§1）的根因修法，也是 <code>AsyncOperation → Running</code> 同步置位的依据。同样适用
+于生命周期链（P3 落地项）：</p>
+<p><strong>现状</strong>：<code>LifecycleBase.Initialize</code>（<code>Shared/LifecycleBase.cs:278-307</code>）调度后台 task 后立即返回，
+<code>NotStarted → Recovering</code> 的转移发生在<strong>后台 task 真正开跑</strong> <code>OnRecoveryStart</code> 时——调度延迟期间
+调用方观测到 <code>NotStarted</code>，<code>WaitGuardPreCheck</code> 只能靠抛异常防御（<code>:179-188</code>）。</p>
+<p><strong>修法（需 Contracts 小扩展）</strong>：<code>IRecovery</code> 增加 <code>MarkScheduled()</code>（或等价入口），
+<code>Initialize</code> 在 <code>Task.Factory.StartNew</code> <strong>之前</strong>在调用线程同步调用（<code>RecoveryBase</code> 实现为
+CAS <code>NotStarted → Recovering</code>）。效果：<code>Initialize</code> 返回时状态必为 <code>Recovering</code> 或更晚，
+&quot;恢复任务尚未启动&quot;窗口从根上消灭；<code>WaitGuardPreCheck</code> 保留为防御性绊线（不变量验证）。</p>
+<hr>
+<h2 id="8-硬性要求踩过的坑禁止重蹈">8. 硬性要求（踩过的坑——禁止重蹈）</h2>
+<ol>
+<li>❌ <strong>同步等待必须有界</strong>——所有 <code>Wait(timeout)</code> 强制超时；发现无界 <code>.Wait()</code> / <code>GetAwaiter().GetResult()</code>
+新增点 = review 阻断项。超时不是失败，是<strong>诊断入口</strong>（带现场 WARN）。</li>
+<li>❌ <strong>禁止在持锁期间同步等桥操作</strong>——等待者持锁 + 完成者需要该锁 = 必死。桥不做锁检测（成本高），
+靠契约 + 违例时快速超时暴露。</li>
+<li>❌ <strong>桥 work 内禁止同步阻塞 / 再入同桥</strong>——work 是协作式异步契约；再入防护自动抛（§6.3），
+但&quot;work 内 <code>Thread.Sleep</code> / 同步重 IO&quot;只能靠 review 与 watchdog 慢任务告警。</li>
+<li>❌ <strong>禁止把屏障等待改造成桥</strong>——内存序屏障（SpinRWLock / epoch / freeze / 段表水位）等待的是
+微秒级内存不变量，完成者就在本进程临界区生态里；跨线程桥接 = 正确性灾难 + 延迟数量级恶化。
+它们的自旋/yield 现状就是正解。</li>
+<li>✅ <strong>先消除、再桥接</strong>——高频热点（如 <code>S3ObjectStore.cs:353</code> 每请求签名路径的凭据
+<code>GetAwaiter().GetResult()</code>）的正解是<strong>消除同步等待</strong>（凭据缓存 / 改真异步签名），不是给坏结构加桥。</li>
+<li>✅ <strong>发起即受理</strong>——新写的&quot;启动后台操作&quot;API，返回前必须同步置 Running（§7）；
+状态查询多消费者安全，控制流只认终态（对齐 lifecycle.md §4）。</li>
+<li>✅ <strong>测试与源 1:1 + 契约测试</strong>（见 §10）——本组件属 Core 并发原语，无契约测试不许合入。</li>
+</ol>
+<hr>
+<h2 id="9-落地映射分批一点一点来">9. 落地映射（分批，一点一点来）</h2>
+<blockquote>
+<p>硬性要求：每阶段独立 commit + 全绿再进下一阶段；行为变更项（P2/P3）须带回归测试。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>范围</th>
+<th>改造</th>
+<th>模式</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>P0</strong></td>
+<td>新增 <code>Primitives/AsyncOperation.cs</code> + <code>Shared/SyncAsyncBridge.cs</code> + 契约测试（§10）</td>
+<td>新基建</td>
+<td>—</td>
+<td>✅（另增 <code>Run</code>/<code>Run&amp;lt;T&amp;gt;</code> 便捷入口——Start+有界 Wait+失败重抛，同步包装改造的一行式形态）</td>
+</tr>
+<tr>
+<td><strong>P1</strong></td>
+<td><code>IO/IObjectStore.cs:214-251</code> 9 个同步包装</td>
+<td>内部改走桥（静态共享 <code>SyncBridgeOptions</code> 免每调分配），对外签名与行为不变</td>
+<td>桥接</td>
+<td>✅（Copy 族 60s 预算）</td>
+</tr>
+<tr>
+<td><strong>P2</strong></td>
+<td><code>RemoteFileHandle</code> 同步族（Write/Read/PunchHole/CopyRange 快路径/Flush）+ <code>RemoteFileSystem</code> 同步族（Open/Exists/Delete/Move/Enumerate）+ fencing 三处（TryAcquireOrTakeover/Heartbeat/ReleaseLease）</td>
+<td>逐调用桥接；<strong><code>FlushAsync</code> 真异步化</strong>（lock→SemaphoreSlim 异步门、multipart 全 await——异步调用方不再被伪异步阻塞，此为超出原稿的必要改造：桥 work 契约禁止内部阻塞）；fencing 锁不变量：桥完成者（对象层 IO）绝不触碰 <code>_lockGate</code>（<code>Thread.Sleep(15)</code> 重试退避保留——受调用方 deadline 有界）</td>
+<td>桥接 + 状态句柄</td>
+<td>✅（Flush 600s / Copy 60s 预算；验证：Core 1209 + Runtime 501 + S3 契约 30 全绿）</td>
+</tr>
+<tr>
+<td><strong>P3</strong></td>
+<td>生命周期链：<code>LifecycleBase.WaitForReady</code> / <code>priorTask.Wait()</code>（<code>:145,155,247</code>）内部改 tiered 等待；<code>IRecovery.MarkScheduled()</code> + <code>Initialize</code> 状态同步置位（§7）；<code>EntryLog.WaitForCommitAsync</code> 名义异步问题（<code>:333</code>）单独评审</td>
+<td>状态可见性修法</td>
+<td>状态句柄</td>
+<td>⏳ 待下一阶段（需 Contracts 变更，与 Runtime 接入同期）</td>
+</tr>
+<tr>
+<td><strong>不改</strong></td>
+<td>内存序屏障（SpinRWLock/epoch/freeze/段表）；Dispose 终局 join（只补超时诊断）；<code>S3ObjectStore</code> 凭据热点（走&quot;消除&quot;路线：凭据缓存）</td>
+<td>—</td>
+<td>见 §8.4/8.5</td>
+<td>—</td>
+</tr>
+</tbody>
+</table>
+<p>交付备注：</p>
+<ul>
+<li>桥级指标（§6.4 <code>bridge.*</code> 系列）首版未实施——依赖 ObservabilityHub 接线，属后续增强；
+watchdog 慢任务告警（TaskTimeout=5s）已随默认池生效。</li>
+</ul>
+<hr>
+<h2 id="10-测试与验收契约测试矩阵">10. 测试与验收（契约测试矩阵）</h2>
+<blockquote>
+<p>硬性要求：测试与源 1:1（<code>src/X/Y.cs</code> ↔ <code>tests/X/YTests.cs</code>）；并发原语必须有契约测试，禁止 SKIP。</p>
+</blockquote>
+<p><strong><code>tests/TC.Tier.Core.Tests/Primitives/AsyncOperationTests.cs</code></strong></p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>用例要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>计数/状态语义</td>
+<td>终态 CAS 单次生效；重复 Report 幂等 no-op；异常槽观察不重抛；<code>ThrowIfFailed</code> 三分支</td>
+</tr>
+<tr>
+<td>唤醒协议</td>
+<td>N waiter 广播全醒；完成先于等待零丢失；取消传播（等待中 ct 触发 → OCE）；超时边界（deadline 前完成 → true）</td>
+</tr>
+<tr>
+<td>配对绊线</td>
+<td>Failed/Canceled 且无观察 → finalizer 告警（泄漏可见）</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>tests/TC.Tier.Core.Tests/Shared/SyncAsyncBridgeTests.cs</code></strong></p>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>用例要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>基本功能</td>
+<td>成功/失败/取消三轨；<code>Start</code> 返回时 <code>Status == Running</code>（★ 可见性原则的机器验证）</td>
+</tr>
+<tr>
+<td>再入防护</td>
+<td>work 内嵌套 <code>Start</code>+<code>Wait</code>（同池）→ 必抛 InvalidOperationException；注入独立 Scheduler → 通过</td>
+</tr>
+<tr>
+<td>池饿死回归</td>
+<td><strong>专项</strong>：打满公共池（N 个 <code>Task.Run(() =&gt; block)</code>）后桥操作仍在超时内完成——独立池价值的验收测试</td>
+</tr>
+<tr>
+<td>超时规范</td>
+<td>全部同步等待有界；超时返回 false + WARN 现场含 op 名/年龄/状态</td>
+</tr>
+<tr>
+<td>并发压测</td>
+<td>M 线程 × K 操作并发 Start/Wait，无丢失唤醒、无状态机错乱（计数器校验）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>性能基线</strong>（<code>benchmarks/TC.Tier.Core.Benchmarks/</code>，对齐既有基准文化）：
+桥派发税目标——完成即等（无 park）路径 ≤ 2µs（IsolatedTaskScheduler 派发 0.5-1µs + 句柄开销）；
+<code>WaitAsync</code> 已完成快路径 ≤ 100ns。超基线回写 perf 文档。</p>
+<hr>
+<h2 id="11-备选方案与否决理由">11. 备选方案与否决理由</h2>
+<table>
+<thead>
+<tr>
+<th>备选</th>
+<th>否决理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>全部改 <code>Task</code> + <code>WaitAsync</code>，不做句柄</td>
+<td>轮询（多消费者状态查询）与&quot;Start 早、Wait 晚&quot;的延迟等待模式无法用单消费者 Task 表达；且裸 Task 无状态机契约与诊断规范</td>
+</tr>
+<tr>
+<td>裸 <code>Thread.Yield()</code> 循环替代 <code>.Wait()</code></td>
+<td>见 §5.1——无界、不保证完成者获 CPU、无超时；是&quot;看起来异步友好&quot;的反模式</td>
+</tr>
+<tr>
+<td>桥等待用 <code>Task.Wait(timeout)</code>（等 Task 而非事件）</td>
+<td>保留对公共池 continuation 的依赖（work 的 await 后续仍可能排公共池——除非 work 全程 <code>ConfigureAwait(false)</code> 且 IO 真异步）；事件等待 + 独立池执行把依赖面收到最小</td>
+</tr>
+<tr>
+<td>每调用方自建独立池</td>
+<td>违反防扩散护栏；well-known 桥池 + 显式注入是受控中间态</td>
+</tr>
+<tr>
+<td>状态机加 <code>Pending</code> 态</td>
+<td>发起即受理（§7）后 Pending 不可观测——不可观测的状态是复杂度，砍</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="关联文档">关联文档</h2>
+<ul>
+<li>异步原语底座：<a href="async-primitives.html"><code>async-primitives.md</code></a></li>
+<li>独立池使用与陷阱：<a href="dedicated-task-scheduler.html"><code>dedicated-task-scheduler.md</code></a></li>
+<li>生命周期编排：<a href="lifecycle.html"><code>lifecycle.md</code></a> ｜ 网络文件系统同步 API：<a href="io.html"><code>io.md</code></a></li>
+<li>覆盖矩阵：<a href="unit-test-coverage.html"><code>unit-test-coverage.md</code></a></li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/sync-async-bridge.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

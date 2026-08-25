@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / PinnedBufferPool / OverflowPool） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / PinnedBufferPool / OverflowPool） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="原生内存与对象池使用指南alignedmemorymanager--nativearena--pinnedbufferpool--overflowpool">原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / PinnedBufferPool / OverflowPool）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要非托管内存/池化的组件开发者（引擎热路径、对齐缓冲、批量临时区）。
+<strong>回答什么</strong>：四种内存积木怎么选、怎么借怎么还、什么不要做。
+<strong>⚠️ 铁律（先记住）</strong>：非托管内存 GC 不管——<strong>自己 new 的要 Dispose，池里借的要归还</strong>，
+两种都不做 = 真泄漏。完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-选型需求--用哪个">0. 选型（需求 → 用哪个）</h2>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>用</th>
+<th>线程安全</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>单块对齐原生内存</strong>（O_DIRECT/DMA/16B CAS 背板）</td>
+<td><code>AlignedMemoryManager</code></td>
+<td>否（单块单线程读写）</td>
+<td><code>new(size, alignment)</code>，挂到对象即用，Dispose 释放</td>
+</tr>
+<tr>
+<td><strong>短生命周期 bump 分配</strong>（批量/临时缓冲）</td>
+<td><code>NativeArena</code></td>
+<td>否（单线程，建议 ThreadStatic）</td>
+<td>一次分配大块，线性 bump，<code>Reset</code> 复用</td>
+</tr>
+<tr>
+<td><strong>pinned/对齐 buffer 池</strong>（高频 Rent/Return）</td>
+<td><code>PinnedBufferPool</code></td>
+<td>是（全局池多线程安全）</td>
+<td>分桶 + thread-local 栈，热路径零分配</td>
+</tr>
+<tr>
+<td><strong>轻量固定容量对象池</strong>（非内存对象）</td>
+<td><code>OverflowPool&lt;T&gt;</code></td>
+<td>是（多线程安全）</td>
+<td><code>ConcurrentQueue</code>，满则 disposer 回收</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-借还规则最容易错的地方">1. 借还规则（最容易错的地方）</h2>
+<table>
+<thead>
+<tr>
+<th>来源</th>
+<th>归还方式</th>
+<th>说错就错</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>自己 <code>new AlignedMemoryManager(...)</code></td>
+<td><strong><code>Dispose()</code></strong></td>
+<td>不 Dispose = 真泄漏（无 finalizer）</td>
+</tr>
+<tr>
+<td><code>pool.Rent(size)</code> → <code>byte[]</code></td>
+<td><strong><code>pool.Return(buf)</code></strong></td>
+<td>别 Dispose——归还即复用</td>
+</tr>
+<tr>
+<td><code>pool.RentAligned(...)</code> → <code>AlignedMemoryManager</code></td>
+<td><strong><code>pool.ReturnAligned(mem)</code></strong></td>
+<td><strong>不是 Dispose</strong>（池 Reset 复用）；带归属池校验，别交叉归还</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>原文曾有&quot;RentAligned 产物必须 Dispose&quot;的说法——<strong>那是错的</strong>：池产物归还是 <code>ReturnAligned</code>，
+Dispose 会绕过池的复用协议。借了要还、建了要 Dispose，两条路都不可省。</p>
+</blockquote>
+<hr>
+<h2 id="2-alignedmemorymanager--单块对齐原生内存">2. <code>AlignedMemoryManager</code> —— 单块对齐原生内存</h2>
+<pre><code class="lang-csharp">using var mem = new AlignedMemoryManager(size: 4096, alignment: AlignmentConst.Alignment4K);
+
+Span&lt;byte&gt; span = mem.GetSpan();                    // 含校验（对外接口用）
+ref Header h  = ref mem.GetRef&lt;Header&gt;(offset: 0);  // 强类型引用
+Span&lt;byte&gt; fast = mem.GetSpanUnsafe(0, 64);         // 热路径零校验（调用方自证合法）
+unsafe { byte* p = mem.BytePtr; }                   // 原生指针（O_DIRECT pread/pwrite）
+</code></pre>
+<ul>
+<li>继承 <code>MemoryManager&lt;byte&gt;</code>——可给 <code>ReadAsync(Memory&lt;byte&gt;)</code>。</li>
+<li>⚠️ <code>lockPhysicalMemory=true</code>：Linux 需 <code>CAP_IPC_LOCK</code> 或调高 <code>RLIMIT_MEMLOCK</code>；<code>alignment</code> 须 ≥ 系统页大小。</li>
+<li>⚠️ 无 finalizer——不 Dispose 即真泄漏。</li>
+</ul>
+<hr>
+<h2 id="3-nativearena--线性-bump-分配">3. <code>NativeArena</code> —— 线性 bump 分配</h2>
+<pre><code class="lang-csharp">using var arena = new NativeArena(size: 1 &lt;&lt; 20);   // 一次分配整块
+Span&lt;int&gt; nums = arena.Allocate&lt;int&gt;(count: 1024);  // 线性 bump（只前进，无单块 Free）
+arena.Reset();                                      // offset 归零复用（内存不释放）
+</code></pre>
+<ul>
+<li>适合批量/临时缓冲；多线程并发 <code>Allocate</code> 须外部同步。</li>
+<li>有 finalizer 兜底但不保证时效——仍应主动 Dispose。</li>
+</ul>
+<hr>
+<h2 id="4-pinnedbufferpool--pinned对齐-buffer-池旗舰池">4. <code>PinnedBufferPool</code> —— pinned/对齐 buffer 池（旗舰池）</h2>
+<pre><code class="lang-csharp">using var pool = new PinnedBufferPool(maxPerBucket: 64);
+
+// pinned byte[] 池
+byte[] buf = pool.Rent(size: 4097, zeroMemory: false);   // size 向上取整 2 的幂（4097→8192）
+try { /* 用 buf */ }
+finally { pool.Return(buf); }                            // 归还（不是 Dispose）
+
+// 对齐原生内存池
+AlignedMemoryManager mem = pool.RentAligned(size: 4096, alignment: AlignmentConst.Alignment4K);
+try { Span&lt;byte&gt; s = mem.GetSpan(); /* 用 */ }
+finally { pool.ReturnAligned(mem); }                     // 归还（池 Reset 复用，非 Dispose）
+</code></pre>
+<ul>
+<li><strong>size 向上取整到 2 的幂</strong>（最多 50% padding）——别指望精确大小。</li>
+<li><strong>别和 <code>ArrayPool&lt;byte&gt;.Shared</code> 混用</strong>——归还非本池 buffer 会被静默忽略/Dispose。</li>
+<li><code>ReturnAligned</code> 带<strong>池身份校验</strong>：归还非本池产出的会被拒——别交叉归还。</li>
+<li><code>pool.Dispose()</code> 释放所有 buffer（全局栈 + 各 thread-local 栈）。</li>
+</ul>
+<hr>
+<h2 id="5-overflowpoolt--轻量固定容量对象池">5. <code>OverflowPool&lt;T&gt;</code> —— 轻量固定容量对象池</h2>
+<pre><code class="lang-csharp">using var pool = new OverflowPool&lt;MyContext&gt;(size: 32, disposer: ctx =&gt; ctx.Cleanup());
+
+if (pool.TryGet(out MyContext? ctx))   // 借：命中 true / 池空 false（自行 new）
+    ctx.Reuse();
+else
+    ctx = new MyContext();
+pool.TryAdd(ctx);                      // 还：未满入池 true / 满→disposer 回收 false
+</code></pre>
+<ul>
+<li><strong>容量是软约束</strong>（高并发瞬时可能超几个，无正确性影响）。</li>
+<li><strong>disposer 默认 no-op</strong>——对象若持有非托管资源必须传回收回调，否则池满丢弃即泄漏。</li>
+</ul>
+<hr>
+<h2 id="6-决策速查">6. 决策速查</h2>
+<pre><code>我要单块对齐内存（O_DIRECT / CAS 背板）？
+  → new AlignedMemoryManager(size, alignment)。using / Resources。热路径 GetSpanUnsafe。
+
+我要批量临时缓冲（用完整体丢）？
+  → new NativeArena(size)。Allocate/AllocateBytes，用完 Reset 复用或 Dispose。
+
+我要高频 Rent/Return 复用 buffer？
+  → PinnedBufferPool。Rent/Return（pinned 数组）或 RentAligned/ReturnAligned（对齐原生内存）。
+    size 取整 2 幂；别跨池归还；Dispose 释放全部。
+
+我要复用非内存对象（会话/上下文）？
+  → OverflowPool&lt;T&gt;(size, disposer)。TryGet/TryAdd；满则 disposer 回收。
+</code></pre>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/memory.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>可观测性使用指南（ObservabilityHub / Metrics / Tracing） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="可观测性使用指南（ObservabilityHub / Metrics / Tracing） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="可观测性使用指南observabilityhub--metrics--tracing">可观测性使用指南（ObservabilityHub / Metrics / Tracing）</h1>
+
+<blockquote>
+<p>定位：TC.Tier 的<strong>唯一可观测接入点</strong>是 <code>ObservabilityHub</code>——聚合**指标（Metrics）+ 追踪（Tracing）**两个信号，
+构造期把「总开关 × sink/tracer.IsEnabled × 维度开关」三重 AND 折叠成单 bool，热路径只读一个 bool。
+<strong>⚠️ 不含 Logging</strong>——日志是第三信号，独立注入（见 <a href="logging.html"><code>logging.md</code></a>）。
+单测：<code>tests/TC.Tier.Core.Tests/Observability/ObservabilityHubTests.cs</code>（89 测试）+ <code>Metrics/</code>。</p>
+</blockquote>
+<hr>
+<h2 id="0-三信号模型与一句话决策">0. 三信号模型与一句话决策</h2>
+<table>
+<thead>
+<tr>
+<th>信号</th>
+<th>接口</th>
+<th>接入方式</th>
+<th>默认</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>日志</strong></td>
+<td><code>ILogger</code></td>
+<td>上层独立注入 <code>ILoggerFactory</code>，<strong>不经 Hub</strong></td>
+<td><code>NullLogger</code>（零开销）</td>
+</tr>
+<tr>
+<td><strong>指标</strong></td>
+<td><code>IMetricsSink</code></td>
+<td><strong>经 Hub 维度视图</strong>，禁止直调 sink</td>
+<td><code>NullMetricsSink</code>（IsEnabled=false）</td>
+</tr>
+<tr>
+<td><strong>追踪</strong></td>
+<td><code>ITracer</code></td>
+<td><strong>经 Hub</strong>（<code>BeginSpan</code>）</td>
+<td><code>NullTracer</code>（零开销）</td>
+</tr>
+</tbody>
+</table>
+<pre><code>我要打日志？ → ILogger（独立注入）。我要发指标/开 span？ → 经 ObservabilityHub，先判 IsEnabled/TracingEnabled。
+</code></pre>
+<hr>
+<h2 id="1-hub-的获取与装配">1. Hub 的获取与装配</h2>
+<pre><code class="lang-csharp">// ① 宿主装配期（唯一真实配置点）：注入真实 sink/tracer + 配置
+var hub = ObservabilityHub.Create(myMetricsSink, myTracer, new ObservabilityOptions
+{
+    Metrics = new MetricsConfig { Enabled = true, EnableStorageMetrics = true, SampleRate = 20 },
+    Tracing = new TracingConfig { Enabled = true },
+});
+// ② 组件默认 / 无观测需求：零开销单例
+var hub0 = ObservabilityHub.Disabled;        // 所有 IsEnabled=false，热路径短路
+// ③ 高级工厂：显式采样率（0~1 double），且 sink/tracer 非 Null 时自动开对应 Enabled
+var hub2 = ObservabilityHub.Create(sink, null, options, sampleRate: 0.2);
+</code></pre>
+<ul>
+<li><strong>组件接入范式</strong>：底层组件构造只收一个 <code>ObservabilityHub?</code>（<code>null → Disabled</code>），
+存 <code>_hub</code> 字段，用 <code>hub.Metrics</code>/<code>hub.Storage</code> 等子视图——<strong>不直接持有 sink/tracer</strong>。
+（Core 内范例：<code>IsolatedTaskScheduler</code>、<code>CpuSampler</code>——见各使用文档 §可观测。）</li>
+<li><code>ObservabilityOptions</code>：<code>Metrics</code>（<code>MetricsConfig</code>）+ <code>Tracing</code>（<code>TracingConfig</code>），<code>Default</code> 全默认。</li>
+<li><strong>两级短路折叠</strong>：<code>Options.Enabled &amp;&amp; sink/tracer.IsEnabled &amp;&amp; 维度开关</code> 在 ctor 折叠成每视图一个
+<code>_enabled</code> bool——热路径读 bool 短路，<strong>关了就是零开销</strong>（JIT 消除后续分支）。</li>
+</ul>
+<h2 id="2-视图全景5-个">2. 视图全景（5 个）</h2>
+<table>
+<thead>
+<tr>
+<th>视图（Hub 属性）</th>
+<th>开关（MetricsConfig）</th>
+<th>覆盖</th>
+<th>指标名前缀</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Metrics</code></td>
+<td><code>Enabled</code></td>
+<td><strong>三原语透传</strong>：<code>Counter/Histogram/Gauge</code>（自定义指标走这）</td>
+<td>自定</td>
+</tr>
+<tr>
+<td><code>Storage</code></td>
+<td><code>EnableStorageMetrics</code>（默认 true）</td>
+<td>引擎 IO：Read/Write/Flush/Compact/Reclaim/Throttle/QueueDepth</td>
+<td><code>storage.*</code></td>
+</tr>
+<tr>
+<td><code>Log</code></td>
+<td><code>EnableLogMetrics</code>（默认 true）</td>
+<td>Log 结构：Append/Commit/Truncate/BufferFull/Recover</td>
+<td><code>log.*</code></td>
+</tr>
+<tr>
+<td><code>Index</code></td>
+<td><code>EnableIndexMetrics</code>（默认 true）</td>
+<td>Index 结构：Find/Insert/Upsert/Delete/Scan</td>
+<td><code>index.*</code></td>
+</tr>
+<tr>
+<td><code>SegmentAllocator</code></td>
+<td><code>EnableSegmentAllocatorMetrics</code>（默认 <strong>false</strong>，高频按需开）</td>
+<td><strong>段表专用</strong>：Segment 分配/释放/FreeList 深度</td>
+<td><code>segment_allocator.*</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <code>SegmentAllocator</code> 是<strong>段表专用</strong>视图（不是通用 Allocator 原语）——命名即作用域，别的分配器
+别往里塞；需要新维度就加独立视图（partial 文件），不泛化旧视图。</p>
+</blockquote>
+<h3 id="21-指标命名约定">2.1 指标命名约定</h3>
+<p>点号分层 + 单位后缀：<code>storage.read.latency_us</code>、<code>log.append.latency_us</code>、<code>segment_allocator.free_list_depth</code>。
+tag 用 <code>ObservabilityHub.Kv(k, v)</code> 零分配构造；sink 端收到 <code>ReadOnlySpan&lt;KeyValuePair&lt;string,string&gt;&gt;</code>。</p>
+<h3 id="22-三原语怎么选">2.2 三原语怎么选</h3>
+<table>
+<thead>
+<tr>
+<th>原语</th>
+<th>语义</th>
+<th>用于</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Counter</code></td>
+<td>单调累计</td>
+<td>次数/事件（<code>OnThrottle</code>、<code>segment_allocator.alloc</code>）</td>
+</tr>
+<tr>
+<td><code>Histogram</code></td>
+<td>分布</td>
+<td><strong>延迟（<code>_us</code> 后缀）/大小</strong>——别用 Gauge 存延迟</td>
+</tr>
+<tr>
+<td><code>Gauge</code></td>
+<td>瞬时值</td>
+<td>队列深度/水位（<code>OnQueueDepth</code>、<code>free_list_depth</code>）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="3-标准接入代码自包含骨架">3. 标准接入代码（自包含骨架）</h2>
+<pre><code class="lang-csharp">sealed class MyComponent : IDisposable
+{
+    private readonly ObservabilityHub _hub;
+    private readonly KeyValuePair&lt;string, string&gt;[] _nameTag;   // ★ 预构造 tag，热路径零分配
+
+    public MyComponent(ObservabilityHub? hub = null, ILogger? logger = null)
+    {
+        _hub = hub ?? ObservabilityHub.Disabled;                // 默认零开销
+        _nameTag = [ObservabilityHub.Kv(&quot;name&quot;, &quot;my-component&quot;)];
+    }
+
+    public void DoWork()
+    {
+        // 指标关→整段被 JIT 消除；开→计时 + 计数 + 直方图
+        var metrics = _hub.Metrics;
+        var timing = metrics.IsEnabled ? MicroTimer.Start() : default;
+        try { /* 干活 */ }
+        finally
+        {
+            if (timing.IsActive)
+            {
+                metrics.Counter(&quot;mycomponent.work.count&quot;, _nameTag);
+                metrics.Histogram(&quot;mycomponent.work.us&quot;, timing.ElapsedMicros(), _nameTag);
+            }
+        }
+    }
+}
+</code></pre>
+<p>要点（对齐 <code>MicroTimer</code> 的 active=false JIT 消除语义——见 <a href="cache-and-compute.html"><code>cache-and-compute.md</code></a>）：</p>
+<ul>
+<li><strong>先 <code>IsEnabled</code> 一次读</strong>，再决定计时/上报——这是 Hub 全部视图的统一模式。</li>
+<li>tag 数组<strong>预构造</strong>存字段，不要热路径现场拼。</li>
+<li>有既有维度视图就用视图方法（<code>hub.Storage.OnRead(...)</code>），<strong>不要</strong>绕过视图直调 sink
+（丢两级短路 + 采样）；自定义指标才走 <code>hub.Metrics</code> 三原语。</li>
+</ul>
+<h2 id="4-采样确定性百分比非随机">4. 采样（确定性百分比，非随机）</h2>
+<ul>
+<li><code>ShouldSample(ref counter, rate)</code>：<code>counter % 100 &lt; rate</code>——每 100 个事件<strong>精确</strong>采 rate 个、均匀分布、
+<code>Interlocked</code> 线程安全。★ 修复：旧实现 <code>counter % (100/rate) == 0</code> 整数除法截断，
+rate=34 实际 50%、rate=51 实际 100%——概念值大幅偏差；新式零除法对 1..99 精确。</li>
+<li>视图内置按操作独立采样：<code>ShouldSampleRead()/Write()/Flush()/Compact()</code>（Storage）、
+<code>ShouldSampleAppend()/Commit()</code>（Log）、<code>ShouldSampleFind()/Insert()/Upsert()/Delete()/Scan()</code>（Index）、
+<code>ShouldSampleAlloc()</code>（SegmentAllocator）——配合 <code>MicroTimer</code>：<code>var t = hub.Storage.BeginReadSample();</code>
+命中采样才计时。</li>
+<li><strong>背压/错误信号全采、不走采样</strong>：<code>OnThrottle</code>/<code>OnBufferFull</code>/<code>ReportError</code>（这类信号稀有且必须可见）。</li>
+<li><code>SampleRate</code> 配置为 0~100 整数（<code>MetricsConfig.SampleRate</code> 默认 100=全采）；<code>Create(..., sampleRate)</code> 的
+double 0~1 经 <code>ToSamplePercent</code> 四舍五入折叠（0.006→0 全灭的截断 bug 同批修复）。</li>
+</ul>
+<h2 id="5-追踪tracing">5. 追踪（Tracing）</h2>
+<pre><code class="lang-csharp">if (hub.TracingEnabled)                       // ★ 先判，关了 BeginSpan 返回 null
+{
+    using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);
+    span?.SetTag(&quot;entry&quot;, entryId.ToString()); // hub.BeginSpan 返回 ISpan?（关闭时 null）
+    // ... 业务
+}
+</code></pre>
+<ul>
+<li><code>SpanKind</code>：Internal/Server/Client/Producer/Consumer；<code>SpanStatus</code>：Ok/Error（无 Unset）。</li>
+<li><code>ITracer.Current</code> 走 <code>AsyncLocal</code> 父子链——子方法无需传参自动挂在当前 span 下。</li>
+<li><strong>AOT 友好</strong>：纯接口 + 枚举 + AsyncLocal，无反射/Emit。</li>
+<li>⚠️ 两个 BeginSpan 语义差异：裸 <code>ITracer.BeginSpan</code> 恒非 null（<code>NullTracer</code> 返回 <code>NullSpan.Instance</code>，
+<code>using</code> 安全）；<strong><code>hub.BeginSpan</code> 关闭时返回 null</strong>——<code>using var</code> 配 <code>?.</code> 或先判 <code>TracingEnabled</code>。</li>
+<li>追踪默认<strong>关</strong>（高频路径 span 开销大）——按采样率/开关显式启用。</li>
+</ul>
+<h2 id="6-错误上报">6. 错误上报</h2>
+<p><code>hub.ReportError(component, errorCode, detail)</code>——统一 <code>error</code> Counter（tag: component/code）。
+全采不走采样；不抛异常（观测永不影响业务路径）。</p>
+<h2 id="7-宿主接入市面后端otel--prometheus--datadog--控制台">7. 宿主接入市面后端（OTel / Prometheus / Datadog / 控制台）</h2>
+<p>桥接核心思路：<strong>适配到 <code>System.Diagnostics.Metrics</code>（Meter）与 <code>System.Diagnostics.ActivitySource</code></strong>——
+这两者是 .NET 8 BCL 内建、OTel SDK 的标准绑定面。一套适配器即可解锁全部市面后端，<strong>Core 零新增依赖</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>想接的后端</th>
+<th>走法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>OTLP → Datadog / Jaeger / Tempo / Collector</td>
+<td>OTel SDK <code>AddOtlpExporter()</code></td>
+</tr>
+<tr>
+<td>Prometheus（Grafana 拉取）</td>
+<td>OTel SDK <code>AddPrometheusExporter()</code>（点号指标名→下划线由 exporter 处理）</td>
+</tr>
+<tr>
+<td>Azure Monitor / AWS X-Ray 等</td>
+<td>各自 OTel 分发包，绑同一批 Meter/Source</td>
+</tr>
+<tr>
+<td>控制台调试</td>
+<td>§7.1 十行 sink</td>
+</tr>
+</tbody>
+</table>
+<h3 id="71-控制台调试-sink最短路径">7.1 控制台调试 sink（最短路径）</h3>
+<pre><code class="lang-csharp">sealed class ConsoleMetricsSink : IMetricsSink
+{
+    public bool IsEnabled =&gt; true;
+    public void Counter(string name, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+        =&gt; Console.WriteLine($&quot;[C] {name}{FormatTags(tags)}&quot;);
+    public void Histogram(string name, double value, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+        =&gt; Console.WriteLine($&quot;[H] {name} = {value}{FormatTags(tags)}&quot;);
+    public void Gauge(string name, double value, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+        =&gt; Console.WriteLine($&quot;[G] {name} = {value}{FormatTags(tags)}&quot;);
+
+    private static string FormatTags(ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+        =&gt; tags.Length == 0 ? &quot;&quot; : &quot; {&quot; + string.Join(&quot;,&quot;, tags.ToArray().Select(t =&gt; $&quot;{t.Key}={t.Value}&quot;)) + &quot;}&quot;;
+}
+</code></pre>
+<h3 id="72-指标--systemdiagnosticsmetricsotel-标准绑定面">7.2 指标 → <code>System.Diagnostics.Metrics</code>（OTel 标准绑定面）</h3>
+<pre><code class="lang-csharp">using System.Collections.Concurrent;
+using System.Diagnostics.Metrics;
+
+/// IMetricsSink → Meter。Counter/Histogram 直映射；Gauge 是推模型、Meter 是拉模型
+/// （ObservableGauge），用每序列最新值持有器桥接。
+sealed class DiagnosticsMetricsSink : IMetricsSink
+{
+    private readonly Meter _meter;
+    private readonly ConcurrentDictionary&lt;string, Counter&lt;double&gt;&gt; _counters = new();
+    private readonly ConcurrentDictionary&lt;string, Histogram&lt;double&gt;&gt; _histograms = new();
+    private readonly ConcurrentDictionary&lt;string, GaugeState&gt; _gauges = new(StringComparer.Ordinal);
+
+    public bool IsEnabled =&gt; true;   // ★ false = 整条指标链路在 Hub 构造期折叠为关
+
+    public DiagnosticsMetricsSink(string meterName = &quot;TC.Tier&quot;) =&gt; _meter = new Meter(meterName);
+
+    public void Counter(string name, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+        =&gt; _counters.GetOrAdd(name, n =&gt; _meter.CreateCounter&lt;double&gt;(n))
+                    .Add(1, ToTags(tags));
+
+    public void Histogram(string name, double value, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+        =&gt; _histograms.GetOrAdd(name, n =&gt; _meter.CreateHistogram&lt;double&gt;(n))
+                      .Record(value, ToTags(tags));
+
+    public void Gauge(string name, double value, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+    {
+        var tagArr = tags.ToArray();   // ★ ref-like（ReadOnlySpan）不能被 lambda 捕获（CS9108）——先物化
+        _gauges.GetOrAdd(SeriesKey(name, tags), _ =&gt; new GaugeState(_meter, name, tagArr)).Value = value;
+    }
+
+    // Gauge 拉模型桥：持最新值，OTel 采集时读
+    private sealed class GaugeState
+    {
+        public double Value;   // ObservableGauge 回调线程读，写入方为业务线程——volatile 语义足够（double 原子性 x64）
+        public GaugeState(Meter meter, string name, KeyValuePair&lt;string, string&gt;[] tags)
+            =&gt; meter.CreateObservableGauge(name,
+                () =&gt; new[] { new Measurement&lt;double&gt;(Volatile.Read(ref Value), ToTags(tags)) });
+    }
+
+    private static KeyValuePair&lt;string, object?&gt;[] ToTags(ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+    {
+        var arr = new KeyValuePair&lt;string, object?&gt;[tags.Length];
+        for (var i = 0; i &lt; tags.Length; i++) arr[i] = new(tags[i].Key, tags[i].Value);
+        return arr;
+    }
+
+    private static string SeriesKey(string name, ReadOnlySpan&lt;KeyValuePair&lt;string, string&gt;&gt; tags)
+    {
+        if (tags.Length == 0) return name;
+        var sb = new System.Text.StringBuilder(name);
+        foreach (var t in tags) sb.Append(',').Append(t.Key).Append('=').Append(t.Value);
+        return sb.ToString();
+    }
+}
+</code></pre>
+<h3 id="73-追踪--activitysourceotel-标准绑定面">7.3 追踪 → <code>ActivitySource</code>（OTel 标准绑定面）</h3>
+<pre><code class="lang-csharp">using System.Diagnostics;
+
+sealed class ActivityTracer : ITracer
+{
+    private readonly ActivitySource _source;
+    public ActivityTracer(string name = &quot;TC.Tier&quot;) =&gt; _source = new ActivitySource(name);
+
+    public bool IsEnabled =&gt; _source.HasListeners();
+
+    // SpanKind 与 ActivityKind 枚举值同构（Internal..Consumer = 0..4）——直接强转
+    public ISpan BeginSpan(string name, SpanKind kind = SpanKind.Internal)
+        =&gt; _source.CreateActivity(name, (ActivityKind)kind) is { } a
+            ? new ActivitySpan(a.Start())
+            : Tracing.NullSpan.Instance;   // ★ 无监听者→必须返回非 null（协议：BeginSpan 恒非 null）
+
+    // 桥接场景父子链经 Activity.Current（原生 AsyncLocal）自然传递，本接口 Current 无需实现
+    public ISpan? Current =&gt; null;
+
+    private sealed class ActivitySpan : ISpan
+    {
+        private readonly Activity _a;
+        public ActivitySpan(Activity a) =&gt; _a = a;
+        public void SetTag(string key, string? value) =&gt; _a.SetTag(key, value);
+        public void SetTag(string key, long value) =&gt; _a.SetTag(key, value);
+        public void SetStatus(SpanStatus status, string? description = null)
+            =&gt; _a.SetStatus(status == SpanStatus.Ok ? ActivityStatusCode.Ok : ActivityStatusCode.Error, description);
+        public void AddEvent(string name) =&gt; _a.AddEvent(new ActivityEvent(name));
+
+        public void RecordException(Exception ex)   // net8 无 Activity.AddException（.NET 9+），按 OTel 惯例打事件
+            =&gt; _a.AddEvent(new ActivityEvent(&quot;exception&quot;, tags: new ActivityTagsCollection {
+                { &quot;exception.type&quot;, ex.GetType().FullName },
+                { &quot;exception.message&quot;, ex.Message },
+                { &quot;exception.stacktrace&quot;, ex.StackTrace } }));
+
+        public void Dispose() =&gt; _a.Dispose();   // Activity.Dispose = Stop + 恢复父 Activity.Current
+    }
+}
+</code></pre>
+<h3 id="74-宿主装配">7.4 宿主装配</h3>
+<pre><code class="lang-csharp">// ① Hub 挂上两个适配器
+var hub = ObservabilityHub.Create(
+    new DiagnosticsMetricsSink(&quot;TC.Tier&quot;), new ActivityTracer(&quot;TC.Tier&quot;),
+    new ObservabilityOptions
+    {
+        Metrics = new MetricsConfig { Enabled = true },
+        Tracing = new TracingConfig { Enabled = true },
+    });
+
+// ② OTel SDK 绑同一批 Meter/ActivitySource（NuGet：OpenTelemetry.Extensions.Hosting + 选 exporter 包）
+//    services.AddOpenTelemetry()
+//        .WithMetrics(m =&gt; m.AddMeter(&quot;TC.Tier&quot;).AddOtlpExporter())          // → Collector/Datadog/…
+//        .WithTracing(t =&gt; t.AddSource(&quot;TC.Tier&quot;).AddOtlpExporter())
+//    换 .AddPrometheusExporter() 即 Prometheus/Grafana 拉取模式。
+</code></pre>
+<p><strong>成本与边界（诚实说明）</strong>：</p>
+<ul>
+<li>tag 转换（<code>ReadOnlySpan&lt;KVP&lt;string,string&gt;&gt;</code> → <code>KVP&lt;string,object?&gt;[]</code>）在适配器里分配——但只发生在
+<strong>已过 Hub 短路 + 采样</strong>之后的调用上（关/未采样根本不进 sink），属宿主显式选择的成本。</li>
+<li><code>IsEnabled =&gt; true</code> 意味着 Hub 侧开关全权由 <code>MetricsConfig.Enabled</code> + 维度开关控制；桥接器自己不折叠。</li>
+</ul>
+<h2 id="8-测试场景组件测试怎么验证可观测">8. 测试场景（组件测试怎么验证可观测）</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>模式（Core 单测现行做法）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>指标确实发了</td>
+<td>挂<strong>捕获 sink</strong>（<code>IMetricsSink</code> 计数版，用并发安全集合——任务可能在私有线程上发）+ <code>MetricsConfig.Enabled=true</code>，断言计数 ≥N / 含某指标名；异步路径用 <code>SpinWait.SpinUntil</code> 等执行侧指标（入队在运行前发、执行在后发的时序差）</td>
+</tr>
+<tr>
+<td>关了就零发射</td>
+<td>同一 sink 挂上但 <code>Metrics.Enabled=false</code> → 断言 sink 三集合全空（验证短路折叠）</td>
+</tr>
+<tr>
+<td><code>Disabled</code> 默认零开销</td>
+<td><code>ObservabilityHub.Disabled</code> 所有视图 <code>IsEnabled=false</code> + <code>MetricsEnabled/TracingEnabled=false</code></td>
+</tr>
+<tr>
+<td>维度开关独立</td>
+<td><code>EnableSegmentAllocatorMetrics=false</code>（默认）→ 该视图 <code>IsEnabled=false</code>，其余不受影响</td>
+</tr>
+<tr>
+<td>采样确定性</td>
+<td><code>ShouldSample</code> 每 100 精确 rate 个（数学契约由单测锁边界表：0/1/50/99/100）；各视图 <code>ShouldSampleXxx</code> 独立计数互不干扰</td>
+</tr>
+<tr>
+<td>背压/错误全采</td>
+<td><code>OnThrottle</code>/<code>OnBufferFull</code>/<code>ReportError</code> 不受 <code>SampleRate</code> 影响</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-硬性要求">9. 硬性要求</h2>
+<ul>
+<li>❌ <strong>绝不</strong>直调 <code>IMetricsSink</code>——一律经 Hub 视图（两级短路 + 采样 + 维度开关全在视图里）。</li>
+<li>❌ <strong>绝不</strong>热路径不判 <code>IsEnabled</code>/<code>TracingEnabled</code> 就格式化/计时/开 span。</li>
+<li>❌ <strong>绝不</strong>热路径现场构造 tag 数组——预构造字段（<code>ObservabilityHub.Kv</code>）。</li>
+<li>❌ <strong>绝不</strong>把 <code>ILogger</code> 塞进 Hub / 在 <code>ObservabilityOptions</code> 里找日志级别——三信号各自独立（<a href="logging.html"><code>logging.md</code></a>）。</li>
+<li>✅ 延迟用 <code>Histogram</code>（<code>_us</code> 后缀），瞬时值用 <code>Gauge</code>，次数用 <code>Counter</code>。</li>
+<li>✅ 新组件只收 <code>ObservabilityHub?</code>（null→<code>Disabled</code>），不收 sink/tracer 具体类型。</li>
+</ul>
+<hr>
+<h2 id="关联文档">关联文档</h2>
+<ul>
+<li>日志（第三信号，独立注入）：<a href="logging.html"><code>logging.md</code></a> ｜ 积木全景：<a href="../COORDINATION.html"><code>../COORDINATION.md</code></a> §3</li>
+<li>计时原语 <code>MicroTimer</code>：<a href="cache-and-compute.html"><code>cache-and-compute.md</code></a> ｜ 组件接入范例：<code>IsolatedTaskScheduler</code>（<a href="dedicated-task-scheduler.html">dedicated-task-scheduler.md</a> §6）、<code>CpuSampler</code>（<a href="worker-loop.html">worker-loop.md</a> §7）</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/observability.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

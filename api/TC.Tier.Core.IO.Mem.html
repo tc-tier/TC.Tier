@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.IO.Mem | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.IO.Mem | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO.Mem">
+
+  <h1 id="TC_Tier_Core_IO_Mem" data-uid="TC.Tier.Core.IO.Mem" class="text-break">Namespace TC.Tier.Core.IO.Mem</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html">MemoryFileSystem</a></h4>
+      <section><p>内存文件系统——path-keyed 中立内存介质（IFileSystem 平权实现）。</p>
+<p>★ 构造：<a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html#TC_Tier_Core_IO_Mem_MemoryFileSystem_Default">Default</a> 全局单例（稀疏、不限容量、Dispose=no-op）/
+  <a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html#TC_Tier_Core_IO_Mem_MemoryFileSystem_New_TC_Tier_Core_IO_Mem_MemoryFileSystemOptions_TC_Tier_Core_Logging_ILogger_">New(MemoryFileSystemOptions?, ILogger?)</a> 私有卷（Capacity 配额 + Sparse/Reserved 分配模式）。
+  ★ 测试隔离纪律：需要隔离的测试一律 New() 私有卷——Default 的路径空间全局共享。</p>
+<p>★ 身份：path 唯一（无数字 id）。open 时 path→(槽, 代际) 解析一次，热路径零字典开销。</p>
+<p>★ 内部并发模型（三窗口防护，D5）：
+  在途读者（微秒级）= per-fs <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a>（Reserved 模式数据面锁外拷贝）；
+  长活观察者（句柄/映射）= 槽引用计数 + Detached 延迟回收 + SlotData 引用计数（直址映射钉住旧 buffer）；
+  槽身份复用 = 代际 bump（ABA 防护，双检 + 空检）；
+  写者×替换（Grow 换租）= freeze 两步替换屏障（epoch 的盲区——写者不进 epoch）。
+  Sparse 模式数据面 = per-file Gate（<a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html">MemoryFileSystem.SparseLayout</a> 自带锁——不同文件并行、同文件互斥）：
+  ① 锁序不变式：唯一合法嵌套 = fs._lock → Gate（单向），持 Gate 禁取 fs._lock（推长度先出 Gate）；
+  ② 可见性顺序：写者"页先就位（Gate 内）→ 长度后发布（fs 锁）"——读者见新长度 ⇒ 页必已可读；
+  ③ 在途 IO × 回收：数据面持 Gate 后代际+layout 引用双检；回收方 fs 锁内摘身份后空获取 Gate
+    （DrainLayoutGate）等在途退出才还页（页级进一步无锁化/CAS 页分配位仍为后续方向）。</p>
+<p>★ Dispose = 拔盘（与磁盘"离开目录"方向相反）：全部槽归还池（含 Detached），此后句柄操作抛
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.DetachedFile.html">MemoryFileSystem.DetachedFile</a></h4>
+      <section><p>已摘除的文件负载（DetachFile/InstallFile 转移——compactor promote 原语）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystemOptions.html">MemoryFileSystemOptions</a></h4>
+      <section><p>内存文件系统选项（medium-protocol-and-parity-design §6——继承 <a class="xref" href="TC.Tier.Core.IO.FileSystemOptions.html">FileSystemOptions</a> 基类）。</p>
+<p>★ 基类三成员在此介质全部生效：Access（包络执法）、QuotaBytes（物理占用计费——G3 改名归一，
+  -1 = 无上限）、Label（P4 落位）。</p>
+<p>★ 用户决策维 = 内存预算（Sparse 省内存）vs 访问性能（Reserved 直址零分配）。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryAllocationMode.html">MemoryAllocationMode</a></h4>
+      <section><p>内存分配模式。</p>
+<p><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryAllocationMode.html#TC_Tier_Core_IO_Mem_MemoryAllocationMode_Sparse">Sparse</a>：真稀疏——按页写时分配，用多少占多少（PunchHole 真释放页归还池）。</p>
+<p><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryAllocationMode.html#TC_Tier_Core_IO_Mem_MemoryAllocationMode_Reserved">Reserved</a>：创建即占——文件单块连续直址（保留现状槽直址语义），Map 零拷贝；
+  建议配 MemoryFileSystemOptions.QuotaBytes 形成硬配额。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

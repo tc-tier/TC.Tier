@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Log（EntryLog）性能基线 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Log（EntryLog）性能基线 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="logentrylog性能基线">Log（EntryLog）性能基线</h1>
+
+<blockquote>
+<p>现行版 Log 独有压测报表（首建——旧架构基准套件 §4 Log 数字出自旧 Structures/{Index,Log,Ring}
+40 文件套件（旧 API 形态），随缺口收尾清理，已过时。注：Log 非泛型——entry 为原始字节流，
+无 key 类型参数）。数字实测于本机
+（i5-12400 / .NET 8.0.30 / x64 RyuJit AVX2），文件系统=内存文件系统（写路径纯 CPU 口径，引擎 IO 噪声为零；
+本地文件系统另行对照）。</p>
+</blockquote>
+<h2 id="配置">配置</h2>
+<ul>
+<li>EntryLog（PageSize=8K / Managed meta / 组提交默认策略——字节量/条数/时间间隔三维阈值自动落盘）</li>
+<li>entry 64B；count 50 万；批变体 512/批</li>
+<li>运行：
+<pre><code class="lang-bash">dotnet run -c Release --project benchmarks/TC.Tier.Runtime.Benchmarks -- --log-write-probe 500000 64
+</code></pre>
+</li>
+</ul>
+<h2 id="数字">数字</h2>
+<table>
+<thead>
+<tr>
+<th>变体</th>
+<th style="text-align: right;">吞吐</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>single（单条 Append）</td>
+<td style="text-align: right;"><strong>1.34M op/s（~745ns/op）</strong></td>
+<td>并发安全化（写路径粗锁）：相对旧无锁版 1.38M <strong>-3%</strong>（Monitor 快速路径 ~20ns/entry）——单写者语义完全保持（水位零改动）</td>
+</tr>
+<tr>
+<td>batch（BeginAppendBatch 512）</td>
+<td style="text-align: right;"><strong>5.49M op/s（~182ns/op）</strong></td>
+<td>批持锁（Begin/Dispose 各一次）——批内本地游标零锁——与旧版 5.4M <strong>持平</strong></td>
+</tr>
+<tr>
+<td>concurrent（8 写者并发 Append）</td>
+<td style="text-align: right;"><strong>~2.1M op/s</strong></td>
+<td>锁竞争下吞吐（正确性确定——串行语义）；并发价值 = API 契约安全（public Append 多线程调用不损坏），非吞吐扩展</td>
+</tr>
+<tr>
+<td>recovery（50 万条重开）</td>
+<td style="text-align: right;"><strong>9 ms</strong></td>
+<td>页帧扫盘 + meta 水位恢复</td>
+</tr>
+</tbody>
+</table>
+<h2 id="对照同机同形mem">对照（同机同形，mem）</h2>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th style="text-align: right;">Log</th>
+<th style="text-align: right;">Ring</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单条写</td>
+<td style="text-align: right;">720ns</td>
+<td style="text-align: right;">906ns（lock 分配）</td>
+<td>Log 略快（单写者无锁）</td>
+</tr>
+<tr>
+<td>批量写</td>
+<td style="text-align: right;">5.40M op/s</td>
+<td style="text-align: right;">6.07M op/s（8 写者批窗口）</td>
+<td>同量级</td>
+</tr>
+<tr>
+<td>恢复</td>
+<td style="text-align: right;">9ms/50 万</td>
+<td style="text-align: right;">45-60ms 底盘</td>
+<td>Log 快一个量级（无索引重建）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="结论">结论</h2>
+<ul>
+<li><strong>并发安全已交付（终案——写路径粗锁）</strong>：public Append/Flush/TruncateSuffix 多线程并发调用
+安全（串行化——不损坏）；API 契约对齐 Ring。代价 = 单写者 -3%（Monitor 快速路径）、批持平
+（批持锁摊薄）——<strong>最小损失方案</strong>。</li>
+<li><strong>模型选型（最终方案）</strong>：窗口模型（双页 ping-pong 强套并发——页状态机/原子段分配/
+换页仲裁）存在未定位的偶发失败且负优化（-29%/-64%），未采用；每写者页缓冲（写者零共享）适配面大（水位/
+TailAddress/TruncateSuffix 是单写者语义深度耦合——并发化需全面语义改造），未采用；粗锁（单写者语义保持、
+水位零改动、零新竞态面）为最终方案——<strong>并发安全以正确性确定为前提，不以吞吐扩展为目标</strong>。</li>
+<li>全量 855 绿 ×6 连过。</li>
+</ul>
+<h2 id="维护">维护</h2>
+<ul>
+<li>改动 Log 写路径（Append/页缓冲/flush/组提交）后必须重跑本探针并更新数字（性能论断须实测）。</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/perf/log-perf-baseline.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

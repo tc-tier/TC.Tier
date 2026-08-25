@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Core/Collections——并发优先级队列使用指南 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Core/Collections——并发优先级队列使用指南 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="corecollections并发优先级队列使用指南">Core/Collections——并发优先级队列使用指南</h1>
+
+<blockquote>
+<p><strong>定位</strong>：三个<strong>线程安全</strong>优先级队列实现，覆盖不同优先级形态与并发模型。非线程安全场景用
+.NET 内置 <code>PriorityQueue&lt;T,P&gt;</code>（单线程基线，性能对照见 <a href="perf/priority-queues-performance.html">perf/priority-queues-performance.md</a>）。</p>
+<p><strong>实验版本声明</strong>：<code>AsyncPriorityQueueV2</code> / <code>AsyncPriorityQueueV3</code> 是<strong>设计验证实验</strong>
+（<code>[Experimental]</code> + <code>internal</code>，测试默认 Skip）——不可用于生产；
+生产异步队列一律 <code>AsyncPriorityQueue&lt;T&gt;</code>（Route A 基线——设计稿的删除协议演进路线：直接引用 + marker 节点 + GC 回收，即当前实现）。</p>
+</blockquote>
+<hr>
+<h2 id="1-选型速查">1. 选型速查</h2>
+<table>
+<thead>
+<tr>
+<th>你的场景</th>
+<th>用什么</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>优先级是少量离散枚举（4~16 级，如任务等级/调度带）</td>
+<td><strong><code>BucketPriorityQueue&lt;TP,T&gt;</code></strong></td>
+<td>数组桶 + <code>ConcurrentQueue</code>——单次往返 ~52 ns，8 线程近线性（34.6 Mops/s）；think-time/毒丸柱塞全负载下最稳（perf §5）——<strong>没有短板的全维度王</strong></td>
+</tr>
+<tr>
+<td>优先级任意取值 + 高吞吐 + 临界区短且持锁者不被外部长延迟</td>
+<td><strong>自建一把 <code>lock</code> + 内置 <code>PriorityQueue&lt;T,long&gt;</code></strong></td>
+<td>2026-08-17 对照实测（perf §2/§4/§5.1）：8 线程 32.0 Mops/s、单线程 305ns、think-time 下 p50/max 全场最优。⚠️ <strong>柱塞边界（perf §5.2）</strong>：持锁者被抢占/GC/页错误时全队 max 放大数百倍——延迟敏感场景换 Bucket/Async</td>
+</tr>
+<tr>
+<td>优先级是任意 <code>int</code> 且需要免疫持锁者延迟（别人的延迟不通过锁传播）</td>
+<td><strong><code>AsyncPriorityQueue&lt;T&gt;</code></strong></td>
+<td>无锁跳表——8 线程 12.6 Mops/s、256K 积压 1.3µs。⚠️ 分配率 1.3KB/op 在 Workstation GC 下尾延迟 22~170ms（perf §5）——延迟敏感需 Server GC 或 B' 零分配路线（设计稿的免分配变体，尚未实施）</td>
+</tr>
+<tr>
+<td>优先级任意 <code>long</code> + 中低并发 / 零分配路径 / 无锁 <code>TryPeek</code></td>
+<td><strong><code>SkipListPriorityQueue&lt;T&gt;</code></strong>（修复后）</td>
+<td>单线程 466ns、8 线程 9.4 Mops/s、分配 92 B/op、think-time 135K ops/s——健康可用的细分锁选项（perf §4.2）。吞吐优先仍选自建大锁+堆（领先 3~4×，perf §2）</td>
+</tr>
+<tr>
+<td>需要 <code>DequeueAsync</code> 异步等待且高并发出队</td>
+<td>Bucket / Async / SkipList（修复后皆可）</td>
+<td>等待机制各异（§3）；SkipList 修复后 4C+4P 全收齐（修复前 30s 不收敛——perf §4）</td>
+</tr>
+<tr>
+<td>单线程 / 无并发</td>
+<td>.NET 内置 <code>PriorityQueue&lt;T,P&gt;</code></td>
+<td>非线程安全但最快（~11 ns）</td>
+</tr>
+<tr>
+<td>想用 V2/V3 实验版</td>
+<td><strong>禁止</strong>（生产）</td>
+<td>实验——非生产；仅设计记录与对照实验</td>
+</tr>
+</tbody>
+</table>
+<p><strong>共同契约</strong>（三实现一致）：</p>
+<ul>
+<li><strong>值小者优先</strong>（min-heap 语义）；同优先级 <strong>FIFO</strong>（sequence 单调递增保证）。</li>
+<li><code>Enqueue</code> 从不阻塞；<code>TryDequeue/TryPeek</code> 非阻塞（空返 false）；<code>DequeueAsync(ct)</code> 异步等待。</li>
+<li><code>Count</code> 并发下<strong>近似值</strong>（诊断/监控用，不做同步决策依据）。</li>
+<li><code>Dispose</code> 幂等；唤醒全部等待者（等待者通常经 ct 退出，Dispose 是无 ct 调用者的兜底）。</li>
+<li>入队/出队混合下的<strong>长时间总量平衡</strong>由调用方保证（无界队列不设背压——worker 模型经上游限流）。</li>
+</ul>
+<hr>
+<h2 id="2-三实现语义细节">2. 三实现语义细节</h2>
+<h3 id="21-bucketpriorityqueue离散枚举桶">2.1 BucketPriorityQueue——离散枚举桶</h3>
+<pre><code class="lang-csharp">enum TaskLevel : short { Critical = 0, High = 1, Normal = 2, Batch = 3 }
+
+using var q = new BucketPriorityQueue&lt;TaskLevel, MyTask&gt;();
+q.Enqueue(task, TaskLevel.High);
+if (q.TryDequeue(out var next)) { }          // 严格按枚举值升序：Critical → High → Normal → Batch
+if (q.TryPeek(out var peek)) { }             // 只看不取
+var item = await q.DequeueAsync(ct);         // 空则异步等待（许可模型，见 §3.1）
+</code></pre>
+<ul>
+<li><strong>构造即定桶</strong>：桶数 = 枚举值数量（<code>Enum.GetValues</code>），运行期不可变。枚举定义新增值 = 桶数变化——
+<strong>队列是实例级绑定，跨版本序列化场景注意</strong>。</li>
+<li>入队 = <code>ConcurrentQueue.Enqueue</code>（无锁）；出队 = 按枚举值升序扫桶（单消费者接近 wait-free）。</li>
+<li><strong>性能特征</strong>：出队成本 O(桶数/扫描命中)，与元素数无关——积压百万项时优势扩大。</li>
+</ul>
+<h3 id="22-skiplistpriorityqueue任意-long-优先级">2.2 SkipListPriorityQueue——任意 long 优先级</h3>
+<pre><code class="lang-csharp">using var q = new SkipListPriorityQueue&lt;Deadline&gt;(maxLevel: 31);   // 默认 31，一般不动
+q.Enqueue(work, deadlineTicks);        // 任意 long（如 DateTime.UtcNow.Ticks）
+if (q.TryDequeue(out var earliest)) { }   // 值最小（最早截止）先出
+</code></pre>
+<ul>
+<li><strong>key = (priority &lt;&lt; 48) | sequence</strong>：priority 占高 16 位、sequence 低 48 位——同优先级严格 FIFO。
+★ 由此 <strong>priority 实际有效域是 16 位</strong>（-32768~32767 之外的值会互相重叠）——用 Ticks 这类宽值域
+时必须先映射/压缩到 16 位桶（如&quot;分钟级时间片 + 槽内序号&quot;）。</li>
+<li>细粒度锁：每节点一把 <code>SpinLock</code>，hand-over-hand——不同区间的插入/删除并行；同区间操作排队。
+<strong>全层级 lazy validate</strong>（Herlihy 论文协议）：标记删除前校验所有层 preds 仍指向 victim——标记即完整摘除，
+marked 节点永为瞬态（曾只校验 level-0，高层 marked 滞留导致 Find 退化 O(n)，2P+2C 20 万项 86s→0.2s）。</li>
+<li><strong>maxLevel 护栏</strong>：构造校验 <code>[1, 31]</code>；⚠️ 层级不足时查找退化 O(n)（2^maxLevel 应 ≥ 预期条目数——
+实测 maxLevel=5 @ 20 万条 = 33µs/op vs 31 层 = 0.3µs/op）。</li>
+<li><strong>内存回收简单</strong>：unlink + 解锁后节点安全可回收（GC 语义，无 epoch/hazard pointer）。</li>
+<li><strong>并发扩展真相</strong>：严格优先级 + FIFO 语义使同优先级全部尾插同一点、所有消费者抢同一个 min——
+吞吐上限由这两个串行热点决定，而非锁粒度。⚠️ 优先队列负载（DeleteMin 全打队头）令细粒度锁的
+&quot;区间并行&quot;收益为零，validate 重试是纯浪费功——与&quot;一把 <code>lock</code> + 内置 <code>PriorityQueue</code>&quot;基线相比
+<strong>全维度落后</strong>（对照见 <a href="perf/priority-queues-performance.html">perf/priority-queues-performance.md</a> §2/§4，
+⚠️ 该记录为修复前压测，修复后本机 2P+2C 混合 86.9s→0.2s、8P Enqueue 7.1 M/s，数字待复测）。
+本类定位是<strong>细分锁实现</strong>（简单、任意 long 优先级、消费者少、无锁 <code>TryPeek</code>）；
+<strong>无锁高吞吐场景用 <code>AsyncPriorityQueue</code></strong>（Route A 生产基线），离散枚举优先级用 <code>BucketPriorityQueue</code>。</li>
+<li>算法依据：Herlihy &amp; Shavit, &quot;A Simple Optimistic Skip-List Algorithm&quot; (DISC 2006, lazy 版本)。</li>
+</ul>
+<h3 id="23-asyncpriorityqueue无锁跳表生产基线-route-a">2.3 AsyncPriorityQueue——无锁跳表（生产基线 Route A）</h3>
+<pre><code class="lang-csharp">using var q = new AsyncPriorityQueue&lt;WorkItem&gt;();    // epoch 参数保留兼容——Route A 后 GC 回收，传 null 即可
+q.Enqueue(item, priority: 3);                        // int 优先级
+if (q.TryDequeue(out var top)) { }
+</code></pre>
+<ul>
+<li><strong>无锁出队</strong>：跳表 + Marker 逻辑删除（delete-min 标记后 splice 物理摘除）——无锁队列的
+DeleteMin 经典难点由 marker 协议解决。</li>
+<li><strong>协议修复（压测驱动，共三处）</strong>：① 尾插（succs==null）高层也 CAS 链接——否则持续
+尾插负载下高层索引永不建立，Find 退化线性扫描（256K 积压实测 ≥1.9ms/op，修复后 1.5µs）；
+② 发布规范——node 全部 Forward 字段在 level-0 发布前写完（发布后的普通写会覆盖并发删除者的
+Marker，令已删节点&quot;复活&quot;）；③ 高层标记 CAS 重试到落地——标记会被 Find 的 helping splice
+同字段竞态打败，留下&quot;已出队但高层未标&quot;的悬挂僵尸，最终演化为全体自旋的<strong>活性死锁</strong>
+。修复后单线程 423ns（原 1156ns）、8 线程 13.3 Mops/s。</li>
+<li><strong>Route A 内存策略</strong>：节点交给 <strong>GC</strong> 回收（不再依赖 epoch——构造参数 <code>LightEpoch?</code> 仅为兼容保留，
+传共享实例或 null 均可）。V2/V3 探索的槽位复用/非移动内存是其实验方向。</li>
+<li><strong>DEBUG 自检</strong>：每 64 次操作巡检 level-0 链不变式（key 严格递增/marker 链长 ≤1/步数护栏）——
+Release 零开销；结构损坏在 DEBUG 构建当场爆，不带病运行。<strong>注意</strong>：活性死锁不破坏链结构，
+校验器对它不报警——活性回归靠 <code>--pq-wedge</code> 复现器与楔死看门狗测试兜底。</li>
+</ul>
+<hr>
+<h2 id="3-dequeueasync-等待机制差异三个实现三种模型">3. DequeueAsync 等待机制差异（三个实现三种模型）</h2>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th>等待机制</th>
+<th>唤醒语义</th>
+<th>适用注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bucket</td>
+<td><strong>一项一许可</strong> <code>SemaphoreSlim</code>（上限 int.MaxValue）</td>
+<td>MPMC <strong>公平逐项唤醒</strong>：每次 Enqueue 精确唤醒一个等待者</td>
+<td>多消费者公平性最好；许可与项 1:1，拿许可后 TryDequeue 必中（极端竞争错过则重试自洽）</td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td><code>AsyncManualResetEvent</code> 模型：Reset → 再试 → Wait</td>
+<td>Set 广播——全部等待者醒来抢（败者回睡）</td>
+<td>惊群规模 = 等待者数；消费者少时无差别</td>
+</tr>
+<tr>
+<td>Async</td>
+<td>同 SkipList（fast-path 直返 + 慢路径事件等待）</td>
+<td>同上</td>
+<td>DequeueAsync 有 fast-path：队列非空零等待开销</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">// 典型 worker 消费循环（三实现通用）：
+while (!ct.IsCancellationRequested)
+{
+    WorkItem item;
+    try { item = await q.DequeueAsync(ct); }
+    catch (OperationCanceledException) { break; }    // ct 退出是正道；Dispose 唤醒是兜底
+    Process(item);
+}
+</code></pre>
+<h2 id="4-常见陷阱">4. 常见陷阱</h2>
+<ol>
+<li><strong>SkipList priority 是 16 位有效域</strong>（key 编码所限）——宽值域（Ticks/大权重）必须先压缩映射，
+否则不同优先级互相折叠、顺序错乱。</li>
+<li><strong>Bucket 的枚举即桶布局</strong>——枚举值 discontinuous（如 <code>A=1, B=100</code>）会建 101 个桶（中间全空扫），
+定义尽量从 0 连续。</li>
+<li><strong><code>Count</code> 是近似值</strong>（各实现内部 Interlocked 读，瞬时态）——不能用于&quot;等 Count==0 再做 X&quot;的同步协议，
+用 <code>TryDequeue</code> 返回值或外部信号。</li>
+<li><strong>Dispose 不清空元素</strong>——只唤醒等待者并封禁后续操作（<code>ObjectDisposedException</code>）；残余元素由 GC
+回收（引用类型元素若持有非托管资源需先排空再 Dispose）。</li>
+<li><strong>无背压</strong>——入队永不阻塞不拒绝；生产速率失控时内存无界增长，须由上游限流/有界信箱约束。</li>
+<li><strong>单线程别用这三者</strong>——线程安全的代价（Bucket 4.7× / SkipList 30× / Async 38× 于内置
+<code>PriorityQueue</code>，见 perf 文档）；单线程场景内置队列碾压。</li>
+<li><strong>SkipList 的 maxLevel 必须够用</strong>——2^maxLevel 应 ≥ 预期条目数（构造有护栏），层级不足时查找
+退化 O(n)（实测 maxLevel=5 @ 20 万条 = 33µs/op vs 31 层 = 0.3µs/op）。多消费者高吞吐负载吞吐
+落后大锁 3~4×（perf §2），吞吐优先自建大锁+内置堆。</li>
+<li><strong>V2/V3 在 Release 程序集里 internal</strong>——编译期不可达（<code>[Experimental]</code> 诊断拦截 + 测试默认 Skip）；
+引用它们 = 引用实验，生产代码审查直接拒绝。</li>
+</ol>
+<h2 id="5-与其他文档的关系">5. 与其他文档的关系</h2>
+<ul>
+<li>性能基线（单线程混合往返 / <strong>并发吞吐矩阵 / 积压敏感性 / 并发正确性压测</strong>）：<a href="perf/priority-queues-performance.html">perf/priority-queues-performance.md</a></li>
+<li>worker 消费循环模式：<a href="worker-loop.html">worker-loop.md</a></li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/priority-queues.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>资源统一管理（ResourceGroup） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="资源统一管理（ResourceGroup） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="资源统一管理resourcegroup">资源统一管理（ResourceGroup）</h1>
+
+<blockquote>
+<p><strong>全部资源管理必须统一走 <code>ResourceGroup</code></strong>——禁止自建 <code>_disposables</code> 列表、禁止手动管释放顺序。
+它解决两个老大难：<strong>释放顺序</strong>（自动逆序）与<strong>泄漏</strong>（构造期/异常路径漏释放）。
+完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-硬性要求一句话">0. 硬性要求（一句话）</h2>
+<p><strong>凡是随实例生命周期需要释放的资源（<code>IDisposable</code>/<code>IAsyncDisposable</code>），一律 <code>Resources.Add(...)</code> 进 <code>ResourceGroup</code>，绝不自己管。</strong></p>
+<p><code>LifecycleBase.Resources</code> 已内建一个 <code>ResourceGroup</code>——所有 <code>LifecycleBase</code> 派生类直接用 <code>Resources.Add(...)</code>，Dispose 时由基类<strong>自动逆序</strong>释放。</p>
+<hr>
+<h2 id="1-为什么强制统一">1. 为什么强制统一</h2>
+<table>
+<thead>
+<tr>
+<th>自己管的坑</th>
+<th><code>ResourceGroup</code> 的解法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>释放顺序错</strong>——先释放被依赖的资源，后释放依赖方 → use-after-dispose / 异常</td>
+<td><strong>逆序释放</strong>：按注册的反序，天然满足&quot;依赖方先释放&quot;</td>
+</tr>
+<tr>
+<td><strong>构造期异常泄漏</strong>——构造到一半抛异常，已 new 的资源没人释放</td>
+<td>进了 <code>Resources</code> 的，异常路径也由组统一回收</td>
+</tr>
+<tr>
+<td><strong>双释放</strong>——外部注入的资源，自己 Dispose 又被外部 Dispose</td>
+<td><code>Referenced</code> 所有权：只跟踪诊断、不释放</td>
+</tr>
+<tr>
+<td><strong>散落的 <code>_disposables</code> 列表 / <code>_owner</code> 字段</strong>——每个类各搞一套，生命周期分散</td>
+<td>统一进 <code>Resources</code>，<code>LifecycleBase</code> 编排</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-用法">2. 用法</h2>
+<h3 id="21-注册owned-vs-referenced">2.1 注册（<code>Owned</code> vs <code>Referenced</code>）</h3>
+<pre><code class="lang-csharp">// Owned（默认）：Dispose 时由组释放。本实例 new 的、拥有所有权的资源。
+Resources.Add(_engine);
+Resources.Add(metaEngine, &quot;meta&quot;);          // 带名（可按名 Get）
+
+// Referenced：外部注入，只跟踪诊断、不释放（防双释放）。
+Resources.Add(sharedEpoch, ownership: ResourceOwnership.Referenced);
+</code></pre>
+<h3 id="22-注册时机">2.2 注册时机</h3>
+<ul>
+<li>构造期 <code>new</code> 出的资源：构造器里 <code>Resources.Add(...)</code>（保证异常路径也能回收）。</li>
+<li><code>OnInitializeBegin</code> 里才创建的资源：在那里 <code>Resources.Add(...)</code>。</li>
+</ul>
+<blockquote>
+<p>⚠️ 不要在 <code>OnInitializeComplete</code>/使用期才注册核心资源——恢复失败路径可能漏释放。</p>
+</blockquote>
+<h3 id="23-查资源">2.3 查资源</h3>
+<pre><code class="lang-csharp">var engine = Resources.Get&lt;IStorageEngine&gt;(&quot;meta&quot;);   // 按名 + 类型，不按下标
+</code></pre>
+<hr>
+<h2 id="3-所有权判定owned-vs-referenced">3. 所有权判定（Owned vs Referenced）</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>所有权</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本实例 <code>new</code> 的、用完该由本实例释放</td>
+<td><code>Owned</code>（默认）</td>
+<td>Dispose 时组释放</td>
+</tr>
+<tr>
+<td>外部注入、外部管生命周期（共享对象）</td>
+<td><code>Referenced</code></td>
+<td>只跟踪诊断，<strong>不释放</strong>（否则双释放）</td>
+</tr>
+<tr>
+<td>不确定</td>
+<td>倾向 <code>Referenced</code></td>
+<td>双释放会崩；漏释放最多是泄漏（更安全）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="嵌套资源组层级释放">嵌套资源组（层级释放）</h3>
+<p>子组件自有 <code>ResourceGroup</code> 时，<strong>子组以 <code>Owned</code> 注册到父组</strong>，形成层级释放链——父组释放时触发子组完整释放，保证跨层级顺序正确。</p>
+<pre><code class="lang-csharp">// 子组件
+public sealed class ChildComponent : IDisposable
+{
+    private readonly ResourceGroup _resources = new();
+    // ... 子组件自己的资源进 _resources
+}
+
+// 父组件注册子组件（整个子组作为一个 Owned 资源）
+Resources.Add(childComponent);   // Owned——父 Dispose 时触发 child._resources 逆序释放
+</code></pre>
+<p>❌ <strong>反模式</strong>：把子组件的资源逐个拆出来注册到父组——破坏组件封装，极易出现顺序错误。</p>
+<h3 id="异步释放">异步释放</h3>
+<p><code>ResourceGroup</code> 完整实现 <code>IAsyncDisposable</code>——<code>DisposeAsync</code> 按注册逆序执行异步释放，聚合所有异步异常。含异步释放逻辑的资源（等刷盘完成、优雅退出后台线程）优先走 <code>DisposeAsync</code>，避免同步 <code>Dispose</code> 阻塞等待死锁。</p>
+<hr>
+<h2 id="4-要求与硬性规则">4. 要求与硬性规则</h2>
+<ul>
+<li>✅ 资源必须实现 <code>IDisposable</code> 或 <code>IAsyncDisposable</code>（至少其一）。</li>
+<li>✅ <strong>全部</strong>资源进 <code>Resources</code>——构造器里的、<code>OnInitializeBegin</code> 里的，一个都不能漏。</li>
+<li>✅ 查资源用 <code>Resources.Get&lt;T&gt;(&quot;name&quot;)</code>，不按下标。</li>
+<li>❌ <strong>绝不</strong>自建 <code>_disposables</code> 列表 / <code>_owner</code> 字段 / 手写 <code>Dispose</code> 释放顺序——全进 <code>Resources</code>。</li>
+<li>❌ <strong>绝不</strong>把外部注入资源当 <code>Owned</code>（双释放）——用 <code>Referenced</code>。</li>
+<li>❌ <strong>绝不</strong>绕过 <code>LifecycleBase.Dispose</code> 自管释放——核心清理基类已做，子类只 override <code>DisposeOverride(bool)</code> 做额外清理（见 <a href="lifecycle.html"><code>lifecycle.md</code></a>）。</li>
+</ul>
+<hr>
+<h2 id="5-范式">5. 范式</h2>
+<pre><code class="lang-csharp">public sealed class MyStore : LifecycleBase&lt;MyHints&gt;
+{
+    private readonly IStorageEngine _engine;
+    private readonly IStorageEngine _metaEngine;
+
+    public MyStore(MyHints hints) : base(hints)
+    {
+        _engine = /* 自己 new 的 */ ...;
+        _metaEngine = /* 自己 new 的 */ ...;
+        Resources.Add(_engine);                       // Owned（默认）
+        Resources.Add(_metaEngine, &quot;meta&quot;);           // Owned + 命名
+    }
+
+    protected override void OnInitializeBegin()
+    {
+        var sharedEpoch = /* 外部注入的共享 epoch */;
+        Resources.Add(sharedEpoch, ownership: ResourceOwnership.Referenced);  // 只跟踪不释放
+        _engine.Initialize(/* hints */);
+    }
+
+    // 不写 Dispose 释放顺序——LifecycleBase + ResourceGroup 自动逆序释放。
+    // 只在需要额外清理时 override：
+    protected override void DisposeOverride(bool disposing) { /* 非托管额外清理 */ }
+}
+</code></pre>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/resource-management.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

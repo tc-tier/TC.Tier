@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class SyncAsyncBridge | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class SyncAsyncBridge | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="同步-异步桥（docs/sync-async-bridge.md &#167;6）——&amp;quot;写路径必须同步转异步&amp;quot;的统一出口。 ★ ：在独立池上发起异步工作，立即返回  状态句柄   （返回时状态已同步置 Running——可见性原则）。调用方继续本地逻辑，最后时刻才 Wait（&quot;Start 早、Wait 晚&quot;）。 ★ /：一次性便捷入口（Start + 有界 Wait + 失败重抛）——   同步 API 桥接的常规形态，替代裸 GetAwaiter().GetResult()。 ★ 死锁拆解：异步工作跑 （IsolatedTaskScheduler 私有线程，   continuation 回流私有线程）——推进不依赖公共池可用性；同步等待者 park 在事件上（非 Task.Wait），   无同步上下文回流、无完成边缘内联续体语义模糊。 ★ 再入防护：桥 work 体内再经同一池同步等待 = 池自锁（M 线程全 park 等嵌套 work）→    快速失败（InvalidOperationException）。嵌套场景注入独立 Scheduler 分池豁免；   跨池嵌套等待必须无环（DAG，对齐 WaitForDependenciesAsync 纪律）。 ★ work 契约：协作式异步——await 让出、不阻塞（M 很小，阻塞任务直接饿死同池操作，   对齐 dedicated-task-scheduler.md &#167;7.2 教训）。真正无法异步化的同步重 IO 由调用方注入 own 单线程实例。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge">
+
+
+
+  <h1 id="TC_Tier_Core_Shared_SyncAsyncBridge" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge" class="text-break">Class SyncAsyncBridge</h1>
+  <div class="markdown level0 summary"><p>同步-异步桥（docs/sync-async-bridge.md §6）——&quot;写路径必须同步转异步&quot;的统一出口。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>：在独立池上发起异步工作，<b>立即</b>返回 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a> 状态句柄
+  （返回时状态已同步置 Running——可见性原则）。调用方继续本地逻辑，最后时刻才 <code>Wait</code>（"Start 早、Wait 晚"）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Run__1_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask___0___TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Run&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;, SyncBridgeOptions?, CancellationToken)</a>：一次性便捷入口（Start + 有界 Wait + 失败重抛）——
+  同步 API 桥接的常规形态，替代裸 <code>GetAwaiter().GetResult()</code>。</p>
+<p>★ 死锁拆解：异步工作跑 <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_DefaultScheduler">DefaultScheduler</a>（IsolatedTaskScheduler 私有线程，
+  continuation 回流私有线程）——推进<b>不依赖公共池可用性</b>；同步等待者 park 在事件上（非 Task.Wait），
+  无同步上下文回流、无完成边缘内联续体语义模糊。</p>
+<p>★ 再入防护：桥 work 体内再经<b>同一池</b>同步等待 = 池自锁（M 线程全 park 等嵌套 work）→
+  <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a> 快速失败（InvalidOperationException）。嵌套场景注入独立 <code>Scheduler</code> 分池豁免；
+  跨池嵌套等待必须无环（DAG，对齐 WaitForDependenciesAsync 纪律）。</p>
+<p>★ work 契约：<b>协作式异步</b>——<code>await</code> 让出、不阻塞（M 很小，阻塞任务直接饿死同池操作，
+  对齐 dedicated-task-scheduler.md §7.2 教训）。真正无法异步化的同步重 IO 由调用方注入 own 单线程实例。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><span class="xref">SyncAsyncBridge</span></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
+  <h5 id="TC_Tier_Core_Shared_SyncAsyncBridge_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class SyncAsyncBridge</code></pre>
+  </div>
+  <h3 id="fields">Fields
+</h3>
+
+
+  <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_DefaultTimeoutMs" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.DefaultTimeoutMs">DefaultTimeoutMs</h4>
+  <div class="markdown level1 summary"><p>同步等待默认超时（ms）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int DefaultTimeoutMs = 15000</code></pre>
+  </div>
+  <h5 class="fieldValue">Field Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_SyncAsyncBridge_DefaultScheduler_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.DefaultScheduler*"></a>
+  <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_DefaultScheduler" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.DefaultScheduler">DefaultScheduler</h4>
+  <div class="markdown level1 summary"><p>桥默认独立池（M = Clamp(ProcessorCount,2,4) 私有线程，watchdog 开）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static IsolatedTaskScheduler DefaultScheduler { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run*"></a>
+  <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask},TC.Tier.Core.Shared.SyncBridgeOptions,System.Threading.CancellationToken)">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>一次性同步桥接：发起 + 有界等待 + 失败重抛。</p>
+<p>★ 超时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>（含 AsyncOperation.Describe 现场 + WARN 日志）——
+  同步 API 有界纪律的机器强制。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void Run(Func&lt;CancellationToken, ValueTask&gt; work, SyncBridgeOptions? options = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</td>
+        <td><span class="parametername">work</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Shared.SyncBridgeOptions.html">SyncBridgeOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run*"></a>
+  <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_Run__1_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask___0___TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run``1(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask{``0}},TC.Tier.Core.Shared.SyncBridgeOptions,System.Threading.CancellationToken)">Run&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;, SyncBridgeOptions?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>带返回值的一次性同步桥接（结果经闭包槽传递：ReportSucceeded 前写入，
+Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static T Run&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt; work, SyncBridgeOptions? options = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;T&gt;&gt;</td>
+        <td><span class="parametername">work</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Shared.SyncBridgeOptions.html">SyncBridgeOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="xref">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="typeParameters">Type Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span class="parametername">T</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_Shared_SyncAsyncBridge_Start_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Start*"></a>
+  <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Start(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask},TC.Tier.Core.Shared.SyncBridgeOptions,System.Threading.CancellationToken)">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>在独立池上发起异步工作，立即返回状态句柄。</p>
+<p>★ 可见性原则：返回时 AsyncOperation.Status 必为 Running——"已受理"不依赖被调度。</p>
+<p>★ 高级形态（"Start 早、Wait 晚"）：发起后继续本地逻辑，最后时刻才 Wait。常规同步桥接直接用 <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>。</p>
+<p>⚠️ 有界队列满时 <code>StartNew</code> 阻塞入队线程（生产者背压，防御性有界——docs/sync-async-bridge.md §6.2）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static AsyncOperation Start(Func&lt;CancellationToken, ValueTask&gt; work, SyncBridgeOptions? options = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</td>
+        <td><span class="parametername">work</span></td>
+        <td><p>异步工作体（协作式契约：await 让出、不阻塞、不再入同池同步等待）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Shared.SyncBridgeOptions.html">SyncBridgeOptions</a></td>
+        <td><span class="parametername">options</span></td>
+        <td><p>桥选项（null = 全默认）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">cancellationToken</span></td>
+        <td><p>传给 work 的取消令牌（取消由 work 协作响应）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>内存文件系统使用指南（MemoryFileSystem &#183; memory:） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="内存文件系统使用指南（MemoryFileSystem &#183; memory:） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="内存文件系统使用指南memoryfilesystem--memory">内存文件系统使用指南（MemoryFileSystem · <code>memory:</code>）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：要极速吞吐（直址零拷贝、纳秒级元数据）或测试隔离的人。
+<strong>回答什么</strong>：怎么构造、双分配模式怎么选、Dispose 语义、怎么持久化、模拟边界在哪。
+四类文件系统的公共契约（<code>IFileSystem</code>/<code>IFileHandle</code> 打开/读写/FileExtra/句柄池）见 <a href="io.html"><code>io.md</code></a>
+——本篇只讲内存文件系统的差异面。⚠️ 与 <a href="memory.html"><code>memory.md</code></a>（原生内存与池）是两回事。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话定位">0. 一句话定位</h2>
+<p><strong>内存文件系统 = 生产级极速文件系统</strong>——直址零拷贝、纳秒级元数据，引擎端到端 ~0.5 µs/op。
+&quot;易失&quot;是机制属性不是概念缺席：<strong>持久化 = 运行时导出镜像</strong>（<code>RootSpaceImage</code>，四类文件系统全部支持，
+见 <a href="io.html"><code>io.md</code></a> §5.2）。需要极速吞吐、数据生命周期 = 进程生命周期的场景（缓存、计算中间态、
+高频写临时区）首选；单元测试/CI 无需本地盘也是它的主场。</p>
+<h2 id="1-构造">1. 构造</h2>
+<pre><code class="lang-csharp">using var mem = TierFs.Open(&quot;memory:&quot;);                  // 私有卷（测试隔离——推荐）
+using var mem2 = TierFs.Open(&quot;memory:?label=test-a&quot;);    // 命名卷
+using var fs = TierFs.New(&quot;memory:&quot;);                    // New = 建空镜像
+
+// 全局共享盘（⚠️ 路径空间跨实例共享——测试隔离一律用私有卷）
+using var g = MemoryFileSystem.Default;
+</code></pre>
+<ul>
+<li><strong><code>fs.Dispose</code> = &quot;拔盘&quot;</strong>：销毁卷（数据内存可能复用，必须失效）——已开句柄抛
+<code>ObjectDisposedException</code>（与本地/网络的&quot;离开目录&quot;语义相反，最反直觉的一条）。</li>
+<li>测试隔离一律 <code>TierFs.Open(&quot;memory:&quot;)</code> 私有卷；<code>TC_TEST_FS_SPEC</code> 可零重编译切换介质。</li>
+</ul>
+<h2 id="2-双分配模式选型">2. 双分配模式（选型）</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Sparse</strong></th>
+<th><strong>Reserved</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>分配</td>
+<td>按页占用（页粒度记账）</td>
+<td>创建即占（全量预留）</td>
+</tr>
+<tr>
+<td>读</td>
+<td>物化映射 / 页粒度</td>
+<td><strong>直址零拷贝</strong>（无锁数据面：epoch 读者 + freeze 屏障，读写双高）</td>
+</tr>
+<tr>
+<td>写</td>
+<td>per-file RW Gate（读共享写独占）+ <strong>免清零租借</strong>（整页覆写零清零税）+ <strong>预分配物理化</strong>（<code>PreallocateSize</code> = 物理预留纯 memcpy 热道）</td>
+<td>锁外读写</td>
+</tr>
+<tr>
+<td>映射</td>
+<td>物化副本（Flush/Dispose 才写回）</td>
+<td>直址实时可见（<code>Memory&lt;byte&gt;</code> 无法只读化——静默写透，已知平权偏差）</td>
+</tr>
+<tr>
+<td>适合</td>
+<td>通用、需要映射视图</td>
+<td>高并发写密集同文件、极速读写</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>实测（io-performance §10）：Reserved 锁外读写 6× 扩展；Sparse 2-8 线程读写并存可用。
+高并发写密集同文件选 Reserved。</p>
+</blockquote>
+<h2 id="3-持久化dispose-即丢不">3. 持久化（&quot;Dispose 即丢&quot;？不）</h2>
+<p>内存文件系统<strong>无原地持久化层</strong>（介质内没有比进程内存更持久的层）——持久化点 = 运行时导出：</p>
+<pre><code class="lang-csharp">using (var out_ = File.Create(&quot;snapshot.tca&quot;))
+    RootSpaceImage.Capture(mem, out_);            // 导出存档（静默快照，稀疏/Extra 全保真）
+using var disk = TierFs.New(&quot;local:///data/x&quot;);
+RootSpaceImage.Restore(File.OpenRead(&quot;snapshot.tca&quot;), disk);   // 还原到任意文件系统
+</code></pre>
+<p>&quot;易失&quot; ≠ &quot;非生产&quot;：内存态运行 + 导出成档 = 与&quot;运行 + fsync&quot;同一概念的两个投影
+（详见 <a href="io.html"><code>io.md</code></a> §5.2——4 源 × 4 目标 16 格全成立）。</p>
+<h2 id="4-模拟边界诚实表达">4. 模拟边界（诚实表达）</h2>
+<ul>
+<li><strong>已支持</strong>：目录树、文件时间戳（目录时间不追踪，Stat 诚实 MinValue/null）、DIO 行为保真
+（512 模拟几何——测试期抓对齐 bug，防切本地文件系统生产爆炸）、范围锁（进程内区间表）、
+卷锁（进程内真锁——自旋互斥，行为保真）。</li>
+<li><strong>不模拟</strong>：跨进程可见性、ACL、符号链接、大小写不敏感（Ordinal 对齐 Linux）。</li>
+</ul>
+<h2 id="5-陷阱">5. 陷阱</h2>
+<ol>
+<li><strong>Sparse 映射写时差</strong>：视图写 Flush/Dispose 才写回——实时可见用 Reserved 或 Write 路径。</li>
+<li><strong><code>Default</code> 全局共享</strong>：路径空间跨实例共享——测试隔离一律私有卷。</li>
+<li><strong>拔盘后操作</strong>：已开句柄抛 <code>ObjectDisposedException</code>；槽复用/强制转移后操作抛
+<code>FileIOException(NotFound)</code>（代际防护——清晰异常非静默串数据）。</li>
+<li><strong>扇区对齐</strong>：DIO 对齐基 = 512 模拟几何（行为保真，非真实设备）。</li>
+</ol>
+<h2 id="6-想深入指路">6. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>公共契约（打开/读写/FileExtra/句柄池）</td>
+<td><a href="io.html"><code>io.md</code></a></td>
+</tr>
+<tr>
+<td>性能（双模式/并发扩展）</td>
+<td><a href="perf/io-performance.html"><code>perf/io-performance.md</code></a> §10</td>
+</tr>
+<tr>
+<td>原生内存与池（<code>AlignedMemoryManager</code>/<code>PinnedBufferPool</code>——注意不是本文件系统）</td>
+<td><a href="memory.html"><code>memory.md</code></a></td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/memory-file-system.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

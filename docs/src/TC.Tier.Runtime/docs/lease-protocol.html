@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Lease 协议使用指南（六类型 &#183; 三阶段 &#183; 三态迭代） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Lease 协议使用指南（六类型 &#183; 三阶段 &#183; 三态迭代） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="lease-协议使用指南六类型--三阶段--三态迭代">Lease 协议使用指南（六类型 · 三阶段 · 三态迭代）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：IO 引擎层（<code>Storage/IO</code>）开发者、所有调 <code>SegmentTable.{X}Lease(...)</code> 的人。
+<strong>回答什么</strong>：我要做追加/覆写/回收/截断/整理——用哪个 lease、怎么遍历 chunk、什么时候 Commit、
+失败怎么办。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲与三条硬性要求">0. 一句话总纲与三条硬性要求</h2>
+<p><strong>lease = IO 层与段表之间的唯一交互协议</strong>。每个操作类型是一个独立的类型化 lease，
+对段表 / 物理段 / 稳态的要求由类型自身表达。</p>
+<ol>
+<li><strong>等待只有一个合法宿主：lease 协议</strong>。物理门（Empty→Ready）的等待点 = chunk 流水线第一拍 +
+类型声明的提交扫尾。段表不等待、worker 不等待、池不等待。</li>
+<li><strong>类型即协议</strong>。禁止 kind 字节路由、禁止合并协议、禁止把某类型的要求放进共享路径。</li>
+<li><strong>段表是核心</strong>，物理段 = IO 层对段表统一事件的实现（见 <a href="segment-table.html">segment-table.md</a>）。</li>
+</ol>
+<hr>
+<h2 id="1-选型表需求--lease-类型">1. 选型表（需求 → lease 类型）</h2>
+<table>
+<thead>
+<tr>
+<th>我要…</th>
+<th>用</th>
+<th>关键语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>追加写新数据（地址由段表分配）</td>
+<td><code>AppendLease(length)</code></td>
+<td>推双尾；物理门有</td>
+</tr>
+<tr>
+<td>只分配地址不写（预留空间）</td>
+<td><code>AllocateLease(length)</code></td>
+<td>无 lease 对象，返回 <code>(Start, End)</code>；占位 Committed+sparse</td>
+</tr>
+<tr>
+<td>覆写已提交区间（地址已知）</td>
+<td><code>WriteLease(start, length)</code></td>
+<td>不动水位；物理门有（快路径）</td>
+</tr>
+<tr>
+<td>回收中间区间（打洞归零抹数据）</td>
+<td><code>ReclaimLease(from, to)</code></td>
+<td><strong>[from,to) 可跨段</strong>——按段切 chunk 逐块 PunchHole；水位不动；无门</td>
+</tr>
+<tr>
+<td>回收头部（删整段）</td>
+<td><code>ReclaimHeadLease(to)</code></td>
+<td>跨段删除 + 尾段打洞；<code>MinAddress</code> 推进；无门</td>
+</tr>
+<tr>
+<td>截断尾部（退水位）</td>
+<td><code>ReclaimTailLease(newTail)</code></td>
+<td><strong>仅退双尾</strong>（无打洞）；独占双尾（不并发）；无门</td>
+</tr>
+<tr>
+<td>整理空洞（搬移压缩）</td>
+<td><code>CompactLease(from, to)</code></td>
+<td>overlay 原子替换段（一把锁内 invalidate+replace）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>主推模型</strong>（性能最优，实测快 ~23%）：一次 <code>AllocateLease</code> 大空间定地址 + 批量 <code>WriteLease</code> 写
+（Write 不推 CommittedTail）。</p>
+<hr>
+<h2 id="2-通用协议结构全部类型共享leasebase">2. 通用协议结构（全部类型共享，<code>LeaseBase</code>）</h2>
+<p>三阶段生命周期：</p>
+<pre><code>① 占住（构造即完成）          ② 锁外 IO（你写数据的地方）        ③ 终态（Commit/Rollback/Dispose）
+  AcquireExtentsForLease        遍历 chunk → 每块 IO →             整体 Commit() / Rollback()
+  逐 chunk 占区间（段表切分）    chunk.Commit()/Rollback()           最后增量者触发 FinalizeTerminalCore
+</code></pre>
+<ul>
+<li><strong>chunk 终态仲裁 doneMask 位掩码 exactly-once</strong>：部分/整体 × 提交/回滚四路径共用单一仲裁——
+每个 chunk 恰好一次终态，重复 Commit/Rollback 是 no-op，<strong>不会重复扣账</strong>。</li>
+</ul>
+<p><strong>区间终态的分界线 = 物理真相</strong>（不是&quot;成功/失败&quot;——这是最容易记错的一点）：</p>
+<table>
+<thead>
+<tr>
+<th>终态</th>
+<th>适用场景</th>
+<th>读门</th>
+<th>为什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Committed+sparse</code></td>
+<td>打洞成功 / Allocate 占位</td>
+<td>✅ 可读（读零）</td>
+<td>物理上<strong>确实全是零</strong></td>
+</tr>
+<tr>
+<td><code>Committed</code></td>
+<td>Append/Write chunk 提交成功</td>
+<td>✅ 可读（真实数据）</td>
+<td>内容为真</td>
+</tr>
+<tr>
+<td><code>Wasted</code></td>
+<td><strong>Append/Write chunk 回滚</strong></td>
+<td>❌ 阻断（可被 Write 覆写）</td>
+<td>地址已消费，但内容<strong>物理未知</strong>——宣称读零 = 读出垃圾</td>
+</tr>
+<tr>
+<td><code>Aborted</code></td>
+<td>Reclaim 打洞失败</td>
+<td>❌（只 Compact 修）</td>
+<td>永久洞</td>
+</tr>
+</tbody>
+</table>
+<p>判定口诀：<strong>物理上真是零 → Committed+sparse；内容未知 → Wasted</strong>。&quot;失败 = 提交 0&quot;只在物理上真是零
+的场景成立；回滚覆写旧数据的场景不成立。</p>
+<ul>
+<li><strong>Dispose 语义</strong>：未终态 chunk 的回滚扫尾 + 终态收敛——<code>using</code> 忘了显式 Commit 不会泄漏区间。</li>
+<li><strong>物理门</strong>（<code>EnterChunkPhysicalGate</code>）：基类无门；<strong>Append/Write override 等 Empty→Ready</strong>；Reclaim
+系无门。门在迭代器/索引器里自动过，调用者无需手动调。</li>
+</ul>
+<h2 id="3-chunk-遍历apichunkscope三态模式">3. chunk 遍历（API：<code>ChunkScope</code>——三态模式）</h2>
+<p>每个 lease 的区间被段表切成 ≥1 个 chunk（跨段必多块）。<code>ChunkScope</code> 是只读几何 + 分段终态：
+<code>Commit()</code>（本块提交）/ <code>Rollback()</code>（本块回滚）。</p>
+<pre><code class="lang-csharp">using var lease = table.AppendLease(length);
+
+// foreach——完整迭代器（推荐默认；自动过物理门）
+foreach (var chunk in lease)
+{
+    await WriteAsync(chunk.SegId, chunk.SegOff, data);   // 锁外 IO（你的部分）
+    chunk.Commit();                                       // 本块终态
+}
+lease.Commit();                                           // 整体：推 CommittedTail
+</code></pre>
+<ul>
+<li><strong>流水线规则</strong>：chunk 逐块提交可以乱序（doneMask 仲裁），但<strong>整体 <code>lease.Commit()</code> 前所有块必须已
+终态</strong>——Append 的扫尾会对未提交块补物理门再收尾。整块失败 → <code>lease.Rollback()</code>（或直接 Dispose）。</li>
+<li>需要随机访问/重试单块时用下标 <code>lease[i]</code>（索引器含物理门）；需要操作枚举器本身时用显式迭代器
+（<code>MoveNext</code> 已过物理门，<code>iter.CommitCurrent()</code>）。</li>
+</ul>
+<h2 id="4-各类型速查卡权威表压缩版">4. 各类型速查卡（权威表压缩版）</h2>
+<h3 id="appendlease追加最频繁">AppendLease（追加——最频繁）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>语义</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围</td>
+<td>从 <code>AllocatedTail</code> 分配 [start,end)；Empty 段合法（注册即 Empty，不阻塞分配）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>物理门</td>
+<td><strong>有</strong>——每个 chunk IO 前等 Empty→Ready</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>chunk 提交</td>
+<td>Leased→Committed，<code>AdvanceOffset</code>；到顶自动 Ready→Full + <code>OnSegmentFull</code> + 预建下一段</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>chunk 回滚</td>
+<td>→Wasted（可覆写空洞），<strong>水位照推</strong>（地址已消费不可逆）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>整体收敛</td>
+<td><code>AppendFinalize(End)</code>：推 <code>CommittedTail</code>（precise-prefix，max-CAS 幂等）</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="writelease覆写">WriteLease（覆写）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>语义</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围</td>
+<td>覆写 [start,start+length)；<strong>目标区间必须 ≤ CommittedTail 且可占（Committed/Wasted）</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>物理门</td>
+<td><strong>有</strong>（显式声明；常态走快路径零开销）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>chunk 提交</td>
+<td>Leased→Committed（去 sparse，落真实覆写）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>chunk 回滚</td>
+<td>→Wasted</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>整体收敛</td>
+<td><strong>无</strong>（目标区间本就 ≤ CommittedTail，推尾即错误前进）</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reclaimlease中间回收--段上打洞">ReclaimLease（中间回收 = 段上打洞）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>语义</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围</td>
+<td>[from,to) 打洞（<strong>可跨段</strong>——逐块 PunchHole 物理归零抹除数据）；区间<strong>保持 Committed+sparse</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>物理门</td>
+<td><strong>无</strong>（作用于已提交区间，物理已存在）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>chunk 提交</td>
+<td>→Committed+sparse（打洞成功终态记录）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>chunk 回滚</td>
+<td>→Aborted（<strong>永久洞，只 Compact 修</strong>）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>三支柱</td>
+<td>只动<strong>段区间</strong>；段/水位不变</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reclaimheadlease头部回收--打洞--跨段删除--推头">ReclaimHeadLease（头部回收 = 打洞 + 跨段删除 + 推头）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>语义</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围</td>
+<td>[MinAddress, to)：to 前整段删除 + to 段 [0,to.Offset) 打洞</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>物理门</td>
+<td><strong>无</strong>（删除不依赖物理就绪）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>Commit/Rollback</td>
+<td><strong>都推 <code>MinAddress</code></strong>（物理删段不可逆）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>物理联动</td>
+<td>删段文件由引擎在 lease 外执行（先 meta Remove+Flush 再删）；lease 不做 IO</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="reclaimtaillease尾截断--仅退双尾">ReclaimTailLease（尾截断 = 仅退双尾）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>语义</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围</td>
+<td>截断 [newTail, AllocatedTail)——<strong>无跨段打洞，段区间状态机不参与</strong>（游标即裁决）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>前置</td>
+<td><code>MinAddress ≤ newTail &lt; AllocatedTail</code>；<strong>独占双尾</strong>（与其它 ReclaimTail 不并发；Append 退避不阻塞）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>Commit/Rollback</td>
+<td>都退水位（物理截断不可逆）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>物理联动</td>
+<td>IO 层跟随 <code>SetLength</code>；段表侧到此为止</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h3 id="compactlease整理--overlay-拷贝--段表原子替换">CompactLease（整理 = overlay 拷贝 + 段表原子替换）</h3>
+<p><strong>使用契约</strong>：<strong>创建（独占占住全部目标区间）→ 完成全部物理 IO/搬移 → 最后一次性 <code>Commit()</code></strong>。
+区间码 <code>CompactLeased</code> 是独占模式——占住持续整个整理期间，<strong>不支持 chunk 级提交/释放</strong>（部分释放
+会破坏&quot;一把锁内全部段原子替换&quot;的不变量）；物理 IO 未全部完成不得提交（完整性绊线拦截 Pending chunk）。
+代价模型：目标区间在整理全程对写者关闭（引擎侧 Compacting 排他）——大范围整理用 RangeCompact 分片。</p>
+<p><strong>独立协议</strong>：<code>sealed class CompactLease : IDisposable</code>——<strong>不继承 LeaseBase</strong>（无 chunk 流水线/
+doneMask/物理门，模型是&quot;占住 → 搬移 → 整体替换&quot;两阶段）。调用方是引擎 Compact 子系统（compactor），
+业务侧入口是引擎的 <code>StartCompact()</code> / <code>StartRangeCompact()</code>。</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>语义</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>范围</td>
+<td>[from,to)——全量 Compact = [MinAddress, <strong>CommittedTail</strong>)（未写满的尾段不含未提交区）；可跨段</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>区间码</td>
+<td><code>CompactLeased</code>（Src=Compact，排他占住）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><strong>物理门</strong></td>
+<td><strong>无</strong>——overlay 拷贝的是已提交数据（物理已存在）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><strong>阶段①（搬移）</strong></td>
+<td>对<strong>每个 chunk 恰好调一次</strong> <code>SetReplacement(newMin, newMax, newGrowthLimit, state)</code>（压缩后重建）或 <code>MarkInvalid()</code>（全部搬空删除）——互斥、一次性流转，未填 = <code>Pending</code></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><strong>阶段②（提交）</strong></td>
+<td><code>Commit()</code>：先过<strong>完整性绊线</strong>（任何 chunk 仍 Pending → 拒绝提交抛异常）→ CAS Active→Committed → <code>AtomicCompactReplace</code>（一把 <code>_mutationLock</code> 内：invalidate 段 + 替换段槽位 <code>Volatile.Write</code> 发布）——中间状态不可见</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>整体终态</td>
+<td><code>Rollback()</code>/<code>Dispose()</code>：全部 chunk 释放占住 + <code>CompactRollback</code>；Dispose = 未终态自动回滚</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-reclaim-家族辨析三兄弟只差三件事跨段不是差异点三者区间都可跨段">5. Reclaim 家族辨析（三兄弟只差三件事——&quot;跨段&quot;不是差异点，三者区间都可跨段）</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>段上打洞</th>
+<th><strong>整段删除</strong></th>
+<th>水位线</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ReclaimLease（中间）</td>
+<td>✓ 逐块打洞归零</td>
+<td>✗（段都保留）</td>
+<td>不动</td>
+</tr>
+<tr>
+<td>ReclaimHeadLease（头）</td>
+<td>✓ 尾段部分区间</td>
+<td>✓ to 之前的整段</td>
+<td><code>MinAddress</code> 推进</td>
+</tr>
+<tr>
+<td>ReclaimTailLease（尾）</td>
+<td>✗</td>
+<td>尾后段随尾消失</td>
+<td><strong>仅退双尾</strong>（回退≠打洞）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-硬性要求与反模式">6. 硬性要求与反模式</h2>
+<ol>
+<li><strong>物理门不手动调</strong>——它在迭代器/索引器里。绕过迭代器直摸 <code>ExtentsInternal</code> = 绕过门 + 绕过仲裁。</li>
+<li><strong>禁止合并协议 / kind 路由</strong>——任一类型的要求泄漏成其它类型的隐藏前提。</li>
+<li><strong>跨段 lease 逐块处理</strong>，不要假设单 chunk（<code>growthLimit</code> 边界必然切块）。</li>
+<li>❌ <strong>对 Reclaim 打洞失败置之不理</strong>——Aborted 永久洞只 Compact 能修，洞多了读门会拦。</li>
+<li>❌ <strong>ReclaimTail 当打洞用</strong>——运行期退尾不删区间记录；真要删数据走 Reclaim（中间）/启动修正。</li>
+<li>❌ <strong>把 lease 对象跨线程共享</strong>——lease 非线程安全；并发写各拿各的 lease（地址唯一性由 CAS 保证）。</li>
+<li><strong>Compact 整体提交</strong>：<code>CompactLease</code> 没有 chunk 级部分提交语义。</li>
+</ol>
+<h2 id="7-最小正确范式含失败路径">7. 最小正确范式（含失败路径）</h2>
+<pre><code class="lang-csharp">// 追加写（生产范式：try/using 覆盖失败路径）
+try
+{
+    using var lease = _table.AppendLease(data.Length, ct);
+    var off = 0L;                                  // lease 内数据游标（chunk.SegOff 是段内相对量，跨段会归零——勿用它算 lease 内偏移）
+    foreach (var chunk in lease)
+    {
+        await WriteChunkAsync(chunk.SegId, chunk.SegOff, data.Slice((int)off, (int)chunk.Length), ct);
+        chunk.Commit();                            // 成功一块提一块（乱序合法）
+        off += chunk.Length;
+    }
+    lease.Commit();                                // 整体：推 CommittedTail（内部最后增量者收敛）
+}
+catch (OperationCanceledException) { throw; }
+catch (Exception)
+{
+    // 未 Commit 的 lease 经 Dispose 自动回滚扫尾（Wasted 空洞，地址不回收）——无需手动 Rollback
+    throw;
+}
+
+// 主推批量模型：Allocate 定地址 + Write 批量写（快 ~23%）
+var (start, end) = _table.AllocateLease(totalLength, ct);          // 纯地址（Committed+sparse 占位）
+for (var off = 0L; off &lt; totalLength; off += chunkSize)
+{
+    using var w = _table.WriteLease(start + off, chunkSize, ct);   // 覆写占位区间
+    foreach (var chunk in w) { await WriteChunkAsync(chunk.SegId, chunk.SegOff, ...); chunk.Commit(); }
+    w.Commit();   // Write 整体 Commit 无段表副作用（不推尾）——终态收敛在 lease 内部完成
+}
+</code></pre>
+<p>// Compact（compactor 视角——业务侧经引擎 StartCompact()/StartRangeCompact()，不直接拿 lease）</p>
+<pre><code class="lang-csharp">using var lease = _table.CompactLease(from, to);
+foreach (var chunk in lease.Chunks)
+{
+    var packed = PlanPacking(chunk);                     // 搬移规划：数据前移压缩
+    if (packed.NewMaxOffset == 0)
+        chunk.MarkInvalid();                             // 该段全部搬空 → 整段删除
+    else
+        chunk.SetReplacement(packed.NewMin, packed.NewMax,  // 压缩后重建（新容量/水位）
+                             packed.NewGrowthLimit, StableState.Ready);
+    CopyData(chunk, packed);                             // 物理搬移（overlay，锁外）
+}
+lease.Commit();   // 完整性绊线：有 chunk 漏填 SetReplacement/MarkInvalid → 此处抛，lease 仍 Active 可回滚
+// 失败路径：异常未提交 → Dispose 自动回滚（全部占住释放，段表零改动）
+</code></pre>
+<h2 id="8-性能画像速览">8. 性能画像（速览）</h2>
+<p>单次 lease 全协议 ~1.5µs / 107-112B（纯地址 438ns；批量 WriteLease 最优）；10 万次 Gen0=1-2、
+区间表保持 1 条、p50 无退化；2 线程近线性零 Monitor 争用；IO 占比 Buffered ~7%、WriteThrough ~0.4%
+——<strong>lease 不是写路径瓶颈，优化预算在 IO 引擎层</strong>。池化：<code>LeaseFactory.Default</code> = 每次 new（默认不池化
+——对象小，池化成本更高）；<code>Pooled</code> 仅诊断/对比用。</p>
+<h2 id="9-决策速查">9. 决策速查</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>高频小写</td>
+<td><code>AppendLease</code> 逐条（便捷）或 Allocate+Write 批量（最快）</td>
+</tr>
+<tr>
+<td>大块顺序写</td>
+<td>Allocate 大空间 + WriteLease 批量</td>
+</tr>
+<tr>
+<td>覆写已知地址</td>
+<td><code>WriteLease</code>（先确认区间 ≤ CommittedTail）</td>
+</tr>
+<tr>
+<td>释放空间不缩边界</td>
+<td><code>ReclaimLease</code> 打洞</td>
+</tr>
+<tr>
+<td>删最老数据</td>
+<td><code>ReclaimHeadLease</code></td>
+</tr>
+<tr>
+<td>truncate 语义</td>
+<td><code>ReclaimTailLease</code></td>
+</tr>
+<tr>
+<td>空洞压缩</td>
+<td><code>CompactLease</code>（整体提交）</td>
+</tr>
+<tr>
+<td>写失败</td>
+<td>块级 <code>chunk.Rollback()</code> 或整体 Dispose（自动扫尾）</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/lease-protocol.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>缓存、字典与计算工具（ClockCache / ShardLockWeakReference / UnifiedCrc / MicroTimer / Utility / ThrowHelper / KeyComparer） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="缓存、字典与计算工具（ClockCache / ShardLockWeakReference / UnifiedCrc / MicroTimer / Utility / ThrowHelper / KeyComparer） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="缓存字典与计算工具clockcache--shardlockweakreference--unifiedcrc--microtimer--utility--throwhelper--keycomparer">缓存、字典与计算工具（ClockCache / ShardLockWeakReference / UnifiedCrc / MicroTimer / Utility / ThrowHelper / KeyComparer）</h1>
+
+<blockquote>
+<p>高并发缓存、弱引用字典、CRC、微秒计时、位运算/CAS 辅助、异常抛出的用法。
+完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>；原生内存/池见 <a href="memory.html"><code>memory.md</code></a>；异步原语/队列见 <a href="async-primitives.html"><code>async-primitives.md</code></a>；
+实测数字（ClockCache 含 miss 代价与调参）见 <a href="perf/core-primitives-perf.html"><code>perf/core-primitives-perf.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-选型决策">0. 选型决策</h2>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>用</th>
+<th>线程安全</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>高并发 LRU 缓存</strong>（<code>TKey</code> 值类型 + <code>TValue</code> 引用类型）</td>
+<td><code>ClockCache&lt;TKey,TValue&gt;</code>（V1）</td>
+<td>是</td>
+<td>CLOCK 近似 LRU，零分配热路径，无全局锁；甜区 = 容量 ≥2× 工作集</td>
+</tr>
+<tr>
+<td><strong>高并发 LRU 缓存</strong>（miss 延迟须任意负载恒定）</td>
+<td><code>ClockCacheV2&lt;TKey,TValue&gt;</code></td>
+<td>是</td>
+<td>组相联 CLOCK——miss 恒 ≤8 路扫描，无探测链悬崖</td>
+</tr>
+<tr>
+<td><strong>弱引用分片字典</strong>（值被 GC 回收后自动失效）</td>
+<td><code>ShardLockWeakReference&lt;TKey,TValue&gt;</code></td>
+<td>是</td>
+<td>16 分片独立锁，Value 弱引用</td>
+</tr>
+<tr>
+<td><strong>CRC32C / CRC64</strong>（硬件加速）</td>
+<td><code>UnifiedCrc</code></td>
+<td>静态方法安全</td>
+<td>x86 Sse42 ~1GB/s；支持增量</td>
+</tr>
+<tr>
+<td><strong>微秒级零分配计时</strong></td>
+<td><code>MicroTimer</code></td>
+<td>是（readonly struct）</td>
+<td>整数无浮点；<code>active=false</code> 时 JIT 消除整段</td>
+</tr>
+<tr>
+<td><strong>位运算 / 哈希 / 单调 CAS</strong></td>
+<td><code>Utility</code></td>
+<td>是（纯静态无状态）</td>
+<td>通用写法：De Bruijn log2 / Knuth 哈希 / PreviousPowerOf2 / 单调 CAS</td>
+</tr>
+<tr>
+<td><strong>热路径抛异常</strong></td>
+<td><code>ThrowHelper</code></td>
+<td>是（纯静态）</td>
+<td><code>[DoesNotReturn]+[NoInlining]</code>，隔离 throw 让调用方 JIT 内联</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-clockcachetkey-tvalue--clockcachev2tkey-tvalue--clock-近似-lru-缓存两个版本">1. <code>ClockCache&lt;TKey, TValue&gt;</code> / <code>ClockCacheV2&lt;TKey, TValue&gt;</code> —— CLOCK 近似 LRU 缓存（两个版本）</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>V1 <code>ClockCache</code>（开放寻址）</th>
+<th>V2 <code>ClockCacheV2</code>（组相联）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>结构</td>
+<td>环形数组 + 线性探测</td>
+<td>sets × 8 ways 固定槽组 + 组内 CLOCK</td>
+</tr>
+<tr>
+<td>miss</td>
+<td>随负载发散（满载 681ns@1024）</td>
+<td><strong>恒定 ≤8 次读（7ns）</strong></td>
+</tr>
+<tr>
+<td>hit / update</td>
+<td><strong>3.7 / 2.9 ns（极致）</strong></td>
+<td>5.0 / 17.6 ns</td>
+</tr>
+<tr>
+<td>驱逐</td>
+<td>满载 ~785ns（全表扫描）</td>
+<td>~70ns</td>
+</tr>
+<tr>
+<td>选型</td>
+<td>容量 ≥2× 工作集可保证时</td>
+<td>容量≈工作集、命中率不可控、Core 库默认</td>
+</tr>
+</tbody>
+</table>
+<p>实测对照见 <a href="perf/core-primitives-perf.html"><code>perf/core-primitives-perf.md</code></a> §6。</p>
+<h3 id="用法两版-api-对齐">用法（两版 API 对齐）</h3>
+<pre><code class="lang-csharp">using var cache = new ClockCacheV2&lt;int, byte[]&gt;(capacity: 1024, onEvict: (k, v) =&gt; v.Dispose());
+// V1：new ClockCache&lt;int, byte[]&gt;(capacity: 1024, onEvict: ...)
+// ⚠️ capacity 须 2 的幂；TKey : struct, IEquatable；TValue : class
+// V2 可选第 3 参 ways（组内路数，2 的幂，默认 8；超过 capacity 自动减半钳制）
+
+// 写
+cache.Put(key, value);
+
+// 取（命中则刷新访问位）
+if (cache.TryGet(key, out var val)) { /* 用 val */ }
+
+// 删
+cache.Remove(key);
+
+// 诊断
+var stats = cache.GetStats();   // hits/misses/evictions/hitRate（V2 返回 ClockCacheV2Stats）
+</code></pre>
+<h3 id="关键-api两版相同v2-多-ways">关键 API（两版相同，V2 多 <code>ways</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ClockCache(int capacity, Action&lt;TKey,TValue&gt;? onEvict = null)</code></td>
+<td>构造；<code>capacity</code> 须 2 的幂</td>
+</tr>
+<tr>
+<td><code>ClockCacheV2(int capacity, Action&lt;TKey,TValue&gt;? onEvict = null, int ways = 8)</code></td>
+<td>构造；<code>capacity</code>/<code>ways</code> 须 2 的幂</td>
+</tr>
+<tr>
+<td><code>Put(TKey, TValue)</code></td>
+<td>写（满/组满按 CLOCK 淘汰）</td>
+</tr>
+<tr>
+<td><code>TryGet(TKey, out TValue)</code> → <code>bool</code></td>
+<td>取（命中刷新访问位）</td>
+</tr>
+<tr>
+<td><code>Remove(TKey)</code> → <code>bool</code></td>
+<td>删（置 tombstone，后续插入复用）</td>
+</tr>
+<tr>
+<td><code>GetStats()</code> / <code>Hits</code>/<code>Misses</code>/<code>Evictions</code>/<code>HitRate</code>（V2 另有 <code>Ways</code>）</td>
+<td>诊断</td>
+</tr>
+<tr>
+<td><code>Clear()</code> / <code>Dispose()</code></td>
+<td>清空/释放</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-陷阱">⚠️ 陷阱</h3>
+<ul>
+<li><strong><code>capacity</code> 必须 2 的幂</strong>。</li>
+<li><strong><code>TKey : struct, IEquatable&lt;TKey&gt;</code> 且 <code>TValue : class</code></strong>。</li>
+<li><strong>V1 硬性要求</strong>：容量 ≥ 2× 预期工作集，否则 miss 探测链随负载发散（50%→49ns、90%→462ns、100%→681ns）。</li>
+<li><strong>V2 组偏斜会提前淘汰</strong>：某组键数 &gt; ways 时未满容量即淘汰（均匀负载实际驻留 ≈ 容量的 85-90%；不变量
+<code>Count == 插入 - 淘汰 - 移除</code> 恒成立）。这是组相联的本质（CPU 缓存同理），不是 bug——<code>capacity</code> 是
+entry 上限而非精确驻留数。</li>
+<li>两版 tombstone 语义：V1 保探测链不断；V2 用于 Remove 并发窗口防护（无探测链）。</li>
+</ul>
+<hr>
+<h2 id="2-shardlockweakreferencetkey-tvalue--弱引用分片字典">2. <code>ShardLockWeakReference&lt;TKey, TValue&gt;</code> —— 弱引用分片字典</h2>
+<p>16 分片独立锁（位运算定位），Value 弱引用——不阻止 GC 回收值，回收后条目失效。</p>
+<h3 id="用法">用法</h3>
+<pre><code class="lang-csharp">var dict = new ShardLockWeakReference&lt;string, object&gt;(shardCount: 16);
+// ⚠️ shardCount 须 2 的幂
+
+dict.AddOrUpdate(key, value);                  // 加/更新（值弱引用持有）
+if (dict.TryGet(key, out var val)) { /* val 可能 null（已被 GC） */ }
+
+dict.Remove(key);
+int dead = dict.CleanupDeadReferences();       // 清理已被 GC 回收的死引用，返回清理数
+foreach (var v in dict.AllValues) { /* 遍历存活值 */ }
+</code></pre>
+<h3 id="关键-api">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ShardLockWeakReference()</code> / <code>(int shardCount, IEqualityComparer&lt;TKey&gt;? = null)</code></td>
+<td>构造</td>
+</tr>
+<tr>
+<td><code>AddOrUpdate(TKey, TValue)</code></td>
+<td>加/更新</td>
+</tr>
+<tr>
+<td><code>TryGet(TKey, out TValue?)</code> → <code>bool</code></td>
+<td>取（值可能已被 GC → null）</td>
+</tr>
+<tr>
+<td><code>Remove(TKey)</code> → <code>bool</code></td>
+<td>删</td>
+</tr>
+<tr>
+<td><code>CleanupDeadReferences()</code> → <code>int</code></td>
+<td>清死引用，返回清理数</td>
+</tr>
+<tr>
+<td><code>Clear()</code> / <code>GetTotalEntryCount()</code> / <code>AllValues</code></td>
+<td>维护/查询</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-陷阱-1">⚠️ 陷阱</h3>
+<ul>
+<li><strong><code>shardCount</code> 须 2 的幂</strong>（位运算定位分片）。</li>
+<li><strong>需定期 <code>CleanupDeadReferences()</code></strong>——否则被 GC 回收的 Value 留下死条目（内存渐涨）。</li>
+<li><strong><code>TryGet</code> 返回的值可能为 null</strong>（GC 已回收）——调用方须容忍。</li>
+</ul>
+<hr>
+<h2 id="3-unifiedcrc--crc32c--crc64">3. <code>UnifiedCrc</code> —— CRC32C / CRC64</h2>
+<p>CRC32C（x86 走 <code>Sse42.X64.Crc32</code> 硬件加速 ~1GB/s，ARM 走 <code>Crc32</code>，否则软件表）+ CRC64（软件）。支持增量、零拷贝。</p>
+<h3 id="用法-1">用法</h3>
+<pre><code class="lang-csharp">// 一次性
+uint crc32 = UnifiedCrc.ComputeCrc32C(buffer);     // 0 初值
+ulong crc64 = UnifiedCrc.ComputeCrc64(buffer);
+
+// 增量（跨多段）
+uint acc = UnifiedCrc.ComputeCrc32C(initialCrc: 0, span1);
+acc = UnifiedCrc.ComputeCrc32C(acc, span2);        // 续算
+</code></pre>
+<h3 id="关键-api-1">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ComputeCrc32C(ReadOnlySpan&lt;byte&gt;)</code> → <code>uint</code></td>
+<td>一次性（初值 0）</td>
+</tr>
+<tr>
+<td><code>ComputeCrc32C(uint initialCrc, ReadOnlySpan&lt;byte&gt;)</code> → <code>uint</code></td>
+<td>增量续算</td>
+</tr>
+<tr>
+<td><code>ComputeCrc64(ReadOnlySpan&lt;byte&gt;)</code> → <code>ulong</code></td>
+<td>CRC64（软件）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-陷阱-2">⚠️ 陷阱</h3>
+<ul>
+<li>硬件加速依赖平台（无 Sse42/ARM Crc32 时回退软件表）。</li>
+<li>CRC64 实例方法（若有）非线程安全——静态 <code>ComputeCrc64</code> 无状态可并发。</li>
+</ul>
+<hr>
+<h2 id="4-microtimer--微秒级零分配计时">4. <code>MicroTimer</code> —— 微秒级零分配计时</h2>
+<p><code>readonly struct</code>，整数换算无浮点；<code>IsActive=false</code> 时 JIT <strong>自动消除整段计时逻辑</strong>。</p>
+<h3 id="用法-2">用法</h3>
+<pre><code class="lang-csharp">var t = MicroTimer.Start(active: true);
+/* 被计时的工作 */
+long us = t.ElapsedMicros();
+long ms = t.ElapsedMillis();
+long ticks = t.ElapsedTicks();
+
+// 热路径零分配格式化（避免 ElapsedReadable 的字符串分配）
+if (t.TryFormat(stackalloc char[32], out int written)) { /* 用 span */ }
+
+// 热路径关闭：active=false 让 JIT 消除整段
+var off = MicroTimer.Start(active: false);
+off.ElapsedMicros();   // 编译期消除，零开销
+</code></pre>
+<h3 id="关键-api-2">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MicroTimer.Start(bool active = true)</code></td>
+<td>工厂（构造 + 计时起点）</td>
+</tr>
+<tr>
+<td><code>ElapsedMicros()</code> / <code>ElapsedMillis()</code> / <code>ElapsedTicks()</code></td>
+<td>读耗时</td>
+</tr>
+<tr>
+<td><code>TryFormat(Span&lt;char&gt;, out int)</code></td>
+<td>零分配格式化（热路径用）</td>
+</tr>
+<tr>
+<td><code>ElapsedReadable()</code> → <code>string</code></td>
+<td>可读字符串（<strong>会分配</strong>，非热路径用）</td>
+</tr>
+<tr>
+<td><code>IsActive</code></td>
+<td>是否激活</td>
+</tr>
+</tbody>
+</table>
+<h3 id="-陷阱-3">⚠️ 陷阱</h3>
+<ul>
+<li><strong><code>ElapsedReadable()</code> 分配字符串</strong>——热路径用 <code>TryFormat(Span&lt;char&gt;)</code>。</li>
+<li><strong>关计时用 <code>Start(active:false)</code></strong>——JIT 消除整段，比 <code>if</code> 守卫更彻底。</li>
+</ul>
+<hr>
+<h2 id="5-utility--位运算--哈希--单调-cas">5. <code>Utility</code> —— 位运算 / 哈希 / 单调 CAS</h2>
+<p>静态通用工具集（位运算、哈希、单调 CAS、容量字符串解析等标准写法）。</p>
+<blockquote>
+<p><strong>可见性规则</strong>：无指针的（<code>ParseSize</code>/<code>GetLogBase2</code>/<code>IsPowerOfTwo</code>/<code>MonotonicUpdate</code>/<code>WithCancellationAsync</code>…）= <code>public</code>；带指针/<code>unsafe</code> 的（<code>IsEqual</code>/<code>Copy</code>/<code>HashBytes</code>/<code>XorBytes</code>）= <code>internal</code>（当前上层未完成时不开，待需要时再提升为 <code>public</code>）。</p>
+</blockquote>
+<h3 id="用法-3">用法</h3>
+<pre><code class="lang-csharp">int log2 = Utility.GetLogBase2(1024);              // → 10（public）
+long size = Utility.ParseSize(&quot;4K&quot;);                // → 4096（public）
+
+// 单调 CAS 推进水位（拒回退）
+if (Utility.MonotonicUpdate(ref watermark, newValue: 100, out long old))
+    /* 推进成功（新&gt;旧） */
+
+// 带指针的方法当前为 internal（Core 内/测试可见，经 InternalsVisibleTo）
+// unsafe { ulong h = Utility.XorBytes(src, len); }   // internal，待上层完成再 public
+</code></pre>
+<h3 id="关键-api-3">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>可见性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GetLogBase2(int)</code> / <code>(ulong)</code></td>
+<td>public</td>
+<td>De Bruijn 对数</td>
+</tr>
+<tr>
+<td><code>ParseSize(string)</code> / <code>PrettySize(long)</code></td>
+<td>public</td>
+<td>容量字符串 ↔ 数值</td>
+</tr>
+<tr>
+<td><code>MonotonicUpdate(ref long, long, out long)</code> / <code>(ref int, ...)</code></td>
+<td>public</td>
+<td>CAS 单调推进（新&gt;旧才写，返回是否推进）</td>
+</tr>
+<tr>
+<td><code>WithCancellationAsync(Task&lt;T&gt;, ct)</code></td>
+<td>public</td>
+<td>给 Task 加取消支持</td>
+</tr>
+<tr>
+<td><code>IsEqual</code> / <code>Copy</code> / <code>HashBytes</code> / <code>XorBytes</code></td>
+<td><strong>internal</strong></td>
+<td>带指针/unsafe（待上层完成再 public）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-throwhelper--热路径异常抛出">6. <code>ThrowHelper</code> —— 热路径异常抛出</h2>
+<p><code>namespace TC.Tier.Core.Primitives</code>（<code>[DoesNotReturn]+[NoInlining]</code>），把 throw 隔离出热路径，让调用方法被 JIT 内联。放在 Primitives，经 <code>global using</code> 免 using。</p>
+<h3 id="用法-4">用法</h3>
+<pre><code class="lang-csharp">// 直接调（不需 using——global using TC.Tier.Core.Primitives 兜底）
+if (offset &lt; 0) ThrowHelper.ThrowArgumentOutOfRange(nameof(offset));
+if (_disposed) ThrowHelper.ThrowObjectDisposed(nameof(MyObj));
+ThrowHelper.ThrowInvalidOperationException(&quot;state invalid&quot;);
+</code></pre>
+<h3 id="关键-api-4">关键 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ThrowArgumentOutOfRange(string? paramName = null)</code> / <code>(string?, string?)</code></td>
+<td>抛 <code>ArgumentOutOfRangeException</code></td>
+</tr>
+<tr>
+<td><code>ThrowObjectDisposed(string objectName)</code></td>
+<td>抛 <code>ObjectDisposedException</code></td>
+</tr>
+<tr>
+<td><code>ThrowInvalidOperationException(string message)</code></td>
+<td>抛 <code>InvalidOperationException</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>[DoesNotReturn]</code> 让编译器知道后续不可达，<code>[NoInlining]</code> 把抛异常的代码物理隔离——调用方方法体不含 throw，可被内联。</p>
+</blockquote>
+<hr>
+<h2 id="7-ikeycomparertkey--keycomparertkey--64-位哈希键比较器">7. <code>IKeyComparer&lt;TKey&gt;</code> / <code>KeyComparer&lt;TKey&gt;</code> —— 64 位哈希键比较器</h2>
+<p>索引类结构（HashIndex / BTree / SkipList）的 key 比较原语。<strong>为什么是 64 位 hash</strong>：32 位 hash 在
+大索引下生日碰撞不可忽视；64 位取高位当 tag（熵充分）、低位当 bucket index，两段独立。</p>
+<h3 id="关键-apitkey--unmanaged">关键 API（<code>TKey : unmanaged</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GetHashCode64(TKey)</code> → <code>ulong</code></td>
+<td><strong>性能命脉</strong>：默认实现 XxHash64 over key 字节（blittable 零装箱，8 字节 key ~3ns）</td>
+</tr>
+<tr>
+<td><code>Equals(TKey, TKey)</code></td>
+<td>判等（HashIndex 路径用 hash + 判等）</td>
+</tr>
+<tr>
+<td><code>Compare(TKey, TKey)</code></td>
+<td>全序比较（BTree / SkipList 路径用）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="用法-5">用法</h3>
+<pre><code class="lang-csharp">// 默认实现开箱即用（结构的字节即哈希输入）
+var cmp = new KeyComparer&lt;long&gt;();
+ulong h = cmp.GetHashCode64(key);
+
+// 有序结构注入（Compare 路径）——构造收 IKeyComparer&lt;TKey&gt;，默认 KeyComparer&lt;TKey&gt;（自定义示例见源码注释）
+</code></pre>
+<h3 id="何时自定义">何时自定义</h3>
+<p>变长 key 的前缀哈希、特定分布优化（如递增 long 的 avalanche）、复用非默认等价语义——
+实现 <code>IKeyComparer&lt;TKey&gt;</code> 注入即可，结构与 <code>SpinRWLock</code>/<code>Atomic128</code> 同级的<strong>可注入原语</strong>。</p>
+<hr>
+<h2 id="8-决策速查">8. 决策速查</h2>
+<pre><code>我要高并发 LRU 缓存？
+  → ClockCache（TKey 值类型, TValue 引用类型, capacity 2 的幂）。
+
+我要弱引用字典（值被 GC 自动失效）？
+  → ShardLockWeakReference（shardCount 2 的幂，定期 CleanupDeadReferences，TryGet 值可能 null）。
+
+我要 CRC？
+  → UnifiedCrc.ComputeCrc32C（硬件加速）/ ComputeCrc64（软件）。增量用 initialCrc 续算。
+
+我要微秒计时？
+  → MicroTimer.Start。热路径 TryFormat(Span) + active=false 消除；非热路径 ElapsedReadable。
+
+我要位运算 / 容量字符串 / 单调 CAS？
+  → Utility（GetLogBase2 / ParseSize·PrettySize / MonotonicUpdate）。
+
+我要热路径抛异常？
+  → ThrowHelper.ThrowXxx（[DoesNotReturn]+[NoInlining]，global using 免 using）。
+</code></pre>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/cache-and-compute.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

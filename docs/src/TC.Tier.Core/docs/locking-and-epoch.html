@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>互斥、回收与原子更新使用指南（SpinRWLock / FairGate / LightEpoch / Atomic128） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="互斥、回收与原子更新使用指南（SpinRWLock / FairGate / LightEpoch / Atomic128） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="互斥回收与原子更新使用指南spinrwlock--fairgate--lightepoch--atomic128">互斥、回收与原子更新使用指南（SpinRWLock / FairGate / LightEpoch / Atomic128）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要并发协调原语的组件开发者（读写互斥 / 重试公平 / 延迟回收 / 大载荷原子更新）。
+<strong>回答什么</strong>：四种原语怎么选、怎么用、什么绝对不要做。
+<strong>核心命题</strong>：什么用锁、什么用 epoch、什么用 CAS——<strong>三者各管一摊；不该进 epoch 的绝不塞 epoch drain。</strong>
+完整积木全景见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-怎么选一句话决策">0. 怎么选（一句话决策）</h2>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>用哪个</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>读侧零等待的状态查询</strong>（读远多于写、数据可整体替换）</td>
+<td>COW 快照发布</td>
+<td>写侧 new 不可变对象 + volatile 引用发布；读者一次引用读 + 拷贝</td>
+</tr>
+<tr>
+<td><strong>单写者多读者的几个标量</strong>（读者可保守回退慢路径）</td>
+<td>seqlock</td>
+<td>版本奇偶 + 双读复验</td>
+</tr>
+<tr>
+<td><strong>对象的读写互斥</strong>（读共享 vs 写/销毁排他，写不饿死）</td>
+<td><code>SpinRWLock</code></td>
+<td>给对象挂一个 <code>SpinRWLock</code> 字段：读 <code>AcquireShared</code>，写/销毁 <code>AcquireExclusive</code>（写偏向：等待写者挡新读者）</td>
+</tr>
+<tr>
+<td><strong>重试循环获取资源的到达顺序公平</strong>（多写者竞争同资源不插队）</td>
+<td><code>FairGate</code></td>
+<td>fast path 查 <code>HasWaiters</code> 让位，慢路径 <code>TryAcquireSlow</code>，资源可获取后 <code>Wake()</code></td>
+</tr>
+<tr>
+<td><strong>对象/内存的延迟回收</strong>（RCU：等所有读者退出再回收）</td>
+<td><code>LightEpoch</code></td>
+<td>drain action <strong>只做轻量回收</strong>（free 指针、归还 buffer）</td>
+</tr>
+<tr>
+<td><strong>&gt;64 位载荷的原子更新</strong>（指针+标志 / 水位+ABA）</td>
+<td><code>Atomic128&lt;T&gt;</code></td>
+<td>16B 对齐背板 + CAS，<code>Interlocked</code> 做不到的 16B 原子</td>
+</tr>
+</tbody>
+</table>
+<p><strong>硬性要求：各管一摊、不可同需求重复上两套</strong>（见 §5 反模式&quot;双轨制&quot;）。</p>
+<p><strong>决策树</strong>：</p>
+<pre><code>读多写少，读侧要绝对零等待？
+  ├─ 数据可整体替换、小或中等 → COW 快照（原生内存回收配 LightEpoch）
+  ├─ 单写者 + 几个标量 + 读者可回退 → seqlock
+  └─ 读者持有期间要屏蔽结构变更 + 事后延迟回收 → LightEpoch（保护期极短，禁 await）
+真需要&quot;读者互斥&quot;（共享临界区内做 IO / 长计算）？
+  → SpinRWLock：读 AcquireShared（可跨 await 长持），写/销毁 AcquireExclusive（短、纯内存）
+     写要&quot;拿到就赚拿不到走人&quot; → TryAcquireExclusive（投机，不挡读者）
+重试循环抢同一资源，怕后来者插队饿死先到者？
+  → FairGate：快路径查 HasWaiters 让位 + TryAcquireSlow + 资源可获取后 Wake
+结构性长临界区 / 持锁跨越 IO 与 await 的排他段 / 低频控制路径？
+  → Monitor（lock）——别用自旋锁扛长临界区
+&gt;64 位载荷原子更新 → Atomic128&lt;T&gt;
+</code></pre>
+<blockquote>
+<p>实测参照（i5-12400，2026-08-20）：读侧成本 COW 0.7ns / seqlock 0.6ns / LightEpoch 9.6ns /
+SpinRWLock 共享 16.3ns；SpinRWLock 写落地均值 0.1µs（1-11 读者锤击不恶化）；LightEpoch 读并发
+×4.7@6T。完整数字见 <a href="perf/core-primitives-perf.html"><code>perf/core-primitives-perf.md</code></a> §7。</p>
+</blockquote>
+<hr>
+<h2 id="1-spinrwlock--写偏向-rw-自旋锁">1. <code>SpinRWLock</code> —— 写偏向 RW 自旋锁</h2>
+<p><strong>机制</strong>：单个 64-bit 原子整数 CAS 自旋 + <code>SpinWait</code> 让步。<strong>写偏向</strong> = 写者进门先置 pending 挡住
+新读者，再等在途读者退出——写者最多等&quot;在途读者的临界区&quot;，不被持续读者流饿死；读者 fast path
+仍是一次 CAS。</p>
+<h3 id="用法">用法</h3>
+<pre><code class="lang-csharp">// scope 工厂（常规临界区优先用——using 自动释放，防手忘 Release）
+using var s = rwLock.EnterShared();      // 读（可跨 await 长持）
+using var x = rwLock.EnterExclusive();   // 写/销毁（短、纯内存、禁 await）
+
+// 手动（释放时机需显式控制的长临界区，如读计划锁跨 IO）
+rwLock.AcquireShared();  /* ... */  rwLock.ReleaseShared();
+rwLock.AcquireExclusive();  /* ... */  rwLock.ReleaseExclusive();
+
+// 投机（不自旋）
+if (rwLock.TryAcquireExclusive()) { /* 拿到就赚 */ }   // 失败不挂 pending 闸（不挡读者）
+</code></pre>
+<p><strong>硬性要求（违反 = 死锁）</strong>：</p>
+<ol>
+<li><strong>绝对不可重入</strong>——同线程禁止重复 <code>AcquireShared</code>/<code>AcquireExclusive</code>。</li>
+<li><strong>禁止锁升级</strong>——持共享锁的线程直接升级排他 = 两线程同时升级互相等。先 <code>ReleaseShared</code>
+再 <code>AcquireExclusive</code>，或一开始就持排他。</li>
+<li><strong>排他临界区极短</strong>——禁 IO、内存分配、<code>await</code>（线程关联，Debug 释放线程校验会抓）；
+共享临界区可长（跨 IO 持共享是设计内用法），但越长写者等越久——能锁外做的移到锁外。</li>
+</ol>
+<blockquote>
+<p>排他锁天然 = &quot;等所有共享读完成&quot; = 安全点。<strong>需要&quot;等读完成再销毁/重做&quot;的，持 <code>AcquireExclusive</code>
+直接做，不要绕去用 epoch。</strong></p>
+</blockquote>
+<hr>
+<h2 id="2-fairgate--重试获取资源的到达顺序公平门">2. <code>FairGate</code> —— 重试获取资源的到达顺序公平门</h2>
+<p><code>SpinRWLock</code> 解决&quot;读写互斥谁进门&quot;；<strong><code>FairGate</code> 解决&quot;重试循环抢资源谁插队&quot;</strong>——资源占用/释放属
+调用方，门只管两件事：<strong>让后来者不插队</strong>、<strong>唤醒并让渡先手</strong>。</p>
+<h3 id="协议三方角色缺一不可">协议（三方角色，缺一不可）</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>调用</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>获取方 fast path</td>
+<td><code>HasWaiters</code></td>
+<td>有等待者时<strong>不走快路径</strong>——否则零间隙复占者永远插队</td>
+</tr>
+<tr>
+<td>获取方 slow path</td>
+<td><code>TryAcquireSlow(tryAcquire)</code></td>
+<td>登记等待者 → 门锁内执行占用尝试 → 成功 true / 失败 park 等唤醒后 false，回到协议循环</td>
+</tr>
+<tr>
+<td>释放方</td>
+<td><code>Wake()</code></td>
+<td>资源<strong>已变为可获取后</strong>再调（唤醒过早 = 被唤醒者双检必败）：PulseAll + 让渡先手</td>
+</tr>
+</tbody>
+</table>
+<p><strong>约束</strong>：<code>tryAcquire</code> 在门锁内执行——必须<strong>纯内存、无异常、快速返回</strong>，不得获取与本门逆序的锁。
+现使用方：<code>SegmentTable._extentGate</code>（AcquireExtent 区间占用公平性）。</p>
+<hr>
+<h2 id="3-lightepoch--epoch-rcu-延迟回收">3. <code>LightEpoch</code> —— epoch RCU 延迟回收</h2>
+<p><strong>粒度</strong>：线程级&quot;我正在读&quot;标记（不是对象锁）。<strong>适合</strong>：对象/内存延迟回收——等所有读者退出
+epoch 再回收（RCU 语义）。<strong>仅上层结构组件</strong>用（index 节点回收、metadata 版本回收）。</p>
+<blockquote>
+<p>⚠️ <strong>命名反直觉</strong>（对齐 FASTER 术语）：<strong><code>Resume</code> = 进入保护区</strong>、<strong><code>Suspend</code> = 退出保护区</strong>——
+不是&quot;恢复/挂起线程&quot;。</p>
+</blockquote>
+<h3 id="机制一分钟">机制（一分钟）</h3>
+<p>三块拼图：全局单调 epoch 计数器 + 每线程 entry 表（记录本线程进入保护区时的 epoch）+ drain 列表
+（(epoch, action) 对）。读者 <code>Resume</code> 登记 → 读共享对象 → <code>Suspend</code> 清除；写者物理摘除旧对象 →
+<code>BumpCurrentEpoch(() =&gt; 旧对象.Dispose())</code> → 待所有 entry 的 epoch 越过旧值 → action 被&quot;恰好此刻
+触发 drain 检查的线程&quot;顺手内联执行。<strong>drain 是协作式、无后台线程</strong>。</p>
+<h3 id="标准用法自包含骨架">标准用法（自包含骨架）</h3>
+<pre><code class="lang-csharp">sealed class DeferredReclaimer
+{
+    private readonly LightEpoch _epoch = new();          // 组件级单实例，所有线程共用
+    private Node? _head;
+
+    public Node? Peek()                                  // 读侧：保护期内旧节点保证存活
+    {
+        _epoch.Resume();
+        try { return _head; }                            // 不可 await！（§3.3）
+        finally { _epoch.Suspend(); }                    // 同线程配对退出
+    }
+
+    public void Replace(Node newNode)                    // 写侧：摘除旧对象 + 延迟回收
+    {
+        _epoch.Resume();                                 // ★ bump 调用线程自己也必须在保护区
+        try
+        {
+            var old = Interlocked.Exchange(ref _head, newNode);
+            _epoch.BumpCurrentEpoch(() =&gt; old.Dispose());
+        }
+        finally { _epoch.Suspend(); }
+    }
+
+    public void Dispose() =&gt; _epoch.Dispose();
+}
+</code></pre>
+<p>要点：一个协作域一个 <code>LightEpoch</code>（组件 own，随组件 Dispose——不是全局单例）；保护期极短
+（Resume→读→Suspend 之间只做指针读写级的事）；回收时机/执行线程不确定——action 只依赖
+&quot;旧 epoch 已静默&quot;这一事实。</p>
+<h3 id="什么该--不该给-epoch最易错">什么该 / 不该给 epoch（最易错）</h3>
+<ul>
+<li>✅ <strong>轻量回收</strong>：free 指针、归还 buffer、丢引用——非阻塞、纳秒~微秒级。</li>
+<li>❌ <strong>阻塞 IO</strong>（<code>PunchHole</code>、<code>fsync</code>、段提升）——drain 是协作式，action 由任意线程（可能是读线程）
+顺手执行，塞毫秒级 IO = IO 落在读热路径。该 IO 的投递 <code>BackgroundWorkerLoop</code> 或持锁直接做。</li>
+<li>❌ <strong>&quot;同步等 drain 完成&quot;的逻辑</strong>——和异步协作本性冲突，死结。</li>
+<li>❌ <strong>用 epoch drain 给销毁排序</strong>——销毁排序持段排他锁直接做（§1）。</li>
+</ul>
+<blockquote>
+<p>一句话：<strong>epoch drain 只回收、不 IO、不排序。</strong></p>
+</blockquote>
+<h3 id="临界区负面清单resumesuspend-之间绝对禁止">临界区负面清单（Resume→Suspend 之间绝对禁止）</h3>
+<p>阻塞操作（IO/锁等待/Sleep）；<code>await</code>/让出线程（Resume/Suspend 必须同线程配对）；调用
+<code>BumpCurrentEpoch</code> 或触发 drain 的逻辑（重入死锁——写侧 bump 在自己保护区内调一次合法，drain
+action <strong>内部</strong>再 bump 不行）；大量托管分配（触发 GC 拉长临界区）。</p>
+<hr>
+<h2 id="4-atomic128t--128-位-cas">4. <code>Atomic128&lt;T&gt;</code> —— 128 位 CAS</h2>
+<p>解决 &gt;64 位载荷的原子更新（&quot;指针+标志&quot;&quot;水位+ABA version&quot;无法用 <code>Interlocked</code>）——x86-64
+<code>lock cmpxchg16b</code> / ARM64 <code>ldaxp-stlxp</code>。</p>
+<p><strong>优先用 <code>Atomic128&lt;T&gt;</code> 封装</strong>（16B 对齐背板 + 探测降级 + 裸读不撕裂已内置）；热路径用 Unsafe
+快路径（<code>TryCompareExchangeUnsafe</code>/<code>ReadUnsafe</code>，~11ns vs safe ~16ns——调用方须保证 native CAS
+可用且未 Dispose）。</p>
+<p><strong>硬约束</strong>：</p>
+<ul>
+<li><code>location</code> 必须 <strong>16 字节对齐</strong>（不对齐 → 硬件异常）——用 <code>AlignedMemoryManager</code> 分配；</li>
+<li><strong>每水位一个独立 64B 块</strong>（Intel Spatial Prefetcher 会绑定相邻缓存行，合并 128B 实测掉吞吐）；</li>
+<li>能力探测失败 → 降级 <code>lock</code>（生产永不触发，但必须提供）。</li>
+</ul>
+<p><strong>标准范式</strong>（双尾水位 CAS）：载荷设计（<code>LogicalAddress</code> 16B，Extension 兼当 ABA version）→
+对齐分配 → 零拷贝 reinterpret（<code>Unsafe.As&lt;LogicalAddress, Int128&gt;</code>）→ CAS 循环（裸读 → 条件检查 →
+算新值 version+1 → CAS → 失败 <code>SpinWait</code> 重试）→ ABA 防护（回退时 Extension+1）。</p>
+<hr>
+<h2 id="5-反模式禁止重蹈">5. 反模式（禁止重蹈）</h2>
+<ol>
+<li>❌ <strong>把阻塞 IO 塞进 epoch drain action</strong>——IO 落在读热路径 + 与异步协作本性冲突死结。
+正解：销毁 IO 持段排他锁直接执行，或投递 <code>BackgroundWorkerLoop</code>。</li>
+<li>❌ <strong>在未持 epoch 的线程调 <code>BumpCurrentEpoch</code></strong>——违反协议（Debug 立即抛；Release 下静默腐败）。
+正解：调用线程先 <code>Resume()</code>，用完 <code>Suspend()</code>（骨架见 §3）。</li>
+<li>❌ <strong>互斥&quot;双轨制&quot;</strong>——同需求上 SpinRWLock + epoch 两套。互斥来源不单一，epoch drain 那套
+引出反模式 1/2。正解：存储读写互斥<strong>统一用 <code>SpinRWLock</code></strong>；<code>LightEpoch</code> 只留上层结构组件的
+延迟回收。</li>
+<li>❌ <strong>SpinRWLock 排他临界区内 await</strong>——线程切换后释放线程 ID 不匹配，锁永久泄漏。
+正解：异步互斥用 <code>AsyncManualResetEvent</code> 等异步原语（<a href="async-primitives.html"><code>async-primitives.md</code></a>）。</li>
+</ol>
+<hr>
+<h2 id="6-想深入指路">6. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>完整 API 表 / Debug 绊线 / 值示波器</td>
+<td>类型 XML 注释（<code>Primitives/</code>、<code>Epochs/</code>）</td>
+</tr>
+<tr>
+<td>机制细节（位布局 / 根因修复记录 / 契约测试矩阵）</td>
+<td>源码注释与单测（<code>SpinRWLockTests</code>/<code>FairGateTests</code>/<code>LightEpochTests</code>）</td>
+</tr>
+<tr>
+<td>实测数字（读侧成本/并发伸缩/写落地）</td>
+<td><a href="perf/core-primitives-perf.html"><code>perf/core-primitives-perf.md</code></a> §7</td>
+</tr>
+<tr>
+<td>版本协调状态机（epoch 保护下分阶段过渡版本）</td>
+<td><a href="version-scheme.html"><code>version-scheme.md</code></a></td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/locking-and-epoch.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

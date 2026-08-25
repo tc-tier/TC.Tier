@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>段表使用指南（SegmentTable） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="段表使用指南（SegmentTable） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="段表使用指南segmenttable">段表使用指南（SegmentTable）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：IO 引擎层（<code>Storage/</code>）开发者、lease 消费侧、恢复/Checkpoint 接入者。
+<strong>回答什么</strong>：段表持有什么、我能碰什么、事件怎么接、回调怎么发、什么绝对不要做。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>段表 = 地址空间的唯一真相之源</strong>：它持有三支柱（水位线 / 段 / 段区间），只发事件、只收回调，
+<strong>不等待、不做 IO、不关心物理文件</strong>。物理段是 IO 层对段表统一事件的实现。</p>
+<pre><code>                    统一事件（ISegmentHandler，段表 → IO 层）
+段表（真相）  ────────────────────────────────────────────→  IO 层（物理资产）
+  三支柱        ←────────────────────────────────────────────  worker 建段 / 预备池 /
+                 建段回调（CreateSegmentCallback，IO 层 → 段表）  meta / 删文件
+</code></pre>
+<h2 id="1-三支柱调用者必须建立的心智模型">1. 三支柱（调用者必须建立的心智模型）</h2>
+<table>
+<thead>
+<tr>
+<th>支柱</th>
+<th>内容</th>
+<th>关键规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>水位线</strong></td>
+<td><code>MinAddress</code>（头）/ <code>CommittedTail</code>（终态前缀）/ <code>AllocatedTail</code>（分配）</td>
+<td>架在区间表上的<strong>粗游标</strong>；外部<strong>只读</strong>；不变量链 <code>MinAddress ≤ CommittedTail ≤ AllocatedTail</code></td>
+</tr>
+<tr>
+<td><strong>段</strong></td>
+<td>每段 <code>MinOffset</code>/<code>MaxOffset</code> 两条段内水位 + <code>StableState</code> + <code>GrowthLimit</code></td>
+<td><strong><code>RealSize = MaxOffset − MinOffset</code> 是数据大小，<code>GrowthLimit</code> 是容量</strong>——两者不是一回事；<code>IsFull ⟺ MaxOffset ≥ GrowthLimit</code>（派生属性）</td>
+</tr>
+<tr>
+<td><strong>段区间</strong></td>
+<td>每段一份区间表（<code>ExtentStateCode</code>：在途带 Src → 终态）</td>
+<td><strong>lease 协议的核心状态机</strong>；可占性 <code>IsOccupiable = Committed || Wasted</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>读门</strong>：区间的可读性看<strong>区间表</strong>（<code>IsRangeFullyReadable</code>），不是看水位游标——游标是粗裁剪，
+区间表才是逐字节真相（游标 vs 区间双轨，勿混用）。</p>
+<h2 id="2-段稳态stablestate准入语义">2. 段稳态（StableState）——准入语义</h2>
+<table>
+<thead>
+<tr>
+<th>稳态</th>
+<th>含义</th>
+<th>进入</th>
+<th>离开</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Empty</code></td>
+<td>逻辑已注册、物理未建——<strong>物理门关</strong>（不接受 chunk IO）</td>
+<td>注册即 Empty（<code>AppendSegmentRaw</code>）</td>
+<td>唯一出口：建段回调</td>
+</tr>
+<tr>
+<td><code>Ready</code></td>
+<td>物理就绪，chunk IO 合法</td>
+<td>回调成功 <code>TryMarkReady</code></td>
+<td>到顶自动→Full；→Compacting；→Invalid</td>
+</tr>
+<tr>
+<td><code>Full</code></td>
+<td><code>MaxOffset ≥ GrowthLimit</code>：不可扩容、可覆写</td>
+<td><code>AdvanceOffset</code> 到顶（<strong>仅 Ready→Full</strong>）</td>
+<td>→Compacting；→Invalid</td>
+</tr>
+<tr>
+<td><code>Compacting</code></td>
+<td>整理排他 overlay</td>
+<td>Compact 进入</td>
+<td>Compact 完成</td>
+</tr>
+<tr>
+<td><code>Broken</code></td>
+<td>建段失败终态——物理门<strong>永久关，不重试</strong>；<strong>不可分配</strong>：分配区间不得含其任何字节，尾在 Broken 段内/请求跨段时<strong>烧洞跳过</strong></td>
+<td>回调失败 <code>TryMarkBroken</code></td>
+<td>终态（地址空间墓碑）</td>
+</tr>
+<tr>
+<td><code>Invalid</code></td>
+<td>已删除：准入吊销、文件不存在</td>
+<td>ReclaimHead/Compact/启动修正</td>
+<td>终态（幂等）</td>
+</tr>
+</tbody>
+</table>
+<p>三条设计决策（勿当缺陷）：</p>
+<ul>
+<li><strong>运行期 Full 只经 Ready→Full</strong>。Empty 期被 Allocate 占位推满的段不转 Full 态——满语义由派生
+<code>IsFull</code> 承担；Empty→Full 直达只存在于启动恢复装配。</li>
+<li><strong>回调双分支幂等</strong>：成功/失败均 CAS，<strong>非 Empty 一律 no-op</strong>——重复/迟到回调不打断已迁移段。</li>
+<li><strong>Compact 后的段槽复用是设计路径</strong>：整理压缩空洞 → 中间段 Invalid 出服务 → 退尾再分配时重注册
+同 segId——这是地址空间回收复用机制。</li>
+</ul>
+<h2 id="3-关键-api调用者视角">3. 关键 API（调用者视角）</h2>
+<table>
+<thead>
+<tr>
+<th>类别</th>
+<th>成员</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>只读查询</strong></td>
+<td><code>AllocatedTail</code> / <code>CommittedTail</code> / <code>MinAddress</code> / <code>SegCount</code> / <code>MaxSegId</code> / <code>GetSegment(segId)</code> / <code>TryGetSegment</code> / <code>IsRangeFullyReadable</code> / <code>GetExtentRanges</code></td>
+<td>全部无锁安全；<code>GetSegment</code> 返回只读 <code>SegmentView</code>（不存在返回 <code>Hollow</code>）</td>
+</tr>
+<tr>
+<td><strong>地址算术</strong></td>
+<td><code>AdvanceAddress</code> / <code>RetreatAddress</code> / <code>GetDistance</code>（+ <code>SegmentGrowthLimit</code>）</td>
+<td>纯计算，不改状态——语义见 §3.1</td>
+</tr>
+<tr>
+<td><strong>lease 入口</strong></td>
+<td><code>AppendLease</code> / <code>AllocateLease</code> / <code>WriteLease</code> / <code>ReclaimLease</code> / <code>ReclaimHeadLease</code> / <code>ReclaimTailLease</code> / <code>CompactLease</code></td>
+<td><strong>外部改状态的唯一合法通道</strong>，见 <a href="lease-protocol.html">lease-protocol.md</a></td>
+</tr>
+<tr>
+<td><strong>协调（IO 层专用）</strong></td>
+<td><code>WaitSegmentReady</code> / <code>CreateSegmentCallback</code> / <code>PulseAllSegmentsReady</code></td>
+<td>建段协调；<code>WaitSegmentReady</code> 的<strong>唯一调用方是 lease 协议</strong>（物理门）</td>
+</tr>
+<tr>
+<td><strong>持久化</strong></td>
+<td><code>SaveAddressTable</code> / <code>LoadAddressTable</code>（一对）+ <code>SetStartupTails</code>（启动水位）</td>
+<td>恢复/落盘专用，见 §3.2</td>
+</tr>
+<tr>
+<td><strong>锁开放面</strong></td>
+<td><code>ExecuteUnderLock</code> / <code>TryGetLock</code></td>
+<td>三级锁中必须开放的两级，见 §4</td>
+</tr>
+</tbody>
+</table>
+<h3 id="31-地址算术三个接口纯计算无状态">3.1 地址算术（三个接口，纯计算无状态）</h3>
+<table>
+<thead>
+<tr>
+<th>接口</th>
+<th>语义</th>
+<th>边界规则</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AdvanceAddress(start, length)</code></td>
+<td>前进 length 字节，跨段<strong>进位</strong></td>
+<td>只前进（回退调 Retreat）；<strong>返回的 Extension 恒为 0——调用方须显式保留 start.Extension</strong>；恰好填满一段时<strong>停驻段末边界 <code>(segId, GrowthLimit)</code></strong></td>
+</tr>
+<tr>
+<td><code>RetreatAddress(start, length)</code></td>
+<td>回退 length 字节，跨段<strong>借位</strong></td>
+<td>只回退；回退到 <code>MinAddress</code> 之前返回 <code>LogicalAddress.Invalid</code>；落点恒为真实字节位置</td>
+</tr>
+<tr>
+<td><code>GetDistance(from, to)</code></td>
+<td>from→to 字节距离，跨段累加</td>
+<td>from &gt; to 返回<strong>负值</strong>；不做 AllocatedTail 上界校验（调用方保证合法）</td>
+</tr>
+<tr>
+<td><code>SegmentGrowthLimit(segId)</code></td>
+<td>取段生长上限</td>
+<td>段存在用段的；<strong>Hollow 段用生命周期上限</strong>——地址空间连续，被回收段在逻辑地址上仍占位</td>
+</tr>
+</tbody>
+</table>
+<p>三个算术共享同一条不变量：<strong>跨段进位/借位按每段各自的 GrowthLimit 计算</strong>（Compact 后段大小可能
+不同，不用全局值）。</p>
+<p><strong>区间表示规范（半开 <code>[start, end)</code>——统一规范）</strong>：</p>
+<ul>
+<li>一切区间都是半开：覆盖 <code>start ≤ b &lt; end</code>；<code>end</code> 是&quot;已占用字节之后第一个位置&quot;。</li>
+<li><strong>边界规范形</strong>：恰好填满一段时，边界停驻<strong>段末 <code>(seg, GrowthLimit)</code></strong>——旧哨兵形态 <code>(seg+1, 0)</code>
+（把段末写成&quot;下一段头&quot;）<strong>已废除</strong>（存量盘兼容接受，新算术永不产出）；<code>(N, 0)</code> 保留唯一身份 =
+<strong>段首字节 / 地址空间原点</strong>。</li>
+<li>半开的理由（定稿）：空区间天然是 <code>start == end</code>（零特判）；Append 写起点就是 end 本身（热路径
+零 <code>+1</code>）；全库水位比较按半开格建设。</li>
+</ul>
+<h3 id="32-持久化一对读写--一个水位修正">3.2 持久化（一对读写 + 一个水位修正）</h3>
+<table>
+<thead>
+<tr>
+<th>接口</th>
+<th>语义</th>
+<th>时机</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SaveAddressTable(IAddressTableWriter)</code></td>
+<td>落盘段表：逐段 <code>SegmentSpec</code> + footer（<strong>双尾水位是权威</strong>）</td>
+<td>Checkpoint / 关闭</td>
+</tr>
+<tr>
+<td><code>LoadAddressTable(IAddressTableReader)</code></td>
+<td>装配：三段式（头部 → 段载荷循环 → 尾部直读）</td>
+<td>恢复期，一次性</td>
+</tr>
+<tr>
+<td><code>SetStartupTails(StartupParameters)</code></td>
+<td><strong>启动期双尾水位设定</strong>（可大可小：小=截断回收；大=覆盖旧数据推水位）。单值=双尾同址；双值=扫盘恢复形态</td>
+<td><strong>仅启动阶段</strong>（首次 Allocate 之前，之后调用直接抛）</td>
+</tr>
+</tbody>
+</table>
+<p>恢复顺序硬性要求：<code>LoadAddressTable</code> → <code>SetStartupTails</code>（若扫盘结果与持久化水位不一致）→ 首次
+Allocate 锁定运行期。无持久化启动：构造 → <code>SetStartupTails</code> 定双尾 → 直接 Allocate——<code>LoadAddressTable</code>
+全程可选。（IO 引擎侧的 <code>EngineRecoveryHints</code> 由引擎恢复流程翻译为 <code>SetStartupTails</code>；两层类型不共用。）</p>
+<h2 id="4-锁模型三级开放两级区间锁不开放">4. 锁模型（三级——开放两级，区间锁不开放）</h2>
+<table>
+<thead>
+<tr>
+<th>级</th>
+<th>锁</th>
+<th>保护对象</th>
+<th>开放面</th>
+<th>谁用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>表级</td>
+<td><code>_mutationLock</code>（Monitor）</td>
+<td>段数组/索引<strong>结构变更</strong></td>
+<td>✅ <code>ExecuteUnderLock(Action)</code></td>
+<td>外部批量自洽结构操作</td>
+</tr>
+<tr>
+<td>段级</td>
+<td><code>SegmentLock</code>（SpinRWLock 写偏向）</td>
+<td><strong>段级读写互斥 / Compact/截断排他</strong></td>
+<td>✅ <code>TryGetLock(segId, out SpinRWLock?)</code>（裸锁）</td>
+<td>读者与写者互斥、Compact 与一切互斥</td>
+</tr>
+<tr>
+<td>段内</td>
+<td>区间锁（struct SpinLock，微秒级临界区）</td>
+<td>段内<strong>区间表</strong></td>
+<td>❌ <strong>不开放</strong>——lease 协议封装</td>
+<td>只有 lease 协议</td>
+</tr>
+</tbody>
+</table>
+<p><strong>为什么区间锁不开放</strong>：区间表的每次变更都是 lease 三阶段协议的一部分（占住→锁外 IO→提交/回滚）——
+开放区间锁 = 外部绕过协议直改区间表 = 状态机与事件契约脱钩。需要区间排他？拿一个 lease，协议替你
+持锁。</p>
+<p><strong>锁序（必须遵守）</strong>：<code>_mutationLock</code> &gt; 段 SpinRWLock &gt; 区间 SpinLock——只能从上往下拿，不可逆序
+（逆序 = 死锁）。SpinRWLock <strong>排他</strong>临界区内<strong>绝对禁止 await</strong>（线程关联原语，跨 await 释放即泄漏；
+共享锁可跨 await 长持，读计划锁即此用法）。</p>
+<p><strong>与物理门的分工</strong>：锁管互斥（谁在改），单向状态闩（§2 Empty→Ready/Broken/Invalid 的
+<code>_physicalReady</code>）管协调（等谁就绪）——纯状态协调不用锁。</p>
+<h2 id="5-事件契约段表--io-层isegmenthandler">5. 事件契约（段表 → IO 层，<code>ISegmentHandler</code>）</h2>
+<table>
+<thead>
+<tr>
+<th>事件</th>
+<th>时机</th>
+<th>IO 层职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OnSegmentCreate(segId, growthLimit, isHighPriority)</code></td>
+<td>注册时 / 段满预建下一段</td>
+<td>正式建段或池预建（build-gate single-flight：<strong>同一 segId 恰好一次物理构建</strong>）</td>
+</tr>
+<tr>
+<td><code>OnSegmentFull(segId, finalSize, growthLimit)</code></td>
+<td>段满（含占位推满——派生 <code>IsFull</code> 判定）</td>
+<td>写 Full-meta + 补池</td>
+</tr>
+<tr>
+<td><code>OnSegmentDelete</code> / <code>OnSegmentReplace</code> / <code>OnSegmentReclaim</code></td>
+<td>删段/Compact 替换/回收通知</td>
+<td>物理联动（引擎子系统自管）</td>
+</tr>
+<tr>
+<td><code>SubmitBackgroundWork(work)</code></td>
+<td>段表自洽低频任务</td>
+<td>worker 顺序执行</td>
+</tr>
+</tbody>
+</table>
+<p><strong>回调契约（IO 层 → 段表）</strong>：物理构建完成后调 <code>CreateSegmentCallback(segId, success)</code>。建段任务唯一
+职责 = 为「已注册且 Empty」的段完成物理构建并回调；<strong>非 Empty / 已摘索引 → 作废绝不重建</strong>。</p>
+<h2 id="6-生命周期与阶段门禁">6. 生命周期与阶段门禁</h2>
+<ul>
+<li>构造（<code>SegmentTableSettings</code>：<code>GrowthLimit</code>/<code>MinSegId</code>/<code>IndexCapacity</code>/<code>SpinMilliseconds</code>/<code>WarnEvery</code>/
+<code>EnableSingleSegment</code>）→ 启动阶段（<code>LoadAddressTable</code>（可选）+ <code>SetStartupTails</code>，<strong>仅 Allocate 之前
+可调</strong>）→ 运行期（首次 Allocate 成功即 CAS 锁定，不可逆）。</li>
+<li>handler 传入与否决定出生态：<strong>带 handler 出生 Empty</strong>（等物理回调）；<code>null</code>（纯内存/测试）出生 Ready。</li>
+</ul>
+<h2 id="7-硬性要求违反--数据丢失--死锁--复活已删段">7. 硬性要求（违反 = 数据丢失 / 死锁 / 复活已删段）</h2>
+<ol>
+<li><strong>外部永远拿 <code>SegmentView</code>，不碰 <code>Segment</code> 引用</strong>；改状态唯一入口 = lease 协议。</li>
+<li><strong>段表不等待、不做 IO</strong>。任何&quot;等建段完成再…&quot;的诉求都是 lease 协议的事（物理门），绝不往段表/
+worker 里加等待。</li>
+<li><strong>建段 single-flight</strong>：同一 segId 的物理构建恰好一次（取用、守卫、声明三者原子同临界区）。</li>
+<li><strong>索引/数组扩容 build-then-publish</strong>（先填 -1 后 <code>Volatile.Write</code> 单点发布），<strong>禁用 <code>Array.Resize</code></strong>——
+其零填充窗口会被无锁读者读到幽灵索引。</li>
+<li><strong>发布-读取 acquire/release 全对称</strong>（ARM 弱序合规）：写侧全 <code>Volatile.Write</code> 发布；读侧对索引
+<strong>字段与槽位</strong>均 <code>Volatile.Read</code>（任一环 plain load 在 ARM 上可见中间态；x64 TSO 恰安全但不得依赖）。</li>
+<li><strong><code>WaitSegmentReady</code> 唯一调用方 = lease 协议</strong>；有界放弃（预算/告警走 Settings）。</li>
+</ol>
+<h2 id="8-反模式禁止重蹈">8. 反模式（禁止重蹈）</h2>
+<ul>
+<li>❌ <strong>Invalid 段重建</strong>：持过期复查的任务去 claim 已回收段 = 复活已删文件 + 容量重计。守卫与声明
+同临界区，四态（Consumed/Claimed/InFlight/Abandoned）一锤定音。</li>
+<li>❌ <strong>锁内的&quot;正确&quot;证明不了无锁读者的中间态</strong>：共享数组变更先想读者看到什么。</li>
+<li>❌ <strong>把 <code>StableState.Full</code> 当满判据</strong>：满 = 派生 <code>IsFull</code>；<code>StableState</code> 是准入/物理语义，不是容量语义。</li>
+<li>❌ <strong>运行期调 <code>SetStartupTails</code></strong> / 在 <code>Allocate</code> 后裸写水位——直接抛。</li>
+<li>❌ <strong>给段表加物理概念</strong>（文件路径、句柄、池深度……）——物理是 IO 层的事。</li>
+</ul>
+<h2 id="9-最小正确范式io-引擎接线">9. 最小正确范式（IO 引擎接线）</h2>
+<pre><code class="lang-csharp">// ① 引擎构造段表：带 handler（出生 Empty），等待参数走 Settings
+_table = new SegmentTable(
+    new SegmentTableSettings(growthLimit: SegmentGrowthLimit, SpinMilliseconds: 30_000),
+    SegmentHandler,          // ISegmentHandler 实现（事件 → worker/池）
+    Logger);
+
+// ② handler 收到注册事件 → 入队正式建段（或池命中同步转正）
+public void OnSegmentCreate(int segId, long growthLimit, bool isHighPriority)
+{
+    if (TryConsumePooledSegment(segId))          // 池命中：物理现成
+        _table.CreateSegmentCallback(segId, success: true);   // 同步转正（幂等）
+    else
+        EnqueueCreateTask(segId, growthLimit, isHighPriority); // worker 正式建
+}
+
+// ③ worker 建段任务体：只对「已注册且 Empty」构建，成败都回调，绝不等待/重试
+private async ValueTask EnsureSegmentPhysicalAsync(int segId, long growthLimit, CancellationToken ct)
+{
+    switch (TryConsumeOrClaimPhysicalBuild(segId, out var gate))   // 取用/守卫/声明同临界区
+    {
+        case PhysicalBuildClaim.Consumed:
+            _table.CreateSegmentCallback(segId, success: true);  return;
+        case PhysicalBuildClaim.Claimed:
+            try { await CreateSegmentCoreAsync(segId, growthLimit, ct);
+                  _table.CreateSegmentCallback(segId, success: true); }
+            catch (Exception ex) { Logger.LogError(ex, &quot;建段失败 {SegId}&quot;, segId);
+                                  _table.CreateSegmentCallback(segId, success: false); } // 幂等，重复不抛
+            finally { CompletePhysicalBuild(segId, gate, pooled: false); }
+            return;
+        case PhysicalBuildClaim.InFlight:   // 池在途——其完成者代执行同一回调
+        case PhysicalBuildClaim.Abandoned:  // 非 Empty/已摘索引——绝不重建
+        default: return;
+    }
+}
+</code></pre>
+<p><strong>纯内存/测试</strong>：<code>handler: null</code> → 段出生即 Ready，无物理协调（<code>SegmentTableLeaseProtocolTests</code> 全套示例）。</p>
+<h2 id="10-决策速查">10. 决策速查</h2>
+<table>
+<thead>
+<tr>
+<th>我要…</th>
+<th>用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>查某段是否存在/多大</td>
+<td><code>GetSegment</code>/<code>TryGetSegment</code> → <code>SegmentView</code>（只读）</td>
+</tr>
+<tr>
+<td>判断区间可读</td>
+<td><code>IsRangeFullyReadable</code>（读门 = 区间表，不是游标）</td>
+</tr>
+<tr>
+<td>地址前进/回退/距离</td>
+<td><code>AdvanceAddress</code> / <code>RetreatAddress</code> / <code>GetDistance</code>（§3.1——注意返回 Extension 恒 0）</td>
+</tr>
+<tr>
+<td>跨段区间切分</td>
+<td><code>GetExtentRanges</code></td>
+</tr>
+<tr>
+<td>改任何状态（写/收/删）</td>
+<td>lease 入口 → <a href="lease-protocol.html">lease-protocol.md</a></td>
+</tr>
+<tr>
+<td>段表落盘/装配/启动水位</td>
+<td><code>SaveAddressTable</code> / <code>LoadAddressTable</code> / <code>SetStartupTails</code>（§3.2，仅启动阶段）</td>
+</tr>
+<tr>
+<td>批量结构变更对外不可见</td>
+<td><code>ExecuteUnderLock</code>（表级，§4）</td>
+</tr>
+<tr>
+<td>段级读写/Compact 互斥</td>
+<td><code>TryGetLock</code>（段级裸锁，§4）</td>
+</tr>
+<tr>
+<td>区间排他</td>
+<td><strong>不直接拿锁——走 lease 协议</strong>（§4 锁模型）</td>
+</tr>
+<tr>
+<td>诊断</td>
+<td><code>GetActiveLeases</code>/<code>SnapshotSegmentExtents</code>（只读；<code>ForceRelease</code> 仅受控回滚）</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/segment-table.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

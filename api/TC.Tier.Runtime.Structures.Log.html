@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Runtime.Structures.Log | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Runtime.Structures.Log | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.Log">
+
+  <h1 id="TC_Tier_Runtime_Structures_Log" data-uid="TC.Tier.Runtime.Structures.Log" class="text-break">Namespace TC.Tier.Runtime.Structures.Log</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLog.html">DeltaLog</a></h4>
+      <section><p>DeltaLog — KV 增量 checkpoint delta 流实现类。</p>
+<p>codec 绑定 DeltaLogCodec（不可替换）。其余参数全部可注入。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLogHeaderCodec.html">DeltaLogHeaderCodec</a></h4>
+      <section></section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLogSettings.html">DeltaLogSettings</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLog.html">DeltaLog</a> 专属配置——临时 checkpoint delta 文件场景。</p>
+<p>无额外专属配置（嵌入式 meta + 临时文件，基类字段够用）。参见 DeltaLog.md §1。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html">EntryLog</a></h4>
+      <section><p>EntryLog — 通用 entry 顺序日志实现类（WAL 是其典型用途，非唯一用途）。</p>
+<p>★ EntryLog.md：通用 per-entry [16B EntryCodec header][payload+4B对齐] 纯追加顺序日志。</p>
+<p>★ 提交模型（两层，职责分离）：</p>
+<p>  1. <b>底层页提交契约（恒成立，不可配置）</b>：Append 跨页 → FlushPage 数据落盘 →
+        <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushed_TC_Tier_Contracts_Storage_LogicalAddress_">OnPageFlushed(LogicalAddress)</a> 同步执行 commit 链（meta.Commit + 推进 CommittedOffset）。
+        这是页模式的本质保证——前一页换出时即持久化，无需任何策略注入。最坏情况：写满一页才提交。</p>
+<p>  2. <b>可选提前提交（注入式优化，降延迟）</b>：<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.html">ICommitPolicy</a> 在页未满时提前触发提交。
+        注入 null（默认）= 仅依赖底层页契约；注入 <span class="xref">TC.Tier.Runtime.Structures.Log.GroupCommitPolicy</span> = 三维度提前提交。</p>
+<p>★ 上述两层取代旧的"fire-and-forget 后台循环 + Append 内 spawn 提交"模型——后者线程池饥饿即系统挂，
+        且错误被静默吞。新模型提交都在写线程同步完成，无并发、错误冒泡。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLogHeaderCodec.html">EntryLogHeaderCodec</a></h4>
+      <section></section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLogSettings.html">EntryLogSettings</a></h4>
+      <section><p><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html">EntryLog</a> 专属配置——通用 entry 顺序日志（WAL 典型用途）。</p>
+<p>★ group commit 三维度阈值（EntryLog 的核心持久性调度，见 Structures-log-rewrite-design.md §0.6）。</p>
+<p>★ group commit 建立在引擎组合之上（默认 Mode C：DIO + None）：</p>
+<p>Append 攒批（pwrite 到 CommittedTail，未 fsync）→ 三维度阈值任一满足触发提交执行链：</p>
+<p>  engine.Flush(commitTail) 落盘 → CommittedOffset = commitTail → meta.Commit() 记录边界。</p>
+<p>★ 崩溃窗口 = 提交触发间隔内的写入量（持久性底线）。</p>
+<p>★ 三场景靠阈值配置表达（无需枚举选模式）：</p>
+<p> - 典型 WAL（默认 1ms/64KB/1000）：三维度兜底。</p>
+<p> - 单条强制（全设 0）：每次 Append 立即触发；宜配 PersistenceMode.WriteThrough（Mode D，逐写已落盘）。</p>
+<p> - 手动/2PC（Interval=InfiniteTimeSpan + 阈值很大）：不自动提交，靠 CommitAsync / TransactionLog 驱动。</p>
+<p>★ 三维度阈值仅用于构造默认 <span class="xref">TC.Tier.Runtime.Structures.Log.GroupCommitPolicy</span>（EntryLog 构造 commitPolicy 参数为 null 时启用）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></h4>
+      <section><p>LogBase 批量追加 partial——★ 地址空间窗口 + 页攒批模型。</p>
+<p>inline 写页缓冲（本地跟踪 _pageUsed），换页时同步宿主 _pageUsed 并提交，Dispose 时回写宿主状态。</p>
+<p>★ 消除 per-entry：EnsureNotDisposed / ComputePaddingLength / OnAppended / EnsureSpace*。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.LogRecovery-1.html">LogBase.LogRecovery&lt;TLogBase&gt;</a></h4>
+      <section><p>Log 恢复基类（<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html">RecoveryBase&lt;THints&gt;</a> 模板派生，子类可继承后 override
+<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.LogRecovery-1.html#TC_Tier_Runtime_Structures_Log_LogBase_LogRecovery_1_OnLogRecovered">OnLogRecovered()</a> 做依赖恢复结果的装配）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.MetaHost.html">LogBase.MetaHost</a></h4>
+      <section><p>Log meta 传输宿主（Transport 策略未注入传输时的回落）——WriteBlock 走 AppendCore(isMeta)，ReadLastBlock 走 cursor 找最后 IsMeta。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.MetaLayout.html">LogBase.MetaLayout</a></h4>
+      <section><p>Log meta 布局描述（供泛型策略操作 LogMetaHeader/LogMetaPayload codec）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogSettings.html">LogSettings</a></h4>
+      <section><p>Log 基类配置（abstract）。通用字段被所有 Log 实现类共享。</p>
+<p>★ 心智模型（见 Structures-log-rewrite-design.md §0）：IO 底层 = 持久化的内存。
+Log 不碰段/对齐/落盘细节，只配 IO 模型 + 持久化模型 + group commit 阈值。</p>
+<p>★ 每个实现类有专属 sealed Settings 子类（对齐 Metadata/Mirror 的 Settings 范式），
+承载该实现类独有的配置（如 <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLogSettings.html">EntryLogSettings</a> 的 group 提交配置）。</p>
+<p>参见 docs/spec/structures/Log/base.md。</p>
+</section>
+    <h3 id="structs">
+Structs
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLog.DeltaLogHeader.html">DeltaLog.DeltaLogHeader</a></h4>
+      <section><p>DeltaLog entry header 布局（unified-binary-layout.md §5.1）。</p>
+<p>CRC32C in Header，无独有字段，4B 对齐。headerLen = 18B。</p>
+<p>★ 本 struct 仅定义字段偏移 + 常量。读写/校验逻辑由 RecordCodec 统一处理。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.EntryLogHeader.html">EntryLog.EntryLogHeader</a></h4>
+      <section><p>EntryLog entry header 布局（unified-binary-layout.md §5.2）。</p>
+<p>CRC64 in Header，无独有字段（codecId 在 flags 高位），4B 对齐。headerLen = 22B。</p>
+<p>★ 本 struct 仅定义字段偏移 + 常量。读写/校验逻辑由 RecordCodec 统一处理。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html">LogBase.AppendBatch</a></h4>
+      <section><p>批量 ref struct——inline 写页缓冲，本地跟踪 _pageUsed，Dispose 时回写宿主状态。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a></h4>
+      <section><p>Log 恢复提示（上层注入的已知水位，加速恢复）。</p>
+<p>★ Log 专属，顺序追加日志语义。三级回退：本 hints → engine 水位 → OpenCursor 扫盘验帧。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

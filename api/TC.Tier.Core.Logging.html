@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.Logging | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.Logging | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Logging">
+
+  <h1 id="TC_Tier_Core_Logging" data-uid="TC.Tier.Core.Logging" class="text-break">Namespace TC.Tier.Core.Logging</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Logging.LoggerExtensions.html">LoggerExtensions</a></h4>
+      <section><p>Logger 扩展方法 — 提供 LogInformation/LogWarning/LogError 等便捷方法。</p>
+<p>★ 零开销短路：每个重载内部先 <a class="xref" href="TC.Tier.Core.Logging.ILogger.html#TC_Tier_Core_Logging_ILogger_IsEnabled_TC_Tier_Core_Logging_LogLevel_">IsEnabled(LogLevel)</a> 再格式化——<b>调用方无需手写 IsEnabled</b>。
+  0~3 参数用强类型重载（关闭时不装箱、不分配、不格式化）。</p>
+<p>★ 超过 3 个参数走 <code>params</code> 重载：内部仍判 IsEnabled（不格式化），但数组+装箱在<b>调用点</b>
+  发生（进扩展之前）——正确性无恙，仅<b>热路径</b>值得先手动 <code>IsEnabled</code> 保护或拆成 ≤3 参。</p>
+<p>★ 格式化用 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string.format#system-string-format(system-iformatprovider-system-string-system-object)">Format(IFormatProvider, string, object)</a>（仅 IsEnabled true 时）。
+  命名占位符（<code>{name}</code>）按参数顺序映射为数字索引，兼容 M.E.Logging 惯例。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Logging.NullLogger.html">NullLogger</a></h4>
+      <section></section>
+      <h4><a class="xref" href="TC.Tier.Core.Logging.NullLoggerFactory.html">NullLoggerFactory</a></h4>
+      <section></section>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></h4>
+      <section><p>Kernel 日志接口 — 替代 Microsoft.Extensions.Logging.ILogger。</p>
+<p>内核代码通过此接口记录日志，默认 <a class="xref" href="TC.Tier.Core.Logging.NullLogger.html">NullLogger</a> 零开销。</p>
+<p>★ 简化签名：去掉 M.E.Logging 的泛型 <code>TState</code> + <code>formatter</code>——内核只做文本日志，
+  结构化参数由 <a class="xref" href="TC.Tier.Core.Logging.LoggerExtensions.html">LoggerExtensions</a> 的扩展方法用 <code>string.Format</code> 先格式化再传入。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.Logging.ILoggerFactory.html">ILoggerFactory</a></h4>
+      <section><p>Logger 工厂接口 — 创建指定分类名的 Logger。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.Logging.LogLevel.html">LogLevel</a></h4>
+      <section><p>日志级别枚举。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

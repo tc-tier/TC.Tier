@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Core/IO 性能全景报告（Linux） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Core/IO 性能全景报告（Linux） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="coreio-性能全景报告linux">Core/IO 性能全景报告（Linux）</h1>
+
+<blockquote>
+<p><strong>环境</strong>：Linux 6.8 / Ubuntu 24.04（ext4 on /tmp），.NET 8，AMD Ryzen 9 6900HX 12C，BenchmarkDotNet + 探针。
+虚拟文件系统六维（§8）与四类文件系统矩阵（§9）为空闲机正式跑（load &lt; 1.2）；网络文件系统 MinIO（§7）为本机 docker（loopback 网络——真云对照见 §7.3）。
+<strong>性质</strong>：绝对值随硬件浮动，<strong>相对比较（比值列）是稳定结论</strong>。
+复现：</p>
+<pre><code class="lang-bash">dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*FileIoBenchmarks*&quot; --job short   # 本地文件系统/抽象税
+dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*RawIo*&quot;                            # Raw 六维（16 项）
+dotnet run --project prototypes/IoMediumMatrixProbe -c Release                                                      # 四类文件系统矩阵（含 MinIO）
+dotnet run --project prototypes/IoConcurrencyProbe -c Release                                                       # 并发扩展性（5 形态 × 梯度）
+</code></pre>
+<p><strong>配套</strong>：API 语义见 <a href="../io.html">io.md</a>；虚拟文件系统深指南 <a href="../virtual-file-system.html">virtual-file-system.md</a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-结论速查把比值翻译成选型决策">0. 结论速查（把比值翻译成选型决策）</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>数据支撑</th>
+<th>决策</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>同文件反复打开（引擎段/索引页）</td>
+<td>池命中往返 <strong>26.9 ns</strong> vs 本地文件系统裸 Open <strong>6.27 μs</strong>（<strong>233×</strong>）</td>
+<td>池是长生命周期访问的唯一合理形态</td>
+</tr>
+<tr>
+<td>关心 Core/IO 抽象层的开销</td>
+<td>读 +3.6% / 写 +0.4%（噪声量级）</td>
+<td><strong>抽象税≈零</strong>——不必绕过本层手写 RandomAccess</td>
+</tr>
+<tr>
+<td>热数据反复读</td>
+<td>Buffered 页缓存命中 2.7 μs vs DIO 53.2 μs（19.6×）</td>
+<td>常规读走 Buffered；DIO 用于绕缓存的有意场景（大扫描/自管缓存）</td>
+</tr>
+<tr>
+<td>文件间大块拷贝</td>
+<td>copy_file_range 比手写循环<strong>快 26%</strong></td>
+<td>Linux 置位 CopyRange——大拷贝走 <code>CopyRange</code></td>
+</tr>
+<tr>
+<td>小写入持久化</td>
+<td>fdatasync 比 fsync <strong>快 22%</strong>（85 vs 109 μs）</td>
+<td>Linux 上 <code>FlushData</code> 是真实加速（FlushDataOnly 位）；数据不变时优先它</td>
+</tr>
+<tr>
+<td>mem 热数据访问</td>
+<td>Reserved 直址读 1.23 μs / 映射扫描 <strong>537 ns</strong>（比 Read 快 2.3×）</td>
+<td>零拷贝读走 <code>Map</code>；写走直址 <code>Write</code></td>
+</tr>
+<tr>
+<td><strong>本地持久化选文件系统</strong></td>
+<td>虚拟文件系统元数据面 Open <strong>35×</strong> / Stat <strong>176×</strong> / 枚举 <strong>18.7×</strong> vs 本地文件系统；数据面全维带内持平</td>
+<td><strong>虚拟文件系统 = 本地持久化推荐位</strong>（单工件 + 元数据内存直达，§8）</td>
+</tr>
+<tr>
+<td><strong>fsync 密集负载（Raw）</strong></td>
+<td>追加+逐次 Flush 钉在硬件 fsync 地板（WAL 单屏障 564 μs vs Disk 490 μs vs 裸 fsync ~548 μs）</td>
+<td>日志模式下 Flush = 单屏障日志提交——无软件余量可挤（§8.4）</td>
+</tr>
+<tr>
+<td><strong>四类文件系统怎么选</strong></td>
+<td>§9 矩阵：本地三类文件系统数据面全带内持平（追加 1.6 GB/s / 顺序读 23-37 GB/s）；差异全在元数据面与一致性语义</td>
+<td>按语义选不按速度选：测试隔离内存 / 目录树本地 / 单工件+元数据快虚拟 / 云归档网络</td>
+</tr>
+<tr>
+<td><strong>网络文件系统读缓存参数</strong></td>
+<td>随机读 4K：4MB 缓存边界颠簸 895 μs vs 32MB 缓存命中 <strong>4.1 μs</strong>（220×）</td>
+<td>网络文件系统随机访问必须把 <code>ReadCacheBytes</code> 调到热集以上（§7.2）</td>
+</tr>
+<tr>
+<td><strong>并发怎么用</strong></td>
+<td>Raw 读并行 <strong>3.6×</strong>（锁外快照）/ 写反扩展（单写者锁）；Mem 写近线性 <strong>2.2×</strong>；Disk 混合最均衡</td>
+<td>Raw 单写者+Append；Mem 写密集同文件选 Reserved；并发读多句柄（§10）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-池化-vs-非池化filehandlepoolacquire归还-完整往返">1. 池化 vs 非池化（FileHandlePool——Acquire/归还 完整往返）</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">分配</th>
+<th style="text-align: right;">vs 池命中</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Pool.Acquire</code>+归还（命中，内存文件系统）</td>
+<td style="text-align: right;"><strong>26.9 ns</strong></td>
+<td style="text-align: right;">40 B</td>
+<td style="text-align: right;">1×</td>
+</tr>
+<tr>
+<td><code>Pool.TryAcquire</code>（命中）</td>
+<td style="text-align: right;">27.3 ns</td>
+<td style="text-align: right;">40 B</td>
+<td style="text-align: right;">1.01×</td>
+</tr>
+<tr>
+<td>裸 <code>fs.Open</code>+Dispose（mem）</td>
+<td style="text-align: right;">118.6 ns</td>
+<td style="text-align: right;">272 B</td>
+<td style="text-align: right;">4.4×</td>
+</tr>
+<tr>
+<td>裸 <code>fs.Open</code>+Dispose（disk，ext4）</td>
+<td style="text-align: right;"><strong>6,271 ns</strong></td>
+<td style="text-align: right;">696 B</td>
+<td style="text-align: right;"><strong>233×</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>本地文件系统差距 233×</strong> 是本表核心：本地文件系统 open 含 syscall + DIO/卷探测 + 句柄对象构建；池命中 = 锁读 + usage++（挂载式归还零系统调用）。</li>
+<li>mem 4.4×：无 syscall 但仍有对象构建 + 槽解析 + 池外 Dispose 关闭逻辑。</li>
+<li>40 B 命中分配来自 <code>FileOpenOptions</code> 传递（record class）——消费者可缓存 options 实例进一步归零。</li>
+<li>并发竞争（8 key 多线程）见 <code>FileHandlePoolContentionBench</code>——键控分桶下无全局锁串行。</li>
+</ul>
+<h2 id="2-本地文件系统抽象税diskfilehandle-vs-裸-randomaccess要不要绕过本层">2. 本地文件系统抽象税（DiskFileHandle vs 裸 RandomAccess——&quot;要不要绕过本层&quot;）</h2>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th style="text-align: right;">Core/IO</th>
+<th style="text-align: right;">裸 BCL</th>
+<th style="text-align: right;">差</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>读 64K（页缓存命中）</td>
+<td style="text-align: right;">2,830 ns</td>
+<td style="text-align: right;">2,732 ns</td>
+<td style="text-align: right;">+3.6%</td>
+</tr>
+<tr>
+<td>写 64K</td>
+<td style="text-align: right;">7.23 μs</td>
+<td style="text-align: right;">7.20 μs</td>
+<td style="text-align: right;">+0.4%</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论：抽象税在噪声内</strong>（本层 = pwrite/pread 直通，校验与游标逻辑为纯托管几 ns 级）。手写绕过本层没有性能收益，反而失去能力协商/对齐校验/池协议。</p>
+<h2 id="3-dio-vs-bufferedo_direct-的诚实标定ext4">3. DIO vs Buffered（O_DIRECT 的诚实标定——ext4）</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">Mean</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>读 64K Buffered（页缓存命中）</td>
+<td style="text-align: right;">2.71 μs</td>
+<td>热数据——页缓存即速度</td>
+</tr>
+<tr>
+<td>读 64K DIO（绕页缓存）</td>
+<td style="text-align: right;">53.2 μs</td>
+<td>真盘读——<strong>19.6×</strong> 差距 = 页缓存价值</td>
+</tr>
+<tr>
+<td>写 64K DIO（绕页缓存）</td>
+<td style="text-align: right;">52.0 μs</td>
+<td>真盘写</td>
+</tr>
+</tbody>
+</table>
+<p>DIO 的 19.6× &quot;惩罚&quot;是<strong>特性不是缺陷</strong>：自管缓存（引擎页表）场景下页缓存是双倍内存 + 额外拷贝。<code>UnbufferedSupport</code> 探测（overlay/tmpfs → Ignored）保证容器内静默降级不炸。</p>
+<h2 id="4-copyrange-vs-手写循环4m同盘">4. CopyRange vs 手写循环（4M，同盘）</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">比值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CopyRange</code>（Linux copy_file_range）</td>
+<td style="text-align: right;">735 μs</td>
+<td style="text-align: right;"><strong>1×（快 26%）</strong></td>
+</tr>
+<tr>
+<td>手写 Read/Write 循环（1M buffer）</td>
+<td style="text-align: right;">990 μs</td>
+<td style="text-align: right;">1.35×</td>
+</tr>
+</tbody>
+</table>
+<p>内核路径省一半用户态拷贝与系统调用数；内存文件系统为用户态回退（4M = 16.4 μs，内存带宽级），能力位如实表达&quot;无零拷贝加速&quot;。</p>
+<h2 id="5-持久化谱系fsync-vs-fdatasync写-4k--刷盘">5. 持久化谱系（fsync vs fdatasync——写 4K + 刷盘）</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">差</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>写 4K + <code>Flush()</code>（fsync 全量）</td>
+<td style="text-align: right;">109.2 μs</td>
+<td style="text-align: right;">—</td>
+</tr>
+<tr>
+<td>写 4K + <code>FlushData()</code>（fdatasync）</td>
+<td style="text-align: right;">85.4 μs</td>
+<td style="text-align: right;"><strong>-22%</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Linux 置位 <code>FlushDataOnly</code> 的实证价值：group commit 攒批后的最终刷盘用 <code>FlushData</code> 省元数据写放大。Win/macOS 未置位时 <code>FlushData ≡ Flush</code> 回退不抛。</p>
+<h2 id="6-mem-reserved-直址模型">6. mem Reserved 直址模型</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">Mean</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>读 64K（直址）</td>
+<td style="text-align: right;">1.23 μs</td>
+<td>memcpy 64K ≈ 53 GB/s 有效带宽</td>
+</tr>
+<tr>
+<td>写 64K（直址）</td>
+<td style="text-align: right;">1.15 μs</td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>Map</code> 视图顺序扫 64K</td>
+<td style="text-align: right;"><strong>537 ns</strong></td>
+<td>零拷贝——比 Read 再快 2.3×（无 memcpy）</td>
+</tr>
+<tr>
+<td>WriteVector 4×16K</td>
+<td style="text-align: right;">1.22 μs</td>
+<td>与逐段等价（mem 回退逐片——VectorIO 位未置位，无惩罚）</td>
+</tr>
+<tr>
+<td>CopyRange 4M（用户态回退）</td>
+<td style="text-align: right;">16.4 μs</td>
+<td>内存带宽级</td>
+</tr>
+<tr>
+<td>Append 4K（原子预留）</td>
+<td style="text-align: right;">1.54 μs</td>
+<td>含 Sparse 页分配；预留成本 = 1 次 Interlocked（淹没在 memcpy 里）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Reserved 直址读写的 ~1.2 μs 是 <strong>memcpy 数据搬运下界</strong>——本层零开销。</li>
+<li>本地文件系统 Append 4K 同基准 7.17 μs ≈ 同尺寸 pwrite（预留开销可忽略）。</li>
+</ul>
+<h2 id="7-网络文件系统remotefilesystem--minio-本机实测2026-08-19">7. 网络文件系统（RemoteFileSystem × MinIO 本机实测——2026-08-19）</h2>
+<blockquote>
+<p>环境：本机 docker <code>minio/minio</code>（loopback 网络，RTT &lt; 1ms）——量化<strong>桥层成本结构</strong>（staging/Flush 编排/读缓存）；
+真云 WAN 数字见 §7.3 COS 对照。探针 <code>prototypes/IoMediumMatrixProbe</code>（与 §9 矩阵同源）。</p>
+</blockquote>
+<h3 id="71-元数据面与数据面minio-loopback">7.1 元数据面与数据面（MinIO loopback）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th style="text-align: right;">Remote</th>
+<th style="text-align: right;">Disk（对照）</th>
+<th>形态解释</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Open</td>
+<td style="text-align: right;"><strong>515 μs</strong></td>
+<td style="text-align: right;">7.3 μs</td>
+<td>每次打开 = HeadObject 网络往返（记长度快照）——网络文件系统的固有税</td>
+</tr>
+<tr>
+<td>Stat</td>
+<td style="text-align: right;"><strong>513 μs</strong></td>
+<td style="text-align: right;">6.6 μs</td>
+<td>同上</td>
+</tr>
+<tr>
+<td>枚举 1000</td>
+<td style="text-align: right;"><strong>25.5 ms</strong></td>
+<td style="text-align: right;">2.45 ms</td>
+<td>ListObjectsV2 单页往返（恢复扫描一次到位）</td>
+</tr>
+<tr>
+<td>追加 64KB×N（不 Flush）</td>
+<td style="text-align: right;"><strong>554-703 MB/s</strong></td>
+<td style="text-align: right;">1665 MB/s</td>
+<td>staging 内存写回层（零网络）——纯追加句柄永不加载历史</td>
+</tr>
+<tr>
+<td>顺序读 4MB（1MB×4）</td>
+<td style="text-align: right;"><strong>2.7-3.3 GB/s</strong></td>
+<td style="text-align: right;">25.4 GB/s</td>
+<td>读句柄 LRU 页缓存命中 + loopback；真云 WAN 受带宽限制</td>
+</tr>
+<tr>
+<td>热随机读 4K</td>
+<td style="text-align: right;"><strong>895 μs → 4.1 μs</strong>（见 §7.2）</td>
+<td style="text-align: right;">919 ns</td>
+<td>缺页 = Range GET 网络往返</td>
+</tr>
+</tbody>
+</table>
+<h3 id="72-读缓存参数敏感度readcachebytes网络文件系统性能的最大杠杆">7.2 读缓存参数敏感度（<code>ReadCacheBytes</code>——网络文件系统性能的最大杠杆）</h3>
+<p>读句柄页缓存默认 4MB（<code>RemoteFileSystemOptions.ReadCacheBytes</code>）。4MB 测文件 = 64 × 64KiB 页，
+<strong>恰好踩满缓存边界</strong>（LRU 互相驱逐）——热随机读每 op 都在重新 Range GET（895 μs/op）；
+调到 32MB（全量驻留）后 <strong>4.1 μs/op（220× 改善）</strong>。</p>
+<p><strong>消费规则</strong>：网络文件系统随机访问的工作集必须整体装进 <code>ReadCacheBytes</code>（热集的 1.5× 以上）；纯顺序扫描不受此限
+（预取窗口 <code>PrefetchPages</code> 流水线供应）。</p>
+<h3 id="73-持久化形态flush--唯一持久化点">7.3 持久化形态（Flush = 唯一持久化点）</h3>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th style="text-align: right;">MinIO loopback</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>追加 64KB + 逐次 Flush</td>
+<td style="text-align: right;"><strong>26-40 ms/op</strong></td>
+<td>每 Flush 一次 multipart PUT（对象式持久化粒度是&quot;对象版本&quot;不是&quot;块&quot;）——逐写 Flush 网络文件系统反模式</td>
+</tr>
+<tr>
+<td>group commit（攒批 Flush）</td>
+<td style="text-align: right;">桥层 870 MB/s 级</td>
+<td>staging 吸收 + 单次 multipart——正确姿势</td>
+</tr>
+<tr>
+<td>增量 Flush（128MB 存量 + 32MB 增量）</td>
+<td style="text-align: right;">耗时比 38%</td>
+<td>未改 part 服务端自拷贝（UploadPartCopy）——出口流量 O(增量)</td>
+</tr>
+</tbody>
+</table>
+<p>真云 COS 对照（ap-chengdu，WAN）：对象层 PUT 13.2 / GET 15.0 MB/s（本机带宽饱和）；Range GET p50=48ms；
+桥级全量 Flush 12.8 MB/s——<strong>网络是网络文件系统的第一性能决定量</strong>，桥层职责是不在网络上再加协议税。</p>
+<h3 id="74-网络文件系统性能规范总结">7.4 网络文件系统性能规范（总结）</h3>
+<ol>
+<li><strong>元数据面避免高频调用</strong>（Open/Stat 各一次网络往返）——枚举融合（FsEntry 含长度，恢复扫描零额外 Head）已内建；</li>
+<li><strong>随机读先量热集，再调 <code>ReadCacheBytes</code></strong>（§7.2 的 220× 是免费收益）；</li>
+<li><strong>持久化永远 group commit</strong>——逐写 Flush 在网络文件系统是 26-40ms/op 的反模式；</li>
+<li><strong><code>RandomWrite</code> 不置位是诚实警告</strong>：GB 级既有对象随机覆写 = 逐区间拉取秒级——改追加式或重建。</li>
+</ol>
+<hr>
+<h2 id="8-虚拟文件系统六维空闲机终判本地持久化推荐位的准入证">8. 虚拟文件系统六维（空闲机终判——本地持久化推荐位的准入证）</h2>
+<blockquote>
+<p><strong>方法</strong>：BDN 隔离进程（<code>RawIoBenchmarks</code> 16 项，定量工作/op——Mean = 每 op 成本，低 = 优）；
+环境 AMD Ryzen 9 6900HX 12C / 26GB 可用 / load &lt; 1.2。验收线（设计 §12.4）：数据面噪声内持平（±5%）、
+元数据面不低于 Disk。<strong>六维全部达线。</strong></p>
+</blockquote>
+<h3 id="81-六维总表对照-diskfilesystem-同机同形">8.1 六维总表（对照 DiskFileSystem 同机同形）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Disk</th>
+<th style="text-align: right;">比值</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Open</strong>（重复打开 d0/f0）</td>
+<td style="text-align: right;"><strong>236 ns</strong></td>
+<td style="text-align: right;">8.29 μs</td>
+<td style="text-align: right;"><strong>35×</strong></td>
+<td>✅ 元数据面</td>
+</tr>
+<tr>
+<td><strong>Stat</strong>（单条目查询）</td>
+<td style="text-align: right;"><strong>36 ns</strong></td>
+<td style="text-align: right;">6.34 μs</td>
+<td style="text-align: right;"><strong>176×</strong></td>
+<td>✅ 元数据面</td>
+</tr>
+<tr>
+<td><strong>枚举</strong>（1000 条目目录）</td>
+<td style="text-align: right;"><strong>132 μs</strong></td>
+<td style="text-align: right;">2.47 ms</td>
+<td style="text-align: right;"><strong>18.7×</strong></td>
+<td>✅ 元数据面</td>
+</tr>
+<tr>
+<td><strong>随机读 4K</strong>（512 次/op，页缓存命中）</td>
+<td style="text-align: right;"><strong>123 μs</strong>（240 ns/读）</td>
+<td style="text-align: right;">465 μs（910 ns/读）</td>
+<td style="text-align: right;"><strong>3.8×</strong></td>
+<td>✅ 数据面</td>
+</tr>
+<tr>
+<td><strong>顺序读 256MB 直达档</strong>（4MB 缓冲）</td>
+<td style="text-align: right;">31.1 ms</td>
+<td style="text-align: right;">29.8 ms</td>
+<td style="text-align: right;">-4.3%</td>
+<td>✅ ±5% 带内</td>
+</tr>
+<tr>
+<td><strong>顺序读 256MB 缓冲档</strong></td>
+<td style="text-align: right;"><strong>22.0 ms</strong>（11.6 GB/s）</td>
+<td style="text-align: right;">—（超热页形态）</td>
+<td style="text-align: right;">最快档</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>追加 4MB</strong>（64KB×64，稳态）</td>
+<td style="text-align: right;">与 Disk 噪声带内持平（探针 1645 vs 1678 MB/s）</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">≈1.0×</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>追加+逐次 Flush</strong>（fsync 密集）</td>
+<td style="text-align: right;">564 μs/op</td>
+<td style="text-align: right;">490 μs/op</td>
+<td style="text-align: right;">0.87×</td>
+<td>✅ 钉硬件地板（§8.4）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="82-元数据面-35176为什么-disk-付-syscall-而-raw-不付">8.2 元数据面 35–176×：为什么 Disk 付 syscall 而 Raw 不付</h3>
+<p>Raw 的命名空间/区间表/位图全部<strong>内存直达</strong>（打开时装载，<code>_sortedKeys</code> 有序索引 O(log n) 维护）——
+Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fstat + 句柄构建，Stat = fstat，枚举 = readdir 循环。
+这是设计预言（§3.4&quot;Open/Stat/枚举 = 内存元数据操作，零 syscall——明显更快&quot;）的实测兑现。
+<strong>消费含义</strong>：海量小文件/高频元数据负载（段表扫描、恢复遍历、索引元数据）在 Raw 上有一个数量级以上的免费加速。</p>
+<h3 id="83-数据面-读自管页缓存--o_direct-读通道">8.3 数据面-读：自管页缓存 + O_DIRECT 读通道</h3>
+<ul>
+<li><strong>热随机读 3.8×</strong>：自管页缓存命中 = ~100ns 级 memcpy（240 ns/读含接口层），Disk 热读要付 pread syscall（910 ns）。</li>
+<li><strong>顺序读两档形态</strong>：
+<ul>
+<li><strong>缓冲档 11.6 GB/s</strong>：冷段批量装入（64 块/次载体读）+ 自动预读（内核 readahead 同构启发式）+ 读绕（大跨度直读不驻留）；</li>
+<li><strong>直达档 -4.3%（带内）</strong>：<code>NoBuffering</code> 走<strong>文件载体专用 O_DIRECT 读通道</strong>——弹跳窗三重对齐 + 单段零拷贝，
+与 Disk O_DIRECT 同 syscall 形态（空闲机实测 2229 vs 9955 MB/s 的缓冲对照）。</li>
+<li><strong>注意</strong>：O_DIRECT 的<strong>写</strong>侧是另一回事——同步小写每写一次设备往返（实测 64KB=189μs、
+1MB=12ms 灾难段），文件载体缓冲档平权 Disk 的存在条件 = 内核 writeback 吸收。<strong>读写两侧分开定策</strong>是这套
+两档模型的核心规范。</li>
+</ul>
+</li>
+</ul>
+<h3 id="84-数据面-写写放大与-wal-单屏障当前口径">8.4 数据面-写：写放大与 WAL 单屏障（当前口径）</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th style="text-align: right;">当前</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>追加（缓冲档）</td>
+<td style="text-align: right;"><strong>1481 MB/s</strong>（超 Disk 1315）——写放大归零（run 一次落位 + continue）</td>
+</tr>
+<tr>
+<td>追加 + 逐次 Flush</td>
+<td style="text-align: right;"><strong>85 vs Disk 83 vs 裸 fsync 地板 66 MB/s</strong>——Flush = 排干 + 记录落区 + <strong>单屏障</strong>；两段式组提交（fsync 期间数据面不停摆）</td>
+</tr>
+<tr>
+<td>原地覆写 + Flush</td>
+<td style="text-align: right;">564 vs 490 μs/op——双 write + 记录机械 ≈ 1.9× 裸 fsync</td>
+</tr>
+</tbody>
+</table>
+<p><strong>设计含义</strong>：fsync 密集场景的性能上限由设备 fsync 延迟决定（硬件地板）；本层的职责是不在地板之上
+再加协议税——检查点 per-op 全量序列化（初版每 Flush 5 屏障 + O(容量) 位图写）正是被 WAL 替换掉的那层税。</p>
+<h3 id="85-调优速查raw">8.5 调优速查（Raw）</h3>
+<table>
+<thead>
+<tr>
+<th>负载</th>
+<th>打开姿势</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>大顺序扫描（不冲刷内存）</td>
+<td><code>Hints = NoBuffering</code> + <code>Advise(Sequential)</code>（纯流式：载体直读、无页机制、无预取交互）</td>
+</tr>
+<tr>
+<td>热随机读 / 重读</td>
+<td>默认缓冲档（自管缓存命中 memcpy）；预算 <code>PageCacheBytes</code>（默认 64MB，0 = 纯直达）</td>
+</tr>
+<tr>
+<td>追加日志型（引擎段同构）</td>
+<td><code>PreallocateSize</code> 预分配消分配税 + <code>Append</code> 原子预留；持久化节奏：<code>FlushData</code>（批）/ <code>Flush</code>（提交点）/ <code>Hints.WriteThrough</code>（逐写零窗口）</td>
+</tr>
+<tr>
+<td>全卷备份/迁移</td>
+<td><code>RootSpaceImage.Transfer</code>（Raw↔Raw 自动走 dd 字节直拷快道）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-四类文件系统横向矩阵2026-08-19-空闲机实测prototypesiomediummatrixprobe">9. 四类文件系统横向矩阵（2026-08-19 空闲机实测——<code>prototypes/IoMediumMatrixProbe</code>）</h2>
+<blockquote>
+<p>同一套形态跑遍四类文件系统（本地 ext4 / 内存 Sparse / 虚拟文件载体 / 网络 MinIO loopback）——
+本地三类文件系统<strong>数据面全带内持平</strong>（差异在元数据面与一致性语义）；网络文件系统是另一个物理世界（网络往返）。</p>
+</blockquote>
+<h3 id="91-元数据面nsop3-轮取最小">9.1 元数据面（ns/op，3 轮取最小）</h3>
+<table>
+<thead>
+<tr>
+<th>文件系统</th>
+<th style="text-align: right;">Open</th>
+<th style="text-align: right;">Stat</th>
+<th style="text-align: right;">枚举 1000</th>
+<th>形态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Disk</td>
+<td style="text-align: right;">7,314</td>
+<td style="text-align: right;">6,607</td>
+<td style="text-align: right;">2,449,200</td>
+<td>每次 = syscall（open/fstat/readdir）</td>
+</tr>
+<tr>
+<td>Mem</td>
+<td style="text-align: right;"><strong>118</strong></td>
+<td style="text-align: right;"><strong>54</strong></td>
+<td style="text-align: right;"><strong>134,483</strong></td>
+<td>纯内存（槽/字典直达）——上界参照</td>
+</tr>
+<tr>
+<td><strong>Raw</strong></td>
+<td style="text-align: right;"><strong>223</strong></td>
+<td style="text-align: right;"><strong>60</strong></td>
+<td style="text-align: right;"><strong>223,785</strong></td>
+<td>纯内存（元数据全量驻留 + 有序索引）</td>
+</tr>
+<tr>
+<td>Remote</td>
+<td style="text-align: right;">515,155</td>
+<td style="text-align: right;">512,926</td>
+<td style="text-align: right;">25,506,325</td>
+<td>每次 = 网络往返（Head/ListObjects）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Raw vs Disk：Open <strong>33×</strong> / Stat <strong>110×</strong> / 枚举 <strong>11×</strong>——与 §8 BDN 隔离口径（35×/176×/18.7×）同量级；</li>
+<li>Raw vs Mem（理论上界）：同数量级（Open 223 vs 118——Raw 多一层共享登记与游标；Stat 打平 60 vs 54）。
+<strong>元数据面 虚拟 ≈ 内存 ≫ 本地 ≫ 网络</strong> 是四类文件系统的基本格局。</li>
+</ul>
+<h3 id="92-数据面">9.2 数据面</h3>
+<table>
+<thead>
+<tr>
+<th>文件系统</th>
+<th style="text-align: right;">顺序读 4MB（GB/s）</th>
+<th style="text-align: right;">热随机读 4K（ns/op）</th>
+<th style="text-align: right;">追加 64KB（MB/s）</th>
+<th style="text-align: right;">fsync 形态 64KB+Flush（ms/op）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Disk</td>
+<td style="text-align: right;">25.4</td>
+<td style="text-align: right;">919（OS page cache）</td>
+<td style="text-align: right;">1,665</td>
+<td style="text-align: right;">0.33</td>
+</tr>
+<tr>
+<td>Mem</td>
+<td style="text-align: right;"><strong>37.3</strong></td>
+<td style="text-align: right;"><strong>126</strong>（直址）</td>
+<td style="text-align: right;">1,627</td>
+<td style="text-align: right;">0.04（no-op）</td>
+</tr>
+<tr>
+<td><strong>Raw</strong></td>
+<td style="text-align: right;">23.6</td>
+<td style="text-align: right;">254（自管页缓存）</td>
+<td style="text-align: right;">1,606</td>
+<td style="text-align: right;">0.38（WAL 单屏障）</td>
+</tr>
+<tr>
+<td>Remote</td>
+<td style="text-align: right;">2.7（loopback）</td>
+<td style="text-align: right;">895,000（4MB 缓存边界）/ 4,086（32MB 缓存）</td>
+<td style="text-align: right;">554（staging）</td>
+<td style="text-align: right;">26-40（每 Flush 一次 multipart）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>本地三类文件系统数据面带内持平</strong>：追加 1.6 GB/s（设备写上限形态）、顺序读 23-37 GB/s（内存拷贝带宽形态）——
+文件系统选择不由数据面速度决定；</li>
+<li>随机读的缓存提供方不同（OS page cache / 直址 / 自管页缓存 / 桥级 LRU）——Raw 254ns 含共享设施
+（游标/epoch/快照），是&quot;带一致性规范的缓存命中&quot;价格；</li>
+<li><strong>fsync 谱系</strong>：Mem 0.04ms（易失）→ Disk 0.33ms（OS fsync）→ Raw 0.38ms（WAL 单屏障 + 载体 fsync）→
+Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应。</li>
+</ul>
+<h3 id="93-选型决策数据面持平的前提下按语义选">9.3 选型决策（数据面持平的前提下按语义选）</h3>
+<table>
+<thead>
+<tr>
+<th>需求</th>
+<th>文件系统</th>
+<th>依据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单元测试 / CI 无盘 / 引擎内存设备</td>
+<td>Mem</td>
+<td>进程内私有卷、易失、元数据最快</td>
+</tr>
+<tr>
+<td>目录树形态 / 宿主直接可读 / 引导期</td>
+<td>Disk</td>
+<td>宿主文件系统原样（工具链兼容）</td>
+</tr>
+<tr>
+<td>本地持久化主形态</td>
+<td><strong>Raw</strong></td>
+<td>单工件自描述 + 元数据面 11-33× + 精确卷几何 + 断电自恢复 + dd 级迁移</td>
+</tr>
+<tr>
+<td>云归档 / 多地容灾 / 弹性容量</td>
+<td>Remote</td>
+<td>对象存储生态（成本 + 持久性 SLA）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="10-并发与扩展性四类文件系统--5-负载形态--1-16-线程梯度prototypesioconcurrencyprobe">10. 并发与扩展性（四类文件系统 × 5 负载形态 × 1-16 线程梯度——<code>prototypes/IoConcurrencyProbe</code>）</h2>
+<blockquote>
+<p>2026-08-19 空闲窗实测（12 核，两轮复跑格局一致）。读维为<strong>每线程独立句柄</strong>（引擎读池形态——
+单句柄多线程读不在 <code>IFileHandle</code> 契约内：Remote 读句柄缓存非线程安全，Mem/Disk/Raw 单句柄
+并发虽巧可跑、不构成承诺）。追加为同句柄多线程（<code>Append</code> 文件级原子预留——契约内）。</p>
+</blockquote>
+<h3 id="101-并发追加同文件-64kbmbs">10.1 并发追加（同文件 64KB，MB/s）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">线程</th>
+<th style="text-align: right;">Disk</th>
+<th style="text-align: right;">Mem(Sparse)</th>
+<th style="text-align: right;">Mem(Reserved)</th>
+<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Remote(staging)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1,108-1,330</td>
+<td style="text-align: right;">1,296-1,520</td>
+<td style="text-align: right;">~22（换租税）</td>
+<td style="text-align: right;">1,250-1,270</td>
+<td style="text-align: right;">380-420</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">290-1,250</td>
+<td style="text-align: right;">2,470-2,750</td>
+<td style="text-align: right;">~23</td>
+<td style="text-align: right;">300-600</td>
+<td style="text-align: right;">120-320</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">50-1,050</td>
+<td style="text-align: right;"><strong>2,840-3,300</strong></td>
+<td style="text-align: right;">~21</td>
+<td style="text-align: right;">28-590</td>
+<td style="text-align: right;">130-410</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Mem(Sparse) 近线性扩展</strong>（1.5→<strong>3.6 GB/s</strong>，2.4×）：RW Gate + 免清零租借（整页覆写零清零税）
+<ul>
+<li>逐页池化分配——写并发的主力形态；<code>PreallocateSize</code> 预分配后页表全命中，
+追加 = 纯 memcpy 热道（1415→1568 MB/s 单写者）；</li>
+</ul>
+</li>
+<li><strong>Mem(Reserved) 追加恒 ~22 MB/s 不是并发问题</strong>：Reserved 追加越过 EOF 必经 Grow 换租
+（O(n) memcpy/次——文件系统固有，io.md §8.10）；原地覆写形态下 Reserved 写 13-26 GB/s（§10.3）；</li>
+<li><strong>Disk 波动大</strong>（内核 inode 锁 + 回写竞争，环境负载敏感）；</li>
+<li><strong>Raw 多线程反扩展</strong>（1,250→~300）：<strong>已知形态</strong>——v1 写路径全局元数据锁（单写者模型，正确性优先），
+多写线程 = 争用税无并行收益。<strong>消费含义：Raw 上的并发写应该用单写者句柄 + <code>Append</code> 原子预留
+（多线程共用一个句柄天然串行化），或上层自己做写聚合</strong>；写路径锁分段是后续优化方向；</li>
+<li>Remote staging 层并发追加 ~150-420 MB/s（内存层 + 连接管理竞争）。</li>
+</ul>
+<h3 id="102-并发热随机读同文件-16mb-热集每线程独立句柄m-opss">10.2 并发热随机读（同文件 16MB 热集，每线程独立句柄，M ops/s）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">线程</th>
+<th style="text-align: right;">Disk</th>
+<th style="text-align: right;">Mem(Sparse)</th>
+<th style="text-align: right;"><strong>Mem(Reserved)</strong></th>
+<th style="text-align: right;"><strong>Raw</strong></th>
+<th style="text-align: right;">Remote</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1.0-1.1</td>
+<td style="text-align: right;">6.1-6.4</td>
+<td style="text-align: right;">6.4-6.7</td>
+<td style="text-align: right;">3.0-3.6</td>
+<td style="text-align: right;">0.14-0.15</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">3.6-3.9</td>
+<td style="text-align: right;">4.3-4.4 → <strong>18.0-23.1</strong>†</td>
+<td style="text-align: right;"><strong>20.1-23.1</strong></td>
+<td style="text-align: right;">8.6-10.1</td>
+<td style="text-align: right;">0.13</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">6.5-7.1</td>
+<td style="text-align: right;">3.6-4.2 → <strong>21.9</strong>†</td>
+<td style="text-align: right;"><strong>31.7-37.5</strong></td>
+<td style="text-align: right;">12.0-14.5</td>
+<td style="text-align: right;">0.11</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">6.1-7.8</td>
+<td style="text-align: right;">3.8-4.3 → <strong>14.0</strong>†</td>
+<td style="text-align: right;"><strong>35.4-40.7</strong></td>
+<td style="text-align: right;">8.2-9.0</td>
+<td style="text-align: right;">0.02-0.03</td>
+</tr>
+</tbody>
+</table>
+<p>† Sparse 的 RW Gate 升级（原裸 monitor 读者互斥且被写者饿死）：读共享后并行 4-5×。</p>
+<ul>
+<li><strong>Mem(Reserved) 读扩展 5-6×</strong>（6.4→35-40M ops/s）：epoch 锁外读者 + freeze 屏障的完全兑现——
+读者互不阻塞、不被写者阻塞（§10.3 混合形态同样成立）；</li>
+<li><strong>Mem(Sparse) 升级后读也并行</strong>（4-22M）：per-file Gate 从裸 monitor 换 <code>SpinRWLock</code>（LockWord 时代）RW 语义——
+并发读者互不阻塞；16 线程回落 = CAS 读计数热点；</li>
+<li><strong>Raw 读路径并行扩展 3.3-4×</strong>（3.0→12-14.5M ops/s @8 线程）：锁外快照读（区间列表 CoW + epoch
+延迟回收）的实测兑现；16 线程回落 = 12 核物理上限 + 环境负载；</li>
+<li>Disk 随内核 pread 并行扩展（7.8×@16）；Remote 受连接与缓存装载竞争限制。</li>
+</ul>
+<h3 id="103-混合读写1-写者-64kb-原地覆写--n-1-读者-4k-随机读同文件写-mbs--读-m-opss">10.3 混合读写（1 写者 64KB <strong>原地覆写</strong> + N-1 读者 4K 随机读同文件；写 MB/s / 读 M ops/s）</h3>
+<blockquote>
+<p>写者用既有数据内轮转覆写（引擎页更新形态）——消除 Reserved 追加越 EOF 的 Grow 换租混杂变量
+（Reserved 追加换租是文件系统固有成本，见 io.md §8.10）。</p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">总线程</th>
+<th style="text-align: right;">Disk</th>
+<th style="text-align: right;">Mem(Sparse)†</th>
+<th style="text-align: right;"><strong>Mem(Reserved)</strong></th>
+<th style="text-align: right;">Raw</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">2</td>
+<td style="text-align: right;">5,929 / 1.0</td>
+<td style="text-align: right;">19,205 / <strong>0.00</strong> → <strong>6.1</strong>†</td>
+<td style="text-align: right;"><strong>22,793 / 6.1</strong></td>
+<td style="text-align: right;">4,188 / 0.00</td>
+</tr>
+<tr>
+<td style="text-align: right;">4</td>
+<td style="text-align: right;">4,941 / 2.6</td>
+<td style="text-align: right;">10,416 / <strong>6.3</strong>†</td>
+<td style="text-align: right;"><strong>20,277 / 16.6</strong></td>
+<td style="text-align: right;">2,900 / 0.00</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">4,730 / 5.6</td>
+<td style="text-align: right;">3,299 / <strong>9.4</strong>†</td>
+<td style="text-align: right;"><strong>13,876 / 27.9</strong></td>
+<td style="text-align: right;">3,037 / 0.01</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">3,396 / 6.0</td>
+<td style="text-align: right;">1 / 12.5†（写者饿死）</td>
+<td style="text-align: right;"><strong>9,227 / 27.8</strong></td>
+<td style="text-align: right;">3,598 / 0.03</td>
+</tr>
+</tbody>
+</table>
+<p>† Mem(Sparse) 的 per-file Gate 已升级 RW 语义（原裸 monitor）：
+<strong>升级前读者 0.2-0.5M ops/s（高频写者下饿死——monitor 无公平性）→ 升级后 6.3-12.5M（30-60×）</strong>，
+读写并存成为可用形态；代价 = ≥16 读者极端下写者退化（RW 锁无公平队列，读者持续涌入时排他难插）。</p>
+<ul>
+<li><strong>Mem(Reserved) 仍是混合负载的生产答案</strong>：写 9-22 GB/s 与读 6-28M ops/s 同时成立且无饿死面
+（epoch 锁外读者 + freeze 屏障）；Sparse 2-8 线程内读写并存可用（写 3-19GB/s + 读 6-9M），
+极端读并发（≥16）或写延迟敏感场景仍选 Reserved；</li>
+<li><strong>Disk 混合最均衡</strong>：pread 无锁（读者 8.1M）+ 缓冲写 4-6 GB/s；</li>
+<li><strong>Raw 单写者模型的已知代价</strong>：数据面覆写本身很快（3-6.6 GB/s——无分配无结构变更），但每写过
+全局元数据锁，饱和写者下读者快照捕获排队（0.00-0.03M）；写静止时读并行如常（§10.2 的 12M ops/s）。
+<strong>消费含义：Raw 上读写并发负载 = 写者限速/攒批，或读写分文件（段模型天然如此）</strong>；锁分段是后续优化方向。</li>
+</ul>
+<h3 id="104-并发-openclosek-opss">10.4 并发 Open/Close（K ops/s）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">线程</th>
+<th style="text-align: right;">Disk</th>
+<th style="text-align: right;">Mem</th>
+<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Remote</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">107</td>
+<td style="text-align: right;"><strong>7,161</strong></td>
+<td style="text-align: right;">3,894</td>
+<td style="text-align: right;">2</td>
+</tr>
+<tr>
+<td style="text-align: right;">8</td>
+<td style="text-align: right;">687</td>
+<td style="text-align: right;">3,535</td>
+<td style="text-align: right;">3,416</td>
+<td style="text-align: right;">9</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Raw 单线程 3.9M ops/s = Disk 的 36×</strong>（内存元数据直达）；多线程缓降（登记/共享设施竞争）但
+8 线程仍是 Disk 的 5×；</li>
+<li>Mem 同型态（7.2M 单线程最高，反扩展至 3.2M）；</li>
+<li>网络文件系统每次 Open = 网络往返（2K ops/s）——网络文件系统高频开关是反模式。</li>
+</ul>
+<h3 id="105-并发独立文件追加n-文件-n-线程mbs">10.5 并发独立文件追加（N 文件 N 线程，MB/s）</h3>
+<table>
+<thead>
+<tr>
+<th style="text-align: right;">线程</th>
+<th style="text-align: right;">Disk</th>
+<th style="text-align: right;">Mem</th>
+<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Remote(staging)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: right;">1</td>
+<td style="text-align: right;">1,400</td>
+<td style="text-align: right;">1,400</td>
+<td style="text-align: right;">1,300</td>
+<td style="text-align: right;">300</td>
+</tr>
+<tr>
+<td style="text-align: right;">16</td>
+<td style="text-align: right;">560-1,260</td>
+<td style="text-align: right;"><strong>3,400-3,600</strong></td>
+<td style="text-align: right;"><strong>19-24</strong></td>
+<td style="text-align: right;">560-750</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>Mem 独立文件近线性（数据面隔离 + 逐文件并行）——多文件并发写的主力形态；</li>
+<li><strong>Raw 全局元数据锁在多文件写下争用放大</strong>（每文件追加都过同一把锁——19-24 MB/s）：与 §10.1 同根
+（单写者模型），多文件形态更吃亏；<strong>消费含义：Raw 卷上的多写入者负载应在上层聚合为单写者</strong>
+（这正是存储引擎段模型的标准形态——一个段一个写者）；</li>
+<li>Disk 独立文件并行最好情形 ~1.3 GB/s（内核 per-inode 锁真隔离）。</li>
+</ul>
+<h3 id="106-并发规范总结">10.6 并发规范总结</h3>
+<ol>
+<li><strong>Raw = 单写者模型（v1 已知边界）</strong>：写路径全局锁——并发写（同文件/多文件）反扩展。正确姿势 =
+单写句柄 + <code>Append</code> 原子预留（多线程共句柄自然串行）或上层写聚合；读路径锁外快照真并行（3.6×）。</li>
+<li><strong>Mem 模式分工</strong>：Sparse 的 per-file Gate 已是 RW 语义（读共享写独占）——混合负载
+读写并存（2-8 线程写 3-19GB/s + 读 6-9M ops/s）；Reserved 仍是读写双高的生产答案（无锁直址 +
+epoch 锁外读，无饿死面）；≥16 读者极端下 Sparse 写者退化（RW 锁无公平队列）——此时必须 Reserved。</li>
+<li><strong>Disk = 混合负载最均衡</strong>：无锁 pread 让读者不吃写锁；多文件并行真隔离。</li>
+<li><strong>Remote = 并发收益在网络侧不在桥侧</strong>：staging 内存层并发有限；<code>MaxConcurrency</code>（默认 4）才是
+网络文件系统并发的正确旋钮（Flush 并行上传）。</li>
+<li><strong>跨文件系统通用</strong>：<code>Append</code> 同句柄多线程安全（原子预留——契约内）；单句柄多线程 <strong>Read</strong> 不在契约内
+——并发读用多句柄（Raw/Mem/Disk 恰好能跑也不依赖）。</li>
+</ol>
+<h3 id="107-生产可用性判定按负载形态逐项给结论">10.7 生产可用性判定（按负载形态逐项给结论）</h3>
+<table>
+<thead>
+<tr>
+<th>负载形态</th>
+<th>判定</th>
+<th>依据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单写者追加/日志卷（Raw）</td>
+<td>✅ <strong>生产就绪</strong></td>
+<td>追加 1.2-1.6 GB/s（Disk 持平）；fsync 钉硬件地板（564μs vs Disk 490μs）；断电自恢复契约测试锁定</td>
+</tr>
+<tr>
+<td>多读者并发扫描/点查（Raw）</td>
+<td>✅ <strong>生产就绪</strong></td>
+<td>读扩展 3.3-4×（14.5M ops/s @8T）；随机读热 240ns/读（Disk 3.8×）</td>
+</tr>
+<tr>
+<td>高并发读写并存（Mem）</td>
+<td>✅ <strong>生产就绪</strong></td>
+<td>Reserved：写 9-22 GB/s 与读 6-28M ops/s 同时成立（§10.3）；Sparse（RW Gate）2-8 线程读写并存可用</td>
+</tr>
+<tr>
+<td>元数据面重负载（Raw）</td>
+<td>✅ <strong>生产就绪</strong></td>
+<td>Open 4.6M ops/s（Disk 35×）；并发 Open/Close 8T 仍 3.2M（Disk 5×）</td>
+</tr>
+<tr>
+<td>网络文件系统 group commit</td>
+<td>✅ <strong>生产就绪</strong></td>
+<td>桥层 870 MB/s；增量 Flush 出口流量 O(增量)；网络侧按部署实测</td>
+</tr>
+<tr>
+<td>读写并发同文件（Raw）</td>
+<td>⚠️ <strong>形态受限（有明确姿势）</strong></td>
+<td>饱和写者下读者排队（0.01M）——写者限速/攒批或读写分文件（段模型天然如此）；锁分段是后续优化方向</td>
+</tr>
+<tr>
+<td>多写入者（Raw）</td>
+<td>⚠️ <strong>形态受限（有明确姿势）</strong></td>
+<td>并发写反扩展（单写者模型）——上层聚合为单写者 + <code>Append</code>（存储引擎段模型的标准形态）</td>
+</tr>
+<tr>
+<td>逐写 Flush（网络文件系统）</td>
+<td>❌ <strong>反模式</strong></td>
+<td>26-40ms/op（对象版本粒度）——网络文件系统持久化永远 group commit</td>
+</tr>
+</tbody>
+</table>
+<p><strong>总判</strong>：IO 层在<strong>契约承诺的负载形态</strong>内全部达到生产性能（数据面带内持平 + 元数据面一个数量级优势 +
+并发读真扩展 + fsync 硬件地板）；两个受限形态（Raw 混合读写/多写者）是 v1 单写者模型的<strong>已知边界而非
+缺陷</strong>——消费姿势已在 §10.6 钉死，与存储引擎&quot;一个段一个写者&quot;的段模型天然对齐。后续优化方向：
+Raw 写路径锁分段 / Mem Reserved 追加快道（Grow 换租）/ Sparse RW Gate 公平性（极端读者下写者退化——
+高并发场景用 Reserved 即绕开）。</p>
+<hr>
+<h2 id="11-方法学规范数字可信的前提">11. 方法学规范（数字可信的前提）</h2>
+<ol>
+<li><strong>定量工作/op</strong>（BDN）：每 op 固定工作量，Mean = 每 op 成本、Ratio 可比、Alloc/op 有意义。
+<del>自旋窗式（while elapsed &lt; N ms）已废弃</del>——Mean 恒等于窗长、Ratio 失义（曾因此返工，防重蹈）。</li>
+<li><strong>迭代间重置</strong>：追加维每 op 删建文件（<code>IterationSetup</code>）——否则预分配 × 迭代数打满卷（DiskFull 假阴性）。</li>
+<li><strong>空闲机终判 ±5%</strong>：共享机负载波动 3× 时数字失真（Disk 自身可退化 100×）；正式结论 load &lt; 1.2 实测。</li>
+<li><strong>fsync 维沉降</strong>：前序基准的内核回写积压会污染 fsync 段（单 inode fsync 付全部积压 vs 多 inode 的测量不对称）。</li>
+<li><strong>探针 vs BDN</strong>：探针（DiskVsRawProbe）快速肉眼对照；正式数字走 BDN（进程隔离 + 预热 + 多轮）。</li>
+</ol>
+<h2 id="12-已知边界">12. 已知边界</h2>
+<ul>
+<li>dev 机基线：绝对值不可外推到生产硬件（NVMe/云盘差异大）；<strong>比值与结论跨硬件稳定</strong>。</li>
+<li>Raw 追加维 0.86×（BDN create 重载形态——每 op 删建文件，建文件路径税 vs ext4 内联建文件；稳态持平）
+——观察项：海量小文件建卷负载再议。</li>
+<li>4Kn 真扇区/Windows 载体/dm-flakey 故障注入矩阵未跑（需 root/Windows 环境）。</li>
+<li><strong>MinIO loopback ≠ 真云</strong>：RTT &lt; 1ms 掩盖了 WAN 延迟（真云 Range GET p50=48ms——§7.3 COS 对照）；
+§7/§9 的 Remote 数字量化的是<strong>桥层成本结构</strong>（staging/缓存/Flush 编排），网络侧按部署实测。</li>
+<li><strong>Raw 写路径锁分段未做</strong>（§10.1/§10.5 反扩展的根）：单写者模型下多线程写无并行收益——
+后续优化方向 = 写锁分段（段级/文件级）+ 位图分块锁；当前消费姿势 = 单写者 + Append。</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/perf/io-performance.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

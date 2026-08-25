@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>优先级队列性能基线与并发压测 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="优先级队列性能基线与并发压测 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="优先级队列性能基线与并发压测">优先级队列性能基线与并发压测</h1>
+
+<blockquote>
+<p><strong>环境</strong>：Windows 11 ｜ i5-12400（6C/12T）｜ .NET 8.0.30 ｜ Workstation GC（2026-08-17 全量压测）；
+单线程 BDN 为 short job。数字用于<strong>实现间横向对比</strong>，绝对值随硬件浮动。</p>
+<p><strong>复现</strong>：</p>
+<pre><code class="lang-bash"># 单线程 BDN（short job）
+dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*PriorityQueueBenchmarks*RoundTrip*&quot; --job short
+# 并发吞吐矩阵 + 积压敏感性 + 并发正确性（独立计时探针）
+dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --pq-probe
+dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Debug   -- --pq-probe correctness   # DEBUG 链校验器
+# 活性回归绊线
+dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --pq-wedge
+</code></pre>
+<p><strong>配套</strong>：API 语义与选型见 <a href="../priority-queues.html">../priority-queues.md</a>。</p>
+</blockquote>
+<hr>
+<h2 id="1-单线程混合往返稳态积压-1024均匀-8-级优先级">1. 单线程混合往返（稳态积压 1024，均匀 8 级优先级）</h2>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">Ratio</th>
+<th style="text-align: right;">分配/次</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>.NET 内置 <code>PriorityQueue</code>（非线程安全，参照）</td>
+<td style="text-align: right;"><strong>11.0 ns</strong></td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">0 B</td>
+</tr>
+<tr>
+<td><code>BucketPriorityQueue</code>（离散 8 桶）</td>
+<td style="text-align: right;"><strong>52.4 ns</strong></td>
+<td style="text-align: right;">4.75</td>
+<td style="text-align: right;">48 B</td>
+</tr>
+<tr>
+<td><code>SkipListPriorityQueue</code>（任意 long）</td>
+<td style="text-align: right;">328.0 ns</td>
+<td style="text-align: right;">29.8</td>
+<td style="text-align: right;">1376 B</td>
+</tr>
+<tr>
+<td><code>AsyncPriorityQueue</code>（无锁 Route A）</td>
+<td style="text-align: right;"><strong>423.2 ns</strong></td>
+<td style="text-align: right;">38.4</td>
+<td style="text-align: right;">1256 B</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Bucket 是并发队列里的性能之王</strong>：50~66 ns 对积压深度不敏感（出队扫桶 O(桶数)）——优先级能映射为
+少量离散枚举时无条件选它。</li>
+<li>SkipList / Async 的差距是&quot;任意优先级 + 线程安全&quot;的代价——两者定位是优先级必须任意取值时的选择。</li>
+<li>与内置 11 ns 对照不是&quot;落后&quot;，是线程安全的定价——单线程场景就该用内置。</li>
+</ul>
+<h2 id="2-并发吞吐矩阵混合往返--线程数独立计时探针">2. 并发吞吐矩阵（混合往返 × 线程数，独立计时探针）</h2>
+<p><strong>方法论</strong>：Thread 直起 + Barrier 对齐起跑 + Stopwatch 总时/总 ops；先探测轮（50K ops/线程，10s 护栏）
+再 5 轮正式（200K/线程，60s 护栏）取中位。<strong>LockedHeap 对照基线</strong> = 一把 <code>lock</code> + 内置 <code>PriorityQueue</code>
+（四叉堆）+ 一项一许可信号量。</p>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th style="text-align: right;">1T ns/op</th>
+<th style="text-align: right;">2T ns/op</th>
+<th style="text-align: right;">4T ns/op</th>
+<th style="text-align: right;">8T ns/op</th>
+<th style="text-align: right;">8T 总吞吐</th>
+<th style="text-align: right;">分配 B/op</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bucket</td>
+<td style="text-align: right;">151.6</td>
+<td style="text-align: right;">232.4</td>
+<td style="text-align: right;">193.0</td>
+<td style="text-align: right;">231.4</td>
+<td style="text-align: right;"><strong>34.6 Mops/s</strong></td>
+<td style="text-align: right;">48.7</td>
+</tr>
+<tr>
+<td><strong>LockedHeap（大锁+堆，对照）</strong></td>
+<td style="text-align: right;">304.5</td>
+<td style="text-align: right;"><strong>154.0</strong></td>
+<td style="text-align: right;">231.1</td>
+<td style="text-align: right;">250.4</td>
+<td style="text-align: right;"><strong>32.0 Mops/s</strong></td>
+<td style="text-align: right;">~0</td>
+</tr>
+<tr>
+<td>Async</td>
+<td style="text-align: right;">466.7</td>
+<td style="text-align: right;">615.2</td>
+<td style="text-align: right;">539.9</td>
+<td style="text-align: right;">635.7</td>
+<td style="text-align: right;"><strong>12.6 Mops/s</strong></td>
+<td style="text-align: right;">1264</td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td style="text-align: right;">465.6</td>
+<td style="text-align: right;">465.3</td>
+<td style="text-align: right;">657.5</td>
+<td style="text-align: right;">851.1</td>
+<td style="text-align: right;"><strong>9.4 Mops/s</strong></td>
+<td style="text-align: right;"><strong>92</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Bucket 近线性扩展</strong>（1T→8T ×5.2）：桶间天然分区，无队头热点。多消费者 + 离散优先级 = 无脑选它。</li>
+<li><strong>细粒度锁 vs 一把大锁（SkipList vs LockedHeap）——大锁领先 3.4×</strong>：优先队列负载的 DeleteMin 全打
+队头、插入集中于少数优先级段——细粒度锁的&quot;区间并行&quot;收益趋零。<strong>吞吐优先的任意 long 场景，
+自建&quot;一把 lock + 内置 PriorityQueue&quot;仍是最优解</strong>。</li>
+<li><strong>SkipList 是健康可用的细分锁选项</strong>（8 线程 9.4 Mops/s、分配 92 B/op）：任意 long + 中低并发 +
+零分配路径 + 无锁 <code>TryPeek</code> 的定位，而非吞吐选择。</li>
+<li><strong>Async 并发下无锁优势兑现</strong>（8 线程 12.6 Mops/s，ns/op 随线程数不升）：价值不是吞吐（大锁更高），
+是<strong>免疫持锁者延迟</strong>（§4.2）——但 Workstation GC 下分配尾巴抵消此优势（§4.3）。</li>
+</ul>
+<h3 id="21-超额订阅扩展163264-线程--12-逻辑核server-gc">2.1 超额订阅扩展（16/32/64 线程 @ 12 逻辑核，Server GC）</h3>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th style="text-align: right;">8T Mops/s</th>
+<th style="text-align: right;">16T</th>
+<th style="text-align: right;">32T</th>
+<th style="text-align: right;">64T</th>
+<th style="text-align: right;">64T ns/op</th>
+<th>扩展形态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bucket</td>
+<td style="text-align: right;">37.6</td>
+<td style="text-align: right;">72.4</td>
+<td style="text-align: right;">148.2</td>
+<td style="text-align: right;"><strong>292.8</strong></td>
+<td style="text-align: right;">219</td>
+<td><strong>完美线性</strong>（ns/op 不涨）</td>
+</tr>
+<tr>
+<td>LockedHeap</td>
+<td style="text-align: right;">37.7</td>
+<td style="text-align: right;">66.1</td>
+<td style="text-align: right;">135.0</td>
+<td style="text-align: right;"><strong>245.0</strong></td>
+<td style="text-align: right;">261</td>
+<td>近线性（大锁未饱和）</td>
+</tr>
+<tr>
+<td>Async</td>
+<td style="text-align: right;">16.7</td>
+<td style="text-align: right;">32.6</td>
+<td style="text-align: right;">65.5</td>
+<td style="text-align: right;"><strong>128.1</strong></td>
+<td style="text-align: right;">500</td>
+<td>线性（ns/op 平）</td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td style="text-align: right;">11.0</td>
+<td style="text-align: right;">20.5</td>
+<td style="text-align: right;">30.2</td>
+<td style="text-align: right;"><strong>46.4</strong></td>
+<td style="text-align: right;"><strong>1379</strong></td>
+<td><strong>亚线性</strong>（445→1379ns，3× 恶化）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>边界</strong>：超额订阅下吞吐超过&quot;核数 × 单线程&quot;是流水线效应（跨线程 Enqueue/TryDequeue 重叠），不代表
+单核能力。<strong>超额订阅 ≠ 真高核</strong>：同核线程共享缓存，掩盖真 64 核下&quot;64 个核抢一个锁字/CAS 目标的缓存
+行乒乓&quot;。本表结论：①扩展性分层 = <strong>分区（Bucket）&gt; 大锁 &gt; 队头单点 CAS（Async）&gt; 队头锁链（SkipList）</strong>；
+②SkipList 的锁链在竞争压力下最先恶化；③**&quot;无锁&quot;属性本身不带来扩展性——热点是不是单点才带来**。</p>
+<h2 id="3-积压深度敏感性单线程-50k-往返实测">3. 积压深度敏感性（单线程 50K 往返实测）</h2>
+<p>负载 A：均匀 0..7（基准负载）｜负载 B：单一 P7 纯尾插（跳表高层索引压力负载）。</p>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th style="text-align: center;">负载</th>
+<th style="text-align: right;">1K</th>
+<th style="text-align: right;">8K</th>
+<th style="text-align: right;">64K</th>
+<th style="text-align: right;">256K</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LockedHeap（大锁+堆，对照）</strong></td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;"><strong>57</strong></td>
+<td style="text-align: right;">70</td>
+<td style="text-align: right;">98</td>
+<td style="text-align: right;"><strong>113</strong></td>
+</tr>
+<tr>
+<td><strong>LockedHeap（大锁+堆，对照）</strong></td>
+<td style="text-align: center;">B</td>
+<td style="text-align: right;">73</td>
+<td style="text-align: right;">61</td>
+<td style="text-align: right;">56</td>
+<td style="text-align: right;"><strong>52</strong></td>
+</tr>
+<tr>
+<td>Bucket</td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;">175</td>
+<td style="text-align: right;">58</td>
+<td style="text-align: right;">117</td>
+<td style="text-align: right;">436</td>
+</tr>
+<tr>
+<td>Bucket</td>
+<td style="text-align: center;">B</td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">68</td>
+<td style="text-align: right;">83</td>
+<td style="text-align: right;">61</td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;">462</td>
+<td style="text-align: right;">438</td>
+<td style="text-align: right;">667</td>
+<td style="text-align: right;">870</td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td style="text-align: center;">B</td>
+<td style="text-align: right;">930</td>
+<td style="text-align: right;">774</td>
+<td style="text-align: right;">661</td>
+<td style="text-align: right;">949</td>
+</tr>
+<tr>
+<td><strong>Async</strong></td>
+<td style="text-align: center;">A</td>
+<td style="text-align: right;">986</td>
+<td style="text-align: right;">1597</td>
+<td style="text-align: right;">1884</td>
+<td style="text-align: right;">2874</td>
+</tr>
+<tr>
+<td><strong>Async</strong></td>
+<td style="text-align: center;">B</td>
+<td style="text-align: right;">954</td>
+<td style="text-align: right;">868</td>
+<td style="text-align: right;">1349</td>
+<td style="text-align: right;">1255</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>LockedHeap 全程最快且最稳</strong>（45~103ns）——单线程任意优先级场景它同样是正确答案（比 SkipList 快
+5~10×）。</li>
+<li><strong>Async 256K 积压仅 1.4~2.0 µs/op</strong>——健康的跳表对数增长（尾插也建高层索引）。</li>
+<li><strong>Bucket 与积压无关</strong>（54~162ns 全程平）：大积压 + 离散优先级 = Bucket 主场。</li>
+<li>优先级分布偏斜（如 99% 同级）对 Bucket 更有利；对 Async 中性偏正。</li>
+</ul>
+<h2 id="4-真实负载维度think-time-与持锁者延迟">4. 真实负载维度——think-time 与持锁者延迟</h2>
+<blockquote>
+<p>§2/§3 是&quot;背靠背纯内存操作&quot;微基准：临界区 50ns 且从不被外部延迟——<strong>偏向大锁</strong>。本节补两个真实
+维度：think-time（worker 出队→干活→回来）与毒丸（持锁线程被外部延迟）。</p>
+</blockquote>
+<h3 id="41-think-time-负载8-线程往返间自旋指数分布均值-50µs">4.1 think-time 负载（8 线程，往返间自旋指数分布均值 50µs）</h3>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th style="text-align: right;">总吞吐 ops/s</th>
+<th style="text-align: right;">op p50</th>
+<th style="text-align: right;">op p99</th>
+<th style="text-align: right;">op p999</th>
+<th style="text-align: right;">op max</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bucket</td>
+<td style="text-align: right;">144,724</td>
+<td style="text-align: right;">300 ns</td>
+<td style="text-align: right;">1.3 µs</td>
+<td style="text-align: right;">5.4 µs</td>
+<td style="text-align: right;">6,408 µs</td>
+</tr>
+<tr>
+<td>LockedHeap（大锁+堆）</td>
+<td style="text-align: right;">143,366</td>
+<td style="text-align: right;"><strong>200 ns</strong></td>
+<td style="text-align: right;">800 ns</td>
+<td style="text-align: right;">2.0 µs</td>
+<td style="text-align: right;"><strong>606 µs</strong></td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td style="text-align: right;">135,151</td>
+<td style="text-align: right;">700 ns</td>
+<td style="text-align: right;">2.7 µs</td>
+<td style="text-align: right;">17.7 µs</td>
+<td style="text-align: right;">15,478 µs</td>
+</tr>
+<tr>
+<td>Async</td>
+<td style="text-align: right;">130,029</td>
+<td style="text-align: right;">600 ns</td>
+<td style="text-align: right;">3.2 µs</td>
+<td style="text-align: right;">53.6 µs</td>
+<td style="text-align: right;">21,900 µs</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>think-time 下大锁并不溃败</strong>——队列操作占比 &lt;2% 时锁几乎无竞争，LockedHeap 与 Bucket 完全同级，
+其 p50/max 甚至全场最优。§2&quot;大锁吞吐王&quot;延伸到低频真实负载依然成立。</li>
+<li><strong>Async 的尾延迟被自身分配压力拖累</strong>（p999 53.6µs、max 21.9ms）：1.3 KB/op 的 Gen0 分配率在
+Workstation GC 下制造毫秒级 GC 停顿——<strong>无锁 ≠ 低尾延迟，分配率才是尾延迟杀手</strong>。</li>
+</ul>
+<h3 id="42-持锁者毒丸8-线程高频往返02-操作注入-2ms-延迟">4.2 持锁者毒丸（8 线程高频往返，0.2% 操作注入 2ms 延迟）</h3>
+<p><strong>LockedHeap☠ 把 2ms 注入在锁内</strong>（模拟持锁线程被抢占/GC 暂停/页错误），其余实现注入在操作前
+（延迟只属于自己）。报告<strong>非毒丸</strong> op 的延迟分布——&quot;一个人的延迟变成全队的灾难&quot;的直接量化：</p>
+<table>
+<thead>
+<tr>
+<th>实现</th>
+<th>注入位置</th>
+<th style="text-align: right;">非毒丸 p50</th>
+<th style="text-align: right;">p99</th>
+<th style="text-align: right;">p999</th>
+<th style="text-align: right;">max</th>
+<th style="text-align: right;">max/p50</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Bucket</td>
+<td>操作前</td>
+<td style="text-align: right;">500 ns</td>
+<td style="text-align: right;">3.8 µs</td>
+<td style="text-align: right;">10.6 µs</td>
+<td style="text-align: right;">309 µs</td>
+<td style="text-align: right;">617×</td>
+</tr>
+<tr>
+<td>LockedHeap</td>
+<td>操作前（对照）</td>
+<td style="text-align: right;">700 ns</td>
+<td style="text-align: right;">6.8 µs</td>
+<td style="text-align: right;">48 µs</td>
+<td style="text-align: right;">1,500 µs</td>
+<td style="text-align: right;">2,143×</td>
+</tr>
+<tr>
+<td><strong>LockedHeap☠</strong></td>
+<td><strong>锁内</strong></td>
+<td style="text-align: right;">700 ns</td>
+<td style="text-align: right;">8.3 µs</td>
+<td style="text-align: right;"><strong>46.6 ms</strong></td>
+<td style="text-align: right;"><strong>140.6 ms</strong></td>
+<td style="text-align: right;">200,905×</td>
+</tr>
+<tr>
+<td>Async</td>
+<td>操作前</td>
+<td style="text-align: right;">1.3 µs</td>
+<td style="text-align: right;">6.4 µs</td>
+<td style="text-align: right;">206 µs</td>
+<td style="text-align: right;">186 ms</td>
+<td style="text-align: right;">143,224×</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>大锁柱塞实锤且被放大 ~70 倍</strong>：同样 0.2% × 2ms 延迟剂量，锁外注入时 max 1.5ms（正常长尾），
+<strong>锁内注入时非毒丸 op 的 p999=46.6ms、max=140.6ms（放大 94 倍）</strong>。机理：持锁者延迟期间全队积压
+在锁上，恢复后 burst 冲锁 → 唤醒风暴。<strong>真实系统里持锁线程被 OS 抢占、GC 暂停、页错误是常态</strong>——
+大锁的吞吐王座有明确适用条件：临界区短 <strong>且</strong> 持锁者不被外部长时间延迟。</li>
+<li><strong>Async 对持锁者延迟结构性免疫</strong>（别人的延迟不通过任何锁传播给自己），<strong>但它的 GC 尾巴（186ms
+max）比柱塞本身还大</strong>——Workstation GC + 高分配下，无锁的柱塞免疫被分配停顿抵消。</li>
+<li>Bucket 全维度最稳：无单点锁、无大分配——毒丸下 max 仅 309µs。</li>
+</ul>
+<h3 id="43-server-gc-对照dotnet_gcserver12026-08-18-补测">4.3 Server GC 对照（DOTNET_gcServer=1，2026-08-18 补测）</h3>
+<table>
+<thead>
+<tr>
+<th>指标（8 线程）</th>
+<th style="text-align: right;">Workstation GC</th>
+<th style="text-align: right;">Server GC</th>
+<th>变化</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Async 吞吐</td>
+<td style="text-align: right;">12.6 Mops/s</td>
+<td style="text-align: right;"><strong>17.4</strong></td>
+<td><strong>+38%</strong>（并行回收释放分配压力）</td>
+</tr>
+<tr>
+<td>LockedHeap 吞吐</td>
+<td style="text-align: right;">32.0</td>
+<td style="text-align: right;">37.5</td>
+<td>+17%</td>
+</tr>
+<tr>
+<td>Bucket think-time max</td>
+<td style="text-align: right;">6,408 µs</td>
+<td style="text-align: right;"><strong>109 µs</strong></td>
+<td><strong>59×</strong></td>
+</tr>
+<tr>
+<td>SkipList think-time max</td>
+<td style="text-align: right;">15,478 µs</td>
+<td style="text-align: right;"><strong>205 µs</strong></td>
+<td><strong>75×</strong></td>
+</tr>
+<tr>
+<td>LockedHeap think-time max</td>
+<td style="text-align: right;">606 µs</td>
+<td style="text-align: right;">343 µs</td>
+<td>1.8×</td>
+</tr>
+<tr>
+<td><strong>Async think-time max</strong></td>
+<td style="text-align: right;">21,900 µs</td>
+<td style="text-align: right;"><strong>30,855 µs</strong></td>
+<td><strong>反而最差</strong></td>
+</tr>
+<tr>
+<td><strong>Async 毒丸非毒丸 max</strong></td>
+<td style="text-align: right;">170 ms</td>
+<td style="text-align: right;"><strong>248~326 ms</strong></td>
+<td><strong>依然全场最差</strong></td>
+</tr>
+<tr>
+<td>SkipList 毒丸非毒丸 max</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">62 ms</td>
+<td>比 LockedHeap（1.3ms）差 47×</td>
+</tr>
+</tbody>
+</table>
+<p><strong>结论</strong>：GC 调整释放了大部分实现的尾延迟（Bucket/SkipList 改善 59~75×）——但 <strong>Async 是例外</strong>：
+1.3 KB/op 的分配率连 Server GC 的并行回收都打不服（think-time/毒丸 max 依然 31ms/250ms+）。Async
+兑现&quot;无锁延迟确定性&quot;的前提不是 Server GC，是<strong>降分配</strong>。SkipList 的毒丸数据（62ms）说明分段锁只
+<strong>部分免疫</strong>持锁者延迟——victim+preds 链上的锁被延迟者持有时照样传导。</p>
+<h2 id="5-并发正确性压测debug-链校验器--release-全量">5. 并发正确性压测（Debug 链校验器 + Release 全量）</h2>
+<p><strong>方法论</strong>：P=4 生产者各 N 唯一项 × C 消费者尽力消费 → 超时停止 → 主线程单线程 drain 收尾 →
+全集 HashSet 校验。Debug 构建下 AsyncPriorityQueue 每 64 op 自动巡检链不变式。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>Bucket</th>
+<th>SkipList</th>
+<th>Async</th>
+<th>LockedHeap（对照）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MPMC 不丢不重（40 万项 Debug / 20 万项 Release）</td>
+<td>✓</td>
+<td>✓（187ms）</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>SPSC 严格序（生产先行，消费段 0 反转硬断言）</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>MPSC 排序语义（drain 0 反转 + 全序列反转率参考）</td>
+<td>✓ 25.2%¹</td>
+<td>✓ 18.0%¹</td>
+<td>✓ 8.9%¹</td>
+<td>✓ 10.0%¹</td>
+</tr>
+<tr>
+<td>DequeueAsync 等待-唤醒（4 消费者先真实挂起再生产）</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>DEBUG 链校验器（巡检 6 千+ 次/场景）</td>
+<td>—（无此仪器）</td>
+<td>—（无此仪器）</td>
+<td>✓ 无结构损坏</td>
+<td>—（一把锁无从损坏）</td>
+</tr>
+</tbody>
+</table>
+<p>¹ 反转率是&quot;竞争性最小&quot;语义的固有参考值（后到的更高优先级项可越过已出队的低优先级项），非缺陷；
+单消费者语义下（SPSC 硬断言）全部 0 反转。</p>
+<h2 id="6-实验版本v2v3不入基准">6. 实验版本（V2/V3）不入基准</h2>
+<p><code>AsyncPriorityQueueV2/V3</code> 为设计验证实验（<code>[Experimental]</code> + internal）——性能数据无生产参考意义，
+不测。</p>
+<h2 id="7-选型速查实测数据支撑">7. 选型速查（实测数据支撑）</h2>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>选择</th>
+<th>依据</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>优先级 = 少量离散枚举（4~16 级）</td>
+<td><strong>Bucket</strong></td>
+<td>单线程 52ns、8 线程 34.6 Mops/s、think-time/毒丸全负载最稳（§4）——<strong>没有短板的全维度王</strong></td>
+</tr>
+<tr>
+<td>优先级任意取值 + 高吞吐 + 临界区短且持锁者不被外部长延迟</td>
+<td><strong>自建一把 lock + 内置 <code>PriorityQueue</code></strong>（LockedHeap 模式）</td>
+<td>8 线程 32.0 Mops/s、单线程 305ns、think-time 下 p50/max 全场最优（§4.1）。⚠️ <strong>柱塞边界（§4.2）</strong>：持锁者被抢占/GC/页错误时全队 max 放大数百倍——延迟敏感场景换 Bucket/Async</td>
+</tr>
+<tr>
+<td>任意 int 优先级 + 免疫持锁者延迟（无单点锁依赖）</td>
+<td><strong>Async</strong></td>
+<td>8 线程 12.6 Mops/s、256K 积压 1.3µs、别人的延迟不通过锁传播。⚠️ 分配率 1.3KB/op 在 Workstation GC 下尾延迟 22~170ms（§4）——延迟敏感需 Server GC 或降分配</td>
+</tr>
+<tr>
+<td>任意 long 优先级 + 中低并发 / 零分配路径 / 无锁 <code>TryPeek</code></td>
+<td><strong>SkipList</strong></td>
+<td>单线程 466ns、8 线程 9.4 Mops/s、分配 92 B/op、think-time 135K ops/s——健康可用的细分锁选项；吞吐落后大锁 3~4×（§2），吞吐优先选大锁</td>
+</tr>
+<tr>
+<td>单线程/无并发</td>
+<td>.NET 内置</td>
+<td>11ns——线程安全的定价不值</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-已知边界">8. 已知边界</h2>
+<ul>
+<li>Windows Workstation GC 实测；Server GC / Linux 下 Async 分配压力（1.3 KB/op）的 GC 频率未单测。</li>
+<li>探针吞吐用 Thread 直起（非 ThreadPool），与真实异步工作负载的调度差异未消除——数据用于<strong>实现间
+横向对比</strong>。</li>
+<li>think-time 用自旋模拟计算型 worker（均值 50µs 指数分布）；IO 型 worker（Sleep 让出）未测。</li>
+<li>毒丸剂量 0.2% × 2ms 为单一组合；柱塞放大系数随剂量/线程数变化，未做扫参。</li>
+<li>short job 快速基线；正式入库用默认 job 复跑。</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/perf/priority-queues-performance.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

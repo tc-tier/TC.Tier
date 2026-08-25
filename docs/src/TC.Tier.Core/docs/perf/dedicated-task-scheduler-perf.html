@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>IsolatedTaskScheduler 性能基准报告 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="IsolatedTaskScheduler 性能基准报告 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="isolatedtaskscheduler-性能基准报告">IsolatedTaskScheduler 性能基准报告</h1>
+
+<blockquote>
+<p>对应基准代码：<code>benchmarks/TC.Tier.Core.Benchmarks/Shared/IsolatedTaskSchedulerBench.cs</code>
+使用指南（选型/旋钮/注意事项）：<a href="../dedicated-task-scheduler.html"><code>../dedicated-task-scheduler.md</code></a></p>
+<p>⚠️ 本文数字为<strong>指示值</strong>（单机开发环境实测，BenchmarkDotNet.Artifacts 不入库，本文是结果的存档）；
+机器 / 负载 / .NET 版本不同会变，以 §1 命令在本机复跑为准。</p>
+</blockquote>
+<hr>
+<h2 id="1-复跑命令">1. 复跑命令</h2>
+<pre><code class="lang-bash"># 完整跑（Release 必须）
+dotnet run -c Release --project benchmarks/TC.Tier.Core.Benchmarks -- --filter *IsolatedTaskSchedulerBench*
+# 快跑冒烟（粗数字）
+dotnet run -c Release --project benchmarks/TC.Tier.Core.Benchmarks -- --filter *IsolatedTaskSchedulerBench* --job short
+</code></pre>
+<h2 id="2-环境">2. 环境</h2>
+<p>2026-08-17 ｜ Windows 11（10.0.26200）｜ i5-12400（6C/12T）｜ .NET 8.0.30 ｜ BenchmarkDotNet 0.13.12（warmup 3 / iteration 5）</p>
+<h2 id="3-基准设计测什么--为什么">3. 基准设计（测什么 / 为什么）</h2>
+<table>
+<thead>
+<tr>
+<th>组</th>
+<th>基准</th>
+<th>回答的问题</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>单任务往返（<code>StartNew</code> no-op → 私有线程执行 → 完成）</td>
+<td>隔离的<strong>每次派发税</strong>多贵？与公共池（<code>TaskScheduler.Default</code>）对照</td>
+</tr>
+<tr>
+<td>2</td>
+<td>同上 + 指标开（noop sink）</td>
+<td>指标采集的热路径开销（默认 Disabled 零开销声明的另一面：开了多贵）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>continuation 回流（任务内 <code>await Task.Yield()</code> ×100）</td>
+<td>每次 <code>await</code> 让出后经 <code>QueueTask</code> 回流私有线程的成本（协作 async 的核心路径）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>多生产者吞吐（4 公共池生产者 × 250 no-op 任务）</td>
+<td>突发灌入下调度器排空能力；默认有界队列（背压阻塞）vs 无界 vs 公共池</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-结果">4. 结果</h2>
+<p>参数：<code>YieldCount=100</code>；M ∈ {1,2,4}；每组以同 M 的公共池行为基线（三组基线实测一致：往返 ~650ns、yield 循环 ~33µs、吞吐 ~76µs）。</p>
+<h3 id="m1">M=1</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">StdDev</th>
+<th style="text-align: right;">Ratio</th>
+<th style="text-align: right;">Gen0</th>
+<th style="text-align: right;">Allocated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ThreadPool round-trip</td>
+<td style="text-align: right;">648.0 ns</td>
+<td style="text-align: right;">15.41 ns</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">0.0067</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td><strong>IsolatedTaskScheduler round-trip</strong></td>
+<td style="text-align: right;"><strong>485.0 ns</strong></td>
+<td style="text-align: right;">14.92 ns</td>
+<td style="text-align: right;"><strong>0.76</strong></td>
+<td style="text-align: right;">0.0067</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td>Isolated round-trip, metrics ON</td>
+<td style="text-align: right;">1,195.2 ns</td>
+<td style="text-align: right;">15.65 ns</td>
+<td style="text-align: right;">1.85</td>
+<td style="text-align: right;">0.0057</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td>ThreadPool yield-loop ×100</td>
+<td style="text-align: right;">33,248.3 ns</td>
+<td style="text-align: right;">159.59 ns</td>
+<td style="text-align: right;">51.81</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">416 B</td>
+</tr>
+<tr>
+<td>IsolatedTaskScheduler yield-loop ×100</td>
+<td style="text-align: right;">31,588.7 ns</td>
+<td style="text-align: right;">1,239.56 ns</td>
+<td style="text-align: right;">48.75</td>
+<td style="text-align: right;">0.6714</td>
+<td style="text-align: right;">6,878 B</td>
+</tr>
+<tr>
+<td>ThreadPool throughput 4×250</td>
+<td style="text-align: right;">76,296.1 ns</td>
+<td style="text-align: right;">520.93 ns</td>
+<td style="text-align: right;">117.80</td>
+<td style="text-align: right;">7.9346</td>
+<td style="text-align: right;">73,745 B</td>
+</tr>
+<tr>
+<td>Isolated throughput 4×250（有界队列）</td>
+<td style="text-align: right;">716,505.0 ns</td>
+<td style="text-align: right;">28,562.30 ns</td>
+<td style="text-align: right;">1,106.15</td>
+<td style="text-align: right;">15.6250</td>
+<td style="text-align: right;">149,620 B</td>
+</tr>
+<tr>
+<td>Isolated throughput 4×250（无界队列）</td>
+<td style="text-align: right;">295,469.5 ns</td>
+<td style="text-align: right;">4,008.87 ns</td>
+<td style="text-align: right;">456.10</td>
+<td style="text-align: right;">7.8125</td>
+<td style="text-align: right;">73,808 B</td>
+</tr>
+</tbody>
+</table>
+<h3 id="m2推荐默认">M=2（推荐默认）</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">StdDev</th>
+<th style="text-align: right;">Ratio</th>
+<th style="text-align: right;">Gen0</th>
+<th style="text-align: right;">Allocated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ThreadPool round-trip</td>
+<td style="text-align: right;">646.4 ns</td>
+<td style="text-align: right;">5.05 ns</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">0.0067</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td><strong>IsolatedTaskScheduler round-trip</strong></td>
+<td style="text-align: right;"><strong>950.6 ns</strong></td>
+<td style="text-align: right;">16.14 ns</td>
+<td style="text-align: right;"><strong>1.47</strong></td>
+<td style="text-align: right;">0.0057</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td>Isolated round-trip, metrics ON</td>
+<td style="text-align: right;">1,072.5 ns</td>
+<td style="text-align: right;">10.05 ns</td>
+<td style="text-align: right;">1.66</td>
+<td style="text-align: right;">0.0057</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td>ThreadPool yield-loop ×100</td>
+<td style="text-align: right;">32,596.9 ns</td>
+<td style="text-align: right;">268.19 ns</td>
+<td style="text-align: right;">50.43</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">416 B</td>
+</tr>
+<tr>
+<td>IsolatedTaskScheduler yield-loop ×100</td>
+<td style="text-align: right;">51,398.6 ns</td>
+<td style="text-align: right;">1,485.11 ns</td>
+<td style="text-align: right;">79.53</td>
+<td style="text-align: right;">0.7324</td>
+<td style="text-align: right;">6,879 B</td>
+</tr>
+<tr>
+<td>ThreadPool throughput 4×250</td>
+<td style="text-align: right;">75,616.8 ns</td>
+<td style="text-align: right;">358.35 ns</td>
+<td style="text-align: right;">116.95</td>
+<td style="text-align: right;">7.9346</td>
+<td style="text-align: right;">73,745 B</td>
+</tr>
+<tr>
+<td>Isolated throughput 4×250（有界队列）</td>
+<td style="text-align: right;">585,702.6 ns</td>
+<td style="text-align: right;">8,135.82 ns</td>
+<td style="text-align: right;">905.93</td>
+<td style="text-align: right;">11.7188</td>
+<td style="text-align: right;">113,505 B</td>
+</tr>
+<tr>
+<td>Isolated throughput 4×250（无界队列）</td>
+<td style="text-align: right;">361,025.8 ns</td>
+<td style="text-align: right;">2,425.74 ns</td>
+<td style="text-align: right;">558.58</td>
+<td style="text-align: right;">7.8125</td>
+<td style="text-align: right;">73,807 B</td>
+</tr>
+</tbody>
+</table>
+<h3 id="m4">M=4</h3>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">StdDev</th>
+<th style="text-align: right;">Ratio</th>
+<th style="text-align: right;">Gen0</th>
+<th style="text-align: right;">Allocated</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ThreadPool round-trip</td>
+<td style="text-align: right;">667.4 ns</td>
+<td style="text-align: right;">6.52 ns</td>
+<td style="text-align: right;">1.00</td>
+<td style="text-align: right;">0.0067</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td><strong>IsolatedTaskScheduler round-trip</strong></td>
+<td style="text-align: right;"><strong>995.2 ns</strong></td>
+<td style="text-align: right;">33.72 ns</td>
+<td style="text-align: right;"><strong>1.49</strong></td>
+<td style="text-align: right;">0.0057</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td>Isolated round-trip, metrics ON</td>
+<td style="text-align: right;">1,085.2 ns</td>
+<td style="text-align: right;">9.26 ns</td>
+<td style="text-align: right;">1.63</td>
+<td style="text-align: right;">0.0057</td>
+<td style="text-align: right;">64 B</td>
+</tr>
+<tr>
+<td>ThreadPool yield-loop ×100</td>
+<td style="text-align: right;">32,823.6 ns</td>
+<td style="text-align: right;">320.16 ns</td>
+<td style="text-align: right;">49.19</td>
+<td style="text-align: right;">-</td>
+<td style="text-align: right;">416 B</td>
+</tr>
+<tr>
+<td>IsolatedTaskScheduler yield-loop ×100</td>
+<td style="text-align: right;">53,065.0 ns</td>
+<td style="text-align: right;">1,200.94 ns</td>
+<td style="text-align: right;">79.51</td>
+<td style="text-align: right;">0.7324</td>
+<td style="text-align: right;">6,879 B</td>
+</tr>
+<tr>
+<td>ThreadPool throughput 4×250</td>
+<td style="text-align: right;">75,100.1 ns</td>
+<td style="text-align: right;">100.72 ns</td>
+<td style="text-align: right;">112.92</td>
+<td style="text-align: right;">7.9346</td>
+<td style="text-align: right;">73,745 B</td>
+</tr>
+<tr>
+<td>Isolated throughput 4×250（有界队列）</td>
+<td style="text-align: right;">575,776.2 ns</td>
+<td style="text-align: right;">9,840.19 ns</td>
+<td style="text-align: right;">862.83</td>
+<td style="text-align: right;">8.7891</td>
+<td style="text-align: right;">89,905 B</td>
+</tr>
+<tr>
+<td>Isolated throughput 4×250（无界队列）</td>
+<td style="text-align: right;">416,066.2 ns</td>
+<td style="text-align: right;">3,073.60 ns</td>
+<td style="text-align: right;">623.46</td>
+<td style="text-align: right;">7.8125</td>
+<td style="text-align: right;">73,752 B</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>注：yield/吞吐组的 Ratio 是 BDN 以<strong>同组往返基线</strong>为 1.00 的换算（故公共池自身显示 50×/117×）；直接比 Mean 即：
+yield M≥2 ≈ 池的 1.6×；吞吐有界 ≈ 池的 7.6~9.4×、无界 ≈ 3.9~5.5×。</p>
+</blockquote>
+<h2 id="5-结论">5. 结论</h2>
+<ol>
+<li><strong>派发税亚微秒</strong>：单任务往返 0.5~1µs，分配与公共池完全相同（64 B/任务 = Task 对象本身，调度零额外分配）。真实 worker 任务（µs~ms 级建段/IO）下派发税占比可忽略。M=1 的单消费者阻塞交接（~485ns）甚至<strong>快于</strong>公共池全局队列（~650ns）——单线程专用实例无排队竞争。</li>
+<li><strong>continuation 回流 ~0.3µs/次（M=1）/ ~0.5µs/次（M≥2）</strong>，每次多 ~64 B 分配（BlockingCollection 节点）：await 密集的真实 worker 摊薄无感；纯 <code>Task.Yield</code> 空转微循环会看到 1.6×（M≥2）——这是调度器的病理用法，见使用指南 §1 不适用表。M=1 ≈ 池速。</li>
+<li><strong>no-op 吞吐天花板 ~2.4-3.4M 任务/s</strong>（M=1..4，无界队列）vs 公共池（12 逻辑核）~13M/s——M 个私有线程换<strong>确定性/隔离</strong>是有意限流，不是缺陷；需要 no-op 火力全开的场景本来就不该用它。</li>
+<li><strong>默认有界队列（cap=max(M*4,16)≈16-20）在 4 生产者突发下触发阻塞背压</strong>：比无界慢 1.5~2×（M=1: 717µs vs 295µs），且 Gen0 压力翻倍（生产者线程在 <code>SemaphoreSlim</code> 上阻塞/唤醒的额外分配，M=1 时 Allocated 149.6KB vs 73.8KB）。</li>
+<li><strong>指标开仅 +0.1~0.7µs/任务、零额外分配</strong>（64 B 与关时相同）——生产环境可常开，不必为省这点关掉可观测性。</li>
+</ol>
+<h2 id="6-调参指引由数据推出">6. 调参指引（由数据推出）</h2>
+<table>
+<thead>
+<tr>
+<th>症状</th>
+<th>数据依据</th>
+<th>动作</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scheduler.queue.full</code> 频发、生产者延迟敏感</td>
+<td>§4 结论 4：有界背压在突发下慢 1.5~2× + GC 翻倍</td>
+<td>确认 worker 工作项队列才是背压主战场（使用指南 §7.3）后，调大 <code>QueueCapacity</code>（如 M*16+）或 <code>-1</code> 无界（配合 <code>queue.depth</code> 监控）</td>
+</tr>
+<tr>
+<td>await 密集 worker 回流延迟敏感</td>
+<td>§4 结论 2：M=1 ≈ 池速、M≥2 1.6×</td>
+<td>该 worker own 一个 M=1 实例（回流路径单消费者最快）；并行度靠多实例或 worker 队列</td>
+</tr>
+<tr>
+<td>需要 no-op 级超大吞吐</td>
+<td>§4 结论 3：天花板 ~M×0.85M 任务/s</td>
+<td>这不是本组件的场景——用公共池或独立分区；或加大 M（受核数校验约束）</td>
+</tr>
+<tr>
+<td>想省指标开销</td>
+<td>§4 结论 5：+0.1~0.7µs/任务</td>
+<td>通常不值得关；确需极限，默认 <code>Hub=null</code>（Disabled）即零开销（<code>IsEnabled</code> 一次读短路）</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/perf/dedicated-task-scheduler-perf.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

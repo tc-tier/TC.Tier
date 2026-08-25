@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>日志使用指南（ILogger / LoggerExtensions） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="日志使用指南（ILogger / LoggerExtensions） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="日志使用指南ilogger--loggerextensions">日志使用指南（ILogger / LoggerExtensions）</h1>
+
+<blockquote>
+<p>定位：TC.Tier 的<strong>极简日志抽象</strong>——两方法接口（<code>Log</code> / <code>IsEnabled</code>），刻意去掉
+<code>Microsoft.Extensions.Logging</code> 的 <code>TState</code>/<code>formatter</code> 复杂度；零开销短路内建。
+<strong>日志不经 <code>ObservabilityHub</code></strong>（Hub 只聚合 Metrics+Tracing）——三信号各自独立，见 <a href="observability.html"><code>observability.md</code></a>。
+单测：<code>tests/TC.Tier.Core.Tests/Logging/</code>。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话决策">0. 一句话决策</h2>
+<pre><code>我要打日志？ → 注入 ILogger?（null 容忍——全部重载 null 安全），用 LogXxx 扩展。
+  ★ 调用方【无需】手写 IsEnabled——短路已内建在每个重载里（关闭时不格式化、0~3 参零装箱零分配）。
+  仅两个例外：
+  · &gt;3 参走 params 重载：数组+装箱在调用点发生（进扩展之前）——【热路径】才值得先手动 IsEnabled；
+  · 直接调 Log(level, msg)：接口方法无任何折叠，自行格式化/自行判断。
+</code></pre>
+<h2 id="1-接口与级别">1. 接口与级别</h2>
+<pre><code class="lang-csharp">public interface ILogger
+{
+    void Log(LogLevel logLevel, string message, Exception? exception = null);
+    bool IsEnabled(LogLevel logLevel);
+}
+</code></pre>
+<p><code>LogLevel</code>：<code>Trace(0) / Debug(1) / Information(2) / Warning(3) / Error(4) / Critical(5) / None(6)</code>。
+<strong>级别过滤由实现自决</strong>（Core 只定义枚举）——<code>IsEnabled</code> 是唯一判断入口，勿自行缓存结果。</p>
+<h2 id="2-扩展方法loggerextensions36-个重载">2. 扩展方法（LoggerExtensions，36 个重载）</h2>
+<table>
+<thead>
+<tr>
+<th>形态</th>
+<th>重载</th>
+<th>关闭时的开销</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0~3 参</td>
+<td><code>LogXxx(message)</code> / <code>(message, arg1)</code> / <code>(…, arg1, arg2)</code> / <code>(…, arg1, arg2, arg3)</code>——每级 Trace~Critical 全套</td>
+<td>一次 <code>IsEnabled</code> 调用即返回，<strong>不装箱、不分配、不格式化</strong>——调用方零负担</td>
+</tr>
+<tr>
+<td>带异常</td>
+<td><code>LogWarning(exception, message[, args…])</code> / <code>LogError(...)</code> / <code>LogCritical(...)</code></td>
+<td>同上</td>
+</tr>
+<tr>
+<td>兜底</td>
+<td><code>LogXxx(message, params object?[] args)</code>（&gt;3 参走这）</td>
+<td>内部仍判 <code>IsEnabled</code>（不格式化），<strong>但 params 数组 + 装箱在调用点已发生</strong>——正确性无恙，热路径才值得手动保护（或拆成 ≤3 参）</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">// 命名占位符（推荐——可读 + 结构化友好）：{name} 自动按顺序映射 {0},{1},...
+logger.LogInformation(&quot;append ok entry={entry} size={size}&quot;, entryId, size);
+logger.LogWarning(ex, &quot;compact failed seg={seg} attempts={n}&quot;, segId, n);
+
+// ★ 仅热路径的 &gt;3 参才手动保护（防 params 调用点分配；日常路径直接调即可）
+if (logger.IsEnabled(LogLevel.Debug))
+    logger.LogDebug(&quot;...{a} {b} {c} {d}&quot;, a, b, c, d);
+</code></pre>
+<ul>
+<li><strong>命名占位符</strong>：<code>{name}</code> 经 <code>NormalizeNamedPlaceholders</code> 归一为 <code>{0},{1},...</code> 再 <code>string.Format</code>
+（<strong>仅 IsEnabled=true 时格式化</strong>）——支持任意合法格式说明（<code>{size:N0}</code>）。</li>
+<li><strong>全部 36 个重载对 <code>null</code> logger 安全</strong>（receiver <code>ILogger?</code> + <code>is not null</code> 短路）——
+组件可持有 <code>ILogger?</code> 字段直接 <code>_logger.LogXxx(...)</code>，无注入即静默。</li>
+</ul>
+<h2 id="3-工厂与默认">3. 工厂与默认</h2>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>角色</th>
+<th>默认行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ILoggerFactory</code></td>
+<td>宿主侧创建 logger（按 categoryName）</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>NullLoggerFactory.Instance</code></td>
+<td>无注入时的默认工厂</td>
+<td>产出 <code>NullLogger</code></td>
+</tr>
+<tr>
+<td><code>NullLogger.Instance</code></td>
+<td>空实现</td>
+<td><code>IsEnabled</code> 恒 false——全链路零开销</td>
+</tr>
+</tbody>
+</table>
+<p><strong>装配范式</strong>：组件构造收 <code>ILogger?</code>（null 即静默——扩展方法 null 安全）；宿主从自己的 factory
+创建并注入——Core 不绑定任何日志后端（桥接见 §4）。</p>
+<h2 id="4-宿主桥接控制台--melogging--可观测后端都很简单">4. 宿主桥接（控制台 / M.E.Logging / 可观测后端）——都很简单</h2>
+<p>接口只有两方法 + <code>LogLevel</code> 与 <code>Microsoft.Extensions.Logging</code> 的枚举值 <strong>1:1 对齐</strong>（Trace..None 同为 0..6，
+直接强转），任何后端十几行桥完。</p>
+<h3 id="41-零依赖控制台最短路径">4.1 零依赖控制台（最短路径）</h3>
+<pre><code class="lang-csharp">sealed class ConsoleLogger : TC.Tier.Core.Logging.ILogger
+{
+    public void Log(LogLevel level, string message, Exception? exception = null)
+        =&gt; Console.WriteLine($&quot;[{level}] {message}&quot; + (exception is null ? &quot;&quot; : $&quot;\n{exception}&quot;));
+    public bool IsEnabled(LogLevel level) =&gt; level &gt;= LogLevel.Information;
+}
+</code></pre>
+<h3 id="42-桥接-melogging控制台--otlp--serilog全家桶一次接入">4.2 桥接 M.E.Logging（控制台 / OTLP / Serilog…全家桶一次接入）</h3>
+<pre><code class="lang-csharp">using Mel = Microsoft.Extensions.Logging;
+
+sealed class MelLoggerAdapter : TC.Tier.Core.Logging.ILogger
+{
+    private readonly Mel.ILogger _inner;
+    public MelLoggerAdapter(Mel.ILogger inner) =&gt; _inner = inner;
+
+    public void Log(LogLevel level, string message, Exception? exception = null)
+        // 占位符包一层：我们的 message 是【已格式化终串】，不能当 MEL 模板（含 { 时会被再解释）
+        =&gt; _inner.Log((Mel.LogLevel)level, exception, &quot;{Msg}&quot;, message);
+
+    public bool IsEnabled(LogLevel level) =&gt; _inner.IsEnabled((Mel.LogLevel)level);
+}
+
+sealed class MelFactoryAdapter : TC.Tier.Core.Logging.ILoggerFactory
+{
+    private readonly Mel.ILoggerFactory _factory;
+    public MelFactoryAdapter(Mel.ILoggerFactory factory) =&gt; _factory = factory;
+    public TC.Tier.Core.Logging.ILogger CreateLogger(string categoryName)
+        =&gt; new MelLoggerAdapter(_factory.CreateLogger(categoryName));
+}
+
+// 宿主装配——MEL 生态全部可用（控制台一行 / OTLP / Serilog 换 builder 即可）：
+TC.Tier.Core.Logging.ILoggerFactory logFactory = new MelFactoryAdapter(
+    Mel.LoggerFactory.Create(b =&gt; b.AddConsole()));
+</code></pre>
+<blockquote>
+<p>★ 适配器放<strong>宿主侧</strong>——Core 不引用 M.E.Logging（依赖方向不变），桥接是宿主的自由。
+日志要进可观测管线（OTel collector 等）同样走 MEL 的 Provider 生态，适配器不用改。</p>
+</blockquote>
+<h3 id="43-指标追踪后端">4.3 指标/追踪后端</h3>
+<p><code>IMetricsSink</code> / <code>ITracer</code> 同理——实现接口即接任意后端（OTel Meter / Prometheus / Datadog），
+现成模式与注意事项见 <a href="observability.html"><code>observability.md</code></a> §7。</p>
+<h2 id="5-与-observabilityhub-的关系勿混">5. 与 ObservabilityHub 的关系（勿混）</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>日志</th>
+<th>指标/追踪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>接入</td>
+<td><code>ILogger</code> 独立注入</td>
+<td>经 <code>ObservabilityHub</code></td>
+</tr>
+<tr>
+<td>开关</td>
+<td>实现自决（<code>IsEnabled</code>）</td>
+<td><code>ObservabilityOptions</code> + sink/tracer + 维度（构造期折叠）</td>
+</tr>
+<tr>
+<td>配置位置</td>
+<td>宿主日志系统</td>
+<td><code>ObservabilityHub.Create(...)</code></td>
+</tr>
+</tbody>
+</table>
+<p>❌ 不要把 <code>ILogger</code> 塞进 Hub、不要在 <code>ObservabilityOptions</code> 里找日志级别（那是反模式，
+见 <a href="../COORDINATION.html"><code>../COORDINATION.md</code></a> §7）。</p>
+<h2 id="6-硬性要求">6. 硬性要求</h2>
+<ul>
+<li>✅ <strong>默认直接调 <code>LogXxx</code>，不写 <code>IsEnabled</code></strong>——短路折叠内建在每个重载里（0~3 参关闭时零开销）。</li>
+<li>✅ 唯一例外：<strong>热路径</strong>的 &gt;3 参（params 重载数组+装箱在调用点白付）——手动保护，或拆成 ≤3 参/拆两条。</li>
+<li>✅ 热路径避免字符串插值（<code>$&quot;...&quot;</code> 在调用点无条件拼接——用占位符重载，关了不花一分钱）。</li>
+<li>✅ 异常日志用 <code>LogWarning/LogError(exception, message, ...)</code> 带异常重载（保堆栈），不要 <code>ex.ToString()</code> 拼进消息。</li>
+<li>❌ 不自己 new 日志实现、不缓存 <code>IsEnabled</code> 结果（实现可动态变）。</li>
+<li>❌ 不在 Core 里绑定具体日志后端——适配/桥接是宿主的事（§4 范例）。</li>
+</ul>
+<hr>
+<h2 id="关联文档">关联文档</h2>
+<ul>
+<li>可观测（指标/追踪，经 Hub）：<a href="observability.html"><code>observability.md</code></a> ｜ 积木全景：<a href="../COORDINATION.html"><code>../COORDINATION.md</code></a> §3</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/logging.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

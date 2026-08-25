@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Core/IO 使用指南——文件 IO 原语层（IFileSystem / IFileHandle） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Core/IO 使用指南——文件 IO 原语层（IFileSystem / IFileHandle） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="coreio-使用指南文件-io-原语层ifilesystem--ifilehandle">Core/IO 使用指南——文件 IO 原语层（IFileSystem / IFileHandle）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要文件级 IO 的组件开发者（引擎、数据结构、工具）；外部业务通常经 <code>IStorageEngine</code>
+间接用（见 <a href="../../TC.Tier.Runtime/docs/storage-engine.html"><code>../TC.Tier.Runtime/docs/storage-engine.md</code></a>）。
+<strong>回答什么</strong>：怎么构造文件系统、怎么读写、怎么落盘、能力怎么协商、什么不要做。
+<strong>本篇只讲怎么用</strong>——机制细节（spec 全参数/句柄池内部/网络桥内部）在链接与源码注释。</p>
+</blockquote>
+<hr>
+<h2 id="0-快速开始30-秒上手">0. 快速开始（30 秒上手）</h2>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+
+// ── 1. 构造文件系统（spec 一行切换——§1.1）──
+using var fs     = TierFs.New(&quot;local:///&quot; + rootDir);                // 本地文件系统（New = 建空镜像）
+using var mem    = TierFs.Open(&quot;memory:&quot;);                           // 内存文件系统私有卷（测试隔离）
+using var remote = TierFs.Open(&quot;network:///s3/minio:9000/tier-logs?tls=0&amp;cred=env:MINIO_KEY&quot;);
+
+// ── 2. 建结构 + 提前创建（建段协议：创建成本移出运行时热路径）──
+fs.EnsureRoot();                                        // 根存在保证（幂等）
+fs.CreateDirectory(&quot;struct1/eng0/compact&quot;);             // mkdir -p 幂等 + 耐久
+fs.CreateFile(&quot;struct1/eng0/data.0&quot;, preallocateSize: 1 &lt;&lt; 30,
+              extra: header);                           // 真预留 + FileExtra 创建即写；已存在抛 AlreadyExists
+
+// ── 3. 运行时打开读写 ──
+using (var h = fs.Open(&quot;struct1/eng0/data.0&quot;, new FileOpenOptions
+       { Access = AccessMode.ReadWrite, Mode = FileOpenMode.OpenExisting, Sharing = FileSharing.ReadWrite }))
+{
+    h.Write(4096, record);                              // pwrite：不读不推进游标；越过 EOF 零洞扩展
+    var landing = h.Append(record);                     // 多写者原子追加（返回落点）
+    h.SetFileExtra(meta);                               // FileExtra ≤1.5K
+    h.Flush();                                          // ★ 网络文件系统 = 唯一持久化点（置顶一）
+}
+
+// ── 4. 枚举 / 恢复扫描 ──
+var segs = fs.EnumerateFiles(&quot;struct1/eng0&quot;, &quot;data.*&quot;);          // 模式匹配
+var all  = fs.EnumerateEntries(&quot;struct1&quot;, &quot;*&quot;, recursive: true); // 混合递归——恢复扫盘
+var st   = fs.Stat(&quot;struct1/eng0/data.0&quot;);                       // 完整信息（含 FileExtra）
+</code></pre>
+<hr>
+<h2 id="1-概念术语在此定义">1. 概念（术语在此定义）</h2>
+<ul>
+<li><strong>两平面 × 四类文件系统 × 一个注入点</strong>：
+<ul>
+<li>命名空间平面 <code>IFileSystem</code>（目录/创建/枚举/FileExtra/卷锁——一个实例 = 根空间）；</li>
+<li>数据平面 <code>IFileHandle</code>（pread/pwrite/追加/空间管理/映射/锁）；</li>
+<li>四类文件系统：本地（<code>DiskFileSystem</code> · <code>local://</code>）/ 内存（<code>MemoryFileSystem</code> · <code>memory:</code>）/
+网络（<code>RemoteFileSystem</code> · <code>network://</code>，对象存储协议）/ 虚拟（<code>RawFileSystem</code> · <code>virtual://</code>，
+<code>.raw</code> 文件 / Linux 块设备，自持一致性 + 自管页缓存；深指南 <a href="virtual-file-system.html"><code>virtual-file-system.md</code></a>）；</li>
+<li>一个注入点：网络文件系统的扩展面 = <code>IObjectStore</code>（厂商实现它即接入完整网络文件系统栈；
+S3 参考实现见 <a href="../../TC.Tier.Core.IO.S3/docs/network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a>）。</li>
+</ul>
+</li>
+<li><strong>spec = 协议头即术语</strong>：<code>local://</code> / <code>memory:</code> / <code>virtual://</code> / <code>network:///s3</code>——换 URI 即换文件系统，
+代码零改动（<code>TierFs</code> 工厂，可序列化、可配置驱动）。</li>
+<li><strong>能力协商</strong>：每文件系统/句柄的 <code>Capabilities</code>/<code>UnbufferedSupport</code> 如实报告能力位（DIO/稀疏/回退），
+消费者按能力位决策，<strong>不按文件系统硬编码分支</strong>。</li>
+</ul>
+<h3 id="-置顶一网络文件系统持久化唯一入口是-flush">⚠️ 置顶一（网络文件系统）：持久化唯一入口是 <code>Flush</code></h3>
+<p><code>RemoteFileSystem</code> 写句柄是 <strong>staging 写回层</strong>：<code>Write/Append</code> 只进 staging 即返回；<strong>任何 Dispose 都不上传</strong>
+（池内 = 归还；池外 = 关闭且未 Flush 的 staging <strong>丢弃</strong>——语义同构&quot;未 fsync 即丢&quot;）。用完即持久必须显式
+<code>h.Flush()</code>。池的三出口（<code>Release(close:true)</code>/<code>RemoveAll</code>/<code>pool.Dispose</code>）同样不 flush——<strong><code>RemoveAll</code>
+不得 flush</strong>（删段后 flush 会复活已删对象）。</p>
+<h3 id="-置顶二内存虚拟dispose-方向差异最反直觉">⚠️ 置顶二（内存/虚拟）：Dispose 方向差异（最反直觉）</h3>
+<table>
+<thead>
+<tr>
+<th>文件系统</th>
+<th>fs.Dispose 语义</th>
+<th>已开句柄</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>本地 / 网络</td>
+<td>&quot;离开目录&quot;——仅释放 fs 自持资源</td>
+<td><strong>继续有效</strong>（OS 句柄/staging 归消费者）</td>
+</tr>
+<tr>
+<td><strong>内存文件系统</strong></td>
+<td><strong>&quot;拔盘&quot;</strong>——销毁卷（数据内存可能复用，必须失效）</td>
+<td><strong>抛 <code>ObjectDisposedException</code></strong></td>
+</tr>
+<tr>
+<td><strong>虚拟文件系统</strong></td>
+<td><strong>&quot;关卷&quot;</strong>——提交 + 置 clean + superblock 轮写</td>
+<td><strong>抛 <code>ObjectDisposedException</code></strong></td>
+</tr>
+</tbody>
+</table>
+<p>可移植规范：按&quot;先映射、再句柄、最后 fs&quot;顺序释放。</p>
+<hr>
+<h2 id="2-怎么选四类文件系统">2. 怎么选（四类文件系统）</h2>
+<table>
+<thead>
+<tr>
+<th>文件系统</th>
+<th>spec 头</th>
+<th>生产特长</th>
+<th>关键支撑</th>
+<th>深指南</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>内存文件系统</strong></td>
+<td><code>memory:</code></td>
+<td><strong>高性能运行时</strong>——直址零拷贝、纳秒级元数据</td>
+<td>Reserved 直址；持久化 = 运行时导出镜像（§5.2）</td>
+<td><a href="memory-file-system.html"><code>memory-file-system.md</code></a></td>
+</tr>
+<tr>
+<td><strong>本地文件系统</strong></td>
+<td><code>local://</code></td>
+<td><strong>可视化目录 / 性能稳定</strong>——宿主工具直接查看</td>
+<td>目录树形态；fsync 持久化</td>
+<td><a href="local-file-system.html"><code>local-file-system.md</code></a></td>
+</tr>
+<tr>
+<td><strong>网络文件系统</strong></td>
+<td><code>network://</code></td>
+<td><strong>本地不落地 / 容量无界 / 共享</strong></td>
+<td>staging 写回层；Flush = PUT</td>
+<td><a href="../../TC.Tier.Core.IO.S3/docs/network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a></td>
+</tr>
+<tr>
+<td><strong>虚拟文件系统</strong></td>
+<td><code>virtual://</code></td>
+<td><strong>功能最全 / 稳定性最高 / 快速迁移</strong></td>
+<td>自持崩溃一致性；能力位覆盖最全；dd 快道</td>
+<td><a href="virtual-file-system.html"><code>virtual-file-system.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<p>&quot;易失&quot;是内存文件系统的<strong>机制属性不是概念缺席</strong>——持久化经导出镜像全额成立（§5.2）；单元测试/CI
+无需本地盘只是它的场景之一。选文件系统 = 选运行形态，不是选完成度——数据面速度四类带内持平，
+差异在元数据面与一致性语义（实测见 <a href="perf/io-performance.html"><code>perf/io-performance.md</code></a> §9）。</p>
+<h3 id="21-构造spec--动词--options-三件套">2.1 构造（spec / 动词 / options 三件套）</h3>
+<pre><code class="lang-csharp">using var db  = TierFs.New (&quot;local:///var/lib/tier?quota=100G&amp;label=prod&quot;);
+using var mem = TierFs.Open(&quot;memory:?label=test-a&quot;);
+using var vol = TierFs.New (&quot;virtual:///data/vol.raw?label=wal-a&quot;);        // 无 quota = 按需自动扩容
+using var s3  = TierFs.Open(&quot;network:///s3/cos.example.com/bucket/pfx?vhost=1&amp;cred=env:TIER_S3&quot;);
+
+// 工厂 × options 合流（spec 定身份 + options 补调优；优先级 = spec 显式胜出 → options → 类型缺省）
+using var db2 = TierFs.New(&quot;local:///var/lib/tier&quot;, new DiskFileSystemOptions { MetadataMode = DiskMetadataMode.Sidecar });
+
+// 类型层直构（工厂底座——三段式签名 (位置[, options][, 日志])）
+using var d3 = DiskFileSystem.New(&quot;/var/lib/tier&quot;, new DiskFileSystemOptions { QuotaBytes = 100L &lt;&lt; 30 });
+using var v3 = RawFileSystem.New(RawCarrier.File(&quot;/data/vol.raw&quot;), new RawFormatOptions { BlockSize = 4096 });
+</code></pre>
+<p><strong>动词</strong>：<code>New</code> = 创建空镜像（已存在且非空抛 AlreadyExists）；<code>Open</code> = 打开既有（不存在抛 NotFound）；
+<code>OpenOrCreate</code> = 懒初始化糖。四类文件系统全部同契约。</p>
+<h3 id="22-spec-语法一分钟">2.2 spec 语法（一分钟）</h3>
+<pre><code>local:///var/...        本地文件系统（绝对）      local:data/tier   相对（构造时对 CWD 固化）
+local:///C:/data        Windows 盘符             local://host/share  UNC
+local | local:          快捷：CWD 为根           memory:            内存文件系统（私有卷）
+virtual:///data/v.raw   虚拟文件系统·文件载体     virtual:///dev/nvme0n1  设备载体
+network:///s3/host[:port]/bucket/prefix           网络文件系统（协议首段必填——s3 随 IO.S3 程序集自动注册）
+?label=..&amp;quota=100G&amp;access=ro|wo|rw&amp;exclusive=1&amp;cred=env:NAME&amp;spill=local:///var/tmp
+</code></pre>
+<p><code>quota</code> 一词制 = 空间根硬上限（-1/缺省 = 无上限；虚拟文件系统文件载体 = 按需自动扩容）。
+<code>cred</code> 永远是引用（<code>env:NAME</code>）不携值。完整参数表见 <a href="medium-parity-matrix.html"><code>medium-parity-matrix.md</code></a>。</p>
+<hr>
+<h2 id="3-命名空间平面ifilesystem">3. 命名空间平面（IFileSystem）</h2>
+<ul>
+<li><strong>路径契约</strong>：层级相对路径，<code>'/'</code> 唯一合法分隔符（<code>\</code> 拒）；空组件/<code>.</code>/<code>..</code> 越根/盘符/保留集 → 抛。</li>
+<li><strong>目录族</strong>：<code>CreateDirectory</code>（mkdir -p 幂等 + 耐久）/ <code>DirectoryExists</code> / <code>DeleteDirectory</code>
+（仅限空——不提供递归删）/ <code>MoveDirectory</code>（整树移动，原子性看能力位）。</li>
+<li><strong>文件操作与创建解耦</strong>：<code>Exists</code> / <code>Delete</code>（耐久）/ <code>Move(overwrite: true)</code>（overwrite 必须显式）/
+<code>CreateFile(preallocateSize:, extra:)</code>（提前创建——与 Open 解耦，创建成本移出热路径）。</li>
+<li><strong>枚举族</strong>：<code>EnumerateFiles/Directories/Entries</code>（<code>*</code>/<code>?</code> 模式匹配；任一组件以 <code>.</code> 开头 → 枚举不可见，
+pattern 首字符 <code>.</code> 豁免；递归 Name = 相对所枚举目录的多组件路径）。</li>
+<li><strong>卷锁</strong>：<code>fs.AcquireExclusive(Timeout)</code>（RAII + 异常安全；非重入；本地 = lock file 崩溃自愈；
+网络 = 尽力型 fencing；内存 = 进程内真锁）。</li>
+</ul>
+<hr>
+<h2 id="4-数据平面ifilehandle">4. 数据平面（IFileHandle）</h2>
+<h3 id="41-打开语义四要素">4.1 打开语义四要素</h3>
+<pre><code class="lang-csharp">using var h = fs.Open(&quot;log-0001.data&quot;, new FileOpenOptions
+{
+    Access   = AccessMode.ReadWrite,   // Read / Write / ReadWrite
+    Mode     = FileOpenMode.OpenOrCreate,  // OpenExisting / OpenOrCreate / CreateNew / Truncate / Append
+    Sharing  = FileSharing.ReadWrite,      // advisory：None / Read / Write / ReadWrite / Delete
+    Hints    = FileOpenHints.None,         // NoBuffering(DIO) / WriteThrough / SequentialScan / RandomAccess
+    PreallocateSize = 64L &lt;&lt; 20,           // &gt;0 → open 即幂等预分配
+});
+</code></pre>
+<ul>
+<li>组合合法性构造时校验（写模式配 <code>Access=Read</code> → 抛）。</li>
+<li><strong>DIO 语义链</strong>（<code>Hints.NoBuffering</code>）：句柄 <code>UnbufferedSupport</code>/<code>RequiredAlignment</code> = 三重对齐单一
+事实源——对齐 buffer 必须走 <code>AlignedMemoryManager</code>/<code>PinnedBufferPool</code>（§7 陷阱 1）。</li>
+</ul>
+<h3 id="42-位置读写与追加">4.2 位置读写与追加</h3>
+<pre><code class="lang-csharp">h.Write(4096, record);                     // pwrite：不读不推进游标；越过 EOF 零洞扩展
+int n = h.Read(4096, dst);                 // 返回实际读数（EOF 处可能 &lt; dst.Length）
+await h.WriteAsync(4096, mem, ct);         // 异步族语义同同步
+var landing = h.Append(record);            // ★ 文件级原子预留（同 fs 任意句柄并发追加——落点两两不交）
+</code></pre>
+<p>三个位置概念各管各的：<code>Write/Read(offset)</code> 无状态 / <code>Position/Seek</code> 句柄级书签 /
+<code>Append</code> 文件级原子预留。<code>FileOpenMode.Append</code> 只初始化游标于 EOF——<strong>不是强制追加</strong>。</p>
+<h3 id="43-空间管理">4.3 空间管理</h3>
+<p><code>Preallocate()</code>（幂等）/ <code>SetLength()</code>（截断/零扩展）/ <code>PunchHole(0, len)</code>（打洞，按 <code>AllocationUnit</code>
+对齐；区间读零）/ <code>AllocatedSize</code>（物理占用）/ <code>EnumerateAllocatedRanges()</code>（块粒度区间）/
+<code>CollapseRange</code>（区间移除/插入，看 RangeShift 位）。</p>
+<h3 id="44-持久化持久化--把数据从会丢的层推进到不会丢的层">4.4 持久化（持久化 = 把数据从&quot;会丢的层&quot;推进到&quot;不会丢的层&quot;）</h3>
+<pre><code class="lang-csharp">h.Flush();                          // fsync/FlushFileBuffers/F_FULLFSYNC；网络文件系统 = PUT（唯一持久化点）
+h.FlushData();                      // fdatasync 语义（仅 Linux 与 Flush 可区分；否则 ≡ Flush 不抛）
+</code></pre>
+<ul>
+<li>本地/虚拟/网络经 <code>Flush</code> 持久；<strong>内存文件系统无原地持久化层</strong>——持久化点 = 运行时导出镜像（§5.2）。</li>
+<li>group commit 模式：写 → 攒批 → <code>Flush()</code> 一次。</li>
+</ul>
+<h3 id="45-fileextra-平面文件附加数据统一唯一概念">4.5 FileExtra 平面（文件附加数据——统一唯一概念）</h3>
+<p>一个文件 = 一份<strong>不透明附加数据 ≤1536 字节</strong>。<code>h.FileExtra</code>（全量读）/ <code>ReadFileExtra(offset, dst)</code> /
+<code>WriteFileExtra(offset, patch)</code> / <code>SetFileExtra(meta)</code>（完全覆盖）。Delete 必清除 / Move 必保留。
+&quot;1536 数学&quot;：S3 用户元数据 HTTP 头 2048 字节总预算 − 键前缀，base64 3:4 折算——三类文件系统同限。</p>
+<h3 id="46-映射--范围锁--向量与拷贝">4.6 映射 / 范围锁 / 向量与拷贝</h3>
+<p><code>h.Map(0, 4096, MapAccess.ReadWrite)</code>（<strong>必须 Dispose</strong>——独立引用，泄漏）/ <code>Lock/TryLock</code>（advisory
+契约）/ <code>WriteVector</code>（readv/writev 或回退）/ <code>src.CopyRange(dst, ...)</code>（部分失败不回滚，
+<code>CompletedLength</code> 携带）/ <code>CloneRange</code>（整文件克隆）。</p>
+<hr>
+<h2 id="5-句柄池与镜像导出">5. 句柄池与镜像导出</h2>
+<h3 id="51-句柄池filehandlepool键控共享缓存">5.1 句柄池（FileHandlePool——键控共享缓存）</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>选择</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>长生命周期反复访问同一批文件（引擎段、索引页）</td>
+<td><strong>池</strong>（同 key 命中同实例——省 open/探测开销）</td>
+</tr>
+<tr>
+<td>一次性临时文件（Compact 临时段）</td>
+<td>裸 <code>fs.Open</code> + using</td>
+</tr>
+<tr>
+<td>需要&quot;现在就关&quot;</td>
+<td>裸 Open 或 <code>Release(h, close: true)</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>真关闭只有三条出口</strong>：<code>Release(h, close: true)</code> / <code>RemoveAll(pred)</code> / <code>pool.Dispose()</code>（须先于 fs.Dispose）。
+归还后不得再触碰该引用。删段顺序：<code>pool.RemoveAll(...)</code> → <code>fs.Delete(...)</code>（Windows 句柄打开时删除被拒）。</p>
+<h3 id="52-采集还原迁移rootspaceimage四类文件系统全部支持">5.2 采集/还原/迁移（RootSpaceImage——四类文件系统全部支持）</h3>
+<p><strong>一套代码通吃四类文件系统</strong>（只认 <code>IFileSystem</code> 接口平面）：<strong>4 源 × 4 目标 = 16 格全部成立</strong>
+——任意文件系统可导出为存档、任意存档可还原到任意文件系统、任意两文件系统可直转。
+产物两种形态：</p>
+<ul>
+<li><strong>TCA1 结构化流</strong>（清单 + 数据帧 + CRC）——<strong>内容镜像，可跨文件系统</strong>（内存 → 本地 / 本地 → 网络等）；</li>
+<li><strong>字节直拷快道</strong>（<code>ContiguousCapture</code>）——<strong>整卷镜像</strong>（仅虚拟 ↔ 虚拟，<code>.raw</code> 文件 ↔ 块设备互拷，
+dd 快道；镜像后目标重载内存态）。</li>
+</ul>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO.Image;                              // RootSpaceImage
+
+// 导出：任何文件系统 → TCA1 存档
+using (var out_ = File.Create(&quot;backup.tca&quot;))
+    RootSpaceImage.Capture(sourceFs, out_, new ImageOptions
+    {
+        Compression = ImageCompression.Zstd,   // None（配快道零拷贝）/ ZLib / Zstd
+        QuietSource = true,                    // ★ 自动进维护门闩——静默快照
+    });
+
+// 还原：存档 → 任何空根空间（目标必须为空，非空抛 AlreadyExists）
+using (var in_ = File.OpenRead(&quot;backup.tca&quot;))
+    RootSpaceImage.Restore(in_, targetFs, new ImageOptions { VerifyChecksums = true });
+
+// 直转：任意两文件系统（能力位自动路由——虚拟↔虚拟走字节快道，其余走 TCA1）
+var summary = RootSpaceImage.Transfer(sourceFs, targetFs, options);
+</code></pre>
+<p><strong>启动的四种形态</strong>（同一份存档，按需选择落点）：</p>
+<table>
+<thead>
+<tr>
+<th>启动形态</th>
+<th>落点</th>
+<th>一句话</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>测试环境复活</td>
+<td>新内存文件系统</td>
+<td>CI/调试无需本地盘启动——内容/Extra/稀疏全保真</td>
+</tr>
+<tr>
+<td>落盘部署</td>
+<td>本地文件系统目录</td>
+<td>解档为宿主可直接查看的目录树</td>
+</tr>
+<tr>
+<td><strong>制成存档卷</strong></td>
+<td>虚拟文件系统</td>
+<td>还原进 <code>.raw</code> = 单工件（<strong>存档即活卷</strong>——可只读挂载检视/抽取）</td>
+</tr>
+<tr>
+<td>云归档</td>
+<td>网络文件系统</td>
+<td>存档上云（TCA1 + 压缩）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>保真清单</strong>：目录树全结构、文件内容（逐帧 CRC）、稀疏洞边界、unwritten 预分配（<code>PreallocateSize</code>
+语义重建——物理预留 + 读零 + 写转换）、FileExtra（≤1536B）。
+⚠️ 压缩会杀死文件→文件零拷贝（必须过用户态）；采集前静默责任：<code>QuietSource=true</code> 只挡 fs 层写——
+消费者自己的后台任务先自行收敛再采集。</p>
+<hr>
+<h2 id="6-想深入指路">6. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>网络文件系统（差异表/staging/Flush 编排/fencing/厂商矩阵）</td>
+<td><a href="../../TC.Tier.Core.IO.S3/docs/network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a> 与源码 <code>IO/Remote/</code></td>
+</tr>
+<tr>
+<td>虚拟文件系统（Raw 深指南：多载体/两档 IO/维护门闩/dd 快道）</td>
+<td><a href="virtual-file-system.html"><code>virtual-file-system.md</code></a></td>
+</tr>
+<tr>
+<td>能力位矩阵与回退表（逐能力详解）</td>
+<td>源码 <code>IO/</code> 注释（使用面按能力位决策即可）</td>
+</tr>
+<tr>
+<td>常见陷阱完整 18 条</td>
+<td>源码注释与 <a href="perf/io-performance.html"><code>perf/io-performance.md</code></a> §8</td>
+</tr>
+<tr>
+<td>性能基线（四类文件系统矩阵/并发扩展）</td>
+<td><a href="perf/io-performance.html"><code>perf/io-performance.md</code></a></td>
+</tr>
+<tr>
+<td>采集/还原/迁移管线（TCA1/快道/启动四形态）</td>
+<td><code>IO/Image/RootSpaceImage.cs</code> 注释与设计稿</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="7-常见陷阱踩坑概率排序精简版">7. 常见陷阱（踩坑概率排序，精简版）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>陷阱</th>
+<th>要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>DIO 三重对齐</td>
+<td>offset/length/buffer 按 <code>h.RequiredAlignment</code>；对齐 buffer 必须走池</td>
+</tr>
+<tr>
+<td>2</td>
+<td>FileSharing 是 advisory</td>
+<td>仅约束同进程同 fs 实例；跨进程用卷锁</td>
+</tr>
+<tr>
+<td>3</td>
+<td>删除语义平台差异</td>
+<td>Win 拒删被开文件；POSIX/内存延迟释放——删前先回收句柄</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>Append</code> ≠ 强制追加</td>
+<td>Mode.Append 只初始化游标；多写者追加 = <code>h.Append()</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Append 失败预留不回滚</td>
+<td>回退会吞噬他人预留；异常带 <code>ReservedOffset</code>（失败区间 = 读零洞）</td>
+</tr>
+<tr>
+<td>6</td>
+<td>mem Sparse 映射写时差</td>
+<td>视图写 Flush/Dispose 才写回；实时可见用 Reserved 或 Write 路径</td>
+</tr>
+<tr>
+<td>7</td>
+<td><code>IMappedSection</code> 必须 Dispose</td>
+<td>独立 fd——不 Dispose = 泄漏；View 越界 = 段错误</td>
+</tr>
+<tr>
+<td>8</td>
+<td>池归还协议</td>
+<td>Dispose=归还不是关闭；真关闭仅三出口；归还后不得触碰引用</td>
+</tr>
+<tr>
+<td>9</td>
+<td>memfs <code>Default</code> 全局共享</td>
+<td>测试隔离一律 <code>TierFs.Open(&quot;memory:&quot;)</code> 私有卷</td>
+</tr>
+<tr>
+<td>10</td>
+<td>mmap × DIO 混用</td>
+<td>一致性边界由内核决定；视图生命周期与 Move/Delete 互斥由调用方协调</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Dispose × 在途异步</td>
+<td>先收敛（await/取消）再 Dispose</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>完整 18 条（含 memfs 分配模式选型/模拟边界/范围锁 OFD/卷锁成对释放）见源码 <code>IO/</code> 注释。</p>
+</blockquote>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/io.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

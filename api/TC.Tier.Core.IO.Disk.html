@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.IO.Disk | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.IO.Disk | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO.Disk">
+
+  <h1 id="TC_Tier_Core_IO_Disk" data-uid="TC.Tier.Core.IO.Disk" class="text-break">Namespace TC.Tier.Core.IO.Disk</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></h4>
+      <section><p>磁盘文件系统——<span class="xref">TC.Tier.Core.NativeInterop.FileNative</span> 的面向对象封口 + 根空间命名空间平面（层级相对路径，filesystem-root-space-design）。</p>
+<p>★ 构造（动词面 §2.3）：<a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html#TC_Tier_Core_IO_Disk_DiskFileSystem_New_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_">New(string, DiskFileSystemOptions?, ILogger?)</a> /
+  <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html#TC_Tier_Core_IO_Disk_DiskFileSystem_Open_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_">Open(string, DiskFileSystemOptions?, ILogger?)</a> /
+  <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html#TC_Tier_Core_IO_Disk_DiskFileSystem_OpenOrCreate_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_">OpenOrCreate(string, DiskFileSystemOptions?, ILogger?)</a>（懒初始化糖——bind-any 终态；
+  磁盘根目录是部署决策，无全局单例）。</p>
+<p>★ 卷锁：lock file + FileShare.None（Win）/ flock（Unix）——跨进程互斥、崩溃自愈
+  （进程死亡后句柄关闭，后来者可重新获取）。</p>
+<p>★ Dispose 契约（磁盘方向）："离开目录"——仅释放 fs 自持资源（卷锁违约释放并告警）；
+  不关闭消费者持有的句柄；Dispose 后 Open/命名空间操作抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></h4>
+      <section><p>本地文件系统选项（medium-protocol-and-parity-design §6——继承 FileSystemOptions 基类）。</p>
+<p>★ 基类成员生效：Access（G2 包络执法）/ QuotaBytes（G3——枚举基线 + 写前拒）/ Label（G1——.tier-volume 标记）。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Disk.DiskMetadataMode.html">DiskMetadataMode</a></h4>
+      <section><p>磁盘元数据存储模式（构造期显式配置——部署决策，非逐文件运行时隐式判定）。</p>
+<p>★ 决策依据（filesystem-root-space-design §3.6 修订）：隐式"写失败回退"会产生混合态
+  （部分文件元数据在 xattr、部分在 sidecar）——读取端被迫永远双通道探测。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

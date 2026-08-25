@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Runtime.Meta | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Runtime.Meta | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Meta">
+
+  <h1 id="TC_Tier_Runtime_Meta" data-uid="TC.Tier.Runtime.Meta" class="text-break">Namespace TC.Tier.Runtime.Meta</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Meta.DisabledMetaPolicy-2.html">DisabledMetaPolicy&lt;THeader, TPayload&gt;</a></h4>
+      <section><p>Disabled meta 策略——no-op（不持久化 meta）。默认值。</p>
+<p>所有读写/提交操作都是 no-op；Load 返回 false（无 meta）。适用于无数据/空盘/外部管 hints 场景。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Meta.ManagedMetaPolicy-2.html">ManagedMetaPolicy&lt;THeader, TPayload&gt;</a></h4>
+      <section><p>Managed meta 策略——独立 <code>IStorageEngine</code> + 四段自描述块 + Magic/CRC 校验。</p>
+<p>★ 统一布局：[统一 Header N B][内部水位线（结构化）][外部 opaque（实际用量）][统一 Footer CRC 4B]。</p>
+<p>★ 自描述核心（设计决策 ）：header.PayloadLength = 水位字节数 + opaque <b>实际用量</b>；
+  水线位置 = HeaderSize（固定）；opaque 范围 = 其后至 PayloadLength；footer 位 = HeaderSize + PayloadLength。
+  <b>容量（可变的启动配置）零参与盘上几何</b>——跨重启容量随便调，读侧全按盘上自述定位，水位无条件恢复。</p>
+<p>★ 容量（MetaOpaqueBytes）只做写侧约束：opaque 写入上限 + 缓冲分配 + 引擎段几何。</p>
+<p>★ CRC32C 覆盖 Header + 水位 + 实际 opaque（到 footer 前），存于 Footer。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html">MetadataMetaTransport</a></h4>
+      <section><p>外部 meta 介质适配器——把 meta 块托管到 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadata.html">VersionedMetadata</a>（版本链稳定存储）。</p>
+<p>★ 3a（外部隔离）语义的<b>推荐实现</b>（用户裁定）：需要外部独有 meta 存储时，不再自写
+  单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、
+  崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：</p>
+<p> - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；</p>
+<p> - 持久化点即 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_System_ReadOnlySpan_System_Byte__">WriteBlock(ReadOnlySpan&lt;byte&gt;)</a>（Write + Persist + flush）——对齐
+  TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；</p>
+<p> - N=2 轮转自动回收（每次写后 VersionedMetadata.ReclaimOldVersions），空间有界；</p>
+<p> - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（
+  经 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_Storage">Storage</a> 注册进 TransactionLog）。</p>
+<p>配置约束：<a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings.html#TC_Tier_Runtime_Structures_Metadata_VersionedMetadataSettings_PayloadSize">PayloadSize</a> 必须 ≥ meta 块上界
+（12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>
+（fail-fast，不静默截断）。引擎名须与主结构不同（如 "xxx.meta"）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Meta.TransportMetaPolicy-2.html">TransportMetaPolicy&lt;THeader, TPayload&gt;</a></h4>
+      <section><p>Transport meta 策略——经 <a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a> 写块/读最后一条。</p>
+<p>★ 统一布局：[Header N B][Payload 结构化水位 + opaque 扩展][Crc32Footer 4B]——
+  块格式与完整性校验完全在策略内，传输只搬字节（单槽覆盖/主流追加/远程皆可）。</p>
+<p>★ 变长块：Commit 只写 Header + 实际 PayloadLength + Footer（无 4K 填充——嵌入主流时
+  不污染数据流）；读写走 4K 对齐的就地缓冲。</p>
+<p>★ 契约：未 Load 读返回 null/Empty；Commit 后同实例可读；重新 Load 全量重置；
+  Load false = 空/无数据/校验失败（不区分）；Dispose 幂等。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

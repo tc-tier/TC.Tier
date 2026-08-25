@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Core.IO | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Core.IO | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO">
+
+  <h1 id="TC_Tier_Core_IO" data-uid="TC.Tier.Core.IO" class="text-break">Namespace TC.Tier.Core.IO</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.DirectIo.html">DirectIo</a></h4>
+      <section><p>DIO（无缓冲直接 IO）的缓冲对齐地板——预分配对齐内存（页池/帧池）与句柄校验共用的单真相。</p>
+<p>★ 与 <span class="xref">TC.Tier.Core.IO.Disk.DiskFileHandle</span> 的 <code>_requiredAlignment</code> 同式：
+Windows = max(扇区, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.environment.systempagesize">SystemPageSize</a>)（Win DIO 缓冲地址须系统页对齐）；
+Linux = 扇区（O_DIRECT 逻辑块粒度）。</p>
+<p>★ 消费纪律：凡打算作为 DIO 写/读缓冲的长命内存（Ring 页池/Log 帧池），
+租用对齐必须取本地板而非卷扇区——按扇区租用令 Windows 下缓冲地址 7/8 概率失配
+（卷扇区 512 时），DIO flush 随机抛 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a> 对齐错。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html">FileHandlePool</a></h4>
+      <section><p>句柄池——<a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a> 的键控共享缓存（公开原语；三步获取/败者自毁语义搬迁自
+StorageEngineBase.FileHandle，第九轮评审重立为 Acquire/Release 协议）。</p>
+<p>★ 单获取接口 <a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html#TC_Tier_Core_IO_FileHandlePool_Acquire_System_String_TC_Tier_Core_IO_FileOpenOptions_">Acquire(string, FileOpenOptions)</a>：读写分离由 options 参数分桶（key 含 Access）；
+  预分配是创建期意图不进 key——同文件不同预分配大小的两次 Acquire 命中同一实例。</p>
+<p>★ 归还协议（挂载式，零分配）：池内句柄 Dispose = 归还使用权（默认<b>不</b>关闭底层）；
+  底层关闭只有三条池内出口——<a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html#TC_Tier_Core_IO_FileHandlePool_Release_TC_Tier_Core_IO_IFileHandle_System_Boolean_">Release(IFileHandle, bool)</a>(close:true)（定向）、
+  <a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html#TC_Tier_Core_IO_FileHandlePool_RemoveAll_System_Predicate_System_String__">RemoveAll(Predicate&lt;string&gt;)</a>(谓词批量)、<a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html#TC_Tier_Core_IO_FileHandlePool_Dispose">Dispose()</a>（全量）。外部任何 Dispose 都不可能关闭池内资源。</p>
+<p>★ 安全 LRU：maxCapacity 超容只淘汰 idle（usage==0）句柄；in-use 跳过并告警
+  （"淘汰正在使用的句柄是调用方错误"从文档警告升级为机制保证）。LRU 淘汰不回收派生
+  <a class="xref" href="TC.Tier.Core.IO.IMappedSection.html">IMappedSection</a>（映射生命周期独立）。</p>
+<p>★ 关闭顺序契约：pool.Dispose 先于 fs.Dispose；Dispose 时 usage&gt;0 告警（忘还观测点）。</p>
+<p>★ io.md 陷阱：无 maxCapacity 时禁无界增长——长期运行消费者必须周期 RemoveAll 回收。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></h4>
+      <section><p>Core/IO 唯一的 IO 异常类型（家族 A·物理层标准）——所有介质实现（磁盘/内存/故障注入）的失败统一出口。</p>
+<p>★ 铁律：不携带任何存储语义（逻辑地址 / lease / 存储层词汇）——存储语义由消费方在边界包装补充。</p>
+<p>★ 派生自 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.ioexception">IOException</a>（BCL）——消费者可用单一 catch (IOException) 兜底。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></h4>
+      <section><p>文件打开语义——Access × Mode × Sharing × Hints 四要素 + 预分配，一次表达完整打开意图
+（BCL <code>File.Open(path, FileMode, FileAccess, FileShare)</code> 三要素一一对应，无损表达）。</p>
+<p>★ 值相等（sealed record，全部成员含 <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html#TC_Tier_Core_IO_FileOpenOptions_PreallocateSize">PreallocateSize</a> 参与）——供消费者比较/测试便利；
+  池缓存的 key 正确性另由专用 HandleCacheKey 承担（预分配不进池 key，两者各自场景互不依赖）。</p>
+<p>★ 组合合法性构造时校验，非法抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileSystemOptions.html">FileSystemOptions</a></h4>
+      <section><p>options 家族基类（medium-protocol-and-parity-design §6）——名字回收自 G12 删除的遗留 God-options。</p>
+<p>★ 准入标准 = "同词同义且全介质成立"；v1 三成员——Access（空间访问三态，一个枚举三个平面）/
+  Label（New = 设置 / Open = 校验——时刻语义见 §2.5）/ QuotaBytes（空间根上限，-1 哨兵）。</p>
+<p>★ 不满足准入标准的参数宁可重复出现在子类，不上收（防 God-options 回潮）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.LocalSpec.html">LocalSpec</a></h4>
+      <section><p>local:// spec 构造器——With 方法集 = [SpecParam] 派生（TierSpec 属性面）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.MemorySpec.html">MemorySpec</a></h4>
+      <section><p>memory: spec 构造器——With 方法集 = [SpecParam] 派生（TierSpec 属性面）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.NetworkSpec.html">NetworkSpec</a></h4>
+      <section><p>network:///s3 spec 构造器——With 方法集 = [SpecParam] 派生（TierSpec 属性面）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.SpecSizeExtensions.html">SpecSizeExtensions</a></h4>
+      <section><p>spec DSL 尺寸后缀人机工学（spec-typed-frontend-and-generator-design §4 P-b）——
+<code>1.Giga()</code> ≡ spec 字符串 <code>quota=1G</code>（1024 基；往返同义由 DSL 契约测试钉死）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.Specs.html">Specs</a></h4>
+      <section><p>spec 构造 DSL（L2 编译期安全层）——非法参数×介质不可写出；ToString = spec 字符串。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.TierFs.html">TierFs</a></h4>
+      <section><p>TierFs——spec 工厂（medium-protocol-and-parity-design §2.2）：&quot;打开一个存储镜像&quot;的统一入口。</p>
+<p>★ 两级注册表：顶层 = 四本性根（封闭——本类内路由）；二级 = network 协议表（开放注册）。</p>
+<p>★ 工厂是薄壳：解析 spec → 委托各介质类型化入口（P2 各介质落位 New/Open 后重新对靶）。</p>
+<p>★ 骨架纪律：spec 参数全量解析校验；介质尚未落地的参数**显式抛 NotSupportedException（带
+  阶段号）**——绝不静默忽略（静默忽略 = 配置写了没生效，比报错恶劣）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.TierSpec.html">TierSpec</a></h4>
+      <section><p>spec 解析结果（medium-protocol-and-parity-design §2.1 方案甲）——构造协议的结构化形态。</p>
+<p>★ scheme 头 = 本性四类（local/memory/virtual/network——封闭）；二级分类 = path 首段
+  （virtual 的 <code>dev</code> 设备载体 / network 的协议名——开放注册键）。</p>
+<p>★ local 路径域四形态：POSIX 绝对（<code>local:///var/…</code>）/ Windows 盘符（<code>\</code> 与 <code>/</code>
+  都收，解析时归一 <code>/</code>）/ UNC（<code>local://server/share</code>）/ 相对（<code>local:rel</code>——
+  CWD 固化由工厂负责，解析层保持原样）。</p>
+<p>★ 快捷档：<code>local</code> ≡ <code>local:</code> = CWD 根；<code>memory</code> ≡ <code>memory:</code> = 缺省私有卷；
+  virtual/network 无裸形态（fail-fast——没有默认载体与默认端点）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.IO.TierSpec.html#TC_Tier_Core_IO_TierSpec_ToString">ToString()</a> 输出规范形——往返稳定：<code>Parse(Parse(s).ToString()).ToString()</code>
+  恒等（设计 §7.3 往返测试的锚点）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.VirtualSpec.html">VirtualSpec</a></h4>
+      <section><p>virtual:// spec 构造器——With 方法集 = [SpecParam] 派生（TierSpec 属性面）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.VolumeInfo.html">VolumeInfo</a></h4>
+      <section><p>卷几何信息——两个独立探测、职责不同的对齐基准（可不同：512B 逻辑扇区+4K 簇；NTFS 4K 扇区+64K 簇）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.IO.VolumeInfo.html#TC_Tier_Core_IO_VolumeInfo_SectorSize">SectorSize</a> = 物理扇区——DIO 读写对齐基准（Win DIO 句柄的 RequiredAlignment 升为 max(sector, 内存页)）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.IO.VolumeInfo.html#TC_Tier_Core_IO_VolumeInfo_AllocationUnit">AllocationUnit</a> = fs 簇/分配单元——空间操作（PunchHole/Collapse/Insert）对齐基准；mem = PageSize。</p>
+</section>
+    <h3 id="structs">
+Structs
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a></h4>
+      <section><p>根空间统一枚举条目（filesystem-root-space-design §3.3）——三族枚举（Files/Directories/Entries）共用。</p>
+<p>★ 轻量：不含元数据（S3 ListObjectsV2 不返回用户元数据——枚举携带 = 逐键 HeadObject，不可接受）；
+  完整信息（含 ≤2K 元数据）见 <a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a>（<code>IFileSystem.Stat</code> 专用）。</p>
+<p>★ Name = 相对所枚举目录的路径（recursive=true 时多组件 "sub/f"）；
+  Length 文件=字节数、目录恒 0；LastWriteTime 文件三介质必有，S3 目录不可得 = <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset.minvalue">MinValue</a>；
+  CreationTime 可空 = 介质不可得（NTFS ✓ / Linux 视 statx / S3 恒 null）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a></h4>
+      <section><p>单条目完整信息（<code>IFileSystem.Stat</code> 专用）——<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a> 全字段 + 用户元数据（≤2K）。</p>
+</section>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></h4>
+      <section><p>单个文件的访问与操作——Core/IO 数据平面（fd 模型 ∪ overlapped 模型，D7）。</p>
+<p>一个 IFileHandle 实例对应一个文件的一种打开语义（Access × Mode × Sharing × Hints）。</p>
+<p>★ 磁盘实现：<code>SafeFileHandle + RandomAccess</code>（内含 DIO 对齐校验与逐句柄探测）。</p>
+<p>★ 内存实现：槽代际寻址（open 时解析一次，热路径零字典开销）。</p>
+<p>★ 位置语义并集：<code>Write/Read(offset)</code> 保持 pwrite/pread 无状态铁律（不读不推进游标）；
+  句柄同时内建生命周期游标（open 初始化、<a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Append_System_ReadOnlySpan_System_Byte__">Append(ReadOnlySpan&lt;byte&gt;)</a> 原子预留推进、<a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Seek_System_Int64_System_IO_SeekOrigin_">Seek(long, SeekOrigin)</a> 移动）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></h4>
+      <section><p><b>根空间管理器</b>——命名空间平面（路径/目录/枚举/元数据）与数据平面 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a> 拆分
+（OS 模型：pread 属 fd，rename/readdir 属命名空间）。</p>
+<p>★ 模型（filesystem-root-space-design）：一个 IFileSystem = 整个存储系统的<b>根空间</b>——
+  内部全相对路径的<b>层级命名空间</b>（'/' 唯一分隔符，组件化校验见 PathValidator.ValidateRelative）。
+  目标布局 <code>{root}/{数据结构}/{引擎}/{段文件、整理目录}</code>；上层经本表面完成全部命名空间管理，
+  零 BCL File/Directory 依赖（三介质平权：Disk/Mem/Remote 实现同一接口，能力位表达差异）。</p>
+<p>★ 创建/句柄解耦：<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_CreateFile_System_String_System_Int64_System_ReadOnlyMemory_System_Byte__">CreateFile(string, long, ReadOnlyMemory&lt;byte&gt;)</a> 提前创建（预分配+元数据，建段协议移出热路径）；
+  <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_Open_System_String_TC_Tier_Core_IO_FileOpenOptions_">Open(string, FileOpenOptions)</a> 保留即建即用模式族（FileMode 语义）。</p>
+<p>★ FileExtra 平面（§3.6）：一份不透明附加数据 ≤<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_MaxFileExtraBytes">MaxFileExtraBytes</a>（创建即写/句柄四成员
+  2KB 上限）；<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_Stat_System_String_">Stat(string)</a> 全量读；枚举条目 <a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a> 轻量不携带（S3 列举不返回
+  用户元数据——携带 = 逐键 Head，不可接受）。</p>
+<p>★ 枚举契约（对齐 POSIX readdir）：不保证原子快照（枚举期间增删可见性未定义）、不保证顺序
+  （消费者自行排序）；模式匹配 = <code>*</code>/<code>?</code> 通配（BCL MatchType.Simple，Ordinal），
+  匹配目标为条目最终组件名；单参重载的 string 实参是 <b>pattern</b>（根范围），子目录枚举须双参。</p>
+<p>★ Dispose 契约（方向差异必须显式认知）：磁盘 = 仅释放 fs 自持资源（卷锁违约释放、探测缓存），
+  <b>不关闭</b>消费者持有的句柄（OS 句柄归消费者），已开句柄继续有效；mem 特例 = 销毁卷（"拔盘"）——
+  全部槽归还池（含 Detached），此后其任何句柄操作抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.IMappedSection.html">IMappedSection</a></h4>
+      <section><p>内存映射视图——生命周期独立于父句柄（Map 私有化底层引用：mem=槽引用计数 / disk=OS 句柄复刻）。</p>
+<p>★ 铁律：必须 Dispose（其持有独立 OS 句柄/引用，不 Dispose = fd/引用泄漏）。</p>
+<p>★ Dispose 后访问 <a class="xref" href="TC.Tier.Core.IO.IMappedSection.html#TC_Tier_Core_IO_IMappedSection_View">View</a> 抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>（不返回悬垂 Memory）。</p>
+<p>★ mem Sparse 模式写穿透契约：视图写在 Flush/Dispose 时写回文件（可见时点=Flush/Dispose，非实时）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.ITierProtocolBuilder.html">ITierProtocolBuilder</a></h4>
+      <section><p>network 协议构建器（二级注册表的开放轴）——第三方 <code>IObjectStore</code> 实现注册
+<code>TierFs.RegisterProtocol(&quot;cos&quot;, builder)</code> 即接入完整远程栈（扩展永不进 scheme 顶层）。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Core.IO.AccessMode.html">AccessMode</a></h4>
+      <section><p>访问三态（medium-protocol-and-parity-design §2.5/§5.2）——一个三值概念，三个平面：
+空间（<code>FileSystemOptions.Access</code>）、文件（<code>FileOpenOptions.Access</code>）、映射（Map API）。</p>
+<p>★ 空间平面即总上包络：句柄/映射构造期校验 <code>⊑ fs.Access</code>，越包络即抛、不构造。</p>
+<p>★ 本枚举为目标词汇先行落位；P3 完成 <code>AccessMode</code> 改名与 <code>AccessMode</code> 并入。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileAdvise.html">FileAdvise</a></h4>
+      <section><p>访问提示（posix_fadvise 族语义）——告诉内核接下来的访问模式，供预取/回收决策。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileLockMode.html">FileLockMode</a></h4>
+      <section><p>字节范围锁模式（fd 级协调原语，与卷锁分层）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html">FileOpenHints</a></h4>
+      <section><p>打开提示轴——缓存策略与访问模式提示（正交可叠加）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html#TC_Tier_Core_IO_FileOpenHints_NoBuffering">NoBuffering</a> 与 <a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html#TC_Tier_Core_IO_FileOpenHints_WriteThrough">WriteThrough</a> 可叠加（DIO + 写透）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html">FileOpenMode</a></h4>
+      <section><p>打开模式轴——文件存在性处置（BCL <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.filemode">FileMode</a> 对应）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html#TC_Tier_Core_IO_FileOpenMode_Append">Append</a> 仅控制句柄游标初始位置（EOF），<b>不</b>施加强制追加——
+  与 BCL FileMode.Append / POSIX O_APPEND 均不同（后者已裁决不在本层）；多写者顺序追加用句柄 Append()。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileSharing.html">FileSharing</a></h4>
+      <section><p>打开共享轴——同文件并发打开约束（BCL <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.fileshare">FileShare</a> 对应）。</p>
+<p>★ POSIX 无原生对应，映射为 advisory 锁语义（平台差异文档化）。</p>
+<p>★ 保护边界（advisory 本质）：仅约束同进程内经同一 fs 实例打开的句柄——
+  外部进程 / 绕过本层的原生 IO 不受保护；跨进程互斥用卷锁（IFileSystem.AcquireExclusive）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html">FileSystemCapabilities</a></h4>
+      <section><p>文件系统能力协商位——介质异构的显式表达（一次性探测，消费者主动避免依赖回退）。</p>
+<p>★ 契约：每个能力位对应的操作在<b>未置位</b>的实现上有文档化回退
+  （xattr→no-op、PunchHole→memset）或抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_Unsupported">Unsupported</a>（无回退族，如 CollapseRange）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html#TC_Tier_Core_IO_FileSystemCapabilities_DirectIO">DirectIO</a> 是 fs/卷级<b>静态</b>能力（构造时探测）；句柄实际探测结果由
+  <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_UnbufferedSupport">UnbufferedSupport</a> 报告——两层互补，不可互相取代。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.FsEntryType.html">FsEntryType</a></h4>
+      <section><p>条目类型（根空间统一条目 FsEntry 的判别）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.IOError.html">IOError</a></h4>
+      <section><p>统一跨平台文件 IO 错误码——Core/IO 的底层统一错误分类（替代原生 Win32 HResult / errno 的碎片化处理）。</p>
+<p>★ 值兼容 Runtime.Storage 旧 <code>IOError</code>（前 9 个成员序号一致），仅追加新成员；
+  适配迁移期两套并存（本枚举属家族 A，旧枚举随旧目录消亡）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html">MaintenanceScope</a></h4>
+      <section><p>维护门闩的作用范围（<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_EnterMaintenance_System_String_TC_Tier_Core_IO_MaintenanceScope_System_Threading_CancellationToken_">EnterMaintenance(string, MaintenanceScope, CancellationToken)</a> 的 scope 参数）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.StorageNature.html">StorageNature</a></h4>
+      <section><p>介质本性（medium-protocol-and-parity-design §1.5/§2.1）——spec 协议头的值域，四类封闭（平权完备族）。</p>
+<p>★ 三层一套词汇：文档标准术语 = spec 协议头 = <code>VolumeInfo.Nature</code> 观测值。</p>
+<p>★ 二级分类在 path 首段（virtual 的 <code>dev</code> 载体 / network 的协议名——开放注册），
+  本枚举只承载封闭的顶层；扩展永不进顶层。</p>
+<p>★ 遗留 <code>FileSystemType</code> 枚举的分类学由此继承（G12——形态退场，概念留任）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.TierFsVerb.html">TierFsVerb</a></h4>
+      <section><p>工厂动词（medium-protocol-and-parity-design §2.3）——New = 创建空镜像并打开（已存在即抛）；Open = 打开既有（不存在即抛）；OpenOrCreate = 懒初始化糖（bind-any——两态显式表达）。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

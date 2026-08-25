@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>概念平权矩阵（活文档——medium-protocol-and-parity-design &#167;4 的收口形态） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="概念平权矩阵（活文档——medium-protocol-and-parity-design &#167;4 的收口形态） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="概念平权矩阵活文档medium-protocol-and-parity-design-4-的收口形态">概念平权矩阵（活文档——medium-protocol-and-parity-design §4 的收口形态）</h1>
+
+<blockquote>
+<p><strong>维护规则</strong>（设计 §7.2 准入流程）：任何文件系统要新增建设面概念，先在下面矩阵填自己那格，然后回答其余
+三格——实现 ✓ / 映射 ◐（注明语义）/ 豁免 ✗†（层错位/物理不存在，附证明）。<strong>三样都拿不出来就不合入。</strong>
+与 io.md §7 能力位矩阵（运行行为）互补：本表管<strong>词汇面</strong>（消费者必须能表达什么），那张管运行面。
+三态：✓ 已实现 / ◐ 映射（形态不同） / ✗† 豁免（附证明）。</p>
+</blockquote>
+<h2 id="spec-层概念消费者表达面">spec 层概念（消费者表达面）</h2>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>本地 local</th>
+<th>内存 memory</th>
+<th>网络 network</th>
+<th>虚拟 virtual</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>位置路径</td>
+<td>✓ root</td>
+<td>—（固有）</td>
+<td>✓ <code>network:///s3/</code> URI（G6 归拢）</td>
+<td>✓ 载体+设备+多载体清单</td>
+<td></td>
+</tr>
+<tr>
+<td><code>label</code></td>
+<td>✓ <code>.tier-volume</code> 标记</td>
+<td>✓ 卷对象字段</td>
+<td>✓ 标记对象</td>
+<td>✓ superblock</td>
+<td>镜像身份，携转换（G1）</td>
+</tr>
+<tr>
+<td>空间根卷记录</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓（参考实现）</td>
+<td>Open 一次装载 / New 一次写入（G1）</td>
+</tr>
+<tr>
+<td>文件级范围锁</td>
+<td>✓ LockFileEx/OFD</td>
+<td>✓ 进程内区间表</td>
+<td>✓ 进程内 advisory（G8 翻案）</td>
+<td>✓ 进程内逻辑锁</td>
+<td>advisory 契约同族</td>
+</tr>
+<tr>
+<td>映射平面 Map</td>
+<td>✓ 手工 mmap</td>
+<td>✓ 物化/直址</td>
+<td>✓ 物化形态（G11 翻案：Read 快照/ReadWrite staging 视图）</td>
+<td>✓ 文件载体（设备诚实 ✗）</td>
+<td>映射无只写（三平面一致值域）</td>
+</tr>
+<tr>
+<td>卷级共享获取 AcquireShared</td>
+<td>✗（G9 可选——矩阵留行）</td>
+<td>✗（同左）</td>
+<td>✗（同左）</td>
+<td>✗（同左）</td>
+<td>做则四类文件系统同批</td>
+</tr>
+<tr>
+<td><code>quota</code></td>
+<td>✓ 惰性基线+写前拒</td>
+<td>✓（原 Capacity→QuotaBytes）</td>
+<td>✓ 惰性 opt-in</td>
+<td>✓ 一词制供给（-1 = <strong>按需自动扩容</strong>）</td>
+<td>UsedBytes 四类文件系统实时可见（G3/G4）</td>
+</tr>
+<tr>
+<td><code>access</code> ro/wo/rw</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>统一枚举 AccessMode 三平面（G2）</td>
+</tr>
+<tr>
+<td><code>exclusive</code></td>
+<td>✓ 锁文件</td>
+<td>✓ 真锁</td>
+<td>✓ fencing 尽力</td>
+<td>✓ 内建</td>
+<td>挂载属性统一表达（G5）</td>
+</tr>
+<tr>
+<td><code>spill</code></td>
+<td>—（无此概念）</td>
+<td>—（自身即内存）</td>
+<td>✓ 嵌套位置（RemoteSpill 两形态——G7）</td>
+<td>—</td>
+<td>位置可嵌套，工厂递归解析</td>
+</tr>
+<tr>
+<td>凭证 <code>cred=env:</code></td>
+<td>—</td>
+<td>—</td>
+<td>✓ 引用永不携值</td>
+<td>—</td>
+<td>v1 唯一形态</td>
+</tr>
+<tr>
+<td>Volume 几何/用量读面</td>
+<td>✓ 配额推导</td>
+<td>✓ 配额推导</td>
+<td>✓ 配额/清单推导（不透明诚实 -1）</td>
+<td>✓ 精确（superblock+位图）</td>
+<td>G4：VolumeInfo 九成员三段</td>
+</tr>
+<tr>
+<td>多载体 member=</td>
+<td>✗† 层错位（OS/LVM 吸收）</td>
+<td>✗† 物理不存在</td>
+<td>✗† 物理不存在</td>
+<td>✓（8 成员/迁移缩容/降级）</td>
+<td>豁免证明随格携带</td>
+</tr>
+<tr>
+<td>跨进程可见性</td>
+<td>✓</td>
+<td>✗† 物理不存在</td>
+<td>✓</td>
+<td>✓</td>
+<td>经典豁免例</td>
+</tr>
+</tbody>
+</table>
+<h2 id="options-层概念文件系统私有旋钮不参与平权iomd-26">options 层概念（文件系统私有旋钮——不参与平权，io.md §2/§6）</h2>
+<p>准入去处唯一 = options 子类；旋钮升格平权概念的通道 = 本矩阵（跨 ≥2 文件系统且属部署事实）。</p>
+<h2 id="运行面概念衔接">运行面概念衔接</h2>
+<p>持久化（数据比进程活得久）：本地/虚拟 = 原地 Flush；网络 = Flush(PUT)；<strong>内存 = 无原地持久化层，
+持久化点 = 运行时导出</strong>（RootSpaceImage——概念全额成立，机制豁免）。其余运行行为见 io.md §7 能力位矩阵
+与 §6.2 差异声明表。</p>
+<h2 id="spec-参数表25-同源tierspec-属性集--dsl-方法集--analyzer-规则集">spec 参数表（§2.5 同源——TierSpec 属性集 = DSL 方法集 = analyzer 规则集）</h2>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>身份层</th>
+<th>New</th>
+<th>Open</th>
+<th>文件系统</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>label</code>（≤32B）</td>
+<td>镜像身份</td>
+<td>写入</td>
+<td>校验（不符抛）</td>
+<td>四类文件系统</td>
+</tr>
+<tr>
+<td><code>quota</code>（尺寸/-1）</td>
+<td>挂载·形态</td>
+<td>供给物化</td>
+<td>收紧 min</td>
+<td>四类文件系统（虚拟 -1 = 自动扩容）</td>
+</tr>
+<tr>
+<td><code>access=ro\|wo\|rw</code></td>
+<td>挂载·形态</td>
+<td>建完即封存（ro）</td>
+<td>总上包络</td>
+<td>四类文件系统</td>
+</tr>
+<tr>
+<td><code>exclusive=1</code></td>
+<td>挂载·形态</td>
+<td>—</td>
+<td>排他获取</td>
+<td>四类文件系统</td>
+</tr>
+<tr>
+<td><code>spill=&lt;spec&gt;</code></td>
+<td>挂载·形态</td>
+<td>同</td>
+<td>同</td>
+<td>网络</td>
+</tr>
+<tr>
+<td><code>cred=env:NAME</code></td>
+<td>挂载·位置</td>
+<td>同</td>
+<td>同</td>
+<td>网络</td>
+</tr>
+<tr>
+<td><code>region</code>/<code>vhost=1</code>/<code>tls=1</code></td>
+<td>挂载·位置</td>
+<td>同</td>
+<td>同</td>
+<td>网络（s3）</td>
+</tr>
+<tr>
+<td><code>member=&lt;路径&gt;</code>（可重复）</td>
+<td>挂载·位置</td>
+<td>全量清单</td>
+<td>装配匹配</td>
+<td>虚拟</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/medium-parity-matrix.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

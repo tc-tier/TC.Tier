@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>本地文件系统使用指南（DiskFileSystem &#183; local://） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="本地文件系统使用指南（DiskFileSystem &#183; local://） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="本地文件系统使用指南diskfilesystem--local">本地文件系统使用指南（DiskFileSystem · <code>local://</code>）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：要落盘持久化的人（目录树形态、宿主工具可直接查看）。
+<strong>回答什么</strong>：怎么构造、有什么能力位、DIO 怎么用、元数据怎么存、什么不要做。
+四类文件系统的公共契约（<code>IFileSystem</code>/<code>IFileHandle</code> 打开/读写/FileExtra/句柄池/镜像导出）见
+<a href="io.html"><code>io.md</code></a>——本篇只讲本地文件系统的差异面。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话定位">0. 一句话定位</h2>
+<p><strong>本地文件系统 = 可视化目录 / 性能稳定的落盘形态</strong>：目录树结构、宿主工具全兼容、fsync 持久化。
+数据面速度与其他三类带内持平（实测见 <a href="perf/io-performance.html"><code>perf/io-performance.md</code></a> §9），
+差异在元数据面与一致性语义。</p>
+<h2 id="1-构造spec-一行">1. 构造（spec 一行）</h2>
+<pre><code class="lang-csharp">using var fs = TierFs.New(&quot;local:///&quot; + rootDir);     // 绝对路径（推荐）
+using var fs2 = TierFs.New(&quot;local:data/tier&quot;);        // 相对——构造时对 CWD 固化
+using var fs3 = TierFs.New(&quot;local:///C:/data&quot;);       // Windows 盘符
+using var fs4 = TierFs.New(&quot;local://host/share&quot;);     // UNC
+
+// 类型层直构（工厂底座）：
+using var d = DiskFileSystem.New(&quot;/var/lib/tier&quot;, new DiskFileSystemOptions
+{
+    QuotaBytes = 100L &lt;&lt; 30,
+    MetadataMode = DiskMetadataMode.Sidecar,          // 元数据模式，见 §4
+});
+</code></pre>
+<ul>
+<li><code>New</code> = 创建空镜像（已存在且非空抛 AlreadyExists）；<code>Open</code> = 打开既有；<code>OpenOrCreate</code> = 懒初始化。</li>
+<li><code>quota</code> 一词制：空间根硬上限（-1/缺省 = 无上限）。</li>
+</ul>
+<h2 id="2-能力位与内存网络虚拟的差异点">2. 能力位（与内存/网络/虚拟的差异点）</h2>
+<table>
+<thead>
+<tr>
+<th>能力位</th>
+<th>本地（Win）</th>
+<th>本地（Linux）</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Sparse</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>PunchHole 物理回收</td>
+</tr>
+<tr>
+<td><code>DirectIO</code></td>
+<td>NTFS/ReFS 非压缩 ✓</td>
+<td>✓</td>
+<td>逐句柄探测对齐（<code>UnbufferedSupport</code>/<code>RequiredAlignment</code>）</td>
+</tr>
+<tr>
+<td><code>DurableRename</code> / <code>AtomicDirectoryMove</code></td>
+<td>✓（同卷 rename）</td>
+<td>✓</td>
+<td>Move 内建目录刷盘</td>
+</tr>
+<tr>
+<td><code>RangeLock</code></td>
+<td>✓（LockFileEx）</td>
+<td>✓（OFD）</td>
+<td>advisory 契约</td>
+</tr>
+<tr>
+<td><code>Mmap</code></td>
+<td>✓（手工 MMF）</td>
+<td>✓（mmap）</td>
+<td>非 BCL MMF（OVERLAPPED 复刻）</td>
+</tr>
+<tr>
+<td><code>FlushDataOnly</code></td>
+<td>✗</td>
+<td>✓（真 fdatasync）</td>
+<td>未置位时 FlushData ≡ Flush 不抛</td>
+</tr>
+<tr>
+<td><code>CopyRange</code></td>
+<td>✗（回退循环）</td>
+<td>✓</td>
+<td>Linux copy_file_range</td>
+</tr>
+</tbody>
+</table>
+<p><strong>消费规则</strong>：按能力位决策，不按文件系统硬编码分支。</p>
+<h2 id="3-diodirect-io">3. DIO（Direct IO）</h2>
+<ul>
+<li>请求：<code>FileOpenOptions { Hints = FileOpenHints.NoBuffering }</code>；真实生效与否经句柄
+<code>UnbufferedSupport</code> 报告（部分环境不吃 DIO，报 <code>Ignored</code>）。</li>
+<li><strong>三重对齐</strong>：offset/length/buffer 按 <code>h.RequiredAlignment</code>（Win = max(扇区, 内存页) /
+Linux = 逻辑块）——对齐 buffer 必须走 <code>AlignedMemoryManager</code>/<code>PinnedBufferPool</code>
+（见 <a href="memory.html"><code>memory.md</code></a>）。</li>
+<li>组合合法性构造时校验（写模式配 <code>Access=Read</code> → 抛）。</li>
+</ul>
+<h2 id="4-元数据模式fileextra-落点diskmetadatamode">4. 元数据模式（FileExtra 落点，<code>DiskMetadataMode</code>）</h2>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>行为</th>
+<th>何时用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Fallback</code>（缺省）</td>
+<td>xattr/ADS 优先，失败回退 sidecar <code>.{name}</code> 伴生文件</td>
+<td>默认——兼容性最好</td>
+</tr>
+<tr>
+<td><code>ExtendedAttr</code></td>
+<td>仅 xattr，惰性探测 fail-fast</td>
+<td>文件系统确定支持扩展属性</td>
+</tr>
+<tr>
+<td><code>Sidecar</code></td>
+<td>单通道 sidecar（tmp+WriteThrough+Flush+原子换名）</td>
+<td>文件系统不支持 xattr（如部分网络盘）</td>
+</tr>
+</tbody>
+</table>
+<p>FileExtra 语义（≤1536B 不透明数据，Delete 必清除 / Move 必保留）见 <a href="io.html"><code>io.md</code></a> §4.5。</p>
+<h2 id="5-陷阱本地文件系统特有">5. 陷阱（本地文件系统特有）</h2>
+<ol>
+<li><strong>Windows 句柄打开时删除被拒</strong>——删段顺序必须是 <code>pool.RemoveAll(...)</code> → <code>fs.Delete(...)</code>。</li>
+<li><strong>FileSharing 是 advisory</strong>——仅约束同进程同 fs 实例；跨进程用卷锁（<code>AcquireExclusive</code>）。</li>
+<li><strong>映射必须 Dispose</strong>（独立 fd）——<code>IMappedSection</code> 泄漏；View 越界 = 段错误。</li>
+<li><strong>锁语义平台差异</strong>：Win LockFileEx（mandatory 不可依赖）/ Linux OFD（F_OFD_SETLK）——同句柄重锁
+不保证幂等，调用方去重。</li>
+<li><strong>大小写敏感</strong>：路径比较一律 Ordinal（Linux 敏感；Windows 上不依赖大小写区分路径）。</li>
+<li><strong>卷锁</strong>：<code>AcquireExclusive</code>（RAII + 异常安全；lock file 崩溃自愈；非重入）。</li>
+</ol>
+<h2 id="6-想深入指路">6. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>公共契约（打开/读写/FileExtra/句柄池/镜像导出）</td>
+<td><a href="io.html"><code>io.md</code></a></td>
+</tr>
+<tr>
+<td>性能（DIO/fsync/并发）</td>
+<td><a href="perf/io-performance.html"><code>perf/io-performance.md</code></a></td>
+</tr>
+<tr>
+<td>能力位矩阵全表</td>
+<td>源码 <code>IFileSystem.Capabilities</code> 注释</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/local-file-system.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

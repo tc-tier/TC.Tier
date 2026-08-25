@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Namespace TC.Tier.Runtime.Transactions | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Namespace TC.Tier.Runtime.Transactions | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Transactions">
+
+  <h1 id="TC_Tier_Runtime_Transactions" data-uid="TC.Tier.Runtime.Transactions" class="text-break">Namespace TC.Tier.Runtime.Transactions</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+    <h3 id="classes">
+Classes
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.RollbackException.html">RollbackException</a></h4>
+      <section><p>★ 协调回合回滚异常——Session 管理层回执&quot;本回合已按协议回滚&quot;的规范形态
+（复制决策 false/超时/异常 → Abort 已 Prepare 者 → 本异常回执；见 session-manager-design.md §6）。</p>
+<p>语义：结构侧悬干已截断（D2 边界回退），调用方可安全重试（staged 缓冲已清空——重试须重新 Stage）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.SessionManager.html">SessionManager</a></h4>
+      <section><p>★ Session 管理器——组合域统一协调协议层（session-manager-design.md v2，Runtime/Transactions 收官件）。</p>
+<p>每组合域一个；读写检查点三 op 的唯一进出：写=staged 物化委托经单飞提交管线
+（纯内存序+排空批合并，FIFO 全序）；检查点=管线内串行回合；读=会话 scope/地址直达（协议面另件）。</p>
+<p>★ 零自有存储、零持久化决策（v2 决策）：持久化真源=参与者各自 meta 水位
+（2PC 六件套本就持久），时机归参与者自身策略；悬挂裁决按域声明（默认 forward-commit 前推）。</p>
+<p>线程安全（管线/计数/通道）；会话（TierSession）单线程使用契约。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.TierSession.html">TierSession</a></h4>
+      <section><p>★ 会话（sealed，单线程会话契约——staged 缓冲与覆盖层无锁；SessionManager 与管线自身完全线程安全）。</p>
+<p>读写统一句柄（session-manager-design.md §3.2）：写=Stage 暂存物化委托 → Commit 入管线单飞；
+读=EnterReadScope（聚合 epoch）/ 地址直达（无会话，一等公民零税）。</p>
+<p>★ 单飞使用门闩：同一时刻仅一个线程使用本会话（FASTER 同款契约）——staged 快照/覆盖层
+无锁数据结构的并发腐蚀防线，违规立即抛；Commit 入队后即释放门闩（await 回执不占）。</p>
+<p>会话状态机：Active →（回合物化/Prepare/决策失败回执）Faulted →（Dispose）Disposed。
+Faulted 后 Stage/Commit 抛（fault 原因内联）；重开=OpenSession。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.TransactionLog.html">TransactionLog</a></h4>
+      <section><p>默认事务日志实现——独立 commit record 文件 + DirectIO + 4K 对齐 + Magic/Crc + Flush 落盘 + 链式触发。</p>
+<p>★ 设计（见 transaction-design.md §5）：</p>
+<p>- 物理：独立文件 + DisableFileBuffering(DirectIO) + 4K 对齐固定覆盖写</p>
+<p>- Commit：seq+1 → 算 Crc → DirectIO 写 + Flush（这一次 Write+Flush = 原子点）→ 链式触发参与者</p>
+<p>- Load：读固定块 → 校验 Magic/Crc → 返回 seq（空/损坏 = 0）</p>
+<p>开箱即用，上层 new 即可；或注入自定义 ITransactionLog 替换。</p>
+</section>
+    <h3 id="structs">
+Structs
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.SessionReadScope.html">SessionReadScope</a></h4>
+      <section><p>★ 会话读 scope（读 op 协议件——session-manager-design.md §3.2）：聚合域内全部
+<a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html">IEpochProtected</a> 参与者的 epoch 读保护，
+一次进/出防组合层漏进单结构 scope（零拷贝 span 生命周期护栏）。</p>
+<p>★ 保护区纪律（IEpochProtected 契约）：区内只做<b>无自保护的零拷贝读</b>
+（如 Ring <code>GetValueSpan</code> 族）；自带 epoch 进出的 API（Ring 写路径/Index 逐次 Find/Insert）
+区内调用=同实例重入（Debug 绊线立即抛）——此类操作在保护区外或用"scope 内单查"形态。</p>
+<p>暴露 <a class="xref" href="TC.Tier.Runtime.Transactions.SessionReadScope.html#TC_Tier_Runtime_Transactions_SessionReadScope_Session">Session</a>/<a class="xref" href="TC.Tier.Runtime.Transactions.SessionReadScope.html#TC_Tier_Runtime_Transactions_SessionReadScope_State">State</a>——RYW 覆盖层挂点（组合层在 State 上自管
+staged 命令表/批号映射；Runtime 只定协议不定内容）。</p>
+</section>
+    <h3 id="enums">
+Enums
+</h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.HangingResolution.html">HangingResolution</a></h4>
+      <section><p>悬挂裁决域声明（仅默认档——注入档裁决归注入的协调器）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Transactions.SessionState.html">SessionState</a></h4>
+      <section><p>会话状态机：Active（可写可提交）→ Faulted（回合失败回执，重开）→ Disposed（终态）。</p>
+</section>
+
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

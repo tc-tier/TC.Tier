@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>存储引擎使用指南（StorageEngine） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="存储引擎使用指南（StorageEngine） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="存储引擎使用指南storageengine">存储引擎使用指南（StorageEngine）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：用 StorageEngine 存取数据的上层（Structures / Session / 应用与测试）。
+<strong>回答什么</strong>：引擎怎么建、数据怎么写读、怎么落盘、怎么回收、怎么恢复、什么不要做。
+文件系统（fs/spec/TierFs/四类文件系统差异）<strong>不在本档</strong>——见
+<a href="../../TC.Tier.Core/docs/io.html"><code>../TC.Tier.Core/docs/io.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-快速上手可运行">0. 快速上手（可运行）</h2>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Runtime.Storage;
+using TC.Tier.Contracts.Storage;
+
+// ① 文件系统（换 URI 即换文件系统，代码不变）
+using var fs = TierFs.New(&quot;memory:&quot;);
+
+// ② 三段式装配：Options 配置 → Builder 构建 → StartAsync 启动（含恢复，异步首选）
+await using var engine = await new StorageEngineOptions(&quot;my-engine&quot;).Builder(fs).StartAsync();
+
+// ③ 模式 A（推荐）：预分配 + 复写
+var (region, _) = engine.Allocate(RegionBytes);          // 圈地（近免费）
+var slotAddr = engine.CalculationAddress(region, slotIndex * SlotSize);   // 圈地内定位槽位
+engine.Write(slotAddr, slotData);                        // 按址填充/复写（可无限次重写）
+engine.Read(slotAddr, buffer);                           // 按址读回
+
+// ④ 模式 B（WAL）：Append
+var logAddr = engine.Append(record.Span);                // 顺序追加，返回起始地址
+engine.Flush();                                          // 批末落盘
+</code></pre>
+<hr>
+<h2 id="1-概念术语在此定义">1. 概念（术语在此定义）</h2>
+<ul>
+<li><strong>引擎地址空间 = 一块可复写的持久化内存</strong>：地址 = 段号+段内偏移（<code>LogicalAddress</code>，16B）。</li>
+<li><strong>模式 A（预分配 + 复写，推荐）</strong>：先 <code>Allocate</code> 圈地、再按址 <code>Write</code> 填充/覆写——<strong>址可原地无限次
+重写</strong>（页回收再利用）；不相交区真并行（4 线程实测 3.1× 扩展）。</li>
+<li><strong>模式 B（Append，WAL 简单路径）</strong>：只管追加，地址是返回值——<strong>地址只进不退</strong>（靠 Reclaim/Compact
+回收）；小包并发反扩展（全局尾串行）。</li>
+<li><strong>三水位</strong>：<code>MinAddress ≤ CommittedTail ≤ AllocatedTail</code>——
+<code>CommittedTail</code>（真实已写水位）= <strong>读/扫描/回收的合法上界</strong>（记住这条就够）；
+<code>AllocatedTail</code>（已预留水位，含未写空洞）= Append 内部起点；<code>MinAddress</code>（最小有效地址）头部回收后移。</li>
+<li><strong>持久化</strong>：&quot;已写完&quot; ≠ 持久化——以 <code>Flush()</code> 返回为准。</li>
+<li><strong>选型口诀</strong>：数据有&quot;页/槽&quot;概念、要复写要并行 → <strong>A</strong>；纯顺序日志 → <strong>B</strong>。大多数数据结构是 A。</li>
+</ul>
+<hr>
+<h2 id="2-建引擎">2. 建引擎</h2>
+<h3 id="21-两个入口">2.1 两个入口</h3>
+<table>
+<thead>
+<tr>
+<th>入口</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>new StorageEngineOptions(name).Builder(fs).StartAsync()</code></td>
+<td><strong>首选</strong>——构造 → 恢复 → 就绪，一步到位（异步）</td>
+</tr>
+<tr>
+<td>同上 <code>.Start()</code></td>
+<td>同步便捷版——仅无同步上下文的环境（控制台/测试）；UI/ASP.NET 等同步上下文下同步阻塞后台任务会经典死锁</td>
+</tr>
+</tbody>
+</table>
+<p>引擎名可直接进构造：<code>new StorageEngineOptions(&quot;my-engine&quot;)</code>。一个 fs 卷里放多个引擎：不同
+<code>EngineName</code>（各占一个子目录，互相隔离）。</p>
+<h3 id="22-选项storageengineoptions默认值即生产值">2.2 选项（<code>StorageEngineOptions</code>，默认值即生产值）</h3>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>EngineName</code></td>
+<td><code>&quot;tier-engine&quot;</code></td>
+<td>引擎子目录名 + 段文件名前缀</td>
+</tr>
+<tr>
+<td><code>SegmentGrowthLimit</code></td>
+<td>256MB</td>
+<td>单段增长上限，到顶自动切下一段</td>
+</tr>
+<tr>
+<td><code>EnableSegmentation</code></td>
+<td><code>true</code></td>
+<td><code>false</code> = 单段模式（只有 seg0，适合小数据量）</td>
+</tr>
+<tr>
+<td><code>PreallocateFile</code></td>
+<td><code>true</code></td>
+<td>建段真实预分配；<code>false</code> = 稀疏按需增长</td>
+</tr>
+<tr>
+<td><code>DeleteOnClose</code></td>
+<td><code>false</code></td>
+<td>Dispose 时删除本引擎全部产物（测试清理常用）</td>
+</tr>
+<tr>
+<td><code>Hints</code></td>
+<td><code>None</code></td>
+<td><code>WriteThrough</code> = 每写同步落盘；<code>NoBuffering</code> = 请求 DIO。见 §3.4</td>
+</tr>
+<tr>
+<td><code>MinSegId</code></td>
+<td><code>0</code></td>
+<td>段表最小有效段号（恢复路径首段）</td>
+</tr>
+</tbody>
+</table>
+<p>流式配置：<code>.WithSegment(limit, enable)</code> / <code>.WithPreallocateFile(b)</code> / <code>.WithDeleteOnClose(b)</code> /
+<code>.WithHints(hints)</code> / <code>.WithMinSegId(id)</code>。</p>
+<h3 id="23-dispose">2.3 Dispose</h3>
+<p><code>await using</code> 即可。内部编排（停 worker → 停 epoch → 清段池 → 补写段元组 → 按需清目录）自动完成。</p>
+<hr>
+<h2 id="3-怎么用">3. 怎么用</h2>
+<h3 id="31-动词速查">3.1 动词速查</h3>
+<table>
+<thead>
+<tr>
+<th>动词</th>
+<th>语义</th>
+<th>注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Allocate(len)</code></td>
+<td><strong>圈地</strong>：预留区间返回 <code>(start, end)</code></td>
+<td>无 lease 协议（纯 CAS），近免费；模式 A 第一步</td>
+</tr>
+<tr>
+<td><code>Write/WriteAsync</code></td>
+<td><strong>按址复写</strong>（模式 A 主力）</td>
+<td>址可无限次重写；目标须 ≤ CommittedTail（Allocate 过即可）</td>
+</tr>
+<tr>
+<td><code>CalculationAddress(addr, ±len)</code></td>
+<td>址上推算（跨段进位/借位）</td>
+<td>圈地内定位槽位的唯一正道；<strong>禁手算 Offset 差</strong></td>
+</tr>
+<tr>
+<td><code>Append/AppendAsync</code></td>
+<td>尾部追加（模式 B）</td>
+<td>每笔付 lease+双尾推进；地址只进不退</td>
+</tr>
+<tr>
+<td><code>Read/ReadAsync</code></td>
+<td>按址读，跨段自动切分</td>
+<td>返回实际读数（0 = 到尾）；地址已被回收则抛异常</td>
+</tr>
+<tr>
+<td><code>OpenSequentialReader</code></td>
+<td>顺序游标，读/跳分离、可双向</td>
+<td>全量扫描（<code>usePageCache</code>/<code>snapshotMode</code> 按需选）</td>
+</tr>
+<tr>
+<td><code>Flush()</code> / <code>Flush(upTo)</code></td>
+<td>落盘（fsync 族）</td>
+<td><strong>仅同步</strong>（OS 无异步 fsync）；upTo 版自动对齐段边界</td>
+</tr>
+<tr>
+<td><code>GetDistance</code></td>
+<td>两址距离（跨段正确）</td>
+<td>与 CalculationAddress 同为地址算术正道</td>
+</tr>
+<tr>
+<td><code>ReclaimHead/Tail/Reclaim</code></td>
+<td>回收区间释放空间</td>
+<td>模式 B 日志消费后收头；<code>StartReclaim</code> 后台版（0 等待）带事件+进度</td>
+</tr>
+<tr>
+<td><code>StartCompact</code> / <code>StartRangeCompact</code></td>
+<td>碎片整理（整段搬迁）</td>
+<td><strong>一律后台句柄</strong>（同步入口已废除）；超时经 <code>await op.WaitAsync(ct)</code> 调用方自控</td>
+</tr>
+<tr>
+<td><code>GetHoleRatio</code></td>
+<td>查区间物理空洞占比</td>
+<td>0.0 全实 / 1.0 全洞</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-模式-a-完整范式预分配--复写">3.2 模式 A 完整范式：预分配 + 复写</h3>
+<pre><code class="lang-csharp">// ── 圈地（页缓冲模型的开销仅 ~6 µs / 256MB）──────────────
+var (region, _) = engine.Allocate(PageCount * PageSize);
+
+// ── 定位槽位：CalculationAddress（圈地内唯一正道）──────────────
+var page3 = engine.CalculationAddress(region, 3 * PageSize);
+var slot  = engine.CalculationAddress(page3, slotNo * SlotSize);
+
+// ── 写：填充 / 原地更新（复写不增长空间，页回收后重写即复用）────
+engine.Write(slot, data);
+
+// ── 并发写：每写者认领不相交区（lease 区间所有权 → 真并行 3.1×）──
+var regions = Enumerable.Range(0, writers).Select(w =&gt; engine.Allocate(RegionSize)).ToArray();
+// 每线程只写自己的 regions[w]，互不干扰
+
+// ── 读：按址直读；全量走游标 ─────────────────────────────────
+engine.Read(slot, buf);
+using var reader = engine.OpenSequentialReader(engine.MinAddress, engine.CommittedTail);
+</code></pre>
+<p><strong>上层自管什么</strong>：槽位→地址映射（自由表/位图）、页水位、脏页回写时机。
+引擎保证：地址稳定（复写不改址）、区间并发安全、崩溃后圈地与已写数据都在。</p>
+<h3 id="33-模式-b-范式append-wal">3.3 模式 B 范式：Append WAL</h3>
+<pre><code class="lang-csharp">var addr = engine.Append(frame.Span);    // 帧格式自带 CRC/长度/序号（上层协议）
+// ……
+engine.Flush(upTo: lastApplied);         // 按应用水位落盘
+// 消费完的头部区间回收：
+engine.ReclaimHead(consumedUpTo);
+</code></pre>
+<h3 id="34-持久化姿势引擎自有开关">3.4 持久化姿势（引擎自有开关）</h3>
+<ul>
+<li><strong>默认（<code>Hints=None</code>）</strong>：写进页缓存攒批，调 <code>Flush()</code> 才保证落盘——吞吐高，按事务/批次 Flush 即可；</li>
+<li><strong><code>WithHints(FileOpenHints.WriteThrough)</code></strong>：每写同步落盘——每笔都必须稳的场景（如 WAL 提交点），
+牺牲吞吐。</li>
+</ul>
+<p><code>WithHints(FileOpenHints.NoBuffering)</code> 是请求直 IO（绕页缓存）；真实生效与否经
+<code>engine.UnbufferedSupport</code> 报告（部分文件系统不吃 DIO，报 <code>Ignored</code>）——它是探测结果，
+<strong>别拿它当文件系统判断做分支</strong>。</p>
+<hr>
+<h2 id="4-崩溃恢复默认全自动不用管">4. 崩溃恢复：默认全自动，不用管</h2>
+<p><code>Builder.Start*</code> 内部已做：扫盘重建段表与地址表 → 重建容量计数 → 启动保护。空目录 / 新卷自动从零
+开始，不报错。启动一步到位（内部 Initialize + WaitForReady），外部无需也不允许手动调 <code>Initialize</code>
+（设计决策：初始化不在接口面）；恢复后的状态经 <code>RecoveryState</code> 可观察。</p>
+<p>两模式恢复语义：</p>
+<ul>
+<li><strong>模式 A</strong>：圈地与已写槽位原样恢复（Allocate 占位即 Committed+sparse，持久）；上层自管的槽位映射
+从自己的元数据恢复。</li>
+<li><strong>模式 B</strong>：物理尾部自动截断半写帧由上层帧协议决策；引擎侧高级口 <code>EngineRecoveryHints</code>
+（<code>CommittedTailHint</code> / <code>AllocatedTailHint</code>）——<strong>上层比引擎知道更多时</strong>（如事务日志持有自己的提交
+水位）修正双尾，防尾部半写数据被当作有效。经 <code>Builder.Start(hints)</code> / <code>StartAsync(hints)</code> 传入；
+只属于<strong>直接构造引擎的消费者</strong>；数据结构内部建引擎时一律不带 hints（物理真相引擎自恢复，
+逻辑水位结构自管，两回事）。</li>
+</ul>
+<hr>
+<h2 id="5-文件系统选型与测试接线">5. 文件系统选型与测试接线</h2>
+<h3 id="51-极速吞吐内存文件系统不只是测试用">5.1 极速吞吐：内存文件系统不只是测试用</h3>
+<p><code>memory:</code> 内存文件系统是<strong>生产级极速文件系统</strong>——直址零拷贝、纳秒级元数据，引擎端到端
+~0.5 µs/op（本地文件系统 2.75 µs）。需要极速吞吐、数据生命周期 = 进程生命周期的场景（缓存、
+计算中间态、高频写临时区）首选内存文件系统。</p>
+<p>数据不是&quot;Dispose 即丢&quot;：<code>RootSpaceImage</code>（Core IO）随时把内存卷<strong>导出为镜像/转化为任意文件系统</strong>
+（四类文件系统全部支持，4 源 × 4 目标 16 格全成立——详见 <a href="../../TC.Tier.Core/docs/io.html"><code>../TC.Tier.Core/docs/io.md</code></a> §5.2）。</p>
+<h3 id="52-测试接线">5.2 测试接线</h3>
+<p>整套测试可用环境变量切换文件系统、零重编译：
+<code>TC_TEST_FS_SPEC=local:///tmp/tier-test dotnet test …</code>（缺省 <code>memory:</code>——CI 零本地盘极速）。
+测试常用：<code>new StorageEngineOptions(&quot;x&quot;).WithDeleteOnClose(true)</code> 自动清理产物。</p>
+<hr>
+<h2 id="6-反模式禁忌">6. 反模式（禁忌）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>规矩</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>别绕过引擎直开段文件</strong>——句柄池与水位契约会被打穿</td>
+</tr>
+<tr>
+<td>2</td>
+<td>读/扫/回收上界用 <code>CommittedTail</code>，不是 <code>AllocatedTail</code>（后者含未写空洞）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>地址距离/推算只用 <code>GetDistance</code>/<code>CalculationAddress</code>，禁手算 <code>Offset</code> 差</td>
+</tr>
+<tr>
+<td>4</td>
+<td>&quot;已写完&quot; ≠ 持久化——持久化以 <code>Flush()</code> 返回为准</td>
+</tr>
+<tr>
+<td>5</td>
+<td><code>Compact</code> 一律后台句柄（<code>StartCompact</code>/<code>StartRangeCompact</code>）——同步入口已废除；禁 <code>GetAwaiter().GetResult()</code> 强制等待（线程池耗尽死锁）；超时/取消经 <code>await op.WaitAsync(ct)</code> 调用方自控</td>
+</tr>
+<tr>
+<td>6</td>
+<td>依赖段文件名格式做外部扫描（段命名是引擎私有规则）</td>
+</tr>
+<tr>
+<td>7</td>
+<td>fs 用法（文件系统构造/spec/options）归 Core IO——本层代码只收 <code>IFileSystem</code>，不自建、不判断文件系统</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>别上来就 Append</strong>——数据有页/槽概念就用模式 A（预分配+复写）；Append 只给纯顺序日志</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="7-决策速查">7. 决策速查</h2>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>答案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>怎么用？</strong></td>
+<td>默认模式 A：<code>Allocate</code> 圈地 → <code>CalculationAddress</code> 定位 → <code>Write</code> 复写；纯 WAL 才模式 B <code>Append</code></td>
+</tr>
+<tr>
+<td>换文件系统？</td>
+<td>改 spec 一行（fs 层的事，见 Core IO io.md §2）；引擎/业务零改动</td>
+</tr>
+<tr>
+<td>大批量随机读写？</td>
+<td>模式 A 直接循环 <code>Write/Read</code>（无批量面，外部循环等价）</td>
+</tr>
+<tr>
+<td>顺序扫全量？</td>
+<td><code>OpenSequentialReader</code></td>
+</tr>
+<tr>
+<td>每笔必稳？</td>
+<td><code>WithHints(FileOpenHints.WriteThrough)</code>；否则默认 + 批末 <code>Flush()</code></td>
+</tr>
+<tr>
+<td>要 DIO？</td>
+<td><code>WithHints(FileOpenHints.NoBuffering)</code> 请求，<code>UnbufferedSupport</code> 看真实结果</td>
+</tr>
+<tr>
+<td>空间回收？</td>
+<td>模式 A 槽位复用（原地重写，无需回收）；模式 B <code>ReclaimHead</code> 收头 / <code>Compact</code> 整理</td>
+</tr>
+<tr>
+<td>一个卷多个引擎？</td>
+<td>不同 <code>EngineName</code>（各占一个子目录）</td>
+</tr>
+<tr>
+<td>性能基线？</td>
+<td><a href="perf/storage-engine-perf-baseline.html">perf/storage-engine-perf-baseline.md</a></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="8-想深入指路">8. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>文件系统/fs/spec 用法</strong>（四类文件系统、TierFs、options、卷镜像）</td>
+<td><a href="../../TC.Tier.Core/docs/io.html"><code>../TC.Tier.Core/docs/io.md</code></a></td>
+</tr>
+<tr>
+<td>段表（地址空间怎么切）</td>
+<td><a href="segment-table.html"><code>segment-table.md</code></a></td>
+</tr>
+<tr>
+<td>段句柄租约</td>
+<td><a href="lease-protocol.html"><code>lease-protocol.md</code></a></td>
+</tr>
+<tr>
+<td>引擎内部机制（恢复/池/worker）</td>
+<td>源码 <code>src/TC.Tier.Runtime/Storage/</code> 各 partial 注释</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/storage-engine.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

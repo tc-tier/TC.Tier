@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>专用线程调度器使用指南（IsolatedTaskScheduler） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="专用线程调度器使用指南（IsolatedTaskScheduler） | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+              <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+              </button>
+
+              <a class="navbar-brand" href="../../../../index.html">
+                <img id="logo" class="svg" src="../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="collapse navbar-collapse" id="navbar">
+              <form class="navbar-form navbar-right" role="search" id="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="专用线程调度器使用指南isolatedtaskscheduler">专用线程调度器使用指南（IsolatedTaskScheduler）</h1>
+
+<blockquote>
+<p>定位：<strong>Core 级公共协调组件</strong>——高频 / 关键路径后台 worker 的线程隔离调度器。固定 M 个<strong>私有</strong>线程执行任务，
+与公共线程池（<code>TaskScheduler.Default</code>）完全隔离；任务内 <code>await</code> 的 continuation 自动回流私有线程（不经公共池）。
+本文档讲<strong>怎么用</strong>：选型、获取实例、配置、生命周期、注意事项、故障排查。
+性能实测与调参见 <a href="perf/dedicated-task-scheduler-perf.html"><code>perf/dedicated-task-scheduler-perf.md</code></a>；worker 积木用法见 <a href="worker-loop.html"><code>worker-loop.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话决策">0. 一句话决策</h2>
+<pre><code>高频 / 关键 worker（引擎建段、compact、段满事件处理）？
+  → 注入 IsolatedTaskScheduler（引擎 own 实例：Create + Resources.Add）
+低频周期 worker（CpuSampler、meta flusher）？
+  → 公共池（BackgroundWorkerLoop 不传 scheduler，null = Task.Run）
+两者都不许 new Thread 自建循环（见 worker-loop.md §0）。
+</code></pre>
+<hr>
+<h2 id="1-适用--不适用">1. 适用 / 不适用</h2>
+<table>
+<thead>
+<tr>
+<th>✅ 适用</th>
+<th>❌ 不适用（改用其它方案）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>高频生产者会淹没公共池、拖垮无关异步工作</td>
+<td><strong>长同步阻塞调用</strong>（霸占 M 线程之一，M 很小）→ 拆短 / 异步化 / 独立 <code>Thread</code></td>
+</tr>
+<tr>
+<td>对 continuation 调度延迟有确定性要求（不与写者争池线程）</td>
+<td>CPU 密集长计算且不让出（饿死 M 线程）→ 独立计算分区</td>
+</tr>
+<tr>
+<td>协作式 async 负载（大量 <code>await</code> 让出）</td>
+<td>低频周期 worker → 公共池，不值得开专用线程</td>
+</tr>
+<tr>
+<td>长生命周期 worker 循环</td>
+<td>单次 fire-and-forget 任务 → 它不是通用任务池</td>
+</tr>
+<tr>
+<td>并发度有限（M ≤ 核数）</td>
+<td>海量并发（超核数）→ 它是有界设计</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-获取实例只有两条受控入口">2. 获取实例——只有两条受控入口</h2>
+<p>ctor 是 <code>internal</code>，<strong>禁止裸 <code>new</code></strong>（每实例开 M 个真实 OS 线程，栈 ~1MB/线程——稀缺资源，受控创建）。</p>
+<h3 id="入口-aisolatedtaskschedulershared进程级单例">入口 A：<code>IsolatedTaskScheduler.Shared</code>（进程级单例）</h3>
+<pre><code class="lang-csharp">// 全默认 options，M = RecommendedThreadCount = Clamp(ProcessorCount, 2, 4)
+// 调用方【不 Dispose】——进程生命期；私有线程 IsBackground=true 不挡进程退出
+Task.Factory.StartNew(work, CancellationToken.None, TaskCreationOptions.None, IsolatedTaskScheduler.Shared);
+</code></pre>
+<p>适用：单引擎 / 纯异步轻量场景，所有专用 worker 共用 M 线程，进程级线程数最省。</p>
+<h3 id="入口-bisolatedtaskschedulercreateoptions独立分区引擎默认">入口 B：<code>IsolatedTaskScheduler.Create(options)</code>（独立分区，<strong>引擎默认</strong>）</h3>
+<pre><code class="lang-csharp">// 在 LifecycleBase 派生的 OnInitializeBegin/OnInitializeComplete 里：
+_workerScheduler = IsolatedTaskScheduler.Create(new IsolatedSchedulerOptions
+{
+    ThreadCount = 2,                      // 引擎异步建段 worker 池
+    Name = &quot;Engine.WorkerScheduler&quot;,      // 线程名前缀 / 日志 / 指标 tag
+    Logger = logger,
+    // Hub = hub,                          // 需要指标时挂（默认 Disabled 零开销）
+});
+Resources.Add(_workerScheduler);           // 随引擎 Dispose 释放（own）
+
+// worker 注入（BackgroundWorkerLoop 构造第一个参数）：
+ConfigureBackgroundWorker(new SegmentBuilderWorker(scheduler: _workerScheduler, consumerCount: 2));
+</code></pre>
+<p>适用：多引擎互不干扰；<strong>同步 worker（compact）与异步 worker（建段）分池</strong>——不共用，避免互相饿死。</p>
+<h3 id="取舍表">取舍表</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>Shared</code>（全局单例）</th>
+<th><code>Create</code> + Resources（own）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>线程数</td>
+<td>进程级固定 M（最省）</td>
+<td>每实例 M（N 引擎 = N×M）</td>
+</tr>
+<tr>
+<td>隔离粒度</td>
+<td>与公共池隔离；<strong>worker 间共享 M 线程</strong></td>
+<td>引擎 / worker 组之间互不干扰</td>
+</tr>
+<tr>
+<td>生命周期</td>
+<td>进程级，无需 Dispose</td>
+<td>随 owner Dispose</td>
+</tr>
+<tr>
+<td>InstanceTracker</td>
+<td>不注册（进程意图资源）</td>
+<td>注册（泄漏/扩散可见）</td>
+</tr>
+<tr>
+<td>适用</td>
+<td>单引擎 / 纯异步轻量</td>
+<td><strong>引擎默认</strong>；多引擎；同步/异步分池</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <strong>实测</strong>：compact 等同步 worker 与异步建段 worker 共用 <code>Shared</code> 的 M 线程时，同步 worker
+霸占线程 → 饿死异步建段（43+ 测试失败）。<strong>同步 worker 必须 own 独立实例（甚至单线程）与异步 worker 分池</strong>。</p>
+</blockquote>
+<blockquote>
+<p>⚠️ 防扩散护栏：进程内 <code>Create</code> 实例数 &gt; 4 → WARN「疑似滥用——考虑用 Shared」。</p>
+</blockquote>
+<hr>
+<h2 id="3-与-backgroundworkerloop-集成">3. 与 BackgroundWorkerLoop 集成</h2>
+<p><code>BackgroundWorkerLoop</code> 构造第一个参数 <code>TaskScheduler? scheduler = null</code>：</p>
+<pre><code class="lang-csharp">sealed class MyWorker : BackgroundWorkerLoop
+{
+    public MyWorker(TaskScheduler? scheduler = null, int consumerCount = 1, string? name = null)
+        : base(scheduler, consumerCount, name) { }
+
+    protected override async ValueTask&lt;bool&gt; RunOneCycleAsync(CancellationToken ct)
+    { /* 一个周期 */ return true; }
+}
+</code></pre>
+<ul>
+<li><code>scheduler: null</code> → 公共池（<code>Task.Run</code>）——低频 worker。</li>
+<li><code>scheduler: IsolatedTaskScheduler</code> → 消费者循环 Task 跑私有线程，<code>await DequeueAsync</code> 等 continuation 回流该调度器，全程不碰公共池。</li>
+<li><strong><code>consumerCount</code>（循环 Task 数 N）与调度器线程数 M 彻底解耦</strong>：N 个消费者由 M 线程协作跑（async 让出复用）。建议 N ≈ M；N ≫ M 时 Start 会 WARN（只增开销不增吞吐）。需要更高并行度调 <code>ThreadCount</code>，不是 consumerCount。</li>
+<li><code>BackgroundWorkerLoop</code> <strong>不 own</strong> 注入的调度器——生命周期归注入方（<code>Shared</code> 进程级不释放；own 实例随 <code>Resources</code> 释放）。</li>
+</ul>
+<hr>
+<h2 id="4-配置旋钮isolatedscheduleroptions-全量">4. 配置旋钮（<code>IsolatedSchedulerOptions</code> 全量）</h2>
+<table>
+<thead>
+<tr>
+<th>旋钮</th>
+<th>默认</th>
+<th>含义 / 调参建议</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ThreadCount</code> (M)</td>
+<td><code>Clamp(ProcessorCount,2,4)</code></td>
+<td>私有线程数。<code>&lt;1</code> throw；<code>&gt;ProcessorCount</code> throw（cooperative async 下超核纯增上下文切换）；<code>&gt;ProcessorCount/2</code> WARN（占核过半，与写者叠加易超订）。</td>
+</tr>
+<tr>
+<td><code>QueueCapacity</code></td>
+<td><code>0</code></td>
+<td>调度器任务队列：<code>0</code>=自动有界 <code>max(M*4,16)</code>；<code>&gt;0</code>=指定有界；<code>&lt;0</code>=无界（永不阻塞，仅监控）。<strong>背压主战场在 worker 工作项队列</strong>，此处仅防御性有界（见 §7 注意事项 3）。</td>
+</tr>
+<tr>
+<td><code>Name</code></td>
+<td><code>&quot;isolated&quot;</code></td>
+<td>诊断名：私有线程名前缀（<code>{Name}-{i}</code>）、日志、指标 tag。<strong>必填一个可读名</strong>（own 实例）。</td>
+</tr>
+<tr>
+<td><code>Logger</code></td>
+<td><code>null</code></td>
+<td>WARN/ERROR 日志（防扩散 / 过半核 / 队列满 / 慢任务 / 死锁 / 重启）。生产建议挂。</td>
+</tr>
+<tr>
+<td><code>Hub</code></td>
+<td><code>null</code> → <code>ObservabilityHub.Disabled</code></td>
+<td>指标（§6）。默认零开销；<strong>要观测必须显式挂</strong>且 <code>Metrics.Enabled=true</code>。</td>
+</tr>
+<tr>
+<td><code>WatchdogInterval</code></td>
+<td>5s</td>
+<td>watchdog 周期。<code>≤0</code> <strong>关闭</strong>（纯隔离无监控无自愈的最轻模式）。</td>
+</tr>
+<tr>
+<td><code>TaskTimeout</code></td>
+<td>30s</td>
+<td>单任务超此判「慢任务」（WARN + 计数）。高频快任务建议下调（如 1~5s）更早暴露霸占；重 IO worker 上调。</td>
+</tr>
+<tr>
+<td><code>DeadlockConfirmTicks</code></td>
+<td>3</td>
+<td>疑似死锁防抖：连续 N 个 tick（≥2 线程慢且）无任何推进才判。误报多可上调。</td>
+</tr>
+<tr>
+<td><code>RestartPolicy</code></td>
+<td><code>Always</code></td>
+<td>线程死亡：<code>Always</code>（重启维持 M，关键路径默认）/ <code>RestartOnce</code>（再死即降级）/ <code>None</code>（死亡即降级，故障快失败）。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-生命周期与-dispose-顺序硬性要求">5. 生命周期与 Dispose 顺序（硬性要求）</h2>
+<pre><code>引擎 Dispose 模板（LifecycleBase 已内置）：
+  ① 停 worker：Stop → WaitForExit（所有任务结束）
+  ② Resources.Dispose() → 调度器 Dispose（CompleteAdding + Join 私有线程）
+</code></pre>
+<ul>
+<li>❌ <strong>绝不</strong>在有在飞任务时 Dispose 调度器——<code>CompleteAdding</code> 后入队的 continuation（孤儿 Task）被静默丢弃，等它的 awaiter 永远挂起。</li>
+<li>❌ <strong>绝不</strong> Dispose <code>Shared</code>（进程意图资源；谁都不 own 它）。</li>
+<li>✅ own 实例经 <code>Resources.Add(scheduler)</code> 注册，让引擎 Dispose 模板保证「先停 worker 再释放调度器」的顺序。</li>
+<li>✅ 私有线程 <code>IsBackground=true</code>：即使泄漏未 Dispose，也不挡进程退出（但会泄漏线程 + InstanceTracker 可见）。</li>
+</ul>
+<hr>
+<h2 id="6-可观测性">6. 可观测性</h2>
+<h3 id="指标挂-hub-且-metricsenabledtrue-时才发默认-disabled-热路径零开销一次-isenabled-读短路">指标（挂 <code>Hub</code> 且 <code>Metrics.Enabled=true</code> 时才发；默认 Disabled <strong>热路径零开销</strong>——一次 <code>IsEnabled</code> 读短路）</h3>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>指标名</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.task.enqueued</code></td>
+<td>任务入队数</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.task.executed</code></td>
+<td>任务执行数</td>
+</tr>
+<tr>
+<td>Histogram</td>
+<td><code>scheduler.task.exec_us</code></td>
+<td>任务执行耗时（μs）</td>
+</tr>
+<tr>
+<td>Gauge</td>
+<td><code>scheduler.queue.depth</code></td>
+<td>队列深度（每次执行后采样）</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.queue.full</code></td>
+<td>队列满、生产者被背压阻塞（&gt;1ms）次数</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.task.slow</code></td>
+<td>慢任务命中数</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.deadlock.suspected</code></td>
+<td>疑似死锁次数</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.threads.restarted</code></td>
+<td>线程死亡重启次数</td>
+</tr>
+<tr>
+<td>Counter</td>
+<td><code>scheduler.threads.degraded</code></td>
+<td>线程死亡不再重启（降级）次数</td>
+</tr>
+</tbody>
+</table>
+<h3 id="日志事件挂-logger-才有">日志事件（挂 <code>Logger</code> 才有）</h3>
+<table>
+<thead>
+<tr>
+<th>级别</th>
+<th>事件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>WARN</td>
+<td>实例数 &gt; 4（防扩散）；ThreadCount 过半核；队列满背压（含阻塞 μs）；慢任务（含已执行 ms / taskTimeout）；线程死亡已重启</td>
+</tr>
+<tr>
+<td>ERROR</td>
+<td>疑似死锁（含线程状态全量转储）；线程死亡不再重启（降级）</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">IsolatedTaskScheduler.Create(new IsolatedSchedulerOptions
+{
+    Name = &quot;Engine.WorkerScheduler&quot;,
+    Logger = logger,
+    Hub = ObservabilityHub.Create(myMetricsSink, tracer: null,
+        new ObservabilityOptions { Metrics = new MetricsConfig { Enabled = true } })
+});
+</code></pre>
+<blockquote>
+<p>sink 的 <code>IsEnabled=true</code> + <code>MetricsConfig.Enabled=true</code> 两者都开才发指标（热路径检查 <code>_hub.Metrics.IsEnabled</code>）。</p>
+</blockquote>
+<hr>
+<h2 id="7-注意事项硬性要求--陷阱清单">7. 注意事项（硬性要求 / 陷阱清单）</h2>
+<ol>
+<li><strong>禁止裸 <code>new</code></strong>——ctor <code>internal</code>，只走 <code>Shared</code> / <code>Create</code>（稀缺 OS 线程，受控创建 + 防扩散护栏）。</li>
+<li><strong>禁止长同步阻塞任务</strong>（<code>Thread.Sleep</code>、同步重 IO、<code>GetAwaiter().GetResult()</code>）——M 很小，一个阻塞任务就吃掉 1/M 的并行度，多个直接饿死整个 worker 组。拆短 / 异步化；确实无法异步化的同步 worker → <strong>own 单线程实例</strong>分池，别混进异步池。</li>
+<li><strong>队列满 = 阻塞生产者</strong>（<code>QueueTask</code> 无法拒绝/转交——Task 已绑定本调度器）。默认容量 <code>max(M*4,16)</code> 很小，突发入队会背压阻塞入队线程。<strong>背压主战场在 worker 工作项队列</strong>（<code>BackgroundWorkerLoop&lt;T&gt;</code> 的 <code>Enqueue</code> 策略），别把调度器队列当限流器用。</li>
+<li><strong>线程死亡救不回在飞任务</strong>（见 §7 注意事项 4）：死亡时正在执行的 Task 的 continuation 链断裂，awaiter 挂起——重启只服务未来任务。靠 worker 层 lease / 超时兜底（如 <code>WaitSegmentReady</code>）。</li>
+<li><strong>疑似死锁是保守启发式、可能误报</strong>（见 §7 注意事项 5）：两个互不相关的慢任务与真互锁在指标上无法区分。watchdog 只 ERROR + 转储上报，<strong>不自动处置</strong>——看到告警先看诊断转储再判断。</li>
+<li><strong>不能强杀卡死的线程</strong>：现代 .NET 无 <code>Thread.Abort</code>。卡在任务中途的线程只能告警 + 等待；强制终止需进程级介入。<code>SOE</code> 进程级不可恢复；<code>OOM</code> 重启只是尽力而为。</li>
+<li><strong>watchdog 不占私有线程</strong>（跑公共池 Timer）——「被看的不能在看病的人身上」；<code>WatchdogInterval ≤ 0</code> 关闭 = 最轻模式，但线程死亡无人重启、慢任务无人告警。</li>
+<li><strong><code>Shared</code> 不 Dispose</strong>；own 实例 Dispose 前必须所有任务已结束（§5 顺序）。<code>CompleteAdding</code> 后的孤儿入队被吞 <code>InvalidOperationException</code>（不抛到入队线程，但任务丢失）。</li>
+<li><strong>指标默认零开销也零可见</strong>——不挂 <code>Hub</code> 就没有 <code>queue.depth</code> / 慢任务计数；生产环境建议挂（开指标的单任务开销见 §8 基准）。</li>
+<li><strong>不用它跑单次 / 海量 fire-and-forget</strong>——它是长生命周期 worker 的执行器，不是通用任务池；一次性负载走公共池。</li>
+</ol>
+<hr>
+<h2 id="8-性能特征">8. 性能特征</h2>
+<p><strong>结论速览</strong>（完整数据、环境与调参指引见 <a href="perf/dedicated-task-scheduler-perf.html"><code>perf/dedicated-task-scheduler-perf.md</code></a>）：</p>
+<ul>
+<li><strong>派发税亚微秒</strong>：单任务往返 0.5~1µs，分配与公共池相同（64 B/任务）；M=1 的单线程交接甚至<strong>快于</strong>公共池——真实 worker 任务（µs~ms 级）下可忽略。</li>
+<li><strong>continuation 回流 ~0.3-0.5 µs/次</strong>（M≥2；M=1 ≈ 池）——await 密集的真实 worker 摊薄无感；no-op 级吞吐天花板约为公共池的 1/6~1/11（M 个线程换隔离与确定性，有意限流）。</li>
+<li><strong>指标开仅 +0.1~0.7 µs/任务、零额外分配</strong>——生产可常开。</li>
+<li><strong>默认有界队列在多生产者突发下有阻塞背压代价</strong>（慢 ~1.5-2×、GC 翻倍）——<code>scheduler.queue.full</code> 频发时的处理见性能文档 §6 调参指引。</li>
+</ul>
+<p>基准代码：<code>benchmarks/TC.Tier.Core.Benchmarks/Shared/IsolatedTaskSchedulerBench.cs</code>
+（复跑：<code>dotnet run -c Release --project benchmarks/TC.Tier.Core.Benchmarks -- --filter *IsolatedTaskSchedulerBench*</code>）。</p>
+<hr>
+<h2 id="9-故障排查">9. 故障排查</h2>
+<table>
+<thead>
+<tr>
+<th>症状 / 信号</th>
+<th>可能原因</th>
+<th>处置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>scheduler.queue.full</code> 频繁 + 生产者被阻塞 WARN</td>
+<td>消费太慢：任务长 / M 小 / consumerCount 低</td>
+<td>拆短任务；升 M（不超核）；查是否有任务霸占（§7 注意事项 2）</td>
+</tr>
+<tr>
+<td><code>scheduler.task.slow</code> WARN</td>
+<td>单任务超 <code>TaskTimeout</code></td>
+<td>看线程名和已执行时长：真慢任务拆短；病理霸占（死锁前兆）看 §9 deadlock</td>
+</tr>
+<tr>
+<td><code>scheduler.deadlock.suspected</code> ERROR + 转储</td>
+<td>≥2 线程慢 + 连续无推进（<strong>可能误报</strong>）</td>
+<td>看转储线程状态；真死锁需人工介入（不能自动解开）；频繁误报上调 <code>DeadlockConfirmTicks</code></td>
+</tr>
+<tr>
+<td><code>scheduler.threads.restarted</code> WARN</td>
+<td>私有线程异常死亡（OOM 等）</td>
+<td>查死亡原因日志；重启已自动完成，但死亡瞬间的在飞任务已丢（§7 注意事项 4）——检查上层 lease 兜底</td>
+</tr>
+<tr>
+<td><code>scheduler.threads.degraded</code> ERROR</td>
+<td>死亡且策略不再重启（<code>RestartOnce</code> 再死 / <code>None</code>）</td>
+<td>调度器已降级（M-1 线程）——尽快安排 owner 重建</td>
+</tr>
+<tr>
+<td>Dispose 卡住</td>
+<td>有任务未结束就 Dispose（Join 等私有线程退出）</td>
+<td>检查 §5 顺序：先 Stop → WaitForExit 再释放调度器</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="关联文档">关联文档</h2>
+<ul>
+<li>性能实测与调参：<a href="perf/dedicated-task-scheduler-perf.html"><code>perf/dedicated-task-scheduler-perf.md</code></a></li>
+<li>worker 积木用法：<a href="worker-loop.html"><code>worker-loop.md</code></a> ｜ 生命周期编排：<a href="lifecycle.html"><code>lifecycle.md</code></a></li>
+<li>单测：<code>tests/TC.Tier.Core.Tests/Shared/IsolatedTaskSchedulerTests.cs</code> ｜ 覆盖矩阵：<a href="unit-test-coverage.html"><code>unit-test-coverage.md</code></a></li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/dedicated-task-scheduler.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>
