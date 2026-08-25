@@ -21,7 +21,7 @@
 > - [`../TC.Tier.Core.IO.S3/COORDINATION.md`](../TC.Tier.Core.IO.S3/COORDINATION.md) —— S3 兼容对象存储客户端层（`S3ObjectStore`：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；使用指南 [`../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md`](../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md)）
 > - [`docs/observability.md`](docs/observability.md) —— 可观测（`ObservabilityHub`/`IMetricsSink`/`ITracer`：视图全景/采样/零开销契约/测试场景）
 > - [`docs/logging.md`](docs/logging.md) —— 日志（`ILogger`/`LoggerExtensions`：重载矩阵/热路径规则/与 Hub 的边界）
-> - [`docs/dedicated-task-scheduler.md`](docs/dedicated-task-scheduler.md) —— 专用线程调度器（`IsolatedTaskScheduler`；性能实测在 [`docs/perf/`](docs/perf/)）
+> - [`docs/dedicated-task-scheduler.md`](docs/dedicated-task-scheduler.md) —— 专用线程调度器（`IsolatedTaskScheduler`；性能实测见 [`docs/perf/dedicated-task-scheduler-perf.md`](docs/perf/dedicated-task-scheduler-perf.md)）
 > - [`../TC.Tier.Contracts/COORDINATION.md`](../TC.Tier.Contracts/COORDINATION.md) —— 接口/数据契约（Core 实现它们的 `ILifecycle`/`IRecovery`）
 
 ---

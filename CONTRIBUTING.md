@@ -54,4 +54,4 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 
 ## 许可
 
-MIT License，见 [LICENSE](LICENSE)。
+MIT License，见 [LICENSE](https://github.com/tc-tier/TC.Tier/blob/main/LICENSE)。
