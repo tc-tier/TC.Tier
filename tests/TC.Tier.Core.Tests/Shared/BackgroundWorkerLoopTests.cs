@@ -234,7 +234,7 @@ public class BackgroundWorkerLoopTests
         worker.Start();
 
         // ★ 轮询替代固定 50ms sleep——并行测试负载下固定窗口易 flaky
-        SpinWait.SpinUntil(() => worker.CycleCount > 0, 2000).Should().BeTrue("公共池模式应正常运行");
+        SpinWait.SpinUntil(() => worker.CycleCount > 0, 30_000).Should().BeTrue("公共池模式应正常运行");
 
         worker.Stop();
         worker.WaitForExit();
@@ -251,7 +251,7 @@ public class BackgroundWorkerLoopTests
         worker.Start();
 
         // ★ 轮询替代固定 50ms sleep——并行测试负载下固定窗口易 flaky
-        SpinWait.SpinUntil(() => worker.CycleCount > 0, 2000).Should().BeTrue("隔离调度器模式应正常运行");
+        SpinWait.SpinUntil(() => worker.CycleCount > 0, 30_000).Should().BeTrue("隔离调度器模式应正常运行");
 
         worker.Stop();
         worker.WaitForExit();

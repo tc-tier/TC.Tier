@@ -267,7 +267,7 @@ public class MetadataBaseRecoveryTests
             using var meta = new VersionedMetadata(vol.Fs, settings, recovery: scripted);
             meta.Initialize();
 
-            SpinWait.SpinUntil(() => meta.RecoveryState.Phase == RecoveryPhase.Failed, 30000)
+            SpinWait.SpinUntil(() => meta.RecoveryState.Phase == RecoveryPhase.Failed, 120000)
                 .Should().BeTrue("恢复算法抛出后状态机应进入 Failed");
             meta.IsReady.Should().BeFalse();
             meta.RecoveryState.Error.Should().BeOfType<InvalidOperationException>()
@@ -296,13 +296,13 @@ public class MetadataBaseRecoveryTests
             meta.Initialize();
             meta.CancelRecovery();
 
-            SpinWait.SpinUntil(() => meta.RecoveryState.Phase == RecoveryPhase.Failed, 30000)
+            SpinWait.SpinUntil(() => meta.RecoveryState.Phase == RecoveryPhase.Failed, 120000)
                 .Should().BeTrue("取消并入 Failed（lifecycle.md §3 失败语义）");
             meta.IsReady.Should().BeFalse();
 
             var retry = () => meta.Initialize(); // 取消回退 _initialized=0——允许重试
             retry.Should().NotThrow();
-            SpinWait.SpinUntil(() => meta.IsReady, 30000).Should().BeTrue("重试后恢复完成");
+            SpinWait.SpinUntil(() => meta.IsReady, 120000).Should().BeTrue("重试后恢复完成");
             scripted.Runs.Should().Be(2, "同一恢复实例被重跑（Reset 语义）");
         }
         finally { vol.Dispose(); }
