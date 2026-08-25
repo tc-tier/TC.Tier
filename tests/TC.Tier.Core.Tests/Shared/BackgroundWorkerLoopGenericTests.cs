@@ -273,7 +273,7 @@ public class BackgroundWorkerLoopGenericTests
         for (var i = 0; i < items; i++)
             worker.Enqueue(i, i % 7 == 0 ? WorkerPriority.High : WorkerPriority.Normal);
 
-        await worker.Tcs.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        await worker.Tcs.Task.WaitAsync(TimeSpan.FromSeconds(120));
         worker.Stop();
         worker.WaitForExit();
 
@@ -302,7 +302,7 @@ public class BackgroundWorkerLoopGenericTests
         for (var i = 0; i < items; i++)
             worker.Enqueue(i, i % 7 == 0 ? WorkerPriority.High : WorkerPriority.Normal);
 
-        await worker.Tcs.Task.WaitAsync(TimeSpan.FromSeconds(15));
+        await worker.Tcs.Task.WaitAsync(TimeSpan.FromSeconds(120));
         worker.Stop();
         worker.WaitForExit();
 
@@ -353,8 +353,9 @@ public class BackgroundWorkerLoopGenericTests
     private sealed class ExitCountingWorker : BackgroundWorkerLoop<int>
     {
         public int ExitCount;
-        public ExitCountingWorker(int consumerCount)
-            : base(IsolatedTaskScheduler.Shared, consumerCount: consumerCount, name: "ExitCount") { }
+        // ★ exitTimeout 测试专用透传：慢 CI runner 上 4 消费者 × 产品默认 5s 退出超时必挂（"5s 停止"问题）
+        public ExitCountingWorker(int consumerCount, TimeSpan exitTimeout)
+            : base(IsolatedTaskScheduler.Shared, consumerCount: consumerCount, name: "ExitCount", exitTimeout: exitTimeout) { }
         protected override ValueTask ProcessItemAsync(int item, CancellationToken ct) => ValueTask.CompletedTask;
         protected override ValueTask OnLoopExitAsync(CancellationToken ct)
         {
@@ -366,7 +367,7 @@ public class BackgroundWorkerLoopGenericTests
     [Fact]
     public void MultiConsumer_OnLoopExitAsyncRunsExactlyOnce()
     {
-        var worker = new ExitCountingWorker(consumerCount: 4);
+        var worker = new ExitCountingWorker(consumerCount: 4, exitTimeout: TimeSpan.FromSeconds(120));
         worker.Start();
         for (var i = 0; i < 100; i++) worker.Enqueue(i);
         worker.Dispose();   // Stop + WaitForExit(all 4)
