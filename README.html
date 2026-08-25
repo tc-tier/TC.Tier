@@ -74,43 +74,59 @@
 <h1 id="tctier">TC.Tier</h1>
 
 <blockquote>
-<p>开箱即用、内核可组合的 .NET 高性能存储运行时。</p>
+<p>可快速上手、内核可组合的 .NET 高性能存储运行时。</p>
 </blockquote>
 <p><a href="README.en.html">English</a> · 中文</p>
-<blockquote>
-<p>⚠️ <strong>项目声明</strong></p>
-<p>本项目为个人兴趣自研工程验证实现，代码公开仅供查阅、学习参考。</p>
+<h2 id="项目介绍">项目介绍</h2>
+<p>TC.Tier 是一套 <strong>纯 C# 从零自研、组合式架构设计的高性能存储运行时内核</strong>。
+项目完全基于现代数据结构论文、操作系统存储方法论与分层工程范式实现，无第三方内核黑盒依赖，全程可控、可审计、可 AOT 原生编译。</p>
+<p>本项目为个人兴趣工程实现，主打底层存储内核的工程落地与技术验证，非商业产品、非通用开源服务型项目。</p>
+<h2 id="项目状态重要">项目状态（重要）</h2>
 <ul>
-<li>交流仅限 GitHub <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> / <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a>；不提供微信、邮件等其它私人沟通渠道。</li>
-<li>问题回复为自愿、非义务，不保证响应时效，可能不予回复。</li>
-<li>当前整体 Beta，上层产品尚未定型，磁盘存储格式存在变更可能，请勿用于正式生产数据。</li>
-<li>实现参考公开学术论文与现代组合设计思想，已完成本地大量压测；不担保跨环境生产稳定性。</li>
-<li>MIT License，使用者自行承担全部使用风险。</li>
+<li>✅ <strong>底层 Runtime 运行时完全完成</strong> —— 内存布局、无锁并发原语、自旋锁、128 位原子操作、分段存储、段表管理、WAL 日志、DirectIO 裸设备读写、多存储后端抽象、跨平台序列化、SourceGenerator 编译期生成体系，已完成本地全维度压测、优化与稳定性验证。</li>
+<li>⚠️ <strong>整体版本处于 Beta 阶段</strong> —— 上层标准化应用产品（KV、队列、时序等）仍在组装定型中，磁盘持久化二进制格式存在迭代变更可能。请勿直接用于生产环境、核心业务数据、持久化重要数据。</li>
+<li>所有实现均为工程验证性质，仅经过本地基准测试与压力测试，不保证全场景、全环境生产级稳定性。</li>
 </ul>
-</blockquote>
-<p>TC.Tier 提供两个层次的存储能力：</p>
+<h2 id="开源定位与说明">开源定位与说明</h2>
+<ol>
+<li>代码完全公开开源，基于 MIT 协议，可自由查阅、学习、参考、二次修改。</li>
+<li>项目无任何商业用途、不做推广、不引流、不提供私有服务。</li>
+<li>所有设计均来自公开学术论文、开源方法论与标准化工程实践，无封闭私有技术。</li>
+</ol>
+<h2 id="交流与答疑规则">交流与答疑规则</h2>
+<ol>
+<li>唯一交流渠道：GitHub <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> / <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a>。</li>
+<li>无微信、无邮箱、无任何私人联系方式，不接受私下咨询。</li>
+<li>答疑为自愿、非义务行为，不保证回复时效，部分问题可直接忽略或关闭。</li>
+<li>优先讨论源码设计、架构思路、工程实现、技术疑问；入门引导、业务部署、生产适配、定制功能类问题可能不予回复。</li>
+</ol>
+<p>任何真诚的问题、建议、批评，都欢迎提出——只是不承诺回复。</p>
+<h2 id="协议与风险声明">协议与风险声明</h2>
 <ul>
-<li><strong>直接可用</strong>：经 <code>StorageEngine</code> 即可获得原地复写（KV 语义）、顺序追加（WAL 语义）、Blob 大值分离、镜像/快照等能力；</li>
-<li><strong>可组合</strong>：基于统一的 16B 逻辑地址空间，组合索引（哈希 / B+树 / 跳表）、Ring、Log 等中间层，构建自定义存储模型。</li>
+<li>本项目基于 MIT 开源协议。</li>
+<li>所有使用者自行承担使用风险，作者不承担任何数据丢失、故障、兼容、稳定性相关责任。</li>
+<li>Beta 阶段不承诺版本兼容、不承诺格式兼容、不承诺功能稳定。</li>
 </ul>
-<p>项目仍在快速演进中：运行时包当前为 beta，API 可能调整。任何问题、建议、甚至批评，都欢迎到 <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> 或 <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a> 提出。</p>
-<hr>
-<h2 id="核心特性">核心特性</h2>
+<h2 id="核心能力亮点">核心能力亮点</h2>
 <ul>
-<li><strong>16B 逻辑地址空间</strong> —— 跨段寻址、地址复用无截断；判等/哈希只比较地址本身</li>
-<li><strong>两种写入模型</strong> —— 模式 A：预分配 + 原地复写（KV 语义）；模式 B：顺序追加（WAL 语义）</li>
-<li><strong>多索引可插拔</strong> —— 哈希 / B+树 / 跳表按需切换</li>
-<li><strong>并发友好</strong> —— 读路径无锁；不重叠区间的写入可并行（4 线程实测约 3.1× 扩展）</li>
-<li><strong>原生 C# 零反射</strong> —— 源生成器替代反射；热点路径使用原生内存，NativeAOT 兼容</li>
-<li><strong>四类文件系统统一抽象</strong> —— 本地文件系统（<code>local://</code>，Direct IO）/ 内存文件系统（<code>memory:</code>）/ 虚拟文件系统（<code>virtual://</code>，.raw 载体）/ 网络文件系统（<code>network:///s3</code>，S3 协议契约）；经 <code>TierFs</code> 工厂切换，代码零改动</li>
-<li><strong>后台碎片整理</strong> —— Compact 整段搬迁在后台执行，不阻塞读写，失败自动续传</li>
+<li><strong>纯托管 C# + Unsafe 自研内核</strong> —— 零 Native 黑盒依赖</li>
+<li><strong>SourceGenerator 全编译期序列化</strong> —— 完整 NativeAOT 支持、零反射</li>
+<li><strong>16B 统一逻辑地址空间</strong> —— 跨段寻址、地址即身份，判等/哈希只比较地址本身</li>
+<li><strong>可组合存储模型</strong> —— 索引（哈希 / B+树 / 跳表）· Ring · Log 中间层按需组合</li>
+<li><strong>显式内存布局</strong> —— 字段对齐、跨平台大小端统一处理</li>
+<li><strong>无锁并发体系</strong> —— 自旋读写锁、分片锁、128 位原子 CAS、无锁队列</li>
+<li><strong>统一存储抽象</strong> —— 内存 / 文件 DirectIO / 裸设备 / S3 对象存储无缝切换</li>
+<li><strong>自研段式存储引擎</strong> —— 自动碎片整理、WAL 崩溃恢复、逻辑地址寻址体系</li>
+<li><strong>全套 Benchmark 基准压测</strong> —— 可复现、可对比、可审计</li>
 </ul>
-<hr>
-<h2 id="安装">安装</h2>
-<pre><code class="lang-bash"># 运行时包（当前为 beta，含 Core / Contracts 依赖）
-dotnet add package TC.Tier.Runtime --prerelease
-</code></pre>
-<p>正式版包（v1.0.x）：<code>TC.Tier.Contracts</code>、<code>TC.Tier.Core</code>、<code>TC.Tier.CodeGen</code>、<code>TC.Tier.Core.IO.S3</code>（网络文件系统 S3 实现）。</p>
+<h2 id="适用场景">适用场景</h2>
+<ul>
+<li>.NET 底层存储内核学习与源码参考</li>
+<li>高性能、低 GC、无锁架构工程实践研究</li>
+<li>个人/实验项目嵌入式存储底座</li>
+<li>自定义中间件、自研组件技术参考</li>
+</ul>
+<p>不适用任何生产业务、持久化核心数据场景。等待上层标准产品定型后，将冻结磁盘存储格式，迭代为正式 V1.0 稳定版。生产使用请关注 v1.0 正式版发布，或自行完成完整的故障注入与压测验证后再评估。</p>
 <h2 id="快速上手">快速上手</h2>
 <pre><code class="lang-csharp">using TC.Tier.Contracts.Storage;
 using TC.Tier.Core.IO;
@@ -130,9 +146,13 @@ var buf = new byte[payload.Length];
 var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // 读回
 </code></pre>
 <p>组合索引 / Ring / Log 构建自定义存储模型的更多示例，见<a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">使用文档</a>。</p>
-<hr>
+<h2 id="安装">安装</h2>
+<pre><code class="lang-bash"># 运行时包（当前为 beta，含 Core / Contracts 依赖）
+dotnet add package TC.Tier.Runtime --prerelease
+</code></pre>
+<p>正式版包（v1.0.x）：<code>TC.Tier.Contracts</code>、<code>TC.Tier.Core</code>、<code>TC.Tier.CodeGen</code>、<code>TC.Tier.Core.IO.S3</code>（网络文件系统 S3 实现）。</p>
 <h2 id="性能">性能</h2>
-<p>以下为 Windows 本机实测（.NET 8），<strong>供参考</strong>——实际表现请以你的硬件与负载为准。完整口径与细节见<a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html">性能文档</a>。</p>
+<p>以下为跨平台实测（.NET 8），<strong>供参考</strong>——已在 Windows（i5-12400）与 Linux（AMD 6900HX）双平台验证，实际表现请以你的硬件与负载为准。完整口径与细节见<a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html">性能文档</a>。</p>
 <table>
 <thead>
 <tr>
@@ -147,7 +167,7 @@ var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // 读�
 </tr>
 <tr>
 <td>复写 64B · 4 线程并行</td>
-<td>约 176 ns/op（约 3.1× 扩展）</td>
+<td>约 176 ns/op（约 3.1× 加速比）</td>
 </tr>
 <tr>
 <td>大块复写 64KB</td>
@@ -186,13 +206,10 @@ Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地
 </ul>
 <hr>
 <h2 id="文档">文档</h2>
-<p>使用文档与性能报告在 <a href="https://docs.mytzz.top/">docs.mytzz.top</a>——在线文档站，含 API 参考与全文搜索。</p>
-<h2 id="交流与反馈">交流与反馈</h2>
 <ul>
-<li><strong>Issues</strong> —— bug 报告与功能请求：<a href="https://github.com/tc-tier/TC.Tier/issues">tc-tier/TC.Tier/issues</a></li>
-<li><strong>Discussions</strong> —— 用法讨论、架构探讨、任何想法：<a href="https://github.com/tc-tier/TC.Tier/discussions">tc-tier/TC.Tier/discussions</a></li>
+<li><strong>在线文档站</strong>：<a href="https://docs.mytzz.top/">docs.mytzz.top</a>——使用文档、性能报告、API 参考与全文搜索</li>
+<li><strong>代码库</strong>：<a href="https://github.com/tc-tier/TC.Tier">github.com/tc-tier/TC.Tier</a>——源码、Issues、Discussions</li>
 </ul>
-<p>我们仍在快速迭代中，欢迎任何形式的反馈——问题、建议、批评都可以。</p>
 <h2 id="贡献">贡献</h2>
 <p>见 <a href="CONTRIBUTING.html">CONTRIBUTING.md</a>——构建、测试约定、代码规范（编译期强制：禁反射 TCSG030 / 禁 sync-over-async TCSG031）。</p>
 <h2 id="license">License</h2>

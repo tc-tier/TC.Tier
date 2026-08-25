@@ -74,65 +74,84 @@
 <h1 id="tctier">TC.Tier</h1>
 
 <blockquote>
-<p>An out-of-the-box, composable high-performance storage runtime for .NET.</p>
+<p>A quick-to-start, composable high-performance storage runtime for .NET.</p>
 </blockquote>
 <p>English · <a href="README.html">中文</a></p>
-<blockquote>
-<p>⚠️ <strong>Project Statement</strong></p>
-<p>This project is a personal-interest, self-developed engineering validation implementation. The code is published for reference and learning purposes only.</p>
+<h2 id="about">About</h2>
+<p>TC.Tier is a high-performance storage runtime kernel, <strong>implemented from scratch in pure C#, with a composable architecture</strong>. It is built entirely on modern data-structure papers, OS storage methodology, and layered engineering practices — no third-party kernel black boxes, fully controllable, auditable, and AOT-native compilable.</p>
+<p>This is a personal-interest engineering project focused on the engineering delivery and technical validation of a low-level storage kernel. It is not a commercial product, nor a general-purpose open-source service project.</p>
+<h2 id="project-status-important">Project Status (Important)</h2>
 <ul>
-<li>Communication is limited to GitHub <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> / <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a>; no other private channels (WeChat, email, etc.) are provided.</li>
-<li>Responses are voluntary and not obligatory; no response time is guaranteed, and some questions may go unanswered.</li>
-<li>The project is overall in Beta; upper-layer products are not yet finalized, and the on-disk storage format may change. Do not use it with production data.</li>
-<li>The implementation draws on public academic papers and modern compositional design ideas and has undergone extensive local stress testing; cross-environment production stability is not guaranteed.</li>
-<li>MIT License. Users bear all risks of use.</li>
+<li>✅ <strong>Core Runtime is complete</strong> — memory layout, lock-free concurrency primitives, spin locks, 128-bit atomic operations, segmented storage, segment table management, WAL logging, DirectIO raw-device I/O, multi-backend storage abstraction, cross-platform serialization, and a SourceGenerator compile-time generation system. All have undergone extensive local stress testing, optimization, and stability verification.</li>
+<li>⚠️ <strong>The overall version is in Beta</strong> — upper-layer standardized application products (KV, queue, time-series, etc.) are still being assembled and finalized; the on-disk persistent binary format may change. Do not use it for production environments, core business data, or important persistent data.</li>
+<li>All implementations are engineering validation in nature, tested only by local benchmarks and stress tests; production-grade stability across all scenarios and environments is not guaranteed.</li>
 </ul>
-</blockquote>
-<p>TC.Tier offers storage at two levels:</p>
+<h2 id="open-source-positioning">Open-Source Positioning</h2>
+<ol>
+<li>The code is fully open source under the MIT license — free to read, learn, reference, and modify.</li>
+<li>No commercial use, no promotion, no traffic funneling, no private services.</li>
+<li>All designs come from public academic papers, open-source methodologies, and standard engineering practices — no closed proprietary technology.</li>
+</ol>
+<h2 id="communication--qa-rules">Communication &amp; Q&amp;A Rules</h2>
+<ol>
+<li>The only communication channel: GitHub <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> / <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a>.</li>
+<li>No WeChat, no email, no personal contact information — private consultations are not accepted.</li>
+<li>Q&amp;A is voluntary and not obligatory; response time is not guaranteed, and some questions may be ignored or closed.</li>
+<li>Priority is given to source design, architecture, engineering implementation, and technical questions; beginner onboarding, deployment, production adaptation, and custom feature requests may go unanswered.</li>
+</ol>
+<p>Genuine questions, suggestions, and criticism are all welcome — we just don't promise to reply.</p>
+<h2 id="license--risk-statement">License &amp; Risk Statement</h2>
 <ul>
-<li><strong>Ready to use</strong> — the <code>StorageEngine</code> provides in-place rewrite (KV semantics), sequential append (WAL semantics), Blob large-value separation, and mirror/snapshot out of the box.</li>
-<li><strong>Composable</strong> — build your own storage model on a unified 16-byte logical address space, combining index (hash / B+ tree / skip list), Ring, Log, and other building blocks.</li>
+<li>This project is licensed under the MIT License.</li>
+<li>Users bear all risks of use; the author assumes no responsibility for data loss, failures, compatibility, or stability.</li>
+<li>In Beta, no version compatibility, format compatibility, or feature stability is promised.</li>
 </ul>
-<p>The project is evolving quickly: the runtime package is currently in beta and APIs may change. Bug reports, feature requests, and even criticism are all welcome via <a href="https://github.com/tc-tier/TC.Tier/issues">Issues</a> or <a href="https://github.com/tc-tier/TC.Tier/discussions">Discussions</a>.</p>
-<hr>
 <h2 id="highlights">Highlights</h2>
 <ul>
-<li><strong>16-byte logical address space</strong> — segment-spanning, reusable without truncation; equality and hashing compare the address itself</li>
-<li><strong>Two write models</strong> — Mode A: pre-allocate + in-place rewrite (KV semantics); Mode B: sequential append (WAL semantics)</li>
-<li><strong>Pluggable indexes</strong> — hash / B+ tree / skip list under one abstraction</li>
-<li><strong>Concurrency-friendly</strong> — lock-free reads; non-overlapping regions can be written in parallel (~3.1× scaling on 4 threads in our measurements)</li>
-<li><strong>Native C#, zero reflection</strong> — source generators replace reflection; hot paths use native memory; NativeAOT-compatible</li>
-<li><strong>One abstraction, four file systems</strong> — local (<code>local://</code>, Direct IO), in-memory (<code>memory:</code>), virtual (<code>virtual://</code>, .raw-backed), network (<code>network:///s3</code>, S3 protocol contract); switch via the <code>TierFs</code> factory with no code changes</li>
-<li><strong>Background compaction</strong> — whole-segment moves run in the background without blocking reads/writes, and resume automatically on failure</li>
+<li><strong>Pure managed C# + Unsafe self-built kernel</strong> — zero native black-box dependencies</li>
+<li><strong>SourceGenerator compile-time serialization</strong> — full NativeAOT support, zero reflection</li>
+<li><strong>16-byte unified logical address space</strong> — segment-spanning, address-as-identity; equality and hashing compare the address itself</li>
+<li><strong>Composable storage model</strong> — index (hash / B+ tree / skip list) · Ring · Log building blocks combined on demand</li>
+<li><strong>Explicit memory layout</strong> — field alignment, unified cross-platform endianness</li>
+<li><strong>Lock-free concurrency</strong> — spin RW locks, sharded locks, 128-bit atomic CAS, lock-free queues</li>
+<li><strong>Unified storage abstraction</strong> — memory / file DirectIO / raw device / S3 object storage with seamless switching</li>
+<li><strong>Self-built segmented storage engine</strong> — automatic compaction, WAL crash recovery, logical address resolution</li>
+<li><strong>Full benchmark suite</strong> — reproducible, comparable, auditable</li>
 </ul>
-<hr>
-<h2 id="install">Install</h2>
-<pre><code class="lang-bash"># Runtime package (currently beta; pulls in Core / Contracts)
-dotnet add package TC.Tier.Runtime --prerelease
-</code></pre>
-<p>Stable packages (v1.0.x): <code>TC.Tier.Contracts</code>, <code>TC.Tier.Core</code>, <code>TC.Tier.CodeGen</code>, <code>TC.Tier.Core.IO.S3</code> (network file system on S3).</p>
-<h2 id="quick-start">Quick start</h2>
+<h2 id="suitable-scenarios">Suitable Scenarios</h2>
+<ul>
+<li>Learning and source reference for .NET low-level storage kernels</li>
+<li>Research on high-performance, low-GC, lock-free architecture engineering</li>
+<li>Embedded storage foundation for personal / experimental projects</li>
+<li>Technical reference for custom middleware and self-built components</li>
+</ul>
+<p>Not suitable for any production business or persistent core data. Once the upper-layer standard products are finalized, the on-disk storage format will be frozen and iterated into a stable V1.0 release. For production use, wait for the v1.0 stable release, or complete your own fault-injection and stress-testing validation first.</p>
+<h2 id="quick-start">Quick Start</h2>
 <pre><code class="lang-csharp">using TC.Tier.Contracts.Storage;
 using TC.Tier.Core.IO;
 using TC.Tier.Runtime.Storage;
 
-// ① Pick a file system — swap the URI and the code stays the same
+// ① Pick a file system — switch by URI, code unchanged
 using var vol = TierFs.New(&quot;memory:&quot;);
 
-// ② Three-step assembly: Options → Builder → StartAsync (includes recovery; async-first)
+// ② Three-stage assembly: Options → Builder → StartAsync (includes recovery, async-first)
 await using var engine = await new StorageEngineOptions(&quot;demo&quot;).Builder(vol).StartAsync();
 
-// ③ Write &amp; read back: AppendAsync is sequential (WAL semantics), WriteAsync rewrites in place (KV semantics)
+// ③ Write &amp; read back: AppendAsync sequential append (WAL semantics), WriteAsync in-place rewrite (KV semantics)
 ReadOnlyMemory&lt;byte&gt; payload = &quot;hello, tier!&quot;u8;
 var addr = await engine.AppendAsync(payload, CancellationToken.None);   // returns the starting logical address
-await engine.WriteAsync(addr, payload, CancellationToken.None);         // rewrite the same address in place
+await engine.WriteAsync(addr, payload, CancellationToken.None);         // in-place rewrite at the same address
 var buf = new byte[payload.Length];
 var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // read back
 </code></pre>
-<p>More examples of composing index / Ring / Log into custom storage models: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">usage docs</a>.</p>
-<hr>
+<p>More examples of building custom storage models with indexes / Ring / Log: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">usage docs</a>.</p>
+<h2 id="installation">Installation</h2>
+<pre><code class="lang-bash"># Runtime package (currently beta; includes Core / Contracts dependencies)
+dotnet add package TC.Tier.Runtime --prerelease
+</code></pre>
+<p>Stable packages (v1.0.x): <code>TC.Tier.Contracts</code>, <code>TC.Tier.Core</code>, <code>TC.Tier.CodeGen</code>, <code>TC.Tier.Core.IO.S3</code> (S3 network file system implementation).</p>
 <h2 id="performance">Performance</h2>
-<p>Measured locally on Windows with .NET 8 — <strong>for reference only</strong>; real numbers depend on your hardware and workload. Full methodology and details: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html">performance docs</a>.</p>
+<p>Measured on .NET 8 across Windows (i5-12400) and Linux (AMD 6900HX) — <strong>for reference only</strong>; your actual results depend on your hardware and workload. Full methodology and details in the <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html">performance docs</a>.</p>
 <table>
 <thead>
 <tr>
@@ -142,28 +161,28 @@ var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // read 
 </thead>
 <tbody>
 <tr>
-<td>Steady in-place rewrite, 64B (single thread)</td>
+<td>Steady-state rewrite 64B (single thread)</td>
 <td>532 ns/op</td>
 </tr>
 <tr>
-<td>Rewrite 64B, 4 threads</td>
-<td>~176 ns/op (~3.1× scaling)</td>
+<td>Rewrite 64B · 4 threads</td>
+<td>~176 ns/op (~3.1× speedup)</td>
 </tr>
 <tr>
 <td>Large rewrite 64KB</td>
 <td>11.5 GB/s</td>
 </tr>
 <tr>
-<td>Point lookup (hash index)</td>
-<td>158 ns/op; ~94.7 ns/op batched (zero allocation)</td>
+<td>Point lookup (Hash index)</td>
+<td>158 ns; batch 94.7 ns (zero allocation)</td>
 </tr>
 <tr>
 <td>Log recovery</td>
-<td>~9 ms per 500K records</td>
+<td>500k entries ~9 ms</td>
 </tr>
 <tr>
-<td>Ring batched concurrent writes (8 writers)</td>
-<td>6.07M op/s (3.0× vs single writer)</td>
+<td>Ring concurrent batch writes (8 writers)</td>
+<td>6.07M op/s (3.0× over single writer)</td>
 </tr>
 </tbody>
 </table>
@@ -174,11 +193,11 @@ var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // read 
 Storage Runtime (composable kernel)
   Index (Hash/BTree/SkipList) · Ring · Log · Blob (metadata/mirror/snapshot)
 ────────────────────────────────────────────────
-Storage Engine (Options → Builder → Start/StartAsync; 16-byte logical address space)
+Storage Engine (Options → Builder → Start/StartAsync, 16B logical address space)
 ────────────────────────────────────────────────
 File system layer (local:// / memory: / virtual:// / network:///s3)
 </code></pre>
-<p>Acyclic dependency chain: <code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code>. The source generator (<code>TC.Tier.CodeGen</code>) is cross-cutting — BinaryLayout and registration bridges are generated at compile time, with zero runtime reflection.</p>
+<p>Dependencies are one-way and acyclic: <code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code>. The source generator (<code>TC.Tier.CodeGen</code>) cuts across — BinaryLayout / registration bridges are generated at compile time, zero runtime reflection.</p>
 <ul>
 <li>Engine guide: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">storage-engine.md</a></li>
 <li>Structures overview: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html">structures.md</a></li>
@@ -186,18 +205,15 @@ File system layer (local:// / memory: / virtual:// / network:///s3)
 </ul>
 <hr>
 <h2 id="documentation">Documentation</h2>
-<p>Usage docs and performance reports live at <a href="https://docs.mytzz.top/">docs.mytzz.top</a> — API reference plus full-text search.</p>
-<h2 id="feedback">Feedback</h2>
 <ul>
-<li><strong>Issues</strong> — bug reports and feature requests: <a href="https://github.com/tc-tier/TC.Tier/issues">tc-tier/TC.Tier/issues</a></li>
-<li><strong>Discussions</strong> — usage questions, architecture discussions, anything: <a href="https://github.com/tc-tier/TC.Tier/discussions">tc-tier/TC.Tier/discussions</a></li>
+<li><strong>Online doc site</strong>: <a href="https://docs.mytzz.top/">docs.mytzz.top</a> — usage docs, performance reports, API reference, full-text search</li>
+<li><strong>Source repository</strong>: <a href="https://github.com/tc-tier/TC.Tier">github.com/tc-tier/TC.Tier</a> — code, Issues, Discussions</li>
 </ul>
-<p>The project is still young — questions, suggestions, and criticism are all genuinely welcome.</p>
 <h2 id="contributing">Contributing</h2>
-<p>See <a href="CONTRIBUTING.html">CONTRIBUTING.md</a> — build &amp; test conventions, code style (enforced at compile time: no reflection TCSG030 / no sync-over-async TCSG031).</p>
+<p>See <a href="CONTRIBUTING.html">CONTRIBUTING.md</a> — build, test conventions, code standards (enforced at compile time: no reflection TCSG030 / no sync-over-async TCSG031).</p>
 <h2 id="license">License</h2>
 <p>MIT — see <a href="https://github.com/tc-tier/TC.Tier/blob/main/LICENSE">LICENSE</a>.</p>
-<p>The core implementation is self-contained; algorithm attribution and third-party notices: <a href="https://github.com/tc-tier/TC.Tier/blob/main/THIRD-PARTY-NOTICES">THIRD-PARTY-NOTICES</a>.</p>
+<p>Core implementation is entirely self-built; algorithm attribution and third-party dependency notes: <a href="https://github.com/tc-tier/TC.Tier/blob/main/THIRD-PARTY-NOTICES">THIRD-PARTY-NOTICES</a>.</p>
 
 </article>
           </div>
