@@ -1,48 +1,63 @@
 # TC.Tier
 
-> 开箱即用、内核可组合的 .NET 高性能存储运行时。
+> 可快速上手、内核可组合的 .NET 高性能存储运行时。
 
 [English](README.en.md) · 中文
 
-> ⚠️ **项目声明**
->
-> 本项目为个人兴趣自研工程验证实现，代码公开仅供查阅、学习参考。
->
-> - 交流仅限 GitHub [Issues](https://github.com/tc-tier/TC.Tier/issues) / [Discussions](https://github.com/tc-tier/TC.Tier/discussions)；不提供微信、邮件等其它私人沟通渠道。
-> - 问题回复为自愿、非义务，不保证响应时效，可能不予回复。
-> - 当前整体 Beta，上层产品尚未定型，磁盘存储格式存在变更可能，请勿用于正式生产数据。
-> - 实现参考公开学术论文与现代组合设计思想，已完成本地大量压测；不担保跨环境生产稳定性。
-> - MIT License，使用者自行承担全部使用风险。
+## 项目介绍
 
-TC.Tier 提供两个层次的存储能力：
+TC.Tier 是一套 **纯 C# 从零自研、组合式架构设计的高性能存储运行时内核**。
+项目完全基于现代数据结构论文、操作系统存储方法论与分层工程范式实现，无第三方内核黑盒依赖，全程可控、可审计、可 AOT 原生编译。
 
-- **直接可用**：经 `StorageEngine` 即可获得原地复写（KV 语义）、顺序追加（WAL 语义）、Blob 大值分离、镜像/快照等能力；
-- **可组合**：基于统一的 16B 逻辑地址空间，组合索引（哈希 / B+树 / 跳表）、Ring、Log 等中间层，构建自定义存储模型。
+本项目为个人兴趣工程实现，主打底层存储内核的工程落地与技术验证，非商业产品、非通用开源服务型项目。
 
-项目仍在快速演进中：运行时包当前为 beta，API 可能调整。任何问题、建议、甚至批评，都欢迎到 [Issues](https://github.com/tc-tier/TC.Tier/issues) 或 [Discussions](https://github.com/tc-tier/TC.Tier/discussions) 提出。
+## 项目状态（重要）
 
----
+- ✅ **底层 Runtime 运行时完全完成** —— 内存布局、无锁并发原语、自旋锁、128 位原子操作、分段存储、段表管理、WAL 日志、DirectIO 裸设备读写、多存储后端抽象、跨平台序列化、SourceGenerator 编译期生成体系，已完成本地全维度压测、优化与稳定性验证。
+- ⚠️ **整体版本处于 Beta 阶段** —— 上层标准化应用产品（KV、队列、时序等）仍在组装定型中，磁盘持久化二进制格式存在迭代变更可能。请勿直接用于生产环境、核心业务数据、持久化重要数据。
+- 所有实现均为工程验证性质，仅经过本地基准测试与压力测试，不保证全场景、全环境生产级稳定性。
 
-## 核心特性
+## 开源定位与说明
 
-- **16B 逻辑地址空间** —— 跨段寻址、地址复用无截断；判等/哈希只比较地址本身
-- **两种写入模型** —— 模式 A：预分配 + 原地复写（KV 语义）；模式 B：顺序追加（WAL 语义）
-- **多索引可插拔** —— 哈希 / B+树 / 跳表按需切换
-- **并发友好** —— 读路径无锁；不重叠区间的写入可并行（4 线程实测约 3.1× 扩展）
-- **原生 C# 零反射** —— 源生成器替代反射；热点路径使用原生内存，NativeAOT 兼容
-- **四类文件系统统一抽象** —— 本地文件系统（`local://`，Direct IO）/ 内存文件系统（`memory:`）/ 虚拟文件系统（`virtual://`，.raw 载体）/ 网络文件系统（`network:///s3`，S3 协议契约）；经 `TierFs` 工厂切换，代码零改动
-- **后台碎片整理** —— Compact 整段搬迁在后台执行，不阻塞读写，失败自动续传
+1. 代码完全公开开源，基于 MIT 协议，可自由查阅、学习、参考、二次修改。
+2. 项目无任何商业用途、不做推广、不引流、不提供私有服务。
+3. 所有设计均来自公开学术论文、开源方法论与标准化工程实践，无封闭私有技术。
 
----
+## 交流与答疑规则
 
-## 安装
+1. 唯一交流渠道：GitHub [Issues](https://github.com/tc-tier/TC.Tier/issues) / [Discussions](https://github.com/tc-tier/TC.Tier/discussions)。
+2. 无微信、无邮箱、无任何私人联系方式，不接受私下咨询。
+3. 答疑为自愿、非义务行为，不保证回复时效，部分问题可直接忽略或关闭。
+4. 优先讨论源码设计、架构思路、工程实现、技术疑问；入门引导、业务部署、生产适配、定制功能类问题可能不予回复。
 
-```bash
-# 运行时包（当前为 beta，含 Core / Contracts 依赖）
-dotnet add package TC.Tier.Runtime --prerelease
-```
+任何真诚的问题、建议、批评，都欢迎提出——只是不承诺回复。
 
-正式版包（v1.0.x）：`TC.Tier.Contracts`、`TC.Tier.Core`、`TC.Tier.CodeGen`、`TC.Tier.Core.IO.S3`（网络文件系统 S3 实现）。
+## 协议与风险声明
+
+- 本项目基于 MIT 开源协议。
+- 所有使用者自行承担使用风险，作者不承担任何数据丢失、故障、兼容、稳定性相关责任。
+- Beta 阶段不承诺版本兼容、不承诺格式兼容、不承诺功能稳定。
+
+## 核心能力亮点
+
+- **纯托管 C# + Unsafe 自研内核** —— 零 Native 黑盒依赖
+- **SourceGenerator 全编译期序列化** —— 完整 NativeAOT 支持、零反射
+- **16B 统一逻辑地址空间** —— 跨段寻址、地址即身份，判等/哈希只比较地址本身
+- **可组合存储模型** —— 索引（哈希 / B+树 / 跳表）· Ring · Log 中间层按需组合
+- **显式内存布局** —— 字段对齐、跨平台大小端统一处理
+- **无锁并发体系** —— 自旋读写锁、分片锁、128 位原子 CAS、无锁队列
+- **统一存储抽象** —— 内存 / 文件 DirectIO / 裸设备 / S3 对象存储无缝切换
+- **自研段式存储引擎** —— 自动碎片整理、WAL 崩溃恢复、逻辑地址寻址体系
+- **全套 Benchmark 基准压测** —— 可复现、可对比、可审计
+
+## 适用场景
+
+- .NET 底层存储内核学习与源码参考
+- 高性能、低 GC、无锁架构工程实践研究
+- 个人/实验项目嵌入式存储底座
+- 自定义中间件、自研组件技术参考
+
+不适用任何生产业务、持久化核心数据场景。等待上层标准产品定型后，将冻结磁盘存储格式，迭代为正式 V1.0 稳定版。生产使用请关注 v1.0 正式版发布，或自行完成完整的故障注入与压测验证后再评估。
 
 ## 快速上手
 
@@ -67,16 +82,23 @@ var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // 读�
 
 组合索引 / Ring / Log 构建自定义存储模型的更多示例，见[使用文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)。
 
----
+## 安装
+
+```bash
+# 运行时包（当前为 beta，含 Core / Contracts 依赖）
+dotnet add package TC.Tier.Runtime --prerelease
+```
+
+正式版包（v1.0.x）：`TC.Tier.Contracts`、`TC.Tier.Core`、`TC.Tier.CodeGen`、`TC.Tier.Core.IO.S3`（网络文件系统 S3 实现）。
 
 ## 性能
 
-以下为 Windows 本机实测（.NET 8），**供参考**——实际表现请以你的硬件与负载为准。完整口径与细节见[性能文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html)。
+以下为跨平台实测（.NET 8），**供参考**——已在 Windows（i5-12400）与 Linux（AMD 6900HX）双平台验证，实际表现请以你的硬件与负载为准。完整口径与细节见[性能文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html)。
 
 | 场景 | 结果 |
 |---|---|
 | 稳态复写 64B（单线程） | 532 ns/op |
-| 复写 64B · 4 线程并行 | 约 176 ns/op（约 3.1× 扩展） |
+| 复写 64B · 4 线程并行 | 约 176 ns/op（约 3.1× 加速比） |
 | 大块复写 64KB | 11.5 GB/s |
 | 点查（Hash 索引） | 158 ns/次；批量口径 94.7 ns/次（零分配） |
 | Log 恢复 | 50 万条约 9 ms |
@@ -107,14 +129,8 @@ Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地
 
 ## 文档
 
-使用文档与性能报告在 [docs.mytzz.top](https://docs.mytzz.top/)——在线文档站，含 API 参考与全文搜索。
-
-## 交流与反馈
-
-- **Issues** —— bug 报告与功能请求：[tc-tier/TC.Tier/issues](https://github.com/tc-tier/TC.Tier/issues)
-- **Discussions** —— 用法讨论、架构探讨、任何想法：[tc-tier/TC.Tier/discussions](https://github.com/tc-tier/TC.Tier/discussions)
-
-我们仍在快速迭代中，欢迎任何形式的反馈——问题、建议、批评都可以。
+- **在线文档站**：[docs.mytzz.top](https://docs.mytzz.top/)——使用文档、性能报告、API 参考与全文搜索
+- **代码库**：[github.com/tc-tier/TC.Tier](https://github.com/tc-tier/TC.Tier)——源码、Issues、Discussions
 
 ## 贡献
 
