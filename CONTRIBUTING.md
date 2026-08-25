@@ -38,8 +38,9 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 
 ## 分支模型
 
-- `main`：生产主干，只接收 PR 合并
-- `fix/xxx`、`feat/xxx`：开发分支，从 main 创建
+公开库 `tc-tier/TC.Tier` 仅 `main` 一条主干（受保护）：
+- `main`：公开主干，只接收 PR 合并
+- 贡献分支（`fix/xxx`、`feat/xxx`）：从 main（fork 后）创建，PR 回 main
 - PR 不允许带冲突（先解决再提）
 
 ## 提交规范
