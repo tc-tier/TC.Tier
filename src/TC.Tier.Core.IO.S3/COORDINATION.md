@@ -31,7 +31,7 @@
 | `S3Xml` | `S3Xml.cs` | XML 解析/构造（ListObjectsV2 / multipart / 错误体）——**命名空间免疫**（LocalName 匹配） | 🔒 internal；畸形响应容错（分页继续、条目跳过） |
 | `ICredentialProvider` / `S3Credentials` / `StaticCredentials` / `EnvironmentCredentials` | 同名文件（一类型一文件） | 凭证三源：静态 / 环境变量（每次重读——外部 STS 刷新生效）/ 自定义 | 每次签名前取当前凭证；STS 会话 token 自动入签 |
 
-**目录形态**：全部平铺本目录（9 文件）——层小不值得子目录；契约类型（`IObjectStore` 族，已按一类型族一文件拆分）在 [`../TC.Tier.Core/IO/`](../TC.Tier.Core/IO/)。
+**目录形态**：全部平铺本目录（9 文件）——层小不值得子目录；契约类型（`IObjectStore` 族，已按一类型族一文件拆分）在 `../TC.Tier.Core/IO/`（入口文档见 [`../TC.Tier.Core/docs/io.md`](../TC.Tier.Core/docs/io.md)）。
 
 ## 2. 正确用法要点
 
