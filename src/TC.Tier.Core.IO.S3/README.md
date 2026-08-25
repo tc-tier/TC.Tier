@@ -25,4 +25,4 @@ var fs = TierFs.New("network:///s3/endpoint/bucket/prefix");
 ## 文档
 
 - 完整文档站：https://docs.mytzz.top/
-- S3 客户端指南：https://docs.mytzz.top/docs/src/TC.Tier.Core.IO.S3/docs/s3-client.html
+- S3 客户端指南：https://docs.mytzz.top/docs/src/TC.Tier.Core.IO.S3/docs/network-file-system-s3.html
