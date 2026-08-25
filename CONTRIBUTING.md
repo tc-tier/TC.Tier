@@ -50,7 +50,7 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 
 ## 文档
 
-- 使用文档与 API 参考统一在独立文档站：https://docs.mytzz.top/（DocFX 自动生成，本地 docs-deploy.sh 部署）
+- 使用文档与 API 参考统一在独立文档站：https://docs.mytzz.top/（DocFX 自动生成，本地 scripts/docs-deploy.sh 部署）
 
 ## 许可
 
