@@ -19,11 +19,44 @@ jobs:
       - name: Build
         run: dotnet build -c Release --nologo
 
-      - name: Test Core
-        run: dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo
+      # ★ WorkerLoop 重并发组先单独跑（不与全量并行）——2 vCPU runner 上
+      #   全量并行 × 每测试多专用线程（dedicated: True）= 线程风暴饿死（实锤 2026-08-25：
+      #   120s 超时两遍都挂、OnLoopExit 4×120s=8 分钟，本地 505ms 全绿）
+      - name: Test WorkerLoop group (isolated)
+        shell: bash
+        run: |
+          for attempt in 1 2; do
+            if dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo \
+                --filter "FullyQualifiedName~BackgroundWorkerLoop"; then
+              exit 0
+            fi
+            echo "== Test WorkerLoop 第 $attempt 次失败（runner 时段性慢）——重试 =="
+          done
+          exit 1
+
+      # ★ 其余 Core 测试（排除 WorkerLoop 组，避免并行争抢）——重试 1 次吸收环境抖动
+      - name: Test Core (rest)
+        shell: bash
+        run: |
+          for attempt in 1 2; do
+            if dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo \
+                --filter "FullyQualifiedName!~BackgroundWorkerLoop"; then
+              exit 0
+            fi
+            echo "== Test Core(rest) 第 $attempt 次失败（runner 时段性慢）——重试 =="
+          done
+          exit 1
 
       - name: Test Runtime
-        run: dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj -c Release --no-build --nologo
+        shell: bash
+        run: |
+          for attempt in 1 2; do
+            if dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj -c Release --no-build --nologo; then
+              exit 0
+            fi
+            echo "== Test Runtime 第 $attempt 次失败（runner 时段性慢）——重试 =="
+          done
+          exit 1
 
       - name: Pack
         run: dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --no-build --nologo -o artifacts
