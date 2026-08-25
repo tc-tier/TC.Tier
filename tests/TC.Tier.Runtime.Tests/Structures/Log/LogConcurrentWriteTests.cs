@@ -208,6 +208,9 @@ public class LogConcurrentWriteTests
         const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var page = (AlignedMemoryManager)typeof(LogBase).GetField("_pageA", Flags)!.GetValue(log)!;
         int used = (int)typeof(LogBase).GetField("_pageUsedA", Flags)!.GetValue(log)!;
-        page.GetSpan(0, used).CopyTo(page.GetSpan(used, used));
+        int alignedLen = Math.Min(log.PageSize, ((used + page.Alignment - 1) / page.Alignment) * page.Alignment);
+        int slack = alignedLen - used;
+        slack.Should().BeGreaterThanOrEqualTo(used, "the test payload must fit inside the sector-aligned slack we are poisoning");
+        page.GetSpan(0, used).CopyTo(page.GetSpan(used, slack).Slice(0, used));
     }
 }
