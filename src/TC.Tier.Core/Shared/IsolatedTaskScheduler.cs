@@ -12,7 +12,7 @@ namespace TC.Tier.Core.Shared;
 /// <para>★ <b>阻塞等待模型</b>：私有线程在 <see cref="BlockingCollection{T}"/> 上阻塞等任务（空闲不占 CPU）。</para>
 /// <para>★ <b>稀缺资源·受控创建</b>：每实例开 M 个真实 OS 线程（栈 ~1MB/线程）。<b>禁止</b>直接 <c>new</c>——ctor 为
 ///   <c>internal</c>，经 <see cref="Shared"/>（进程级全局单例）或 <see cref="Create"/>（工厂 + 防扩散护栏）获取，
-///   使用指南见 <see href="~/src/TC.Tier.Core/docs/dedicated-task-scheduler.md"/>§2（选型/旋钮/注意事项/故障排查）。</para>
+///   使用指南见 §2（使用指南：docs/dedicated-task-scheduler.md，文档站）（选型/旋钮/注意事项/故障排查）。</para>
 /// <para>★ 释放：调用方须在所有任务结束后（worker 的 WaitForExit 之后）调 <see cref="Dispose"/>——
 ///   <see cref="BlockingCollection{T}.CompleteAdding"/> + Join 线程。</para>
 /// </summary>
