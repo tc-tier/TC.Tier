@@ -4,6 +4,16 @@
 
 [English](README.en.md) · 中文
 
+> ⚠️ **项目声明**
+>
+> 本项目为个人兴趣自研工程验证实现，代码公开仅供查阅、学习参考。
+>
+> - 交流仅限 GitHub [Issues](https://github.com/tc-tier/TC.Tier/issues) / [Discussions](https://github.com/tc-tier/TC.Tier/discussions)；不提供微信、邮件等其它私人沟通渠道。
+> - 问题回复为自愿、非义务，不保证响应时效，可能不予回复。
+> - 当前整体 Beta，上层产品尚未定型，磁盘存储格式存在变更可能，请勿用于正式生产数据。
+> - 实现参考公开学术论文与现代组合设计思想，已完成本地大量压测；不担保跨环境生产稳定性。
+> - MIT License，使用者自行承担全部使用风险。
+
 TC.Tier 提供两个层次的存储能力：
 
 - **直接可用**：经 `StorageEngine` 即可获得原地复写（KV 语义）、顺序追加（WAL 语义）、Blob 大值分离、镜像/快照等能力；

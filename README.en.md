@@ -4,6 +4,16 @@
 
 English · [中文](README.md)
 
+> ⚠️ **Project Statement**
+>
+> This project is a personal-interest, self-developed engineering validation implementation. The code is published for reference and learning purposes only.
+>
+> - Communication is limited to GitHub [Issues](https://github.com/tc-tier/TC.Tier/issues) / [Discussions](https://github.com/tc-tier/TC.Tier/discussions); no other private channels (WeChat, email, etc.) are provided.
+> - Responses are voluntary and not obligatory; no response time is guaranteed, and some questions may go unanswered.
+> - The project is overall in Beta; upper-layer products are not yet finalized, and the on-disk storage format may change. Do not use it with production data.
+> - The implementation draws on public academic papers and modern compositional design ideas and has undergone extensive local stress testing; cross-environment production stability is not guaranteed.
+> - MIT License. Users bear all risks of use.
+
 TC.Tier offers storage at two levels:
 
 - **Ready to use** — the `StorageEngine` provides in-place rewrite (KV semantics), sequential append (WAL semantics), Blob large-value separation, and mirror/snapshot out of the box.
