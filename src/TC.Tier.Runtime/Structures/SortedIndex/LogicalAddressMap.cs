@@ -44,6 +44,7 @@ internal sealed class LogicalAddressMap<TValue> where TValue : unmanaged
     internal int MaxProbeLength;
 #endif
 
+    /// <summary>构造地址映射（哈希表簇 + 素数表簇；溢出探测链有界——契约测试断言满表不死循环）。</summary>
     /// <param name="capacity">定容模式=准入条数上限（超出静默不进）；生长模式=初始容量（满则倍增重散列）。</param>
     /// <param name="growable">true=无上限生长（SkipList 节点即数据量级）；false=定容（BTree 内部节点缓存）。</param>
     internal LogicalAddressMap(int capacity, bool growable)
@@ -67,7 +68,7 @@ internal sealed class LogicalAddressMap<TValue> where TValue : unmanaged
 
     internal int Count => _count;
 
-    /// <summary>命中返回槽引用；未命中返回 null-ref（<see cref="Unsafe.IsNullRef{T}(ref T)"/> 判别）——零拷贝读。</summary>
+    /// <summary>命中返回槽引用；未命中返回 null-ref（<c>Unsafe.IsNullRef&lt;T&gt;</c> 判别）——零拷贝读。</summary>
     internal ref readonly TValue Find(LogicalAddress key)
     {
         var t = _tables;

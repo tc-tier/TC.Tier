@@ -24,6 +24,8 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     // === 子类钩子实现（格式布局）===
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>体长 = 几何 32B + 桶区 size×128B + 溢出池 ofbCap×128B（头 BodyLength 字段——写头时先知，帧长可推导）。</summary>
+    /// <returns>体字节数。</returns>
     protected override long ComputeBodyLength()
     {
         var table = _table;
@@ -31,6 +33,10 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
                + table.OverflowPool.LongLength * PersistBucketSize;
     }
 
+    /// <summary>
+    /// 写体：几何（表尺寸/溢出池容量/条目数）→ 桶区 → 溢出池（fuzzy 逐槽 128bit 原子读拷贝，
+    /// Tentative/Empty 槽写零、Occupied/链指针原样收），分片经 <see cref="ProbingIndexBase{TKey}.WriteBodyChunk"/>。
+    /// </summary>
     protected override void WriteBody()
     {
         var table = _table;                                   // ★ 单引用捕获（表+溢出池同代原子对）
@@ -98,6 +104,13 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     // === 帧物化（基类帧走链定位后调——读几何 → 重建表+溢出池 → 重数实收）===
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// 物化最新完整帧：读头（codec 全校验）→ 读几何（尺寸 2 的幂/池容量校验 + 体长核对）→
+    /// 整读体重建表+溢出池 → 重数实收（fuzzy 帧内可能混入 dump 期间新插条目，计数以实收为准）。
+    /// </summary>
+    /// <param name="head">帧头地址（基类帧走链定位的最新完整帧）。</param>
+    /// <param name="entryCount">物化后条目数（实收计数——仅成功返回时有意义）。</param>
+    /// <returns>true = 物化成功；false = 任一校验失败（恢复核心走全量重放 fail-safe）。</returns>
     protected override bool TryMaterializeFrame(LogicalAddress head, out long entryCount)
     {
         entryCount = 0;
@@ -143,8 +156,11 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
         return true;
     }
 
+    /// <summary>物化后回调——重数实收结果写回写者维护的条目计数（fuzzy 帧实收为准）。</summary>
+    /// <param name="entryCount">物化实收条目数。</param>
     protected override void OnMaterialized(long entryCount) => _entryCount = entryCount;
 
+    /// <summary>当前条目数（Volatile 读写者计数——后台 dump 策略触发用）。</summary>
     protected override long CurrentEntryCount => Volatile.Read(ref _entryCount);
 
     private bool ReadBodyExact(LogicalAddress at, Span<byte> dst)

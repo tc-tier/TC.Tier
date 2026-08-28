@@ -6,7 +6,7 @@ TC.Tier 的**存储运行时**——存储引擎 + 结构层（Ring / Log / Inde
 
 - **存储引擎**：Options/Builder 装配（构造 → 启动一步到位）、16B 逻辑地址、零写放大 Compact、全并发区间所有权
 - **结构层**：Ring（WiscKey 值分离）/ Log（WAL）/ 索引（Hash/BTree/SkipList）/ Metadata（版本链）/ Mirror（镜像）/ Snapshot（大流）
-- **TierFs 四介质**：local（Direct IO）/ memory / virtual（.raw）/ network（S3）
+- **TierFs 四介质**：local（Direct IO）/ memory / virtual（.tier）/ network（S3）
 
 ## 快速开始
 

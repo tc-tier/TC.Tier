@@ -12,13 +12,21 @@ public interface ITransactionParticipant
     /// <para>数据持久化但"悬空"——未被 commit record 确认。崩溃在此后 Commit 前恢复时丢弃。</para>
     /// <para>★ 必须包含 Flush——WriteAsync 不保证落盘。</para>
     /// </summary>
+    /// <param name="seq">本轮事务序号。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>异步完成的 <see cref="ValueTask"/>。</returns>
     ValueTask PrepareAsync(long seq, CancellationToken ct);
+
+    /// <summary>同步 Prepare（对等异步版 <see cref="PrepareAsync"/>）：把数据写到设备并 Flush（真正持久化），
+    /// 附 seq，但 lastCommittedSeq 不推进。</summary>
+    /// <param name="seq">本轮事务序号。</param>
     void Prepare(long seq);
 
     /// <summary>
     /// ★ CommitPoint（提交点确认）：本结构确认已提交到 seq。推进自身 lastCommittedSeq。
     /// <para>由 TransactionLog.Commit 触发（链式）或上层显式调。</para>
     /// </summary>
+    /// <param name="seq">本轮事务序号。</param>
     void ConfirmCommitted(long seq);
 
     /// <summary>
@@ -30,7 +38,13 @@ public interface ITransactionParticipant
     /// <para>- IndexBase：no-op（纯内存参与者，回退 seq）。</para>
     /// <para>实现必须是幂等的——恢复时可能对同一 seq 多次调用。</para>
     /// </summary>
+    /// <param name="seq">要回滚的 Prepare 序号。</param>
     void Abort(long seq);
+
+    /// <summary>异步回滚未提交的 Prepare（对等同步版 <see cref="Abort"/>）——语义由各参与者 IO 模型决定，实现须幂等。</summary>
+    /// <param name="seq">要回滚的 Prepare 序号。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>异步完成的 <see cref="ValueTask"/>。</returns>
     ValueTask AbortAsync(long seq, CancellationToken ct);
 
     /// <summary>当前已提交序号（恢复/运行时读）。</summary>
@@ -48,5 +62,7 @@ public interface ITransactionParticipant
     /// ★ 注册提交回调（链式触发）：当本结构提交到 seq 时触发 callback。
     /// <para>用于"A 提交 → 自动触发 B"链式编排。</para>
     /// </summary>
+    /// <param name="seq">本轮事务序号。</param>
+    /// <param name="callback">提交回调。</param>
     void OnCommitted(long seq, Action callback);
 }

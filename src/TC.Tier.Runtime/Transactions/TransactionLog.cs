@@ -33,6 +33,7 @@ public sealed class TransactionLog : ITransactionLog
         public uint Crc;
     }
 
+    /// <summary>构造事务日志（对齐缓冲 + 固定块 commit record；打开即读盘恢复 lastCommittedSeq）。</summary>
     /// <param name="engine">注入的 commit record 引擎（外部管生命周期）。</param>
     public TransactionLog(IStorageEngine engine)
     {
@@ -41,10 +42,15 @@ public sealed class TransactionLog : ITransactionLog
         _buffer = new AlignedMemoryManager(blockSize, DioAlignment);
     }
 
+    /// <summary>当前全局已提交序号（恢复/运行时读）。</summary>
     public long LastCommittedSeq => _lastCommittedSeq;
 
+    /// <summary>当前注册的参与者名称集合（诊断用）。</summary>
     public IReadOnlyCollection<string> ParticipantNames => _participants.Keys;
 
+    /// <summary>注册参与者（带名称标识——诊断/按名称查找；同名注册覆盖保留末次插入顺序）。</summary>
+    /// <param name="name">参与者名称（非空）。</param>
+    /// <param name="participant">参与者实例。</param>
     public void Register(string name, ITransactionParticipant participant)
     {
         ArgumentNullException.ThrowIfNull(participant);
@@ -54,6 +60,9 @@ public sealed class TransactionLog : ITransactionLog
         _participants[name] = participant;
     }
 
+    /// <summary>按名称取消注册（可选，子系统销毁时调）。</summary>
+    /// <param name="name">参与者名称。</param>
+    /// <returns>是否找到并移除。</returns>
     public bool Unregister(string name) => _participants.Remove(name);
 
     /// <summary>★ 协调者提交事件：每次 Commit 成功（全局 seq 推进 + Flush 落盘）后触发，传新 seq。</summary>
@@ -61,6 +70,8 @@ public sealed class TransactionLog : ITransactionLog
 
     // === Load ===
 
+    /// <summary>从磁盘加载 commit record（固定块读 → Magic/Crc 校验）——返回 lastCommittedSeq（空/损坏 = 0）。</summary>
+    /// <returns>lastCommittedSeq（无 record = 0）。</returns>
     public long Load()
     {
         try
@@ -72,6 +83,9 @@ public sealed class TransactionLog : ITransactionLog
         catch { _lastCommittedSeq = 0; return 0; }
     }
 
+    /// <summary>异步从磁盘加载 commit record（对等同步版 <see cref="Load()"/>）。</summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>lastCommittedSeq（无 record = 0）。</returns>
     public async ValueTask<long> LoadAsync(CancellationToken ct)
     {
         try
@@ -90,8 +104,8 @@ public sealed class TransactionLog : ITransactionLog
     /// <para>调用方须在调用前 Register 所有参与者（与 Commit 时相同的集合）。</para>
     /// <para>恢复判定：</para>
     /// <para>- committedSeq == 0（空盘/损坏）→ 所有有悬干的参与者 Abort</para>
-    /// <para>- LastCommittedSeq < committedSeq → ConfirmCommitted(committedSeq)（正向：未同步推进）</para>
-    /// <para>- LastPreparedSeq > committedSeq → Abort(LastPreparedSeq)（反向：超前悬干丢弃）</para>
+    /// <para>- LastCommittedSeq &lt; committedSeq → ConfirmCommitted(committedSeq)（正向：未同步推进）</para>
+    /// <para>- LastPreparedSeq &gt; committedSeq → Abort(LastPreparedSeq)（反向：超前悬干丢弃）</para>
     /// </summary>
     public long LoadAndReconcile()
     {
@@ -115,6 +129,9 @@ public sealed class TransactionLog : ITransactionLog
         return committedSeq;
     }
 
+    /// <summary>异步恢复协调（对等同步版 <see cref="LoadAndReconcile()"/>）——LoadAsync + 按双向判定推进/回退参与者。</summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>加载的 committedSeq（空盘/损坏 = 0）。</returns>
     public async ValueTask<long> LoadAndReconcileAsync(CancellationToken ct)
     {
         long committedSeq = await LoadAsync(ct).ConfigureAwait(false);
@@ -157,6 +174,9 @@ public sealed class TransactionLog : ITransactionLog
 
     // === Commit（真正两阶段：foreach Prepare → persist commit record → foreach ConfirmCommitted）===
 
+    /// <summary>真正两阶段提交（同步）：Phase 1 foreach Prepare（任一失败 → Abort 已 Prepare 的并抛）→
+    /// 全部成功 → persist commit record（Write+Flush = 原子点）→ Phase 2 foreach ConfirmCommitted。</summary>
+    /// <returns>新提交的 seq。</returns>
     public long Commit()
     {
         long newSeq = _lastCommittedSeq + 1;
@@ -189,6 +209,10 @@ public sealed class TransactionLog : ITransactionLog
         return newSeq;
     }
 
+    /// <summary>真正两阶段提交（异步）：Phase 1 foreach PrepareAsync（任一失败 → Abort 已 Prepare 的并抛）→
+    /// 全部成功 → persist commit record（WriteAsync+Flush = 原子点）→ Phase 2 foreach ConfirmCommitted。</summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>新提交的 seq。</returns>
     public async ValueTask<long> CommitAsync(CancellationToken ct)
     {
         long newSeq = _lastCommittedSeq + 1;
@@ -258,12 +282,15 @@ public sealed class TransactionLog : ITransactionLog
         return stored == rec.Crc;
     }
 
+    /// <summary>释放对齐缓冲（幂等——CAS 守卫，重复调 no-op）。</summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _buffer.Dispose();
     }
 
+    /// <summary>异步释放对齐缓冲（幂等——CAS 守卫；实质同步，无异步资源）。</summary>
+    /// <returns>表示释放完成的 ValueTask。</returns>
     public ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return ValueTask.CompletedTask;

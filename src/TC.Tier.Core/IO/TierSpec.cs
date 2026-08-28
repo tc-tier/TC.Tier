@@ -421,6 +421,8 @@ public sealed record TierSpec
 
     // ═══════════════ 规范形序列化（往返稳定）═══════════════
 
+    /// <summary>输出规范形 spec 字符串（往返稳定：<c>Parse(Parse(s).ToString()).ToString()</c> 恒等）。</summary>
+    /// <returns>规范形 spec 字符串。</returns>
     public override string ToString()
     {
         var sb = new StringBuilder();
@@ -466,6 +468,9 @@ public sealed record TierSpec
     }
 
     // Members 是集合——record 默认按引用比较，覆写为序列相等（往返等价判定依赖值相等）
+    /// <summary>值相等比较（含 Members 序列相等——record 默认引用比较对集合不适用）。</summary>
+    /// <param name="other">另一 spec（null = 不相等）。</param>
+    /// <returns>true = 全部字段值相等且 Members 序列相等。</returns>
     public bool Equals(TierSpec? other) =>
         other is not null
         && Nature == other.Nature && SubKind == other.SubKind
@@ -478,6 +483,8 @@ public sealed record TierSpec
         && VirtualHostAddressing == other.VirtualHostAddressing && Tls == other.Tls
         && Members.SequenceEqual(other.Members);
 
+    /// <summary>哈希码（介质/位置/端点/桶 + 挂载参数 label/quota/access/exclusive 的复合哈希）。</summary>
+    /// <returns>复合哈希值。</returns>
     public override int GetHashCode() => HashCode.Combine(
         HashCode.Combine(Nature, SubKind, AbsolutePath, UncHost, RelativePath, IsCwdRoot, Endpoint, Bucket),
         HashCode.Combine(Label, QuotaBytes, Access, Exclusive));

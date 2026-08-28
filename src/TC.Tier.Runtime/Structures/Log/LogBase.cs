@@ -68,6 +68,19 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
     public ReadOnlySpan<byte> ReadOpaqueMeta()
         => MetaPolicy.ReadPayload();
 
+    /// <summary>
+    /// Log 基类构造：接入主引擎 + 装配 codec/设置/meta 策略。
+    /// <para>★ 构造 = 配置（Core 完整生命周期）：主引擎纯 Create（启动在 <see cref="OnInitializeBegin"/>）；
+    /// Managed 模式另建 meta 引擎（同构纯 Create）；meta 策略按工厂注入或默认映射装配（??= 收口）。</para>
+    /// </summary>
+    /// <param name="codec">entry 头尾编解码器（消除虚分发）。</param>
+    /// <param name="fs">文件系统（主引擎 + Managed meta 引擎共用）。</param>
+    /// <param name="settings">Log 设置（页位宽 / 主引擎配置 / meta 模式与 opaque 容量）。</param>
+    /// <param name="recovery">恢复器（LifecycleBase 模板参数，null = 无恢复）。</param>
+    /// <param name="cursorFactory">扫描游标工厂（扫描读与 MetaHost 找最后 meta 用）。</param>
+    /// <param name="metaPolicyFactory">meta 策略工厂（null = 默认映射 CreateMetaPolicyDefault）。</param>
+    /// <param name="metaTransport">Transport 模式的传输实例（null = 回落 MetaHost 嵌入 log 流）。</param>
+    /// <param name="logger">日志器。</param>
     protected LogBase(ILogCodec codec,
         IFileSystem fs,
         LogSettings settings,
@@ -112,6 +125,7 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
         Resources.Add(MetaPolicy, "metaPolicy");
     }
 
+    /// <summary>★ Initialize 第一阶段钩子——双引擎并行启动（均非阻塞）：主引擎带恢复水位 hint；Managed meta 引擎自恢复。</summary>
     protected override void OnInitializeBegin()
     {
         // ★ 双引擎并行启动（均非阻塞）：主引擎带恢复水位 hint；meta 引擎（Managed）自恢复。
@@ -123,14 +137,19 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
 
 
 
+    /// <summary>★ 起始地址 = 引擎 MinAddress（第一个 entry 的起始——水位读引擎，Log 不自存）。</summary>
     public LogicalAddress BeginAddress => _engine.MinAddress;
 
+    /// <summary>★ 尾地址 = 当前写游标——最后一个已追加 entry 的尾地址（含页缓冲内未落盘 entry；
+    /// 写未初始化或空页时 = 已落盘水位 _logicalTail）。</summary>
     public LogicalAddress TailAddress => GetCurrentWriteTail();
 
     internal LogicalAddress FlushedTail => _logicalTail;
 
+    /// <summary>页大小（2^LogPageSizeBits）——页攒批单位（一页组装一个 frame 写窗口）。</summary>
     public int PageSize { get; }
 
+    /// <summary>页大小位宽（log2(PageSize)，来自 LogSettings.LogPageSizeBits）。</summary>
     public int LogPageSizeBits { get; }
 
     internal int PageSizeMask { get; }

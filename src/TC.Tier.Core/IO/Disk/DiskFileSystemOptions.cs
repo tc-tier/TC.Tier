@@ -10,4 +10,12 @@ public sealed class DiskFileSystemOptions : FileSystemOptions
 {
     /// <summary>FileExtra 存储模式（构造期显式配置——部署决策，非逐文件运行时隐式判定）。</summary>
     public DiskMetadataMode MetadataMode { get; init; } = DiskMetadataMode.Fallback;
+
+    /// <summary>
+    /// 预分配方式轴（IS-04，默认 <see cref="PreallocationMode.Metadata"/> = 现行 best-effort 稀疏降级）。
+    /// <para><see cref="PreallocationMode.Full"/> = 物理占位强制：CreateFile/句柄 Preallocate 走
+    ///   <c>EnsurePhysicalAllocation</c>（SetFileValidData/fallocate/F_PREALLOCATE/零写兜底），
+    ///   失败显式报错而非静默降级为稀疏（部署错误 fail-fast）。</para>
+    /// </summary>
+    public PreallocationMode Preallocation { get; init; } = PreallocationMode.Metadata;
 }

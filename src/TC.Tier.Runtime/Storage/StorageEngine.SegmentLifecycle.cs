@@ -18,7 +18,7 @@ internal sealed partial class StorageEngine
     ///   物理建段是 IO 层的事，段表只发通知（OnSegmentCreate/OnSegmentFull），池攒 N 个现成段、
     ///   随取随补、Dispose 毁余量（架构约定 ）。</para>
     /// <para>★ 调用契约（）：两调用方经 build-gate single-flight 互斥进入
-    ///   （<see cref="EnsureSegmentPhysicalAsync"/> / <c>PreCreateSegmentPhysical</c>，均在
+    ///   （<see cref="EnsureSegmentPhysical"/> / <c>PreCreateSegmentPhysical</c>，均在
     ///   StorageEngine.SegmentPool.cs）——本方法自身不再防重，直接调用者之外勿绕过 gate。</para>
     /// </summary>
     /// <param name="segId">段号。</param>

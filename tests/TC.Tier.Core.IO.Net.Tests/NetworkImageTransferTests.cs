@@ -4,14 +4,14 @@ using TC.Tier.Core.IO;
 using TC.Tier.Core.IO.Image;
 using TC.Tier.Core.IO.Mem;
 using TC.Tier.Core.IO.Net;
-using TC.Tier.Core.IO.Raw;
+using TC.Tier.Core.IO.TierVolume;
 using Xunit;
 
 namespace TC.Tier.Core.IO.Net.Tests;
 
 /// <summary>
 /// TIN1 网络传送契约测试（raw-medium-and-conversion-design §9）——
-/// 回环 TCP：Mem→Raw 跨介质流式收发 + 回执对账 + 握手违约拒读 + 空卷往返。
+/// 回环 TCP：Mem→TierVolume 跨介质流式收发 + 回执对账 + 握手违约拒读 + 空卷往返。
 /// </summary>
 public sealed class NetworkImageTransferTests : IDisposable
 {
@@ -56,11 +56,11 @@ public sealed class NetworkImageTransferTests : IDisposable
     { Access = AccessMode.Read, Mode = FileOpenMode.OpenExisting, Sharing = FileSharing.ReadWrite };
 
     [Fact]
-    public void SendReceive_MemToRaw_Loopback_Roundtrip()
+    public void SendReceive_MemToTv_Loopback_Roundtrip()
     {
         using var src = MemoryFileSystem.New();
-        var raw = RawFileSystem.New(RawCarrier.File(Path.Combine(_dir, $"v-{Guid.NewGuid():N}.raw")),
-            new RawFormatOptions { QuotaBytes = 32L << 20 });
+        var tv = TierVolumeFs.New(TierVolumeCarrier.File(Path.Combine(_dir, $"v-{Guid.NewGuid():N}.tier")),
+            new TierVolumeFormatOptions { QuotaBytes = 32L << 20 });
         _open.Add(raw);
         Populate(src);
 
@@ -88,7 +88,7 @@ public sealed class NetworkImageTransferTests : IDisposable
         }
     }
 
-    private static NetworkTransferResult NetworkTransferResultOnFixedPort(IFileSystem src, RawFileSystem raw,
+    private static NetworkTransferResult NetworkTransferResultOnFixedPort(IFileSystem src, TierVolumeFs tv,
         int port, CancellationToken ct)
     {
         // 接收端监听重试（固定端口可能短暂占用——3 次退避）
@@ -114,8 +114,8 @@ public sealed class NetworkImageTransferTests : IDisposable
     public void SendReceive_EmptyVolume_Roundtrips()
     {
         using var src = MemoryFileSystem.New();
-        var raw = RawFileSystem.New(RawCarrier.File(Path.Combine(_dir, $"e-{Guid.NewGuid():N}.raw")),
-            new RawFormatOptions { QuotaBytes = 8 << 20 });
+        var tv = TierVolumeFs.New(TierVolumeCarrier.File(Path.Combine(_dir, $"e-{Guid.NewGuid():N}.tier")),
+            new TierVolumeFormatOptions { QuotaBytes = 8 << 20 });
         _open.Add(raw);
         src.EnsureRoot();
 
@@ -131,8 +131,8 @@ public sealed class NetworkImageTransferTests : IDisposable
     [Fact]
     public void Handshake_BadMagic_Rejected()
     {
-        using var raw = RawFileSystem.New(RawCarrier.File(Path.Combine(_dir, $"b-{Guid.NewGuid():N}.raw")),
-            new RawFormatOptions { QuotaBytes = 8 << 20 });
+        using var tv = TierVolumeFs.New(TierVolumeCarrier.File(Path.Combine(_dir, $"b-{Guid.NewGuid():N}.tier")),
+            new TierVolumeFormatOptions { QuotaBytes = 8 << 20 });
         _open.Add(raw);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         var receiver = Task.Run(() =>

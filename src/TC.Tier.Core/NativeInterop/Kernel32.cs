@@ -299,6 +299,17 @@ internal static unsafe partial class Kernel32
         ref uint bytesReturned, IntPtr overlapped);
 
     /// <summary>
+    /// DeviceIoControl 无缓冲版本（in/out 均 null）——FSCTL_LOCK_VOLUME（卷锁定——裸设备载体
+    /// 独占排他；Windows 裸分区补齐，用户拍板 2026-08-26）用。
+    /// </summary>
+    [LibraryImport(NativeLibraries.Kernel32, EntryPoint = "DeviceIoControl", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool DeviceIoControlSimple(
+        SafeFileHandle device, uint ioControlCode,
+        IntPtr inBuffer, int inBufferSize, IntPtr outBuffer, int outBufferSize,
+        out uint bytesReturned, IntPtr overlapped);
+
+    /// <summary>
     /// SetFilePointerEx — 设置文件指针位置（64 位）。
     /// </summary>
     /// <param name="file">要设置文件指针的文件句柄</param>

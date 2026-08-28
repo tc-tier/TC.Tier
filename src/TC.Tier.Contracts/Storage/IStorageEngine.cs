@@ -103,10 +103,14 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     LogicalAddress Write(LogicalAddress destination, ReadOnlySpan<byte> source);
 
     /// <summary>异步覆写。</summary>
+    /// <param name="destination">目标地址。</param>
+    /// <param name="source">源数据。</param>
+    /// <param name="ct">取消令牌。</param>
     /// <exception>超出 maxOffset 或 pwrite 失败。
     ///     <cref>FileIOException</cref>（Core IO 统一语义异常透传，IOError 语义码）
     /// </exception>
     /// <exception cref="OperationCanceledException">取消。</exception>
+    /// <returns>写入后的绝对地址（等于 destination）。</returns>
     ValueTask<LogicalAddress> WriteAsync(LogicalAddress destination, ReadOnlyMemory<byte> source, CancellationToken ct);
 
     // === Read（跨段查表） ===
@@ -124,6 +128,10 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     int Read(LogicalAddress source, Span<byte> destination);
 
     /// <summary>异步读取。</summary>
+    /// <param name="source">源地址。</param>
+    /// <param name="destination">目标缓冲区。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际所读字节数（越界可能小于 destination.Length，0 = EOF）。</returns>
     /// <exception>地址指向已删除的段文件。
     ///     <cref>PartitionInvalidException</cref>
     /// </exception>
@@ -176,6 +184,9 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     ///   动词 Start 表达"启动后台操作"。失败断点：Failed 事件异常的 <c>Data["lastPunchedOffset"]</c>
     ///   携带最后成功打洞地址，调用方据此重试剩余区间。</para>
     /// </summary>
+    /// <param name="from">回收区间的起始地址（含）。</param>
+    /// <param name="to">回收区间的结束地址（不含）。</param>
+    /// <param name="ct">取消令牌。</param>
     /// <returns>后台回收操作句柄（进度 + 事件 + Cancel + WaitAsync）。</returns>
     IAsyncOperation StartReclaim(LogicalAddress? from, LogicalAddress? to, CancellationToken ct);
 
@@ -199,9 +210,12 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     /// </summary>
     /// <param name="from">区间起点（含）。</param>
     /// <param name="to">区间终点（不含）。</param>
+    /// <returns>空洞率（0.0 ~ 1.0）。</returns>
     double GetHoleRatio(LogicalAddress from, LogicalAddress to);
 
     /// <summary>单段空洞率——查询 OS 真实物理分配。</summary>
+    /// <param name="segId">段 ID。</param>
+    /// <returns>空洞率（0.0 ~ 1.0）。</returns>
     double GetHoleRatio(int segId);
 
     // === 顺序读句柄 ===
@@ -227,6 +241,7 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
 
     /// <summary>启动全量 Compact——[MinAddress, CommittedTail] 全部已提交数据搬迁到紧凑新段。
     /// 0 等待返回句柄；取消/超时/等待由调用方控制（op.Cancel / await op.WaitAsync(ct)）。</summary>
+    /// <returns>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</returns>
     IAsyncOperation<CompactResult> StartCompact();
 
     /// <summary>
@@ -239,6 +254,7 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     /// <param name="from">整理范围起始（含）。</param>
     /// <param name="to">整理范围结束（不含）。</param>
     /// <param name="addresses">需翻译的地址集合。</param>
+    /// <returns>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</returns>
     IAsyncOperation<CompactResult> StartRangeCompact(LogicalAddress from, LogicalAddress to,
         IReadOnlyList<LogicalAddress> addresses);
 
@@ -256,6 +272,7 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     /// <param name="from">整理范围起始（含）。</param>
     /// <param name="to">整理范围结束（不含）。</param>
     /// <param name="liveRecords">使用方申报的活记录区间集合（Start + Length）。</param>
+    /// <returns>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</returns>
     IAsyncOperation<CompactResult> StartRangeCompact(LogicalAddress from, LogicalAddress to,
         IReadOnlyList<(LogicalAddress Start, long Length)> liveRecords);
 }

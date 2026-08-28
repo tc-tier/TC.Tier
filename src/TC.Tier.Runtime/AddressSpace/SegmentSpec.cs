@@ -5,9 +5,16 @@ namespace TC.Tier.Runtime.AddressSpace;
 /// </summary>
 public readonly record struct SegmentSpec
 {
+    /// <summary>段的增长上限（段可容纳的最大逻辑地址；不变量 minOffset ≤ maxOffset ≤ growthLimit）。</summary>
     public long GrowthLimit { get; }
+
+    /// <summary>段的最大偏移（当前已提交水位）。</summary>
     public long MaxOffset { get; }
+
+    /// <summary>段的稳定状态。</summary>
     public StableState StableState { get; }
+
+    /// <summary>段的最小偏移（段内可寻址起点）。</summary>
     public long MinOffset { get; }
 
     /// <summary>

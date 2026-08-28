@@ -16,6 +16,7 @@ public interface ITracer
     /// <para>NullTracer 返回 false → 热路径 <c>if (_tracer.IsEnabled)</c> 完全短路，不调 BeginSpan、不分配 span。</para>
     /// <para>注入真实 tracer 返回 true → 配合 <see cref="TracingConfig.SampleRate"/> 采样命中才 BeginSpan。</para>
     /// </summary>
+    /// <remarks>★ 热路径必须在 <c>if (_tracer.IsEnabled)</c> 内调用 BeginSpan，避免 NullTracer 也分配 span。</remarks>
     bool IsEnabled { get; }
 
     /// <summary>
@@ -25,6 +26,7 @@ public interface ITracer
     /// </summary>
     /// <param name="name">span 名（如 "wal.append"、"kv.read"、"checkpoint"）。</param>
     /// <param name="kind">span 角色（默认 Internal）。</param>
+    /// <returns>新 span（Dispose=EndSpan）。</returns>
     ISpan BeginSpan(string name, SpanKind kind = SpanKind.Internal);
 
     /// <summary>
@@ -32,5 +34,6 @@ public interface ITracer
     /// <para>BeginSpan 自动设为新 span，Dispose 恢复父 span。子方法无需传参即可拿到当前 span 添加标签/事件。</para>
     /// <para>NullTracer 返回 null（无活跃 span）。</para>
     /// </summary>
+    /// <remarks>★ AsyncLocal 模式：BeginSpan/Dispose 自动维护父子链，子方法无需传参即可拿到当前 span 添加标签/事件。</remarks>
     ISpan? Current { get; }
 }

@@ -43,7 +43,7 @@ public abstract class LifecycleBase<THints> : ILifecycle<THints>, IDisposable, I
     ///   早期实现 <c>_recovery ??= CreateRecovery()</c> 在 getter 懒创建：并发读双实例竞态 +
     ///   Initialize 前任何 <see cref="IsReady"/> 观测读都会偷跑工厂（Dispose 前查一下也凭空建出
     ///   Recovery）——已废除（设计决策：风险不该上层承担，基类直接原子）。</para></summary>
-    protected IRecovery<THints>? Recovery
+    private IRecovery<THints>? Recovery
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => Volatile.Read(ref _recovery);
@@ -107,6 +107,8 @@ public abstract class LifecycleBase<THints> : ILifecycle<THints>, IDisposable, I
     private void ForwardProgress(RecoveryProgress p) => _recoveryProgressChanged?.Invoke(p);
 
     /// <summary>诊断：当前所有存活的 LifecycleBase 实例快照（对齐 lease GetActiveLeases——泄漏时定位"谁没 Dispose"）。</summary>
+    /// <param name="typeFilter">可选类型名过滤（子串匹配，null = 全部）。</param>
+    /// <returns>当前所有存活的 LifecycleBase 实例快照。</returns>
     public IReadOnlyList<TrackedInstanceInfo> GetAliveInstances(string? typeFilter = null)
         => InstanceTracker.GetAlive(typeFilter);
 
@@ -154,6 +156,8 @@ public abstract class LifecycleBase<THints> : ILifecycle<THints>, IDisposable, I
 
     /// <inheritdoc/>
     /// <remarks>⚠️ <b>禁止在异步上下文调用</b>（同 <see cref="WaitForReady()"/> 死锁警告）。</remarks>
+    /// <param name="timeoutMilliseconds">超时时间（毫秒）。</param>
+    /// <returns>是否在超时时间内就绪。</returns>
     public bool WaitForReady(int timeoutMilliseconds)
     {
         ThrowIfDisposed();

@@ -27,7 +27,7 @@ internal struct AsyncPriorityQueueV2Slot
 /// <summary>
 /// ★ 实验版本（Route B' 方案 A 验证版）——**不可用于生产**：仅保留作设计档案与对照实验；
 ///   生产一律用 <see cref="AsyncPriorityQueue{T}"/>（Route A 基线）。测试默认 Skip，不入基准。
-/// AsyncPriorityQueue <b>Route B' 方案 A 验证版——非移动内存 + 槽位寻址 + generation +
+/// AsyncPriorityQueue <b>Route B' 方案 A 验证版——非移动内存 + 槽位寻址 + generation +</b>
 /// <b>128 位边对（16B = slotRef + mark 位）</b> + epoch 回收 + 零分配。
 /// <para>★ 与 <see cref="AsyncPriorityQueue{T}"/>（Route A，生产基线）同族；本版把删除协议升级为
 ///   <b>Harris 原版</b>：mark 在 <b>victim 自身边</b>（非 marker 槽），物理摘除时 mark 被 splice 消耗。</para>

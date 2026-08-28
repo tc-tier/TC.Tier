@@ -70,10 +70,10 @@ public abstract partial class LogBase
             }
 
             var pageFrameStart = _owner._engine.CalculationAddress(_owner._spaceStart, _owner._spaceWriteOffset);
-            LogicalAddress entryStart = _owner._engine.CalculationAddress(pageFrameStart, LogPageFrameHeaderCodec.StructSize + _localPageUsed);
+            var entryStart = _owner._engine.CalculationAddress(pageFrameStart, LogPageFrameHeaderCodec.StructSize + _localPageUsed);
 
-            Span<byte> page = _owner.ActivePage.GetSpan(_localPageUsed, totalSize);
-            entry.CopyTo(page.Slice(_headerSize));
+            var page = _owner.ActivePage.GetSpan(_localPageUsed, totalSize);
+            entry.CopyTo(page[_headerSize..]);
             page.Slice(_headerSize + entry.Length, paddingLen).Clear();
             _owner.LogCodec.WriteHeader(page, entry.Length, paddingLen, false);
             _localPageUsed += totalSize;
@@ -91,7 +91,9 @@ public abstract partial class LogBase
             return entryStart;
         }
 
+        /// <summary>本批已追加的 entry 条数。</summary>
         public int Count => _count;
+        /// <summary>本批第一条 entry 的起始 LogicalAddress（空批时为 Empty）。</summary>
         public LogicalAddress FirstOffset => _firstOffset;
 
         /// <summary>Dispose：回写宿主 _pageUsed（地址空间窗口状态由 FlushPage 维护，无需回写）+ 释放写锁。</summary>

@@ -797,9 +797,6 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
 
     // ═════════════════════════════ 扩展属性（PUT 原子快照语义）═════════════════════════════
 
-    /// <inheritdoc/>
-    /// <remarks>写句柄：staging 值（Flush 随 PUT 原子提交；Flush 前读 = staging 值）；
-    /// 读句柄：Open 时 Head 缓存（句柄生命周期内不再重拉）。值经 Base64 往返（对象元数据为字符串域）。</remarks>
     // ═══════════════ FileExtra 平面（§3.6：staging 生命周期——写即时可见，随 Flush/PUT 原子提交）═══════════════
 
     /// <summary>取 FileExtra 当前值（staging 优先；缓存回退带大小写归一——AWS S3 服务端小写化键）。</summary>

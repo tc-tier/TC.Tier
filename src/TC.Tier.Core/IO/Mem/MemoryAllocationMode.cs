@@ -4,7 +4,7 @@ namespace TC.Tier.Core.IO.Mem;
 /// 内存分配模式。
 /// <para><see cref="Sparse"/>：真稀疏——按页写时分配，用多少占多少（PunchHole 真释放页归还池）。</para>
 /// <para><see cref="Reserved"/>：创建即占——文件单块连续直址（保留现状槽直址语义），Map 零拷贝；
-///   建议配 <see cref="MemoryFileSystemOptions.QuotaBytes"/> 形成硬配额。</para>
+///   建议配 <see cref="FileSystemOptions.QuotaBytes"/> 形成硬配额。</para>
 /// </summary>
 public enum MemoryAllocationMode
 {

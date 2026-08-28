@@ -28,6 +28,8 @@ public interface IExtentLeaseSource
     /// <param name="segId">段 ID。</param>
     /// <param name="start">段内起始偏移（跨段时 segOff ≠ 0，不能硬编码 0）。</param>
     /// <param name="end">段内结束偏移（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void AppendCommit(int segId, long start, long end, int compactVersion = 0);
 
     /// <summary>
@@ -36,6 +38,8 @@ public interface IExtentLeaseSource
     /// <param name="segId">段 ID。</param>
     /// <param name="start">段内起始偏移。</param>
     /// <param name="end">段内结束偏移（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void AppendRollback(int segId, long start, long end, int compactVersion = 0);
 
     // ═══ Write（单 Chunk）═══
@@ -44,12 +48,16 @@ public interface IExtentLeaseSource
     /// <param name="segId">段 ID。</param>
     /// <param name="start">起始地址。</param>
     /// <param name="end">结束地址（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void WriteCommit(int segId, long start, long end, int compactVersion = 0);
 
     /// <summary>Write 单 Chunk 回滚——MarkWasted（可覆写修复）。</summary>
     /// <param name="segId">段 ID。</param>
     /// <param name="start">起始地址。</param>
     /// <param name="end">结束地址（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void WriteRollback(int segId, long start, long end, int compactVersion = 0);
 
     // ═══ Reclaim（单 Chunk，中间回收）═══
@@ -58,12 +66,16 @@ public interface IExtentLeaseSource
     /// <param name="segId">段 ID。</param>
     /// <param name="start">起始地址。</param>
     /// <param name="end">结束地址（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void ReclaimCommit(int segId, long start, long end, int compactVersion = 0);
 
     /// <summary>Reclaim 单 Chunk 回滚——Abort → Aborted 永久洞（只 Compact 修）。</summary>
     /// <param name="segId">段 ID。</param>
     /// <param name="start">起始地址。</param>
     /// <param name="end">结束地址（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void ReclaimRollback(int segId, long start, long end, int compactVersion = 0);
 
     // ═══ Compact（单 Chunk）═══
@@ -72,11 +84,15 @@ public interface IExtentLeaseSource
     /// <param name="segId">段 ID。</param>
     /// <param name="start">起始地址。</param>
     /// <param name="end">结束地址（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void CompactCommit(int segId, long start, long end, int compactVersion = 0);
 
     /// <summary>Compact 单 Chunk 回滚——ReleaseCompact（overlay 释放，段表不变）。</summary>
     /// <param name="segId">段 ID。</param>
     /// <param name="start">起始地址。</param>
     /// <param name="end">结束地址（不包含）。</param>
+    /// <param name="compactVersion">lease 获取时快照的段 Compact 版本号——段被 Compact 原位重整后版本递增，
+    /// 提交/回滚时校验不符即拒（陈旧认知快速失败，不静默 no-op）。</param>
     void CompactRollback(int segId, long start, long end, int compactVersion = 0);
 }

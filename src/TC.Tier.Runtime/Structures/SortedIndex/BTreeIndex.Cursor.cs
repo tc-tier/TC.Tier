@@ -5,6 +5,9 @@ namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>有序遍历游标（最左叶子起叶链 Next 扫描——range scan 比较族独有能力）。</summary>
+    /// <param name="direction">遍历方向（扫描沿叶链前向产出条目——direction 由游标 Direction 原样暴露）。</param>
+    /// <returns>叶链扫描游标。</returns>
     public override IIndexScanCursor<TKey> CreateScanCursor(ReadDirection direction)
         => new BTreeScanCursor(this, direction);
 

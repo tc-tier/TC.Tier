@@ -11,7 +11,7 @@ public partial class BlittableRing<TKey> : RingBase<TKey>
     where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>
-    /// ctor 收 <see cref="protected internal"/>——★开放泛型不落消费面（设计稿 §2）的编译期闸门：
+    /// ctor 收 <c>protected internal</c>——★开放泛型不落消费面（设计稿 §2）的编译期闸门：
     /// 外部程序集直接 <c>new BlittableRing&lt;TKey&gt;(...)</c> 即 CS0122 编译错，必须用 [RingKey]
     /// 生成的封闭类型（RingOfLong 等，经 protected 肢调本 ctor）；内核单元测试/基准经 IVT（internal 肢）。
     /// </summary>
@@ -52,9 +52,15 @@ public partial class BlittableRing<TKey> : RingBase<TKey>
     }
 
     // === override 字节几何插槽（override sealed → JIT 去虚化；类开放继承但几何不可再变）===
+    /// <summary>固定记录大小——0 表示变长（record 大小由 header 自述 PayloadLength/PaddingLength）。</summary>
     protected internal sealed override int FixedRecordSize => 0;
+
+    /// <summary>平均记录大小（溢出阈值/容量估算用）——header + 64B payload 的估算值。</summary>
     protected internal sealed override int AverageRecordSize => RingCodec.HeaderSize + 64;
 
+    /// <summary>读物理地址处 record 的实际几何——header 自述 PayloadLength/PaddingLength 算出（filled=字节数，allocated=对齐后槽长）。</summary>
+    /// <param name="phys">record 的物理地址。</param>
+    /// <returns>（实际字节数, 对齐后占用槽长）。</returns>
     protected internal sealed override unsafe (int filled, int allocated) GetRecordSize(long phys)
     {
         var headerSpan = new System.ReadOnlySpan<byte>((void*)phys, RingCodec.HeaderSize);
@@ -64,5 +70,9 @@ public partial class BlittableRing<TKey> : RingBase<TKey>
         return (total, aligned);
     }
 
+    /// <summary>给定可用字节数下覆盖该 record 所需的最小槽长——BlittableRing 变长估算用平均记录大小。</summary>
+    /// <param name="phys">record 的物理地址。</param>
+    /// <param name="availableBytes">可用字节数。</param>
+    /// <returns>所需槽长（平均记录大小）。</returns>
     protected internal sealed override int GetRequiredRecordSize(long phys, int availableBytes) => AverageRecordSize;
 }

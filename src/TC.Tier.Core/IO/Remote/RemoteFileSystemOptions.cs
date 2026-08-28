@@ -47,6 +47,14 @@ public sealed class RemoteFileSystemOptions : FileSystemOptions
     /// </summary>
     public string KeyPrefix { get; init; } = string.Empty;
 
+    /// <summary>
+    /// 预分配方式轴（IS-04，默认 <see cref="PreallocationMode.Metadata"/>）。
+    /// <para>network 无预分配概念（对象存储无块布局——厂商配额，FreeSpace=-1）；
+    /// 显式请求 <see cref="PreallocationMode.Full"/> 在挂载入口抛
+    /// <see cref="IOError.Unsupported"/>（能力位诚实不置 + 显式请求不静默）。</para>
+    /// </summary>
+    public PreallocationMode Preallocation { get; init; } = PreallocationMode.Metadata;
+
     /// <summary>二级协议身份（G4 观测用——协议构建器填充，如 "s3"；VolumeInfo.SubKind 的来源）。</summary>
     public string? SubKind { get; init; }
 

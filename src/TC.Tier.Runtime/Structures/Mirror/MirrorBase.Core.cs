@@ -68,7 +68,7 @@ public abstract partial class MirrorBase
     /// Prepare：flush 已写数据 + meta.Commit（记录 LastPreparedSeq + 悬干水位）。
     /// <para>★ checkpoint 数据由子类写门面（Begin/Chunk/End 或 WritePage）先行写盘——Prepare 是 2PC 持久化点
     /// （数据 fsync 先于 meta fsync，断电时 meta 绝不标记 data 未落盘的 commit 点）。</para>
-    /// </para>崩溃在 Prepare 后 Commit 前：seq 未推进 → 恢复按 meta 裁决尾截断悬干（一致）。</para>
+    /// <para>崩溃在 Prepare 后 Commit 前：seq 未推进 → 恢复按 meta 裁决尾截断悬干（一致）。</para>
     /// </summary>
     public void Prepare(long seq)
     {

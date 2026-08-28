@@ -24,7 +24,11 @@ public static class ProbingIndexFormat
     public const int GeometrySize = 32;
 
     // === 族别（Kind 字段值——体几何由族自描述）===
+
+    /// <summary>族别：探测族（HashIndex——桶区/溢出池几何）。</summary>
     public const ushort KindProbing = 0;
+
+    /// <summary>族别：比较族（BTree/SkipList——32B 几何，节点在引擎内）。</summary>
     public const ushort KindSorted = 1;
 
     /// <summary>
@@ -34,25 +38,33 @@ public static class ProbingIndexFormat
     [StructLayout(LayoutKind.Explicit, Size = HeaderSize)]
     public struct ProbingIndexHeader
     {
+        /// <summary>头 magic 常量（"IXHD"——RecordMagic.ProbingIndexHeader）。</summary>
         public const uint Magic = RecordMagic.ProbingIndexHeader; // "IXHD"
+
+        /// <summary>当前头版本常量（major=1, minor=0）。</summary>
         public const ushort CurrentVersion = (ushort)((1 << 8) | 0);   // major=1, minor=0
 
+        /// <summary>默认规范 flags（CRC64 + 尾 magic 校验）。</summary>
         public const ushort DefaultFlags = RecordFlags.FLAG_CRC64
                                          | RecordFlags.FLAG_FOOTER_MAGIC;
 
         private const int HeaderSize = 20;
 
+        /// <summary>magic 字段（ValidEquals(Magic)——写侧自动填、读侧校验）。</summary>
         [FieldOffset(0), ValidEquals(Magic)] public uint MagicValue;
 
+        /// <summary>版本字段（ValidEquals(CurrentVersion)——写侧自动填、读侧校验）。</summary>
         [FieldOffset(4), ValidEquals(CurrentVersion)]
         public ushort Version;
 
+        /// <summary>规范 flags 字段（ValidEquals(DefaultFlags)——写侧自动填、读侧校验）。</summary>
         [FieldOffset(6), ValidEquals(DefaultFlags)]
         public ushort Flags;
 
         /// <summary>族别（KindProbing/KindSorted）——体几何解释权。</summary>
         [FieldOffset(8)] public ushort Kind;
 
+        /// <summary>保留字段（对齐 padding，恒零）。</summary>
         [FieldOffset(10)] public ushort Reserved;
 
         /// <summary>体长（几何块 + 结构内容——不含头尾；读侧定界）。</summary>
@@ -66,12 +78,15 @@ public static class ProbingIndexFormat
     [StructLayout(LayoutKind.Explicit, Size = FooterSize)]
     public struct ProbingIndexFooter
     {
+        /// <summary>尾 magic 常量（"IXFT"——RecordMagic.ProbingIndexFooter）。</summary>
         public const uint FooterMagic = RecordMagic.ProbingIndexFooter; // "IXFT"
 
         private const int FooterSize = 32;
 
+        /// <summary>尾 magic 字段（ValidEquals(FooterMagic)——写侧自动填、读侧校验）。</summary>
         [FieldOffset(0), ValidEquals(FooterMagic)] public uint Magic;
 
+        /// <summary>保留字段（对齐 padding，恒零）。</summary>
         [FieldOffset(4)] public uint Reserved;
 
         /// <summary>水位 W：帧内容 = record 流 [?, W) 的折叠；重放只需 (W, End)。</summary>

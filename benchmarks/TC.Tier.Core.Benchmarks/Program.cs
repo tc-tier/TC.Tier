@@ -14,10 +14,14 @@ public class Program
             return PqWedgeRepro.Run(args);
         if (args.Length > 0 && args[0] == "--sync-probe")
             return Primitives.SyncModesProbe.Run(args);
-        if (args.Length > 0 && args[0] == "--raw-page-cache-probe")
-            return RawPageCacheProbe.Run(args);
-        if (args.Length > 0 && args[0] == "--raw-write-probe")
-            return RawWriteProbe.Run(args);
+        if (args.Length > 0 && args[0] == "--tier-volume-page-cache-probe")
+            return TierVolumePageCacheProbe.Run(args);
+        if (args.Length > 0 && args[0] == "--tier-volume-write-probe")
+            return TierVolumeWriteProbe.Run(args);
+        if (args.Length > 0 && args[0] == "--tier-volume-snapshot-probe")
+            return TierVolumeSnapshotProbe.Run(args);
+        if (args.Length > 0 && args[0] == "--tier-volume-delta-probe")
+            return TierVolumeDeltaProbe.Run(args);
         if (args.Length > 0 && args[0] == "--disk-syscall-probe")
             return DiskSyscallProbe.Run(args);
         if (args.Length > 0 && args[0] == "--s3-protocol-probe")

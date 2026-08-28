@@ -4,6 +4,9 @@ namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>删除条目——塔链逐层下降记录前驱、逐层拆链回收（epoch 读保护内）。</summary>
+    /// <param name="key">条目键。</param>
+    /// <returns>true = 真删到；false = 不存在。</returns>
     public override unsafe bool Delete(TKey key)
     {
         _epoch.Resume();

@@ -17,6 +17,7 @@ namespace TC.Tier.Runtime.Structures.Mirror.Contracts;
 [StructLayout(LayoutKind.Explicit, Size = HeaderSize)]
 public struct MirrorFrameHeader
 {
+    /// <summary>当前版本号（major=2, minor=0——v2 流式帧）。</summary>
     public const ushort CurrentVersion = (ushort)((2 << 8) | 0); // major=2, minor=0
 
     private const int HeaderSize = 32;
@@ -24,6 +25,7 @@ public struct MirrorFrameHeader
     /// <summary>帧头 magic（codec 填写/校验——WMHD/PMHD）。</summary>
     [FieldOffset(0)] public uint MagicValue;
 
+    /// <summary>盘上版本字段（必须等于 <see cref="CurrentVersion"/>）。</summary>
     [FieldOffset(4), ValidEquals(CurrentVersion)]
     public ushort Version;
 
@@ -52,6 +54,7 @@ public struct MirrorFrameHeader
 [StructLayout(LayoutKind.Explicit, Size = FooterSize)]
 public struct MirrorFrameFooter
 {
+    /// <summary>当前版本号（major=2, minor=0——v2 流式帧）。</summary>
     public const ushort CurrentVersion = (ushort)((2 << 8) | 0); // major=2, minor=0
 
     private const int FooterSize = 40;
@@ -62,6 +65,7 @@ public struct MirrorFrameFooter
     /// <summary>帧尾 magic（codec 填写/校验——WMFT/PMFT）。</summary>
     [FieldOffset(0)] public uint MagicValue;
 
+    /// <summary>盘上版本字段（必须等于 <see cref="CurrentVersion"/>）。</summary>
     [FieldOffset(4), ValidEquals(CurrentVersion)]
     public ushort Version;
 

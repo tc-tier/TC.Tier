@@ -1,11 +1,11 @@
 namespace TC.Tier.Contracts.Lifecycle;
 
 /// <summary>
-/// 生命周期持有者统一接口。全部 <see cref="LifecycleBase{THints}"/> 派生类实现此接口——
+/// 生命周期持有者统一接口。全部 <c>LifecycleBase&lt;THints&gt;</c> 派生类实现此接口——
 /// 数据结构基类（Log/Ring/Index/Metadata/Blob）与 IO 引擎（StorageEngine）。
 /// 泛型参数 <typeparamref name="THints"/> 为各持有者自己的恢复 hints struct。
 /// <para>★ 接口面只保留<b>观测/等待</b>契约（IsReady / RecoveryState / 事件 / WaitForReady* / CancelRecovery）；
-///   <see cref="LifecycleBase{THints}.Initialize"/> 启动入口<b>不在接口面</b>——启动由各持有者自己的装配面提供
+///   <c>LifecycleBase&lt;THints&gt;.Initialize</c> 启动入口<b>不在接口面</b>——启动由各持有者自己的装配面提供
 ///   （引擎 = <c>StorageEngineBuilder.Start/StartAsync</c> 一步到位；结构 = 组合器/生成代码内部调用），
 ///   <b>不允许外部经接口直接调 Initialize</b>（详见 src/TC.Tier.Core/docs/lifecycle.md）。</para>
 /// <para>★ 与 <see cref="IRecovery{TRecoveryHints}"/> 正交：ILifecycle 是生命周期持有者对外观测契约，
@@ -32,7 +32,7 @@ public interface ILifecycle<in THints> where THints : struct
 
     /// <summary>
     /// 同步等待恢复完成（内部 join 后台恢复 task，阻塞<strong>当前调用线程</strong>直到 Ready）。
-    /// <para>★ 与 <see cref="Initialize"/> 的关系：Initialize 启动后台恢复后立即返回；
+    /// <para>★ 与 <c>Initialize</c> 的关系：Initialize 启动后台恢复后立即返回；
     ///   调用方若需"启动后立即阻塞等就绪"，在 Initialize 后调本方法。</para>
     /// <para>★ 不阻塞其他数据结构，只阻塞调用本方法的线程。</para>
     /// <para>★ 若恢复已失败（Failed），本方法重抛恢复异常。</para>
@@ -45,6 +45,8 @@ public interface ILifecycle<in THints> where THints : struct
     /// 带超时的同步等待。返回是否在超时内就绪。
     /// <para>超时未就绪返回 false（不抛异常），调用方可继续轮询或放弃。</para>
     /// </summary>
+    /// <param name="timeoutMilliseconds">超时时间（毫秒）。</param>
+    /// <returns>是否在超时内就绪。</returns>
     bool WaitForReady(int timeoutMilliseconds);
 
     /// <summary>

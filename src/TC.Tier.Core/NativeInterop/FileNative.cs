@@ -152,9 +152,24 @@ internal static unsafe class FileNative
         return SparseFallback(handle, size, logger);
     }
 
-    /// <summary>降级：RandomAccess.SetLength（SetEndOfFile/ftruncate，产生稀疏文件）。</summary>
-    private static PreallocateResult SparseFallback(SafeFileHandle handle, long size, ILogger? logger)
+    /// <summary>降级：稀疏标记（Windows FSCTL_SET_SPARSE——SetLength 元数据化，免 NTFS 即时簇分配）
+    /// + RandomAccess.SetLength（SetEndOfFile/ftruncate，产生稀疏文件）。</summary>
+    internal static PreallocateResult SparseFallback(SafeFileHandle handle, long size, ILogger? logger)
     {
+        // Windows：先标记稀疏再 SetLength——非稀疏 SetEndOfFile 扩展 = 即时簇分配（RM-41 同根因，IS-01）。
+        // SetSparse 自身含非 Windows 守卫；失败仅降级（非稀疏 SetLength 仍正确，只是慢）。
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            try
+            {
+                if (!Kernel32.SetSparse(handle))
+                    logger?.LogWarning("稀疏标记失败（FSCTL_SET_SPARSE），回退非稀疏 SetLength（NTFS 即时簇分配）");
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "稀疏标记异常，回退非稀疏 SetLength");
+            }
+        }
         try
         {
             RandomAccess.SetLength(handle, size);
@@ -164,6 +179,95 @@ internal static unsafe class FileNative
         {
             logger?.LogWarning(ex, "Sparse fallback (RandomAccess.SetLength) also failed");
             return PreallocateResult.Failed;
+        }
+    }
+
+    /// <summary>
+    /// full 档物理占位保证：真实分配全部 <paramref name="size"/> 字节（创建时付成本——
+    /// 与 <see cref="PreallocateFile"/> 的 best-effort 降级不同，本方法不允许静默降级为稀疏）。
+    /// <para>Windows：<see cref="Kernel32.SetFileSize"/>（非稀疏 SetEndOfFile 即时分配簇 +
+    ///   SetFileValidData 特权标记 valid）；SetFileValidData 无特权失败也接受——分配事实已达成。</para>
+    /// <para>Linux：<c>fallocate(mode:0)</c>；macOS：F_PREALLOCATE；不支持/失败 → 分块零写物化。</para>
+    /// </summary>
+    /// <returns>物理占位是否达成（false = 调用方应 fail-fast——不允许静默降级）。</returns>
+    public static bool EnsurePhysicalAllocation(SafeFileHandle handle, long size, ILogger? logger = null)
+    {
+        if (size <= 0) return true;
+
+        // === Windows: SetFileSize（SetEndOfFile 即时分配 + SetFileValidData 特权标记 valid）===
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            try
+            {
+                if (Kernel32.SetFileSize(handle, size)) return true;
+                var err = Marshal.GetLastWin32Error();
+                logger?.LogWarning(
+                    "SetFileValidData failed (errno={Err}, likely missing SE_MANAGE_VOLUME_NAME)——非稀疏 SetEndOfFile 已即时分配，full 档达成",
+                    err);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "SetFileSize threw——full 档物理占位失败");
+                return false;
+            }
+        }
+
+        // === Linux: fallocate（真实分配磁盘块）→ 失败零写物化 ===
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        {
+            var success = false;
+            try
+            {
+                handle.DangerousAddRef(ref success);
+                if (!success) return false;
+                var fd = handle.DangerousGetHandle().ToInt32();
+                if (fd >= 0 && LibC.Fallocate(fd, mode: 0, offset: 0, len: size) == 0)
+                    return true;
+                logger?.LogWarning("fallocate failed (errno={Err})——full 档转零写物化", Marshal.GetLastPInvokeError());
+            }
+            catch (Exception ex)
+            {
+                logger?.LogWarning(ex, "fallocate threw——full 档转零写物化");
+            }
+            finally
+            {
+                if (success) handle.DangerousRelease();
+            }
+            return WriteZeroes(handle, size, logger);
+        }
+
+        // === macOS: F_PREALLOCATE（先连续后非连续）→ 失败零写物化 ===
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            if (LibC.TryPreallocate(handle, size, logger)) return true;
+            logger?.LogWarning("F_PREALLOCATE failed——full 档转零写物化");
+            return WriteZeroes(handle, size, logger);
+        }
+
+        // === 其他平台：零写物化 ===
+        return WriteZeroes(handle, size, logger);
+    }
+
+    /// <summary>分块零写物化（full 档兜底——无原生预分配/不支持时的物理占位）。</summary>
+    private static bool WriteZeroes(SafeFileHandle handle, long size, ILogger? logger)
+    {
+        try
+        {
+            var zero = new byte[1 << 20];
+            long offset = 0;
+            while (offset < size)
+            {
+                var chunk = (int)Math.Min(zero.Length, size - offset);
+                RandomAccess.Write(handle, zero.AsSpan(0, chunk), offset);
+                offset += chunk;
+            }
+            return true;
+        }
+        catch (Exception ex)
+        {
+            logger?.LogWarning(ex, "零写物化失败——full 档物理占位失败");
+            return false;
         }
     }
 
@@ -519,7 +623,7 @@ internal static unsafe class FileNative
     ///   本方法返回文件系统**实际分配的磁盘块总字节**，稀疏/预分配空洞不计入。</para>
     /// <para>★ 用途：冷启动恢复时区分"预分配了但未写满"的段——避免把预分配 1GB 误报为已写 1GB。</para>
     /// <para>★ 平台分发：</para>
-    /// <para>- Windows: <see cref="Kernel32.GetFileInformationByHandleEx"/>(FileStandardInfo) →
+    /// <para>- Windows: <c>Kernel32.GetFileInformationByHandleEx</c>(FileStandardInfo) →
     ///   <see cref="FileStandardInfo.AllocatedSize"/>（分配簇总字节，最精准）。</para>
     /// <para>- Linux: <see cref="LibC.Fstat"/> → st_blocks * 512（POSIX 标准，单位固定 512 字节）。</para>
     /// <para>- macOS: fstat 布局与 Linux 不同，降级到 <see cref="GetFileSize"/>（逻辑大小作下界，偏保守）。</para>
@@ -528,7 +632,7 @@ internal static unsafe class FileNative
     ///   （Windows SetFileValidData/SetEndOfFile、Linux fallocate mode=0 都是真实分配）。预分配生效后，
     ///   AllocatedSize/st_blocks = 预分配大小，<b>无法区分"预分配的块"与"已写入的块"</b>——这是预分配机制
     ///   的固有特性，非 API 用错。故<b>预分配段的真实写入量必须由上层 hint 提供</b>
-    ///   （<see cref="StorageDeviceBase.Initialize"/>)。未预分配的普通段，AllocatedSize = 真实写入量，正确。</para>
+    ///   （上层 Initialize 时传入的写入水位）。未预分配的普通段，AllocatedSize = 真实写入量，正确。</para>
     /// <para>★ <b>降级语义</b>：失败时返回逻辑大小（偏保守，可能把预分配空洞算进去）。调用方据此判断
     ///   "无法 100% 正确"——上层若有精确的写入水位（如 flushedUntilAddress），应优先用上层 hint。</para>
     /// </summary>
@@ -871,9 +975,9 @@ internal static unsafe class FileNative
     /// </summary>
     /// <param name="filePath">宿主文件路径（ADS 附加到此文件）。</param>
     /// <param name="data">元数据字节。</param>
-    /// <param name="attName"></param>
+    /// <param name="attName">属性名称（默认 <c>XattrName</c>）。</param>
     /// <param name="logger">可选日志——写入失败时记录警告。</param>
-    /// <returns>true if native write succeeded</returns>
+    /// <returns>true = 原生写入成功。</returns>
     public static bool WriteFileMeta(string filePath, ReadOnlySpan<byte> data, string attName = XattrName, ILogger? logger = null)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
@@ -925,13 +1029,15 @@ internal static unsafe class FileNative
         return false;
     }
 
-   /// <summary>
-   ///
     /// <summary>
     /// ★ span 形态元数据读取（零分配——调用方缓冲；2K 元数据上界场景 stackalloc 直配）。
     /// <para>两通道天然支持调用方缓冲：Linux/macOS = getxattr 两段式（size 探测 → 拷入 destination）；
     /// Windows = ADS GetFileSizeEx + ReadFile 入 destination。</para>
     /// </summary>
+    /// <param name="filePath">宿主文件路径（ADS 附加到此文件）。</param>
+    /// <param name="destination">调用方提供的目标缓冲（零分配读取）。</param>
+    /// <param name="attName">属性名称（默认 <c>XattrName</c>）。</param>
+    /// <param name="logger">可选日志——读取失败时记录警告。</param>
     /// <returns>有效长度（&gt;0 成功）；0 = 无元数据/通道缺失；-1 = 值超 destination 或读取失败。</returns>
     public static int ReadFileMeta(string filePath, Span<byte> destination, string attName, ILogger? logger = null)
     {
@@ -993,11 +1099,11 @@ internal static unsafe class FileNative
     /// <summary>
     /// 元数据读取（返回精确尺寸托管数组——句柄级 xattr 公共 API / 探针用；
     /// 元数据热路径用 <see cref="ReadFileMeta(string, Span{byte}, string, ILogger?)"/> span 形态）。
-   /// </summary>
-   /// <param name="filePath"></param>
-   /// <param name="attName"></param>
-   /// <param name="logger"></param>
-   /// <returns></returns>
+    /// </summary>
+    /// <param name="filePath">宿主文件路径（ADS 附加到此文件）。</param>
+    /// <param name="attName">属性名称（默认 <c>XattrName</c>）。</param>
+    /// <param name="logger">可选日志——读取失败时记录警告（ADS 首次不存在静默）。</param>
+    /// <returns>元数据字节（精确尺寸托管数组）；无元数据/读取失败 = null。</returns>
    public static byte[]? ReadFileMeta(string filePath, string attName = XattrName, ILogger? logger = null)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
@@ -1089,7 +1195,7 @@ internal static unsafe class FileNative
     /// <summary>
     /// 探测文件系统是否支持扩展属性（xattr/ADS）——决定 meta 写入策略。
     /// <para>★ 模式照搬 <see cref="ProbeUnbufferedIo"/>：try/catch 包裹，失败保守降级（安全侧倾斜）。</para>
-    /// <para>★ 实现方式：在 probe 文件上试 <see cref="WriteFileMeta"/> + <see cref="ReadFileMeta"/> 读回校验。
+    /// <para>★ 实现方式：在 probe 文件上试 <see cref="WriteFileMeta"/> + <see cref="ReadFileMeta(string, string, ILogger?)"/> 读回校验。
     ///   写入失败（EOPNOTSUPP/EACCES/ENOTSUP）或读回数据不一致 → <see cref="FileMetaSupport.Unsupported"/>。</para>
     /// <para>★ 决策影响：Supported → 主路径走 per-segment xattr/ADS（段前写 + 段满写真实偏移）；
     ///   Unsupported → 回退异步边车后台写（device 级集中文件，自适应频率）。</para>
@@ -1097,7 +1203,7 @@ internal static unsafe class FileNative
     /// <param name="probeFilePath">探测用的宿主文件路径（不存在时自动创建——探测的是文件系统能力，
     ///   不是文件存在性；EngineMeta 首次惰性探测时 sidecar 文件尚未建，旧契约"须已存在"导致
     ///   setxattr ENOENT / ADS CreateFile 失败恒判 Unsupported，xattr 主路径从未生效）。</param>
-    /// <param name="attName"></param>
+    /// <param name="attName">属性名称（默认 <c>XattrName</c>）。</param>
     /// <param name="logger">可选日志——探测失败/异常时记录警告。</param>
     /// <returns>支持程度：<see cref="FileMetaSupport.Supported"/> 或 <see cref="FileMetaSupport.Unsupported"/>。</returns>
     public static FileMetaSupport ProbeFileMetaSupport(string probeFilePath, string attName = XattrName, ILogger? logger = null)

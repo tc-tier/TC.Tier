@@ -21,7 +21,7 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     where TKey : struct, IEquatable<TKey>
 {
     /// <summary>默认组内路数（8 路 ≈ 全相联 90-99% 命中率，扫描恒定）。</summary>
-    public const int DefaultWays = 8;
+    private const int DefaultWays = 8;
 
     private readonly Slot[] _slots;
     private readonly int _capacity;
@@ -67,12 +67,20 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     }
 
     // === 公共属性 ===
+    /// <summary>当前驻留条目数（原子计数快照；tombstone 槽已从计数中扣除）。</summary>
     public int Count => (int)Interlocked.Read(ref _count);
+    /// <summary>容量（slot 总数 = sets × ways）。</summary>
     public int Capacity => _capacity;
+    /// <summary>组内路数（每 set 的槽数）。</summary>
     public int Ways => _ways;
+    /// <summary>累计命中次数（诊断指标）。</summary>
     public long Hits => Interlocked.Read(ref _hits);
+    /// <summary>累计未命中次数（诊断指标）。</summary>
     public long Misses => Interlocked.Read(ref _misses);
+    /// <summary>累计淘汰次数（诊断指标）。</summary>
     public long Evictions => Interlocked.Read(ref _evictions);
+    /// <summary>命中率 = Hits / (Hits + Misses)；无访问时为 0（诊断指标）。</summary>
+    /// <remarks>★ 诊断指标：命中率 = Hits / (Hits + Misses)；无访问时为 0。热路径零分配。</remarks>
     public double HitRate
     {
         get { long h = _hits, m = _misses; return (h + m) > 0 ? (double)h / (h + m) : 0; }
@@ -80,6 +88,12 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
 
     /// <summary>★ 查找——命中返回 true + value（设访问位），未命中返回 false。热路径零分配。</summary>
     /// <para>★ 全路扫描（不因空槽提前终止）：miss 恒 ways 次读，任意负载因子下延迟恒定。</para>
+    /// <para>★ 命中：访问位 Interlocked CAS 置 1，_hits++；未命中：_misses++。</para>
+    /// <para>★ 线程安全：无锁读路径，Put/Remove 并发不破坏查找语义（尽力而为）。</para>
+    /// <para>★ 组相联结构：查找只扫描组内 ways 槽，miss 恒 ≤8 次读，避免 V1 开放寻址满载探测链发散。</para>
+    /// <para>★ 组相联对哈希质量敏感（桶偏斜 → 组内溢出提前淘汰），HashKey 做 murmur3 fmix32 终混消除低位偏斜。</para>
+    /// <param name="key">要查找的键。</param>
+    /// <param name="value">如果找到键，则返回对应的值；否则返回默认值。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGet(TKey key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out TValue value)
     {
@@ -106,6 +120,9 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     }
 
     /// <summary>★ 插入/更新——组内无空槽时触发组内 CLOCK 淘汰。尽力而为（并发冲突重扫一次）。</summary>
+    /// <param name="key">要插入或更新的键。</param>
+    /// <param name="value">要插入或更新的值。</param>
+    /// <remarks>★ 组相联结构：插入/更新只扫描组内 ways 槽，miss 恒 ≤8 次读，避免 V1 开放寻址满载探测链发散。</remarks>
     public void Put(TKey key, TValue value)
     {
         ThrowIfDisposed();
@@ -164,6 +181,9 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     /// ★ CORE-08：置 tombstone 后<b>不清 Key/Value</b>——清场会抹掉并发 Put 已 CAS 抢槽写入的新条目
     ///（条目丢失 + _count 漂移）；tombstone 槽被复用（Put CAS 0/tombstone→新值）时新值覆盖旧引用——
     /// 引用滞留 = 已删条目数（≤ 容量，有界），复用即释放。</summary>
+    /// <param name="key">要移除的键。</param>
+    /// <returns>是否成功移除。</returns>
+    /// <remarks>★ 组相联结构：移除只扫描组内 ways 槽，miss 恒 ≤8 次读，避免 V1 开放寻址满载探测链发散。</remarks>
     public bool Remove(TKey key)
     {
         ThrowIfDisposed();
@@ -188,6 +208,7 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     }
 
     /// <summary>★ 清空缓存（调淘汰回调释放所有值）。</summary>
+    /// <remarks>★ 线程安全：清空期间 Put/Remove 并发不破坏语义（尽力而为）。</remarks>
     public void Clear()
     {
         ThrowIfDisposed();
@@ -195,6 +216,7 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     }
 
     /// <summary>指标快照。</summary>
+    /// <returns>当前缓存的统计指标快照。</returns>
     public ClockCacheV2Stats GetStats() => new()
     {
         Count = Count,
@@ -205,6 +227,7 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
         HitRate = HitRate
     };
 
+    /// <summary>释放缓存：清空全部条目（逐条调淘汰回调）并标记 disposed（幂等，线程安全）。</summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -298,6 +321,13 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
 }
 
 /// <summary>ClockCacheV2 指标快照。</summary>
+/// <remarks>★ 诊断指标：命中率 = Hits / (Hits + Misses)；无访问时为 0。</remarks>
+/// <param name="Count">当前驻留条目数（原子计数快照；tombstone 槽已从计数中扣除）。</param>
+/// <param name="Capacity">容量（slot 总数 = sets × ways）。</param>
+/// <param name="Hits">累计命中次数（诊断指标）。</param>
+/// <param name="Misses">累计未命中次数（诊断指标）。</param>
+/// <param name="Evictions">累计淘汰次数（诊断指标）。</param>
+/// <param name="HitRate">命中率 = Hits / (Hits + Misses)。</param>
 public record struct ClockCacheV2Stats(
     int Count,
     int Capacity,

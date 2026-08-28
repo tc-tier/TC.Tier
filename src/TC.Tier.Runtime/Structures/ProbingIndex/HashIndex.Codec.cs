@@ -9,7 +9,10 @@ namespace TC.Tier.Runtime.Structures.ProbingIndex;
 /// </summary>
 public interface IProbingIndexCodec
 {
+    /// <summary>头字节数（实现格式自有）。</summary>
     int HeaderSize { get; }
+
+    /// <summary>尾字节数（实现格式自有）。</summary>
     int FooterSize { get; }
 
     /// <summary>CRC 字段在尾内偏移——帧走链 CRC 覆盖截止点（位置=格式知识，由实现声明）。</summary>
@@ -35,14 +38,21 @@ public interface IProbingIndexCodec
 /// </summary>
 public sealed class HashIndexCodec : IProbingIndexCodec
 {
+    /// <summary>单例（codec 无状态——机制状态全在基类，共享安全）。</summary>
     public static readonly HashIndexCodec Instance = new();
 
     private HashIndexCodec() { }
 
+    /// <inheritdoc/>
     public int HeaderSize => ProbingIndexHeaderCodec.StructSize;
+
+    /// <inheritdoc/>
     public int FooterSize => ProbingIndexFooterCodec.StructSize;
+
+    /// <inheritdoc/>
     public int FooterCrcOffset => ProbingIndexFooterCodec.Offset_Crc;
 
+    /// <inheritdoc/>
     public void WriteHeader(Span<byte> dest, long bodyLength)
     {
         // ★ Create()：ValidEquals 规范字段（Magic/Version/Flags/Kind）自动填常量——只填变化字段
@@ -51,6 +61,7 @@ public sealed class HashIndexCodec : IProbingIndexCodec
         ProbingIndexHeaderCodec.Write(dest, in header);
     }
 
+    /// <inheritdoc/>
     public bool TryReadHeader(ReadOnlySpan<byte> src, out long bodyLength)
     {
         bodyLength = -1;
@@ -65,6 +76,7 @@ public sealed class HashIndexCodec : IProbingIndexCodec
         return true;
     }
 
+    /// <inheritdoc/>
     public void WriteFooter(Span<byte> dest, LogicalAddress watermark)
     {
         // ★ Create()：ValidEquals 规范字段（Magic）自动填常量——只填变化字段
@@ -73,6 +85,7 @@ public sealed class HashIndexCodec : IProbingIndexCodec
         ProbingIndexFooterCodec.Write(dest, in footer);
     }
 
+    /// <inheritdoc/>
     public bool TryReadFooter(ReadOnlySpan<byte> src, out LogicalAddress watermark, out ulong crc)
     {
         watermark = LogicalAddress.Invalid;

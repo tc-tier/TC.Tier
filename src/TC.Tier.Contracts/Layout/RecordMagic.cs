@@ -109,4 +109,14 @@ public static partial class RecordMagic
 
     /// <summary>"SLFT" — SkipListIndex 主存储帧 footer magic（总验收——W + CRC64）。</summary>
     public const uint SkipListIndexFooter = 0x54464C53;
+
+    // ══ TierWAL 产品（协议中立 WAL——opaque 容器头 + 快照传输帧）══
+    /// <summary>"WLHD" — TierWAL opaque 容器头 magic（搭 Meta 边车：Tail/Head index→addr + raft 预留区）。</summary>
+    public const uint WalOpaque = 0x44484C57;
+
+    /// <summary>"WTHD" — TierWAL 快照传输帧 header magic（一致性点 N₀）。</summary>
+    public const uint WalSnapshotHeader = 0x44544857;
+
+    /// <summary>"WTFT" — TierWAL 快照传输帧 footer magic（条数/总长/CRC 总验收）。</summary>
+    public const uint WalSnapshotFooter = 0x54544657;
 }

@@ -102,6 +102,7 @@ public partial class SkipListIndex<TKey> : SortedIndexBase<TKey> where TKey : un
         _currentLevel = 1;
     }
 
+    /// <summary>建空跳表结构（head 哨兵按满层建并引擎落盘——恢复核心第一步，主存储不可用时；空塔无帧）。</summary>
     protected override unsafe void InitializeIndex()
     {
         int headSize = ComputeNodeSize(_maxLevel);

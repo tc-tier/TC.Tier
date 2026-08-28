@@ -174,6 +174,8 @@ public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable
     /// 便捷构造（internal）——向后兼容 <see cref="BackgroundWorkerLoop"/> 现有调用 + 测试便利。
     /// 默认自动有界队列（<c>max(M*4,16)</c>）、注册 InstanceTracker。
     /// </summary>
+    /// <param name="threadCount">专用线程数 M（并发度上限）。</param>
+    /// <param name="name">诊断名前缀（线程名 / 日志 / 指标 tag）。默认 "isolated"。</param>
     internal IsolatedTaskScheduler(int threadCount, string? name = null)
         : this(new IsolatedSchedulerOptions { ThreadCount = threadCount, Name = name ?? "isolated" }) { }
 
@@ -197,6 +199,7 @@ public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>私有线程主循环——阻塞取任务 → 本线程执行（TaskScheduler.Current=本调度器，await continuation 回流）。</summary>
+    /// <param name="idx">线程槽位索引（0~M-1）。</param>
     private void ThreadLoop(int idx)
     {
         var metrics = _hub.Metrics;   // ★ 闭包提升到循环外：IsEnabled 一次读
@@ -247,6 +250,7 @@ public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable
     /// <para>★ <see cref="BlockingCollection{T}.CompleteAdding"/> 后入队（Dispose 竞态/超时遗留 continuation）：吞
     ///   <see cref="InvalidOperationException"/>，避免抛到入队线程（此时 worker 已停，任务为孤儿）。</para>
     /// </summary>
+    /// <param name="task">入队任务。</param>
     protected override void QueueTask(Task task)
     {
         var metrics = _hub.Metrics;
@@ -267,12 +271,16 @@ public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable
     }
 
     /// <summary>不支持出队——任务一旦入队即在私有线程执行（cancellation 由任务内部 ct 处理）。</summary>
+    /// <param name="task">任务。</param>
     protected override bool TryDequeue(Task task) => false;
 
     /// <summary>不内联——所有任务经队列到私有线程执行（保证线程隔离 + 不在调用线程跑 worker 逻辑）。</summary>
+    /// <param name="task">任务。</param>
+    /// <param name="taskWasPreviouslyQueued">是否已入队（无用）。</param>
     protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued) => false;
 
     /// <summary>诊断快照（调试器用）。</summary>
+    /// <returns>当前队列任务快照（并发下近似）。</returns>
     protected override IEnumerable<Task> GetScheduledTasks() => _tasks;
 
     // ════════════════════════════════════════════════════════════

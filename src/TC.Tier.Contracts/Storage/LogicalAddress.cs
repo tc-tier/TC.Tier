@@ -24,12 +24,12 @@ public readonly struct LogicalAddress : IEquatable<LogicalAddress>, IComparable<
     /// <summary>
     /// 无效地址哨兵（段号 -1、扩展字段 -1、偏移 -1）——表示"无值/未初始化/越界"。
     /// <para>★ 与 <see cref="Empty"/> (0,0) 区分：Empty 是合法的 seg0 起点，Invalid 才是"没有值"。</para>
-    /// <para>★ 校验用 <see cref="IsValid"/>：<c>SegId &gt;= 0 && Offset &gt;= 0</c>（Invalid 的 SegId=-1 或 Offset=-1 不满足）。</para>
+    /// <para>★ 校验用 <see cref="IsValid"/>：<c>SegId &gt;= 0 &amp;&amp; Offset &gt;= 0</c>（Invalid 的 SegId=-1 或 Offset=-1 不满足）。</para>
     /// </summary>
     public static readonly LogicalAddress Invalid = new(segId: -1, extension: -1, offset: -1);
 
     /// <summary>
-    /// 地址是否有效——SegId &gt;= 0 && Offset &gt;= 0（Invalid 哨兵的 SegId=-1 返回 false，Empty 的 SegId=0 返回 true）。
+    /// 地址是否有效——SegId &gt;= 0 &amp;&amp; Offset &gt;= 0（Invalid 哨兵的 SegId=-1 返回 false，Empty 的 SegId=0 返回 true）。
     /// <para>★ 用于区分"合法地址（含 seg0 起点 Empty）"与"无效/未初始化/越界（Invalid）"。</para>
     /// </summary>
     public bool IsValid => SegId >= 0 && Offset >= 0;
@@ -74,12 +74,19 @@ public readonly struct LogicalAddress : IEquatable<LogicalAddress>, IComparable<
         return segCmp != 0 ? segCmp : Offset.CompareTo(other.Offset);
     }
 
+    /// <summary>字符串形态：<c>seg#{SegId}@0x{Offset:X}</c>。</summary>
     public override string ToString() => $"seg#{SegId}@0x{Offset:X}";
 
+    /// <summary>相等（仅基于 SegmentId + FileOffset，extension 不参与）。</summary>
     public static bool operator ==(LogicalAddress left, LogicalAddress right) => left.Equals(right);
+    /// <summary>不等（仅基于 SegmentId + FileOffset，extension 不参与）。</summary>
     public static bool operator !=(LogicalAddress left, LogicalAddress right) => !left.Equals(right);
+    /// <summary>大于——先 SegmentId 后 FileOffset。</summary>
     public static bool operator >(LogicalAddress left, LogicalAddress right) => left.CompareTo(right) > 0;
+    /// <summary>小于——先 SegmentId 后 FileOffset。</summary>
     public static bool operator <(LogicalAddress left, LogicalAddress right) => left.CompareTo(right) < 0;
+    /// <summary>大于等于——先 SegmentId 后 FileOffset。</summary>
     public static bool operator >=(LogicalAddress left, LogicalAddress right) => left.CompareTo(right) >= 0;
+    /// <summary>小于等于——先 SegmentId 后 FileOffset。</summary>
     public static bool operator <=(LogicalAddress left, LogicalAddress right) => left.CompareTo(right) <= 0;
 }

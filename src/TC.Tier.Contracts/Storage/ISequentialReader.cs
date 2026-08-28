@@ -24,23 +24,29 @@ public interface ISequentialReader : IDisposable
     /// 从 <see cref="Position"/> 读取 destination.Length 字节，读后 Position 自动推进。
     /// <para>跨段自动；越界返回实际所读字节数（可能 0 = EOF）。</para>
     /// </summary>
+    /// <param name="destination">目标缓冲区。</param>
+    /// <returns>实际读取的字节数（可能 0 = EOF）。</returns>
     int Read(Span<byte> destination);
 
     /// <summary>
     /// 异步从 <see cref="Position"/> 读取。
     /// </summary>
+    /// <param name="destination">目标缓冲区。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际读取的字节数（可能 0 = EOF）。</returns>
     ValueTask<int> ReadAsync(Memory<byte> destination, CancellationToken ct);
 
     /// <summary>
     /// 相对移动游标 length 字节，不读数据。
     /// <para>正序前进 / 倒序后退。</para>
     /// </summary>
+    /// <param name="length">要跳过的字节数。</param>
     void Skip(long length);
 
     /// <summary>
     /// 绝对地址跳转——把游标定位到任意地址（方向不变）。
     /// </summary>
     /// <param name="target">目标地址。</param>
-    /// <exception cref="PartitionInvalidException">target 指向已删除的段文件（硬错误）。</exception>
+    /// <exception>target 指向已删除的段文件（硬错误——Runtime 层 PartitionInvalidException）。</exception>
     void Seek(LogicalAddress target);
 }

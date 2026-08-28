@@ -183,6 +183,11 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     #endregion
 
     #region MemoryManager 核心
+    /// <summary>固定内存（O_DIRECT 缓冲本就驻留，返回直接指向内存的句柄，零额外 pin）。</summary>
+    /// <param name="elementIndex">起始字节偏移。</param>
+    /// <returns>指向 <paramref name="elementIndex"/> 处字节的内存句柄。</returns>
+    /// <exception cref="ObjectDisposedException">管理器已释放。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">elementIndex 越界。</exception>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override MemoryHandle Pin(int elementIndex = 0)
     {
@@ -192,9 +197,12 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
         return new MemoryHandle(BytePtr + elementIndex);
     }
 
+    /// <summary>取消固定 —— 空操作（内存始终固定，Pin 未登记任何额外状态）。</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override void Unpin() { }
 
+    /// <summary>释放原生内存（解除物理内存锁定后 AlignedFree；幂等，线程安全）。</summary>
+    /// <param name="disposing">保留参数（本类无托管资源，两路径同行为）。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     protected override void Dispose(bool disposing)
     {
@@ -210,6 +218,7 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     #endregion
 
     #region 标准 Dispose 模式
+    /// <summary>释放内存管理器（解除物理内存锁定并释放对齐内存；幂等）。</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {

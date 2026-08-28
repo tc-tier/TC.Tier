@@ -8,7 +8,10 @@ namespace TC.Tier.Runtime.Structures.ProbingIndex;
 /// </summary>
 public readonly struct ProbingIndexRecoveryHints(LogicalAddress begin, LogicalAddress end)
 {
+    /// <summary>重放窗口起点（组合层锚点 W——含于窗口）。</summary>
     public LogicalAddress Begin { get; } = begin;
+
+    /// <summary>重放窗口终点（Ring 尾——窗口为 [Begin, End) 半开区间，End 不含）。</summary>
     public LogicalAddress End { get; } = end;
 
     /// <summary>窗口有效性——End &gt; Begin 才重放（默认 default hints = Empty/Empty = 不重放）。</summary>

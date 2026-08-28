@@ -21,8 +21,17 @@ public sealed class S3ProtocolBuilder : ITierProtocolBuilder
     /// <summary>单例（兼容既有引用；注册生成走无参构造）。</summary>
     public static readonly S3ProtocolBuilder Instance = new();
 
+    /// <summary>无参构造（协议注册生成走此路径；<see cref="Instance"/> 兼容既有显式引用）。</summary>
     public S3ProtocolBuilder() { }
 
+    /// <summary>按解析后的 s3 spec + 用户 options 组装 S3ObjectStore + RemoteFileSystem 全栈：
+    /// endpoint/凭证/寻址映射（spec 显式胜出 → options 同名值）、spill 挂载、动词路由
+    /// （New = 前缀有内容即抛 / Open = 既有视图 + label 断言 / OpenOrCreate = bind-any 零探测）。</summary>
+    /// <param name="spec">解析后的 s3 spec（endpoint/bucket/cred/tls/prefix/spill 等）。</param>
+    /// <param name="options">用户调优选项（同名字段兜底；null = 类型缺省）。</param>
+    /// <param name="verb">挂载动词（New/Open/OpenOrCreate）。</param>
+    /// <param name="logger">日志器（可空）。</param>
+    /// <returns>组装完成的远程文件系统（挂载语义按 verb 路由）。</returns>
     public IFileSystem Build(TierSpec spec, FileSystemOptions? options, TierFsVerb verb, ILogger? logger)
     {
 
@@ -55,6 +64,7 @@ public sealed class S3ProtocolBuilder : ITierProtocolBuilder
             OrphanUploadCleanup = o.OrphanUploadCleanup,
             // 位置/挂载：spec 显式胜出 → options 同名值（审计时字符串必须可信）
             KeyPrefix = string.IsNullOrEmpty(spec.KeyPrefix) ? o.KeyPrefix : spec.KeyPrefix,
+            Preallocation = o.Preallocation,   // IS-04 轴（Full 在挂载入口抛 Unsupported）
             Access = spec.Access != AccessMode.ReadWrite ? spec.Access : o.Access,
             Label = spec.Label ?? o.Label,
             QuotaBytes = spec.QuotaBytes != -1 ? spec.QuotaBytes : o.QuotaBytes,
@@ -65,12 +75,14 @@ public sealed class S3ProtocolBuilder : ITierProtocolBuilder
             merged = new RemoteFileSystemOptions   // Open + label：断言语义由 RemoteFileSystem.Open 单点执法
             {
                 KeyPrefix = merged.KeyPrefix,
+                Preallocation = merged.Preallocation,
                 Label = spec.Label,
             };
         else if (verb == TierFsVerb.New && spec.Label is not null)
             merged = new RemoteFileSystemOptions   // New + label：设置（标记对象写入）
             {
                 KeyPrefix = merged.KeyPrefix,
+                Preallocation = merged.Preallocation,
                 Label = spec.Label,
             };
         if (spec.Spill is not null)
@@ -84,11 +96,12 @@ public sealed class S3ProtocolBuilder : ITierProtocolBuilder
                 ? new RemoteFileSystemOptions
                 {
                     KeyPrefix = merged.KeyPrefix,
+                    Preallocation = merged.Preallocation,
                     Spill = RemoteSpill.ToDisk(spec.Spill.UncHost is not null
                         ? $@"\\{spec.Spill.UncHost}{spec.Spill.UncPath}"
                         : (spec.Spill.IsCwdRoot ? Environment.CurrentDirectory : spec.Spill.AbsolutePath!)),
                 }
-                : new RemoteFileSystemOptions { KeyPrefix = merged.KeyPrefix, Spill = RemoteSpill.ToMemory() };
+                : new RemoteFileSystemOptions { KeyPrefix = merged.KeyPrefix, Preallocation = merged.Preallocation, Spill = RemoteSpill.ToMemory() };
         }
 
         // 动词路由（P2 收尾）：New = 前缀有内容即抛 AlreadyExists（枚举检查）/ Open = 既有视图 + label 断言

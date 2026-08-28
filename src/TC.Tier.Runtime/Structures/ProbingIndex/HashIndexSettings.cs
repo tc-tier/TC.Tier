@@ -1,5 +1,8 @@
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
 
+/// <summary>
+/// HashIndex 配置——探测族 hash 表形态参数（基类收持久化机制配置，本件只填表容量/溢出池参数）。
+/// </summary>
 public sealed class HashIndexSettings : ProbingIndexSettings
 {
     /// <summary>引擎选项直构（对齐 BlittableRingSettings/EntryLogSettings 双 ctor 形态）。</summary>

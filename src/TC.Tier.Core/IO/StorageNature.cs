@@ -15,7 +15,7 @@ public enum StorageNature
     /// <summary>内存文件系统（<c>memory:</c>）——进程内私有卷，高性能运行时。</summary>
     Memory,
 
-    /// <summary>虚拟文件系统（<c>virtual://</c>）——盘上自持 FS（.raw 文件 / 块设备），存档即活卷。</summary>
+    /// <summary>虚拟文件系统（<c>virtual://</c>）——盘上自持 FS（.tier 文件 / 块设备），存档即活卷。</summary>
     Virtual,
 
     /// <summary>网络文件系统（<c>network:///协议/</c>…）——对象存储（协议 = 首段，s3 今天，cos/oss 开放）。</summary>

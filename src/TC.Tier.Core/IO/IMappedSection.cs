@@ -12,6 +12,7 @@ public interface IMappedSection : IDisposable
     Memory<byte> View { get; }
 
     /// <summary>映射级访问提示（madvise 族；不支持平台 no-op）。</summary>
+    /// <param name="advise">访问提示</param>
     void Advise(FileAdvise advise);
 
     /// <summary>把脏视图写回文件（msync 语义；mem Sparse=脏区间物化写回）。</summary>

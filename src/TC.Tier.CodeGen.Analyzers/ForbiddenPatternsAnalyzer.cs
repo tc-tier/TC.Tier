@@ -43,9 +43,13 @@ public sealed class ForbiddenPatternsAnalyzer : DiagnosticAnalyzer
         "CreateInstance", "Load", "LoadFrom", "LoadFile", "Invoke", "GetValue", "SetValue", "GetGenericArguments",
     };
 
+    /// <summary>本分析器支持的全部诊断规则（TCSG030 禁运行时反射 / TCSG031 禁 sync-over-async）。</summary>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
         ImmutableArray.Create(NoReflectionRule, NoSyncOverAsyncRule);
 
+    /// <summary>注册 InvocationExpression 语法节点回调：AnalyzeReflection（TCSG030）、
+    /// AnalyzeSyncOverAsync / AnalyzeSyncOverAsyncWait（TCSG031）——生成代码不分析、启用并发执行。</summary>
+    /// <param name="context">分析上下文。</param>
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);

@@ -5,6 +5,14 @@ namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>
+    /// 插入条目（key → valueAddress）——塔链下降记录各层前驱、同 key 原位覆写 value 不增计数；
+    /// 新节点逐层 CAS 入塔链（epoch 读保护内完成）。
+    /// </summary>
+    /// <param name="key">条目键。</param>
+    /// <param name="valueAddress">条目 value 逻辑地址。</param>
+    /// <param name="beginAddress">结构起始地址（重放路径约定参数——跳表插入不消费）。</param>
+    /// <returns>插入后地址。</returns>
     public override unsafe LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)
     {
         _epoch.Resume();

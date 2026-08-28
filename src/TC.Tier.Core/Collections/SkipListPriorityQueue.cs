@@ -206,6 +206,9 @@ public sealed class SkipListPriorityQueue<T> : IDisposable
     //  ENQUEUE（Insert）
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>入队——按 (priority, sequence) 键插入 skip-list；同优先级按入队顺序 FIFO。</summary>
+    /// <param name="item">入队元素。</param>
+    /// <param name="priority">优先级（任意 long，值小者先出）。</param>
     public void Enqueue(T item, long priority)
     {
         var sequence = Interlocked.Increment(ref _sequenceCounter);
@@ -279,6 +282,9 @@ public sealed class SkipListPriorityQueue<T> : IDisposable
     //  DEQUEUE / DeleteMin
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>出队——摘除并返回优先级最小的元素（同优先级 FIFO）。队列空返回 false。</summary>
+    /// <param name="item">出队元素（成功时为最小优先级元素）。</param>
+    /// <returns>true = 出队成功；false = 队列为空。</returns>
     public bool TryDequeue(out T item)
     {
         var preds = RentPreds();
@@ -374,6 +380,9 @@ public sealed class SkipListPriorityQueue<T> : IDisposable
     //  Peek（不加锁——lazy 版本特性）
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>查看队头（最小优先级元素，同优先级 FIFO）——不加锁纯读，不出队。</summary>
+    /// <param name="item">队头元素（成功时）。</param>
+    /// <returns>true = 有队头元素；false = 队列为空。</returns>
     public bool TryPeek(out T item)
     {
         // 跳过已 marked 的首节点（它们会被后续 DeleteMin 清理）
@@ -394,6 +403,10 @@ public sealed class SkipListPriorityQueue<T> : IDisposable
     //  异步出队
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>异步出队——快路径直接 TryDequeue，队列空则挂在 <c>_signal</c> 上等待元素到达或取消。</summary>
+    /// <param name="cancellationToken">取消令牌（取消时抛 <see cref="OperationCanceledException"/>）。</param>
+    /// <returns>出队的元素。</returns>
+    /// <exception cref="OperationCanceledException">cancellationToken 被取消。</exception>
     public async ValueTask<T> DequeueAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -412,6 +425,7 @@ public sealed class SkipListPriorityQueue<T> : IDisposable
     //  辅助
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>当前队列元素数（原子计数快照）。</summary>
     public int Count => (int)Interlocked.Read(ref _count);
 
     private static long MakeKey(long priority, long sequence)
@@ -428,6 +442,7 @@ public sealed class SkipListPriorityQueue<T> : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void Exit(Node node) => node.Lock.Exit(false);
 
+    /// <summary>释放队列——置 disposed 标志（防重复释放）并唤醒全部挂起的异步出队等待者（幂等）。</summary>
     public void Dispose()
     {
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;

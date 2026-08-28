@@ -52,6 +52,7 @@ public sealed class CpuSampler : BackgroundWorkerLoop
     /// </summary>
     public double ThrottleFactor => Volatile.Read(ref _throttleFactor);
 
+    /// <summary>构造 CPU 采样器（后台采样 → EMA 平滑 → 分段线性限流系数折叠到 hub）。</summary>
     /// <param name="sampleInterval">采样周期（默认 1s）。须 &gt; 0。</param>
     /// <param name="emaAlpha">EMA 平滑系数（默认 0.5——大=跟手、小=平滑）。须 ∈ (0, 1]。</param>
     /// <param name="throttleLowCutoff">不限流阈值（默认 0.70）。须 ∈ [0,1) 且 &lt; highCutoff。</param>
@@ -163,6 +164,11 @@ public sealed class CpuSampler : BackgroundWorkerLoop
     /// EMA 平滑一步（纯函数）：<c>首样本直接取 raw</c>（标志位初始化，<b>不</b>拿 prev==0 当哨兵）；
     /// 此后 <c>ema' = α·raw + (1−α)·prev</c>。
     /// </summary>
+    /// <param name="hasPrev">是否有前样本（首样本标志位）。</param>
+    /// <param name="prev">前样本 EMA 值（0~1）。 </param>
+    /// <param name="raw">本次采样原始值（0~1 ）。</param>
+    /// <param name="alpha"><![CDATA[EMA 平滑系数（0 < α ≤ 1）。]]></param>
+    /// <returns>EMA 平滑后的值（0~1）。</returns>
     internal static double ApplyEma(bool hasPrev, double prev, double raw, double alpha)
         => hasPrev ? prev * (1 - alpha) + raw * alpha : raw;
 
@@ -170,6 +176,10 @@ public sealed class CpuSampler : BackgroundWorkerLoop
     /// 分段线性限流映射（纯函数）：cpu ≤ low → 0；cpu ≥ high → 1；中间线性
     /// <c>(cpu − low) / (high − low)</c>。调用方保证 0 ≤ low &lt; high ≤ 1（ctor 校验）。
     /// </summary>
+    /// <param name="cpu">CPU 利用率（0~1）。</param>
+    /// <param name="low">不限流阈值（0~1）。 </param>
+    /// <param name="high">强阻塞阈值（0~1）。</param>
+    /// <returns>限流因子（0~1）。</returns>
     internal static double MapThrottleFactor(double cpu, double low, double high)
         => cpu <= low ? 0.0
          : cpu >= high ? 1.0

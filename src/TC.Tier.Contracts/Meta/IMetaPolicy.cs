@@ -25,38 +25,49 @@ public interface IMetaPolicy<THeader, TPayload> : IDisposable, IAsyncDisposable
     int PayloadSize { get; }
 
     /// <summary>从存储加载 meta（false = 空/无数据/损坏）。</summary>
+    /// <returns>是否成功加载（true = 成功，false = 空/无数据/损坏）。</returns>
     bool Load();
 
     /// <summary>异步加载（对等同步版）。</summary>
+    /// <param name="ct">取消令牌（可选）。</param>
+    /// <returns>是否成功加载（true = 成功，false = 空/无数据/损坏）。</returns>
     ValueTask<bool> LoadAsync(CancellationToken ct);
 
     /// <summary>提交（缓冲 → 算 Crc → 写存储 + Flush）。</summary>
     void Commit();
 
     /// <summary>异步提交（对等同步版）。</summary>
+    /// <param name="ct">取消令牌（可选）。</param>
+    /// <returns>提交完成的 <see cref="ValueTask"/>。</returns>
     ValueTask CommitAsync(CancellationToken ct);
 
     // === Header 读写（纯规范字段）===
 
     /// <summary>写规范 header（Magic/Version/Flags 由策略保证正确；水位不在此）。</summary>
+    /// <param name="header">纯规范 header 结构体。</param>
     void WriteHeader(THeader header);
 
     /// <summary>读规范 header（未 Load 返回 null）。</summary>
+    /// <returns>纯规范 header 结构体或 null。</returns>
     THeader? ReadHeader();
 
     // === Payload 读写（结构化水位）===
 
     /// <summary>写结构化水位 payload。</summary>
+    /// <param name="payload">结构化水位 payload 结构体。</param>
     void WritePayload(in TPayload payload);
 
     /// <summary>读结构化水位 payload（未 Load 返回 null）。</summary>
+    /// <returns>结构化水位 payload 结构体或 null。</returns>
     TPayload? ReadMetaPayload();
 
     // === Opaque 读写（raw 扩展区，写在结构化 payload 之后）===
 
     /// <summary>写 opaque 扩展（raw bytes，写入结构化 payload 之后；不抹掉结构化首部）。</summary>
+    /// <param name="opaque">Opaque 扩展字节。</param>
     void WritePayload(ReadOnlySpan<byte> opaque);
 
     /// <summary>读 opaque 扩展（raw bytes；未 Load 返回 Empty）。</summary>
+    /// <returns>Opaque 扩展字节。</returns>
     ReadOnlySpan<byte> ReadPayload();
 }

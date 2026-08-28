@@ -41,6 +41,17 @@ public sealed partial class EntryLog : LogBase
     /// <summary>最近一次提交错误（若有）。上层应周期查询以发现持久化失败。</summary>
     public Exception? LastCommitError => Volatile.Read(ref _lastCommitError);
 
+    /// <summary>
+    /// 构造 EntryLog——通用 entry 顺序日志（WAL 是其典型用途）。
+    /// <para>★ commitPolicy 为 null 时自动从 settings 构造默认 <see cref="GroupCommitPolicy"/>（三维度阈值全部生效）。</para>
+    /// </summary>
+    /// <param name="fileSystem">文件系统（主引擎与可选 Managed meta 引擎共用）。</param>
+    /// <param name="settings">EntryLog 配置（页几何/提交阈值/MetaPolicyKind 等）。</param>
+    /// <param name="commitPolicy">提交策略（null = 默认 GroupCommitPolicy 三维度提前提交）。</param>
+    /// <param name="recovery">恢复策略（null = 默认 EntryLogRecovery——恢复后设 CommittedOffset + 启提前提交循环）。</param>
+    /// <param name="cursorFactory">扫描游标工厂。</param>
+    /// <param name="metaPolicyFactory">meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。</param>
+    /// <param name="metaTransport">Transport 模式的外部 meta 传输（Managed/Disabled 不用）。</param>
     public EntryLog(IFileSystem fileSystem,EntryLogSettings settings,
         ICommitPolicy? commitPolicy = null,
         IRecovery<LogRecoveryHints>? recovery = null,
@@ -62,8 +73,8 @@ public sealed partial class EntryLog : LogBase
         _lastCommitTicks = DateTime.UtcNow.Ticks;
     }
 
-    /// <summary>★ EntryLog 专属 Recovery——继承 <see cref="LogRecovery{TLogBase}"/>（复用四级回退），
-    /// override <see cref="LogRecovery{TLogBase}.OnLogRecovered"/> 在恢复后设 _committedOffset + 启 StartEarlyCommitLoop
+    /// <summary>★ EntryLog 专属 Recovery——继承 <see cref="LogBase.LogRecovery{TLogBase}"/>（复用四级回退），
+    /// override <see cref="LogBase.LogRecovery{TLogBase}.OnLogRecovered"/> 在恢复后设 _committedOffset + 启 StartEarlyCommitLoop
     ///（修复原 OnInitialize 里 _committedOffset 取到 Empty 的 bug）。</summary>
     private sealed class EntryLogRecovery(EntryLog owner) : LogRecovery<EntryLog>(owner)
     {
@@ -144,7 +155,8 @@ public sealed partial class EntryLog : LogBase
     /// <para>这是页模式的本质保证——前一页换出即持久化（数据 + meta + CommittedOffset 推进）。
     /// 不依赖任何注入策略，删除 <see cref="ICommitPolicy"/> 此保证依然成立。</para>
     /// </summary>
-    protected override void OnPageFlushed(LogicalAddress flushedUntil)
+    /// <param name="committedTail">已 flush 落盘的页尾地址（含）</param>
+    protected override void OnPageFlushed(LogicalAddress committedTail)
     {
         // ★ 重入守卫：CommitCore→AppendMeta 写 meta entry 触发的页 flush 不再递归提交（防栈溢出）
         if (_inCommit) return;
@@ -153,22 +165,23 @@ public sealed partial class EntryLog : LogBase
         //   应由显式 CommitAsync/group commit 驱动；未 commit 的末页重启后按未 commit 处理，符合 WAL 语义）。
         if (IsDisposed) return;
         // 仅当 flushedUntil 超过当前 commit 边界才提交（避免末页重复 flush 时无谓 commit）
-        lock (_commitLock) { if (flushedUntil <= _committedOffset) return; }
-        CommitCore(flushedUntil);
+        lock (_commitLock) { if (committedTail <= _committedOffset) return; }
+        CommitCore(committedTail);
     }
 
     /// <summary>
     /// ★ 底层页提交契约（异步轨）：异步入口（AppendAsync/FlushAsync/PrepareAsync）的页提交挂载点。
     /// <para>走纯异步 commit 链（<see cref="CommitCoreAsync"/> → meta.CommitAsync），无 sync-over-async。</para>
     /// </summary>
-    protected override async ValueTask OnPageFlushedAsync(LogicalAddress flushedUntil)
+    /// <param name="committedTail">已 flush 落盘的页尾地址（含）</param>
+    protected override async ValueTask OnPageFlushedAsync(LogicalAddress committedTail)
     {
         // ★ 重入守卫（同 OnPageFlushed）
         if (_inCommit) return;
         // ★ Dispose 守卫（同 OnPageFlushed 同步版）
         if (IsDisposed) return;
-        lock (_commitLock) { if (flushedUntil <= _committedOffset) return; }
-        await CommitCoreAsync(flushedUntil).ConfigureAwait(false);
+        lock (_commitLock) { if (committedTail <= _committedOffset) return; }
+        await CommitCoreAsync(committedTail).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -176,7 +189,22 @@ public sealed partial class EntryLog : LogBase
     /// （Prepare 的 AppendMeta(TailAddress) 同样推进 meta CommittedOffset），回滚必须一并夹回，
     /// 否则 CommittedOffset &gt; TailAddress 违反 §7 不变量、Replay 读到已物理销毁的区域。
     /// </summary>
+    /// <param name="rollbackTail">回退的尾地址（含）</param>
     protected override void OnAborted(LogicalAddress rollbackTail)
+    {
+        lock (_commitLock)
+        {
+            if (_committedOffset > rollbackTail) _committedOffset = rollbackTail;
+        }
+    }
+
+    /// <summary>
+    /// ★ 普通尾截断（raft 冲突修正——TruncateSuffix）后夹 CommittedOffset 到截断边界：
+    /// 同 OnAborted 语义（截断后 commit 边界不得越过物理尾——否则 Replay 越界跳段报
+    /// Segment not found）。OnAborted 只覆盖 2PC Abort 路径，此处补全普通截断。
+    /// </summary>
+    /// <param name="rollbackTail">回退的尾地址（含）</param>
+    protected override void OnTailTruncated(LogicalAddress rollbackTail)
     {
         lock (_commitLock)
         {
@@ -194,6 +222,7 @@ public sealed partial class EntryLog : LogBase
     /// （LogicalAddress.Offset 是段内偏移，跨段减法无意义）。</para>
     /// <para>★ 错误冒泡：异常写入 <see cref="_lastCommitError"/> 供上层查询，不静默吞。</para>
     /// </summary>
+    /// <param name="commitTarget">提交目标地址（含）</param>
     private void CommitCore(LogicalAddress commitTarget)
     {
         // 临界区：单调推进 CommittedOffset 检查
@@ -227,6 +256,7 @@ public sealed partial class EntryLog : LogBase
     /// <summary>
     /// 提交核心（异步轨）：对等 <see cref="CommitCore"/>，走异步 meta.CommitAsync。
     /// </summary>
+    /// <param name="commitTarget">提交目标地址（含）</param>
     private async ValueTask CommitCoreAsync(LogicalAddress commitTarget)
     {
         lock (_commitLock)
@@ -254,6 +284,7 @@ public sealed partial class EntryLog : LogBase
     }
 
     /// <summary>推进 CommittedOffset + 重置计数器 + 唤醒等待者（CommitCore/CommitCoreAsync 共用尾部）。</summary>
+    /// <param name="commitTarget">提交目标地址（含）</param>
     private void AdvanceCommittedOffset(LogicalAddress commitTarget)
     {
         lock (_commitLock)
@@ -468,6 +499,8 @@ public sealed partial class EntryLog : LogBase
     }
 
 
+    /// <summary>停止提前提交循环（cancel + 最多等 1s）并释放其 CTS，再走基类 FlushOnDispose 链（最后一次页提交）。</summary>
+    /// <param name="disposing">true = 显式释放资源（调用方主动 Dispose）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         _loopCts?.Cancel();

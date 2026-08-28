@@ -14,9 +14,12 @@ public abstract partial class MetadataBase
     [StructLayout(LayoutKind.Explicit, Size = HeaderSize)]
     public struct MetadataHeader
     {
+        /// <summary>Magic 常量（VersionedMetadata record 魔数，块身份校验）。</summary>
         public const uint Magic = RecordMagic.VersionedMetadata;
+        /// <summary>当前版本号（major=1, minor=0）。</summary>
         public const ushort CurrentVersion = (ushort)((1 << 8) | 0); // major=1, minor=0
 
+        /// <summary>默认 Flags（CRC32C | PAYLOAD_4B）——数据版本 record 的规范 flags。</summary>
         public const ushort DefaultFlags = RecordFlags.FLAG_CRC32C
                                            | RecordFlags.FLAG_PAYLOAD_4B;
 
@@ -27,15 +30,20 @@ public abstract partial class MetadataBase
         private const int HeaderSize = 42;
 
         // === 规范字段（14B，unified-binary-layout §1.2）===
+        /// <summary>Magic 标识（ValidEquals 校验必须等于 <see cref="Magic"/>）。</summary>
         [FieldOffset(0), ValidEquals(Magic)] public uint MagicValue;
 
+        /// <summary>版本号（ValidEquals 校验必须等于 <see cref="CurrentVersion"/>）。</summary>
         [FieldOffset(4), ValidEquals(CurrentVersion)]
         public ushort Version;
 
+        /// <summary>Flags（ValidEquals 校验必须等于 <see cref="DefaultFlags"/>；meta record 经 codec 覆写叠加 IS_META）。</summary>
         [FieldOffset(6), ValidEquals(DefaultFlags)]
         public ushort Flags;
 
+        /// <summary>元数据结构体字节数（payload 长度）。</summary>
         [FieldOffset(8)] public uint PayloadLength; // 元数据结构体字节数
+        /// <summary>扇区对齐填充字节数。</summary>
         [FieldOffset(12)] public ushort PaddingLength; // 扇区对齐填充
 
         // === 版本链独有字段（跟数据一起，数据头包裹的一部分）===

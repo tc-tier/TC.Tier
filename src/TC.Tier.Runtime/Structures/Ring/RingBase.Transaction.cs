@@ -128,6 +128,15 @@ public abstract partial class RingBase<TKey>
         WriteMeta();                                           // meta 重写：持久化回退后状态
     }
 
+    /// <summary>
+    /// ★ AbortAsync（2PC 回滚的异步版，D2 决策落地）：TruncateSuffix 回退到上一已确认提交边界，
+    /// 丢弃本轮悬干数据，随后异步 WriteMeta 持久化回退后状态。
+    /// <para>对等 <see cref="Abort"/> 的守卫矩阵与窗口契约（回退点 = _txRollbackTail，
+    /// 上一提交点之后的全部写入必须属于被回滚事务）。</para>
+    /// </summary>
+    /// <param name="seq">要回滚的 Prepare 序号。</param>
+    /// <param name="ct">取消令牌——异步 meta 落盘途中响应取消。</param>
+    /// <returns>回滚完成的 ValueTask。</returns>
     public async ValueTask AbortAsync(long seq, CancellationToken ct)
     {
         EnsureReady();

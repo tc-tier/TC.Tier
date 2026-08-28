@@ -4,6 +4,16 @@ namespace TC.Tier.Runtime.Structures.ProbingIndex;
 
 public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>
+    /// 插入条目（key → valueAddress；tag 命中后经 KeyResolver 读回真 key 判等，同 key 覆写 value 不增计数）。
+    /// epoch 读保护内完成。
+    /// <para>★ 增长在<b>本次插入之前</b>触发（装载超阈值）——此刻全部既有条目已返回调用方且注册完成，
+    ///   rehash 逐条 TryGetKey 必可解析；若在插入后触发，刚落位条目可能尚未注册而被 rehash 静默丢弃。</para>
+    /// </summary>
+    /// <param name="key">条目键。</param>
+    /// <param name="valueAddress">条目 value 逻辑地址。</param>
+    /// <param name="beginAddress">探测下限地址——槽内旧条目地址小于它视为陈旧，可覆写落位（重放路径约定参数）。</param>
+    /// <returns>插入后地址（新条目=落位地址；同 key 覆写=新 value 地址）。</returns>
     public override LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)
     {
         var hash = ComputeHash(key);
@@ -122,6 +132,12 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
         }
     }
 
+    /// <summary>
+    /// 删除条目：tag 命中后经 KeyResolver 读回真 key 判等确认（避免误删同 tag 异 key 条目），
+    /// CAS 清槽 + 条目计数递减。epoch 读保护内完成。
+    /// </summary>
+    /// <param name="key">条目键。</param>
+    /// <returns>true = 真删到；false = 不存在（含 tag 冲突未命中）。</returns>
     public override bool Delete(TKey key)
     {
         var hash = ComputeHash(key);

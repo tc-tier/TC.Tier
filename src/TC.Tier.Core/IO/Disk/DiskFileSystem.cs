@@ -23,6 +23,7 @@ public sealed class DiskFileSystem : IFileSystem
     private readonly string _root;
     private readonly ILogger? _logger;
     private readonly DiskMetadataMode _metaMode;
+    private readonly PreallocationMode _preallocation;
     private int _metaChannelProbe;   // ExtendedAttr 模式惰性探测结果：0=未探，1=可用，-1=不可用
     private readonly PinnedBufferPool _ioBufferPool = new();
     private readonly object _lockGate = new();
@@ -100,22 +101,23 @@ public sealed class DiskFileSystem : IFileSystem
             _quotaKnownSizes.Count, sum, _root);
     }
 
-    private DiskFileSystem(string root, DiskMetadataMode metadataMode, ILogger? logger)
+    private DiskFileSystem(string root, DiskMetadataMode metadataMode, PreallocationMode preallocation, ILogger? logger)
     {
         _root = root;
         _logger = logger;
         _metaMode = metadataMode;
+        _preallocation = preallocation;
         _baseVolume = ProbeVolume(root);
         Capabilities = ProbeCapabilities(root);
     }
 
     /// <summary>构造核（绑定根目录——绝对路径，路径分隔符归一；不立即创建，<see cref="EnsureRoot"/> 幂等建）。
     /// 旧公共入口 Create 已退役（P2 收尾）：动词面 = New / Open / OpenOrCreate。</summary>
-    private static DiskFileSystem BindCore(string root, DiskMetadataMode metadataMode, ILogger? logger)
+    private static DiskFileSystem BindCore(string root, DiskMetadataMode metadataMode, PreallocationMode preallocation, ILogger? logger)
     {
         PathValidator.ValidateRoot(root);
         var full = Path.GetFullPath(root);
-        return new DiskFileSystem(full, metadataMode, logger);
+        return new DiskFileSystem(full, metadataMode, preallocation, logger);
     }
 
     /// <summary>OpenOrCreate = 懒初始化糖（设计 §2.3 可选形态——显式表达"我接受两种状态"）：
@@ -124,7 +126,7 @@ public sealed class DiskFileSystem : IFileSystem
     public static DiskFileSystem OpenOrCreate(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)
     {
         options ??= new DiskFileSystemOptions();
-        var fs = BindCore(root, options.MetadataMode, logger);
+        var fs = BindCore(root, options.MetadataMode, options.Preallocation, logger);
         var existed = Directory.Exists(fs._root);
         fs.EnsureRoot();   // 幂等建（ApplyOptions 前——默认访问不触 ro 拒写，与 New 同序）
         fs.ApplyOptions(options, existed ? TierFsVerbDummy.Open : TierFsVerbDummy.New);
@@ -135,7 +137,7 @@ public sealed class DiskFileSystem : IFileSystem
     public static DiskFileSystem New(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)
     {
         options ??= new DiskFileSystemOptions();
-        var fs = BindCore(root, options.MetadataMode, logger);
+        var fs = BindCore(root, options.MetadataMode, options.Preallocation, logger);
         fs.EnsureRoot();   // New+ro = 建完即封存——创建动作本身不算写（封络在建后生效）
         if (fs.EnumerateEntries("*").Any())
             throw new FileIOException(IOError.AlreadyExists,
@@ -148,7 +150,7 @@ public sealed class DiskFileSystem : IFileSystem
     public static DiskFileSystem Open(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)
     {
         options ??= new DiskFileSystemOptions();
-        var fs = BindCore(root, options.MetadataMode, logger);
+        var fs = BindCore(root, options.MetadataMode, options.Preallocation, logger);
         if (!Directory.Exists(fs._root))
             throw new FileIOException(IOError.NotFound,
                 $"Open 目标根不存在：{fs._root}（创建请用 New）。", fs._root, "disk-open");
@@ -487,7 +489,7 @@ public sealed class DiskFileSystem : IFileSystem
             using (h)
             {
                 if (preallocateSize > 0)
-                    FileNative.PreallocateFile(h, preallocateSize, _logger);   // 毫秒级真预留（失败降级稀疏——PreallocateFile 内建）
+                    PreallocateHandle(h, preallocateSize, path);
             }
             if (!extra.IsEmpty)
                 WriteFileExtraCore(full, path, extra.Span);   // 空 = 不写（新建文件无需清除）
@@ -499,6 +501,24 @@ public sealed class DiskFileSystem : IFileSystem
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         { throw ex.Wrap(nameof(CreateFile), path); }
+    }
+
+    /// <summary>预分配方式轴（IS-04——DiskFileHandle.Preallocate 读取挂载档）。</summary>
+    internal PreallocationMode PreallocationMode => _preallocation;
+
+    /// <summary>按挂载档预分配：Full = 物理占位强制（失败显式报错——不允许静默降级为稀疏）；
+    /// Metadata（缺省）= PreallocateFile 链（best-effort——IS-01 修复后降级 = 稀疏标记 + SetLength）。</summary>
+    private void PreallocateHandle(SafeFileHandle h, long size, string path)
+    {
+        if (_preallocation == PreallocationMode.Full)
+        {
+            if (!FileNative.EnsurePhysicalAllocation(h, size, _logger))
+                throw new FileIOException(IOError.IOFailure,
+                    $"预分配失败（Preallocation=Full）：{path}——full 档不允许静默降级为稀疏",
+                    path, nameof(CreateFile));
+            return;
+        }
+        FileNative.PreallocateFile(h, size, _logger);   // 毫秒级真预留（失败降级稀疏——PreallocateFile 内建）
     }
 
     /// <summary>

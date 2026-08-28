@@ -119,6 +119,10 @@ public abstract partial class MetadataBase
     /// </summary>
     public Span<byte> AsSpan() => CurrentMemorySpan;
 
+    /// <summary>强类型引用视图——返回当前版本 payload 起始的 <typeparamref name="T"/> 引用
+    /// （加载版本 slice 或热区 [0]，热路径 GetRefUnsafe 零校验）。</summary>
+    /// <typeparam name="T">非托管目标类型（大小必须 ≤ 当前内容大小，裸调危险）。</typeparam>
+    /// <returns>当前内容首字节按 <typeparamref name="T"/> 重解释的引用。</returns>
     public ref T GetRef<T>() where T : unmanaged
         => ref _serveLoaded && _loadedVersion is { } lv
             ? ref lv.GetRefUnsafe<T>(0)
@@ -270,6 +274,11 @@ public abstract partial class MetadataBase
         WriteMeta();
     }
 
+    /// <summary>Prepare 异步对等版（同步 <see cref="Prepare(long)"/>）——记录回退快照 → 追加新版本到磁盘链头
+    /// （内容未变跳过追加）→ 写 meta。★ 数据 flush 原生同步（AppendVersionToDisk 同步执行），
+    /// 仅 meta 走异步轨（MetaPolicy.CommitAsync）。</summary>
+    /// <param name="seq">准备提交的序号。</param>
+    /// <param name="ct">取消令牌。</param>
     public async ValueTask PrepareAsync(long seq, CancellationToken ct)
     {
         EnsureNotDisposed();
@@ -387,6 +396,10 @@ public abstract partial class MetadataBase
         }
     }
 
+    /// <summary>Abort 异步对等版——回退逻辑复用同步 <see cref="Abort(long)"/>（内存窗口回退零 IO +
+    /// 尾截断回退悬干新版本 + meta），异步轨仅包一层已完成 Task（引擎 flush 原生同步）。</summary>
+    /// <param name="seq">回滚的 Prepare 序号。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不参与取消）。</param>
     public async ValueTask AbortAsync(long seq, CancellationToken ct)
     {
         Abort(seq);

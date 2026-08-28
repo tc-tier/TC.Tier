@@ -28,6 +28,24 @@ internal static class NativeConstants
     /// <summary>GENERIC_WRITE 访问标志。</summary>
     public const uint GenericWrite = 0x40000000;
 
+    /// <summary>FILE_SHARE_READ 共享标志（快照挂载只读开口——与活卷并发由冻结纪律保证）。</summary>
+    public const uint FileShareRead = 0x00000001;
+
+    /// <summary>FILE_SHARE_WRITE 共享标志。</summary>
+    public const uint FileShareWrite = 0x00000002;
+
+    /// <summary>OPEN_EXISTING 创建方式（设备/卷必须已存在——裸设备无创建语义）。</summary>
+    public const uint OpenExisting = 3;
+
+    /// <summary>FILE_FLAG_WRITE_THROUGH（写完成即达设备——载体写穿档 IS-03 的 Windows 化身）。</summary>
+    public const uint FileFlagWriteThrough = 0x80000000;
+
+    /// <summary>FSCTL_LOCK_VOLUME（卷锁定——独占排他，防挂载层写入；用户拍板：独占 + 锁卷）。</summary>
+    public const uint FsctlLockVolume = 0x00090018;
+
+    /// <summary>FSCTL_DISMOUNT_VOLUME（卸载卷——本实现不用：危险操作，锁定失败由调用方手动卸载）。</summary>
+    public const uint FsctlDismountVolume = 0x00090020;
+
     /// <summary>关闭时删除文件标志。</summary>
     public const uint FileFlagDeleteOnClose = 0x04000000;
 

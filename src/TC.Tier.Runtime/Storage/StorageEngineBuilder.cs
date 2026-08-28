@@ -123,6 +123,7 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
         return engine;
     }
 
+    /// <summary>释放——仅当所有权未转移（未成功 Start）时由 Builder 释放内部引擎。</summary>
     public void Dispose()
     {
         // 只有所有权没转移时，才由 Builder 释放
@@ -130,6 +131,8 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
             _engine?.Dispose();
     }
 
+    /// <summary>异步释放——所有权已转移（成功 Start）时引擎归调用方，Builder 不做释放。</summary>
+    /// <returns>释放完成的任务（已转移/无引擎时立即完成）。</returns>
     public ValueTask DisposeAsync()
     {
         return _ownershipTransferred || _engine is null

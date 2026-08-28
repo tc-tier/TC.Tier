@@ -42,5 +42,7 @@ public interface IRecovery<in TRecoveryHints> : IRecovery
     /// <summary>异步执行恢复算法（统一后台异步恢复入口，支持 CancellationToken 取消）。
     /// <para>★ 同步版 Recover 已删除——恢复统一走 LifecycleBase.Initialize 启动的后台 task，
     ///   调用方用 WaitForReady/WaitForReadyAsync 观测就绪。</para></summary>
+    /// <param name="hints">恢复 hints（可选，缺省值为 default(TRecoveryHints)）</param>
+    /// <param name="ct">取消令牌——取消恢复时本方法抛 <see cref="OperationCanceledException"/>。</param>
     ValueTask RecoverAsync(TRecoveryHints hints, CancellationToken ct = default);
 }

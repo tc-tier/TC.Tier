@@ -29,6 +29,8 @@ public sealed record SortedIndexPersistencePolicy
 /// <summary>SortedIndexSettings 配置基类（引擎选项经 Settings.MainEngine；水位线归结构层不下传）。</summary>
 public abstract class SortedIndexSettings : Settings
 {
+    /// <summary>名称直构（默认 tc.sortedindex——segmentGrowthLimit 固定 1G，对齐 Settings 家族 ctor 形态）。</summary>
+    /// <param name="name">结构名称。</param>
     protected SortedIndexSettings(string name = "tc.sortedindex")
         : base(name, segmentGrowthLimit: AlignmentConst.Alignment1G) { }
 

@@ -4,6 +4,9 @@ namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>点查 key → value 逻辑地址（epoch 读保护内转发 <see cref="FindNoEpoch"/>）。</summary>
+    /// <param name="key">查找键。</param>
+    /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     public override LogicalAddress Find(TKey key)
     {
         _epoch.Resume();

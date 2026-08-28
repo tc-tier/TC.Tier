@@ -158,8 +158,10 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
     // === 元信息 ===
 
     /// <inheritdoc/>
-    /// <remarks>★ 卷几何来自注入的根空间（构造时探测、fs 生命周期内不变）——mem 表达无对齐要求。</remarks>
-    public uint SectorSize => (uint)Math.Max(1, _fs.Volume.SectorSize);
+    /// <remarks>★ 卷几何来自注入的根空间（构造时探测、fs 生命周期内不变）——mem 表达无对齐要求。
+    /// ★ SectorSize 恒取 fs 适配值（四介质各自报告：raw=块大小 4096 / mem=512 模拟 / local=探测 /
+    /// remote=1 无物理约束）——上层绝不用固定值兜底（fs 层保证按介质/文件系统适配且恒非 0）。</remarks>
+    public uint SectorSize => (uint)_fs.Volume.SectorSize;
 
     /// <summary>★ 无缓冲 IO 探测结果（Core IO 对象——首个写句柄借出时回写；int 背板走 Volatile）。</summary>
     public UnbufferedIoSupport UnbufferedSupport => (UnbufferedIoSupport)Volatile.Read(ref _unbufferedSupportRaw);

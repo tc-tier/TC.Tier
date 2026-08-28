@@ -35,6 +35,7 @@ public sealed class CompactChunk(int segId, long oldGrowthLimit)
         => new(range);
 
     // 底层第一阶段填（外部只读）
+    /// <summary>旧段的段 ID。</summary>
     public int SegId { get; } = segId;
 
     /// <summary>

@@ -52,17 +52,27 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
     }
 
     // === 公共属性 ===
+    /// <summary>当前驻留条目数（原子计数快照）。</summary>
     public int Count => (int)Interlocked.Read(ref _count);
+    /// <summary>容量（slot 数组长度，须 2 的幂）。</summary>
     public int Capacity => _capacity;
+    /// <summary>累计命中次数（诊断指标）。</summary>
     public long Hits => Interlocked.Read(ref _hits);
+    /// <summary>累计未命中次数（诊断指标）。</summary>
     public long Misses => Interlocked.Read(ref _misses);
+    /// <summary>累计淘汰次数（诊断指标）。</summary>
     public long Evictions => Interlocked.Read(ref _evictions);
+    /// <summary>命中率 = Hits / (Hits + Misses)；无访问时为 0（诊断指标）。</summary>
+    ///  <remarks>★ 诊断指标：命中率 90-95%（近似 LRU，工程足够）。</remarks>
     public double HitRate
     {
         get { long h = _hits, m = _misses; return (h + m) > 0 ? (double)h / (h + m) : 0; }
     }
 
     /// <summary>★ 查找——命中返回 true + value（设访问位），未命中返回 false。热路径零分配。</summary>
+    /// <param name="key">要查找的键。</param>
+    /// <param name="value">命中时返回值，未命中返回 default。</param>
+    /// <returns>是否命中。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGet(TKey key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out TValue value)
     {
@@ -94,6 +104,9 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
     }
 
     /// <summary>★ 插入/更新——已满时触发 CLOCK 淘汰。</summary>
+    /// <param name="key">要插入/更新的键。</param>
+    /// <param name="value">要插入/更新的值。</param>
+    /// <remarks>★ 热路径零分配：Put 尽力而为，遇并发冲突由 caller 重试或接受。</remarks>
     public void Put(TKey key, TValue value)
     {
         ThrowIfDisposed();
@@ -154,6 +167,9 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
     }
 
     /// <summary>★ 移除指定键（手动淘汰）。返回是否成功。</summary>
+    /// <param name="key">要移除的键。</param>
+    /// <returns>是否成功移除。</returns>
+    /// <remarks>★ 热路径零分配：Remove 尽力而为，遇并发冲突由 caller 重试或接受。</remarks>
     public bool Remove(TKey key)
     {
         ThrowIfDisposed();
@@ -184,6 +200,7 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
     }
 
     /// <summary>★ 清空缓存（调淘汰回调释放所有值）。</summary>
+    /// <remarks>★ 热路径零分配：Clear 尽力而为，遇并发冲突由 caller 重试或接受。</remarks>
     public void Clear()
     {
         ThrowIfDisposed();
@@ -191,6 +208,7 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
     }
 
     /// <summary>指标快照。</summary>
+    /// <returns>当前缓存指标快照。</returns>
     public ClockCacheStats GetStats() => new()
     {
         Count = Count,
@@ -201,6 +219,7 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
         HitRate = HitRate
     };
 
+    /// <summary>释放缓存：清空全部条目（逐条调淘汰回调）并标记 disposed（幂等，线程安全）。</summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -281,6 +300,12 @@ public sealed class ClockCache<TKey, TValue> : IDisposable
 }
 
 /// <summary>ClockCache 指标快照。</summary>
+/// <param name="Count">当前缓存条目数。</param>
+/// <param name="Capacity">缓存容量（slot 数组长度）。</param>
+/// <param name="Hits">累计命中次数。</param>
+/// <param name="Misses">累计未命中次数。</param>
+/// <param name="Evictions">累计淘汰次数。</param>
+/// <param name="HitRate">命中率 = Hits / (Hits + Misses )。</param>
 public record struct ClockCacheStats(
     int Count,
     int Capacity,

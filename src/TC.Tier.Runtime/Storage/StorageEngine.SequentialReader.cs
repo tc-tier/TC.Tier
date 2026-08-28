@@ -153,7 +153,17 @@ internal sealed partial class StorageEngine
                 int segId = _position.SegId;
                 var seg = _owner._segmentTable.GetSegment(segId);
                 if (seg.StableState == StableState.Invalid)
+                {
+                    // ★ 跳段进入的段不存在 = 自然数据边界（物理尾 < end——截断后 meta 未夹）→ EOF；
+                    //   直接读段内 Invalid（offset > 0）= 真错误（段被删除）
+                    if (_position.Offset == 0) break;
                     throw new PartitionInvalidException("Segment not found.", _position);
+                }
+
+                // ★ EOF 先于跳段检查：Position 恰好 = End（截断后 committed 夹到边界/帧尾=end）
+                //   时 segRemaining 可能 = 0——先 break（EOF）而非跳段（跳段会撞不存在段 throw）。
+                long toEnd = DistanceToEnd(segId, _position.Offset);
+                if (toEnd <= 0) break;
 
                 long segRemaining = seg.RealSize - _position.Offset;
                 if (segRemaining <= 0)
@@ -162,9 +172,6 @@ internal sealed partial class StorageEngine
                     _position = new LogicalAddress(segId, 0);
                     continue;
                 }
-
-                long toEnd = DistanceToEnd(segId, _position.Offset);
-                if (toEnd <= 0) break;
 
                 int chunkLen = (int)Math.Min(totalLen - dstOffset, Math.Min(segRemaining, toEnd));
 
@@ -217,7 +224,17 @@ internal sealed partial class StorageEngine
                 int segId = _position.SegId;
                 var seg = _owner._segmentTable.GetSegment(segId);
                 if (seg.StableState == StableState.Invalid)
+                {
+                    // ★ 跳段进入的段不存在 = 自然数据边界（物理尾 < end——截断后 meta 未夹）→ EOF；
+                    //   直接读段内 Invalid（offset > 0）= 真错误（段被删除）
+                    if (_position.Offset == 0) break;
                     throw new PartitionInvalidException("Segment not found.", _position);
+                }
+
+                // ★ EOF 先于跳段检查：Position 恰好 = End（截断后 committed 夹到边界/帧尾=end）
+                //   时 segRemaining 可能 = 0——先 break（EOF）而非跳段（跳段会撞不存在段 throw）。
+                long toEnd = DistanceToEnd(segId, _position.Offset);
+                if (toEnd <= 0) break;
 
                 long segRemaining = seg.RealSize - _position.Offset;
                 if (segRemaining <= 0)
@@ -226,9 +243,6 @@ internal sealed partial class StorageEngine
                     _position = new LogicalAddress(segId, 0);
                     continue;
                 }
-
-                long toEnd = DistanceToEnd(segId, _position.Offset);
-                if (toEnd <= 0) break;
 
                 int chunkLen = (int)Math.Min(totalLen - dstOffset, Math.Min(segRemaining, toEnd));
 

@@ -15,7 +15,9 @@ namespace TC.Tier.Core.Primitives;
 /// </summary>
 public static class UnifiedCrc
 {
+    /// <summary>CRC32C 校验值字节数（4 字节）。</summary>
     public const int Crc32CLen = 4;
+    /// <summary>CRC64 校验值字节数（8 字节）。</summary>
     public const int Crc64Len  = 8;
 
     // ══ CRC32C 硬件加速（零分配）══

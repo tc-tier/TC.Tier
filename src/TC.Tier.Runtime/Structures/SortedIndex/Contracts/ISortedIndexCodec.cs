@@ -8,7 +8,9 @@ namespace TC.Tier.Runtime.Structures.SortedIndex.Contracts;
 /// </summary>
 public interface ISortedIndexCodec
 {
+    /// <summary>帧头字节长（机制侧定界——头 = magic/version/flags/kind/体长，写头时体长已知）。</summary>
     int HeaderSize { get; }
+    /// <summary>帧尾字节长（机制侧定界——尾 = magic/水位 W/CRC64）。</summary>
     int FooterSize { get; }
 
     /// <summary>CRC 字段在尾内偏移——帧走链 CRC 覆盖截止点（位置=格式知识，由实现声明）。</summary>

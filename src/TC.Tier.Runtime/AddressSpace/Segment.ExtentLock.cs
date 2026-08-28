@@ -14,8 +14,8 @@ public sealed partial class Segment
     private readonly object _extentGate = new();
 
     /// <summary>
-    /// 获取区间锁的 scope（using 块自动 Enter/Exit <see cref="Primitives.MonitorScope"/>，零分配）。
+    /// 获取区间锁的 scope（using 块自动 Enter/Exit <see cref="TC.Tier.Core.Primitives.MonitorScope"/>，零分配）。
     /// </summary>
-    /// <returns>返回一个 <see cref="Primitives.MonitorScope"/> 实例，用于在 using 块中自动管理锁的获取和释放。</returns>
+    /// <returns>返回一个 <see cref="TC.Tier.Core.Primitives.MonitorScope"/> 实例，用于在 using 块中自动管理锁的获取和释放。</returns>
     public MonitorScope AcquireExtentLock() => MonitorScope.Enter(_extentGate);
 }

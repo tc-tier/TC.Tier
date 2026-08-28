@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using TC.Tier.Core.IO.Disk;
 using TC.Tier.Core.IO.Mem;
-using TC.Tier.Core.IO.Raw;
+using TC.Tier.Core.IO.TierVolume;
 
 namespace TC.Tier.Core.IO;
 
@@ -111,8 +111,8 @@ public static partial class TierFs
             StorageNature.Memory => BuildMemory(s,
                 Expect<MemoryFileSystemOptions>(options, s, "MemoryFileSystemOptions"), verb, logger),
             StorageNature.Virtual => verb == TierFsVerb.New
-                ? BuildVirtual(s, Expect<RawFormatOptions>(options, s, "RawFormatOptions（New）"), verb, logger)
-                : BuildVirtual(s, Expect<RawOpenOptions>(options, s, "RawOpenOptions（Open）"), verb, logger),
+                ? BuildVirtual(s, Expect<TierVolumeFormatOptions>(options, s, "TierVolumeFormatOptions（New）"), verb, logger)
+                : BuildVirtual(s, Expect<TierVolumeOpenOptions>(options, s, "TierVolumeOpenOptions（Open）"), verb, logger),
             StorageNature.Network => BuildNetwork(s, options, verb, logger),
             _ => throw new InvalidOperationException($"未知的介质本性：{s.Nature}"),
         };
@@ -128,6 +128,7 @@ public static partial class TierFs
         var options = new DiskFileSystemOptions
         {
             MetadataMode = o.MetadataMode, // 调优：只住 options
+            Preallocation = o.Preallocation, // IS-04 轴：只住 options
             Access = mount.Access, // G2 包络
             Label = mount.Label, // G1：New = 写标记 / Open = 校验
             QuotaBytes = mount.QuotaBytes, // G3：-1 = 不设（零成本）
@@ -170,44 +171,56 @@ public static partial class TierFs
 
     // ═══════════════ virtual（虚拟文件系统）═══════════════
 
-    private static RawFileSystem BuildVirtual(TierSpec s, FileSystemOptions? user, TierFsVerb verb, ILogger? logger)
+    private static TierVolumeFs BuildVirtual(TierSpec s, FileSystemOptions? user, TierFsVerb verb, ILogger? logger)
     {
         // exclusive：虚拟文件系统构造即排他（内建）——概念已满足，无需动作
         var carrier = s.SubKind == "dev"
-            ? RawCarrier.Device(s.AbsolutePath!)
-            : RawCarrier.File(s.AbsolutePath!);
-        RawCarrier?[] carriers = s.Members.Count == 0
+            ? TierVolumeCarrier.Device(s.AbsolutePath!)
+            : TierVolumeCarrier.File(s.AbsolutePath!);
+        TierVolumeCarrier?[] carriers = s.Members.Count == 0
             ? [carrier]
-            : new[] { carrier }.Concat(s.Members.Select(RawCarrier.File)).ToArray();
-        var mount = MergeMount(s, user ?? new RawOpenOptions());
+            : new[] { carrier }.Concat(s.Members.Select(TierVolumeCarrier.File)).ToArray();
+        var mount = MergeMount(s, user ?? new TierVolumeOpenOptions());
 
         if (verb == TierFsVerb.New)
         {
             if (mount.QuotaBytes == -1 && s.Members.Count > 0)
                 throw new NotSupportedException(
                     "virtual New 多载体（member=）须显式 quota=供给——自动扩容仅限单文件载体（多载体扩容 = AddCarrier 显式路径）。");
-            var fmt = user as RawFormatOptions;
-            var fs = RawFileSystem.New(carrier, new RawFormatOptions
+            var fmt = user as TierVolumeFormatOptions;
+            var fs = TierVolumeFs.New(carrier, new TierVolumeFormatOptions
             {
                 BlockSize = fmt?.BlockSize ?? 4096, // 调优：只住 options
                 JournalReserveBytes = fmt?.JournalReserveBytes ?? 8L << 20, // 调优：只住 options
+                Preallocation = fmt?.Preallocation ?? PreallocationMode.Metadata, // IS-02 载体档
+                CarrierWriteThrough = fmt?.CarrierWriteThrough ?? false, // IS-03 载体档
+                WriteConcurrency = fmt?.WriteConcurrency ?? WriteConcurrencyMode.Serial, // V2 §2.1 写并发档
                 QuotaBytes = mount.QuotaBytes, // 一词制：供给 = 基类 QuotaBytes（正数 = New 时刻物化位图；-1 = 自动扩容卷）
                 Label = mount.Label,
             }, logger);
             // New + access=ro = 建完即封存：格式化 → 关卷提交 → 只读重开（§2.5）
             if (mount.Access != AccessMode.Read) return fs;
             fs.Dispose();
-            return RawFileSystem.Open(carrier, new RawOpenOptions { Access = AccessMode.Read }, logger);
+            return TierVolumeFs.Open(carrier, new TierVolumeOpenOptions
+            {
+                Access = AccessMode.Read,
+                Preallocation = fmt?.Preallocation ?? PreallocationMode.Metadata, // 与格式化档一致（full 载体免被稀疏标记）
+                CarrierWriteThrough = fmt?.CarrierWriteThrough ?? false,
+                WriteConcurrency = fmt?.WriteConcurrency ?? WriteConcurrencyMode.Serial, // V2 §2.1 写并发档
+            }, logger);
         }
 
-        var open = user as RawOpenOptions;
+        var open = user as TierVolumeOpenOptions;
         // Open：quota = 挂载收紧（min(quota, 供给)——分配咽喉执法）；label = 校验（不符即抛）
         // OpenOrCreate：已格式化 → Open（label 断言）；未格式化/不存在 → New 回退（上方 New 分支同款参数）
-        RawFileSystem OpenIt() => RawFileSystem.Open(carriers, new RawOpenOptions
+        TierVolumeFs OpenIt() => TierVolumeFs.Open(carriers, new TierVolumeOpenOptions
         {
             PageCacheBytes = open?.PageCacheBytes ?? 64L << 20, // 调优：只住 options
             AllowDegraded = open?.AllowDegraded ?? false, // 策略：只住 options
-            Access = mount.Access, // Read = 只读（dirty 降级形态同）；Write 在 RawFileSystem.Open 入口即拒
+            Preallocation = open?.Preallocation ?? PreallocationMode.Metadata, // IS-02 载体档
+            CarrierWriteThrough = open?.CarrierWriteThrough ?? false, // IS-03 载体档
+            WriteConcurrency = open?.WriteConcurrency ?? WriteConcurrencyMode.Serial, // V2 §2.1 写并发档
+            Access = mount.Access, // Read = 只读（dirty 降级形态同）；Write 在 TierVolumeFs.Open 入口即拒
             QuotaBytes = mount.QuotaBytes, // -1 = 不收紧（受供给物理约束）
             Label = mount.Label, // 非 null = 断言卷上 label
         }, logger);
@@ -220,7 +233,7 @@ public static partial class TierFs
         catch (Exception ex) when (ex is FileIOException { Error: IOError.NotFound or IOError.IOFailure }
             or FileNotFoundException or DirectoryNotFoundException)
         {   // 未格式化/不存在 → 建（bind-any）；裸 FileNotFound = 文件载体本身不存在（OpenMemberCarrier 不包装）
-            return RawFileSystem.New(carrier, new RawFormatOptions   // 未格式化/不存在 → 建（bind-any）
+            return TierVolumeFs.New(carrier, new TierVolumeFormatOptions   // 未格式化/不存在 → 建（bind-any）
             {
                 BlockSize = 4096, JournalReserveBytes = 8L << 20,   // 格式缺省（懒刈糖不带格式期调优——显式格式用 New）
                 QuotaBytes = mount.QuotaBytes,

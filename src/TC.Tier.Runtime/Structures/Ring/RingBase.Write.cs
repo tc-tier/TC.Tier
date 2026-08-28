@@ -77,7 +77,7 @@ public abstract partial class RingBase<TKey>
         return new ValueTask<LogicalAddress>(WriteRecordCore(key, value.Span, 0));  // 快路径:同步,零 async 开销
     }
 
-    /// <summary>★ 引擎/子类异步扩展点（带 flags）。对齐 <see cref="WriteRecordWithFlags"/> 的异步版。</summary>
+    /// <summary>★ 引擎/子类异步扩展点（带 flags）。对齐 <see cref="WriteWithFlags"/> 的异步版。</summary>
     private protected ValueTask<LogicalAddress> WriteWithFlagsAsync(TKey key, ReadOnlyMemory<byte> value, ushort flags, CancellationToken ct)
     {
         EnsureNotDisposed();
@@ -105,6 +105,14 @@ public abstract partial class RingBase<TKey>
                                (ushort)(flags | RecordFlags.FLAG_VALUE_OVERFLOW));
     }
 
+    /// <summary>
+    /// ★ 原位更新既有 record 的 value（同步）——按「旧/新是否溢出」四分支翻转：
+    /// overflow→overflow 更新溢出帧指针、inline→overflow 补 OVERFLOW 位并写溢出帧、
+    /// overflow→inline 回退（清 OVERFLOW 位 + 容量校验 + 拷值）、inline→inline 重写 payload 长度 + 拷值，
+    /// 每分支后重写 header 与 CRC。
+    /// </summary>
+    /// <param name="addr">目标 record 的逻辑地址。</param>
+    /// <param name="newValue">新 value 字节。</param>
     public unsafe void UpdateValue(LogicalAddress addr, ReadOnlySpan<byte> newValue)
     {
         EnsureNotDisposed();

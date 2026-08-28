@@ -91,6 +91,7 @@ public sealed class SessionManager : LifecycleBase
     /// </summary>
     public void Initialize() => Initialize(default(EmptyHints));
 
+    /// <summary>启动序收口——协调器悬挂裁决（ReconcileStartup）+ 启动提交管线。</summary>
     protected override void OnInitializeComplete()
     {
         _coordinator.ReconcileStartup();   // 悬挂裁决（forward-commit 前推 / 丢尾 / 注入 txn 裁决）
@@ -451,6 +452,8 @@ public sealed class SessionManager : LifecycleBase
 
     // ══════════ Dispose（有界排水）══════════
 
+    /// <summary>异步 Dispose——关管线通道后有界等待管线排空（超时强制排水），再释放注入 txn。</summary>
+    /// <param name="disposing">true = 主动 Dispose；false = 终结器路径（本实现无终结器，不做处理）。</param>
     protected override async ValueTask DisposeOverrideAsync(bool disposing)
     {
         if (!disposing) return;
@@ -471,6 +474,8 @@ public sealed class SessionManager : LifecycleBase
         _injectedTxn?.Dispose();
     }
 
+    /// <summary>同步 Dispose——关管线通道后同步有界等待管线排空（超时强制排水），再释放注入 txn。</summary>
+    /// <param name="disposing">true = 主动 Dispose；false = 终结器路径（本实现无终结器，不做处理）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         if (!disposing) return;

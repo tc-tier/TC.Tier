@@ -45,13 +45,16 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
         }
     }
 
-    /// <summary></summary>
+    /// <summary>
+    /// 判断当前 EPVS 是否处于中间态（正在两个状态之间过渡）。
+    /// </summary>
     /// <returns>当前 EPVS 是否处于中间态（正在两个状态之间过渡）。</returns>
     public bool IsIntermediate() => (Phase & kIntermediateMask) != 0;
 
     /// <summary>
     /// 当前状态的版本号。
     /// </summary>
+    /// <returns>当前状态的版本号。</returns>
     public long Version
     {
         get => Word & kVersionMaskInWord;
@@ -62,6 +65,11 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
         }
     }
 
+    /// <summary>
+    /// 拷贝给定的状态机状态。
+    /// </summary>
+    /// <param name="other">要拷贝的状态机状态。</param>
+    /// <returns>拷贝出的状态机状态。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static VersionSchemeState Copy(ref VersionSchemeState other)
     {
@@ -85,10 +93,19 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
         return info;
     }
 
+    /// <summary>
+    /// 将给定状态标记为中间态（将相位的中间态位置 1）。
+    /// </summary>
+    /// <param name="state">要标记为中间态的状态。</param>
+    /// <returns>标记为中间态的状态。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static VersionSchemeState MakeIntermediate(VersionSchemeState state)
         => Make((byte)(state.Phase | kIntermediateMask), state.Version);
 
+    /// <summary>
+    /// 移除中间态标记（将相位的中间态位清零）。
+    /// </summary>
+    /// <param name="state">要移除中间态标记的状态。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static void RemoveIntermediate(ref VersionSchemeState state)
     {
@@ -107,6 +124,9 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
     }
 
 
+    /// <summary>比较是否与指定对象相等（仅当对象为同类型且 Word 相同时相等）。</summary>
+    /// <param name="obj">比较对象。</param>
+    /// <returns>true = 相等。</returns>
     public override bool Equals(object? obj)
     {
         return obj is VersionSchemeState other && Equals(other);
@@ -118,6 +138,9 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
         return Word.GetHashCode();
     }
 
+    /// <summary>比较与另一个状态是否相等（相位与版本号整字比较）。</summary>
+    /// <param name="other">另一状态。</param>
+    /// <returns>true = 相位与版本号均相同。</returns>
     public bool Equals(VersionSchemeState other)
     {
         return Word == other.Word;

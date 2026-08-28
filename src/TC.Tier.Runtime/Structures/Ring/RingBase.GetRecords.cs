@@ -5,6 +5,13 @@ namespace TC.Tier.Runtime.Structures.Ring;
 
 public abstract partial class RingBase<TKey>
 {
+    /// <summary>
+    /// 按地址读单条 key（IKeyResolver 契约）——热冷透明：热区直读 native 页，冷区自动整页回源后读。
+    /// key 位置 = record 起始 + header 字节数（定长 sizeof(TKey) 字节）。
+    /// </summary>
+    /// <param name="addr">record 的起始逻辑地址。</param>
+    /// <param name="key">输出的 key 值。</param>
+    /// <returns>读取成功返回 true（本实现读路径恒成功）。</returns>
     public bool TryGetKey(LogicalAddress addr, out TKey key)
     {
         EnsureReady();
@@ -179,6 +186,13 @@ public abstract partial class RingBase<TKey>
             valLen, bFlags, addr);
     }
 
+    /// <summary>
+    /// 读 addr 处 record 的 value（拷贝交付到 <paramref name="destination"/>）。
+    /// 热区直读 native 页拷贝；冷区自动回源后拷贝；溢出 record（FLAG_VALUE_OVERFLOW）从溢出引擎读入。
+    /// </summary>
+    /// <param name="addr">record 的起始逻辑地址。</param>
+    /// <param name="destination">value 字节的拷贝目的地。</param>
+    /// <returns>写入 destination 的 value 字节数。</returns>
     public unsafe int GetValue(LogicalAddress addr, Span<byte> destination)
     {
         EnsureReady();
@@ -266,8 +280,14 @@ public abstract partial class RingBase<TKey>
         _epoch.Resume();
     }
 
+    /// <summary>退出 epoch 读保护（IEpochProtected 契约——与 <see cref="EnterEpoch"/> 同线程配对）。</summary>
     public void ExitEpoch() => _epoch.Suspend();
 
+    /// <summary>
+    /// ★ 零拷贝读 scope（ref struct 栈护栏）——构造时进入 epoch 读保护，<see cref="ReadScope.Dispose"/> 时退出。
+    /// 持有期间（即 <see cref="GetValueSpan"/> 返回 span 的有效期）热页驱逐/冷缓存淘汰经 epoch 排水被阻塞，
+    /// 底层页恒稳不被释放/复用；跨 scope 持有 span = 未定义。
+    /// </summary>
     public readonly ref struct ReadScope
     {
         private readonly RingBase<TKey> _owner;
@@ -277,6 +297,7 @@ public abstract partial class RingBase<TKey>
             _owner = owner;
         }
 
+        /// <summary>退出 epoch 读保护（owner 已释放时为空操作）。</summary>
         public void Dispose()
         {
             _owner?.ExitEpoch();
@@ -345,6 +366,10 @@ public abstract partial class RingBase<TKey>
         }
     }
 
+    /// <summary>异步读单条 key：热区同步快路径直读；冷区异步整页回源后读。</summary>
+    /// <param name="addr">record 的起始逻辑地址。</param>
+    /// <param name="ct">取消令牌——冷区异步回源途中响应取消。</param>
+    /// <returns>record 的 key 封装（Key/ValueLength/Flags/Address）。</returns>
     public async ValueTask<RecordKey<TKey>> GetKeyAsync(LogicalAddress addr, CancellationToken ct = default)
     {
         EnsureReady();
@@ -356,6 +381,14 @@ public abstract partial class RingBase<TKey>
         return GetKeyFromColdPage(pageMem, addr);
     }
 
+    /// <summary>
+    /// 异步读 value（拷贝交付到 <paramref name="destination"/>）：热区同步快路径
+    /// （溢出值走异步溢出引擎读）；冷区异步整页回源后同步拷贝。
+    /// </summary>
+    /// <param name="addr">record 的起始逻辑地址。</param>
+    /// <param name="destination">value 字节的拷贝目的地。</param>
+    /// <param name="ct">取消令牌——溢出值/冷区异步读途中响应取消。</param>
+    /// <returns>写入 destination 的 value 字节数。</returns>
     public async ValueTask<int> GetValueAsync(LogicalAddress addr, Memory<byte> destination,
         CancellationToken ct = default)
     {
@@ -417,6 +450,10 @@ public abstract partial class RingBase<TKey>
         byte* basePtr = pageMem.BytePtr + offset;
         return ReadValueOrOverflowFromPtr(basePtr, flags, keyLen, payloadLen, dest);
     }
+    /// <summary>异步读单条 key（<see cref="TryGetKey"/> 的异步版）：热区同步快路径，冷区异步整页回源后读。</summary>
+    /// <param name="addr">record 的起始逻辑地址。</param>
+    /// <param name="ct">取消令牌——冷区异步回源途中响应取消。</param>
+    /// <returns>(Key=读到的 key 值, Success=是否成功)。</returns>
     public async ValueTask<(TKey Key, bool Success)> TryGetKeyAsync(LogicalAddress addr, CancellationToken ct = default)
     {
         EnsureReady();
