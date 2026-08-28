@@ -74,7 +74,8 @@
 <h1 id="coreio-性能全景报告linux">Core/IO 性能全景报告（Linux）</h1>
 
 <blockquote>
-<p><strong>环境</strong>：Linux 6.8 / Ubuntu 24.04（ext4 on /tmp），.NET 8，AMD Ryzen 9 6900HX 12C，BenchmarkDotNet + 探针。
+<p><strong>环境</strong>：Linux 6.8 / Ubuntu 24.04（ext4 on /tmp，SSD——无 fsync 地板），.NET 8，AMD Ryzen 9 6900HX 12C，BenchmarkDotNet + 探针。
+<strong>持久化两档</strong>：默认档（journal 提交 + 载体 fsync）与挂载级<strong>载体写穿档</strong>（<code>CarrierWriteThrough</code>——写穿完成即单屏障提交，免 fsync）。写穿档为持久化热路径主推形态（数字见 §3 摘要/§8.4/fsync 谱系注记）；读路径/元数据面/mem/零拷贝数字与档位无关。
 虚拟文件系统六维（§8）与四类文件系统矩阵（§9）为空闲机正式跑（load &lt; 1.2）；网络文件系统 MinIO（§7）为本机 docker（loopback 网络——真云对照见 §7.3）。
 <strong>性质</strong>：绝对值随硬件浮动，<strong>相对比较（比值列）是稳定结论</strong>。
 复现：</p>
@@ -133,8 +134,8 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 </tr>
 <tr>
 <td><strong>fsync 密集负载（Virtual）</strong></td>
-<td>追加+逐次 Flush 钉在硬件 fsync 地板（WAL 单屏障 564 μs vs Disk 490 μs vs 裸 fsync ~548 μs）</td>
-<td>日志模式下 Flush = 单屏障日志提交——无软件余量可挤（§8.4）</td>
+<td>默认档钉在硬件 fsync 地板（WAL 单屏障 564 μs vs Disk 490 μs vs 裸 fsync ~548 μs）；<strong>载体写穿档免 fsync</strong>——写穿完成即提交，本环境（SSD）p50 0.115–0.132 ms 四模式全达标，Windows 机械盘实测 p50 0.17–0.20 ms</td>
+<td>持久化热路径用载体写穿档（挂载级）；默认档的地板是 OS fsync 语义（§8.4）——复现 <code>--wal-meta-probe virtual 1000 all true</code></td>
 </tr>
 <tr>
 <td><strong>四类文件系统怎么选</strong></td>
@@ -535,31 +536,34 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 </ul>
 </li>
 </ul>
-<h3 id="84-数据面-写写放大与-wal-单屏障当前口径">8.4 数据面-写：写放大与 WAL 单屏障（当前口径）</h3>
+<h3 id="84-数据面-写写放大与-wal-单屏障">8.4 数据面-写：写放大与 WAL 单屏障</h3>
 <table>
 <thead>
 <tr>
 <th>场景</th>
-<th style="text-align: right;">当前</th>
+<th style="text-align: right;">默认档</th>
+<th style="text-align: right;">载体写穿档（CarrierWriteThrough）</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>追加（缓冲档）</td>
 <td style="text-align: right;"><strong>1481 MB/s</strong>（超 Disk 1315）——写放大归零（run 一次落位 + continue）</td>
+<td style="text-align: right;">同左（缓冲档与写穿档正交——写穿只改持久化路径）</td>
 </tr>
 <tr>
 <td>追加 + 逐次 Flush</td>
-<td style="text-align: right;"><strong>85 vs Disk 83 vs 裸 fsync 地板 66 MB/s</strong>——Flush = 排干 + 记录落区 + <strong>单屏障</strong>；两段式组提交（fsync 期间数据面不停摆）</td>
+<td style="text-align: right;">85 vs Disk 83 vs 裸 fsync 地板 66 MB/s——Flush = 排干 + 记录落区 + 单屏障；两段式组提交</td>
+<td style="text-align: right;"><strong>免 fsync——写穿完成即单屏障</strong>：本环境（SSD）p50 0.115–0.132 ms，Windows 机械盘 p50 0.17–0.20 ms（p99.9 ≤1.74 ms）</td>
 </tr>
 <tr>
 <td>原地覆写 + Flush</td>
 <td style="text-align: right;">564 vs 490 μs/op——双 write + 记录机械 ≈ 1.9× 裸 fsync</td>
+<td style="text-align: right;">写穿形态下无双 write + fsync 串联——同写穿档口径</td>
 </tr>
 </tbody>
 </table>
-<p><strong>设计含义</strong>：fsync 密集场景的性能上限由设备 fsync 延迟决定（硬件地板）；本层的职责是不在地板之上
-再加协议税——检查点 per-op 全量序列化（初版每 Flush 5 屏障 + O(容量) 位图写）正是被 WAL 替换掉的那层税。</p>
+<p><strong>设计含义</strong>：默认档的 fsync 密集上限由设备 fsync 延迟决定（硬件地板）；本层的职责是不在地板之上再加协议税。载体写穿档把&quot;写数据 + journal + fsync&quot;三段压成一次写穿——持久化成本与设备写穿延迟对齐而非 fsync 延迟（挂载级选项，MMF 直映射路径仍走 FlushCarrier 全屏障）。</p>
 <h3 id="85-调优速查virtual">8.5 调优速查（Virtual）</h3>
 <table>
 <thead>
@@ -687,7 +691,7 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 文件系统选择不由数据面速度决定；</li>
 <li>随机读的缓存提供方不同（OS page cache / 直址 / 自管页缓存 / 桥级 LRU）——Virtual 254ns 含共享设施
 （游标/epoch/快照），是&quot;带一致性规范的缓存命中&quot;价格；</li>
-<li><strong>fsync 谱系</strong>：Mem 0.04ms（易失）→ Disk 0.33ms（OS fsync）→ Virtual 0.38ms（WAL 单屏障 + 载体 fsync）→
+<li><strong>fsync 谱系</strong>：Mem 0.04ms（易失）→ Disk 0.33ms（OS fsync）→ Virtual 默认档 0.38ms（WAL 单屏障 + 载体 fsync）/ Virtual 载体写穿档 0.115–0.132ms（本环境 SSD，免 fsync）→
 Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应。</li>
 </ul>
 <h3 id="93-选型决策数据面持平的前提下按语义选">9.3 选型决策（数据面持平的前提下按语义选）</h3>
