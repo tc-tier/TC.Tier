@@ -79,7 +79,7 @@
 <strong>性质</strong>：绝对值随硬件浮动，<strong>相对比较（比值列）是稳定结论</strong>。
 复现：</p>
 <pre><code class="lang-bash">dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*FileIoBenchmarks*&quot; --job short   # 本地文件系统/抽象税
-dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*RawIo*&quot;                            # Raw 六维（16 项）
+dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*TierVolumeIo*&quot;                            # Virtual 六维（16 项）
 dotnet run --project prototypes/IoMediumMatrixProbe -c Release                                                      # 四类文件系统矩阵（含 MinIO）
 dotnet run --project prototypes/IoConcurrencyProbe -c Release                                                       # 并发扩展性（5 形态 × 梯度）
 </code></pre>
@@ -132,7 +132,7 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 <td><strong>虚拟文件系统 = 本地持久化推荐位</strong>（单工件 + 元数据内存直达，§8）</td>
 </tr>
 <tr>
-<td><strong>fsync 密集负载（Raw）</strong></td>
+<td><strong>fsync 密集负载（Virtual）</strong></td>
 <td>追加+逐次 Flush 钉在硬件 fsync 地板（WAL 单屏障 564 μs vs Disk 490 μs vs 裸 fsync ~548 μs）</td>
 <td>日志模式下 Flush = 单屏障日志提交——无软件余量可挤（§8.4）</td>
 </tr>
@@ -148,8 +148,8 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 </tr>
 <tr>
 <td><strong>并发怎么用</strong></td>
-<td>Raw 读并行 <strong>3.6×</strong>（锁外快照）/ 写反扩展（单写者锁）；Mem 写近线性 <strong>2.2×</strong>；Disk 混合最均衡</td>
-<td>Raw 单写者+Append；Mem 写密集同文件选 Reserved；并发读多句柄（§10）</td>
+<td>Virtual 读并行 <strong>3.6×</strong>（锁外快照）/ 写反扩展（单写者锁）；Mem 写近线性 <strong>2.2×</strong>；Disk 混合最均衡</td>
+<td>Virtual 单写者+Append；Mem 写密集同文件选 Reserved；并发读多句柄（§10）</td>
 </tr>
 </tbody>
 </table>
@@ -442,7 +442,7 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 <hr>
 <h2 id="8-虚拟文件系统六维空闲机终判本地持久化推荐位的准入证">8. 虚拟文件系统六维（空闲机终判——本地持久化推荐位的准入证）</h2>
 <blockquote>
-<p><strong>方法</strong>：BDN 隔离进程（<code>RawIoBenchmarks</code> 16 项，定量工作/op——Mean = 每 op 成本，低 = 优）；
+<p><strong>方法</strong>：BDN 隔离进程（<code>TierVolumeIoBenchmarks</code> 16 项，定量工作/op——Mean = 每 op 成本，低 = 优）；
 环境 AMD Ryzen 9 6900HX 12C / 26GB 可用 / load &lt; 1.2。验收线（设计 §12.4）：数据面噪声内持平（±5%）、
 元数据面不低于 Disk。<strong>六维全部达线。</strong></p>
 </blockquote>
@@ -451,7 +451,7 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 <thead>
 <tr>
 <th>维度</th>
-<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Virtual</th>
 <th style="text-align: right;">Disk</th>
 <th style="text-align: right;">比值</th>
 <th>判定</th>
@@ -516,11 +516,11 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 </tr>
 </tbody>
 </table>
-<h3 id="82-元数据面-35176为什么-disk-付-syscall-而-raw-不付">8.2 元数据面 35–176×：为什么 Disk 付 syscall 而 Raw 不付</h3>
-<p>Raw 的命名空间/区间表/位图全部<strong>内存直达</strong>（打开时装载，<code>_sortedKeys</code> 有序索引 O(log n) 维护）——
+<h3 id="82-元数据面-35176为什么-disk-付-syscall-而-virtual-不付">8.2 元数据面 35–176×：为什么 Disk 付 syscall 而 Virtual 不付</h3>
+<p>Virtual 的命名空间/区间表/位图全部<strong>内存直达</strong>（打开时装载，<code>_sortedKeys</code> 有序索引 O(log n) 维护）——
 Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fstat + 句柄构建，Stat = fstat，枚举 = readdir 循环。
 这是设计预言（§3.4&quot;Open/Stat/枚举 = 内存元数据操作，零 syscall——明显更快&quot;）的实测兑现。
-<strong>消费含义</strong>：海量小文件/高频元数据负载（段表扫描、恢复遍历、索引元数据）在 Raw 上有一个数量级以上的免费加速。</p>
+<strong>消费含义</strong>：海量小文件/高频元数据负载（段表扫描、恢复遍历、索引元数据）在 Virtual 上有一个数量级以上的免费加速。</p>
 <h3 id="83-数据面-读自管页缓存--o_direct-读通道">8.3 数据面-读：自管页缓存 + O_DIRECT 读通道</h3>
 <ul>
 <li><strong>热随机读 3.8×</strong>：自管页缓存命中 = ~100ns 级 memcpy（240 ns/读含接口层），Disk 热读要付 pread syscall（910 ns）。</li>
@@ -560,7 +560,7 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 </table>
 <p><strong>设计含义</strong>：fsync 密集场景的性能上限由设备 fsync 延迟决定（硬件地板）；本层的职责是不在地板之上
 再加协议税——检查点 per-op 全量序列化（初版每 Flush 5 屏障 + O(容量) 位图写）正是被 WAL 替换掉的那层税。</p>
-<h3 id="85-调优速查raw">8.5 调优速查（Raw）</h3>
+<h3 id="85-调优速查virtual">8.5 调优速查（Virtual）</h3>
 <table>
 <thead>
 <tr>
@@ -583,7 +583,7 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 </tr>
 <tr>
 <td>全卷备份/迁移</td>
-<td><code>RootSpaceImage.Transfer</code>（Raw↔Raw 自动走 dd 字节直拷快道）</td>
+<td><code>RootSpaceImage.Transfer</code>（Virtual↔Virtual 自动走 dd 字节直拷快道）</td>
 </tr>
 </tbody>
 </table>
@@ -620,7 +620,7 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 <td>纯内存（槽/字典直达）——上界参照</td>
 </tr>
 <tr>
-<td><strong>Raw</strong></td>
+<td><strong>Virtual</strong></td>
 <td style="text-align: right;"><strong>223</strong></td>
 <td style="text-align: right;"><strong>60</strong></td>
 <td style="text-align: right;"><strong>223,785</strong></td>
@@ -636,8 +636,8 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 </tbody>
 </table>
 <ul>
-<li>Raw vs Disk：Open <strong>33×</strong> / Stat <strong>110×</strong> / 枚举 <strong>11×</strong>——与 §8 BDN 隔离口径（35×/176×/18.7×）同量级；</li>
-<li>Raw vs Mem（理论上界）：同数量级（Open 223 vs 118——Raw 多一层共享登记与游标；Stat 打平 60 vs 54）。
+<li>Virtual vs Disk：Open <strong>33×</strong> / Stat <strong>110×</strong> / 枚举 <strong>11×</strong>——与 §8 BDN 隔离口径（35×/176×/18.7×）同量级；</li>
+<li>Virtual vs Mem（理论上界）：同数量级（Open 223 vs 118——Virtual 多一层共享登记与游标；Stat 打平 60 vs 54）。
 <strong>元数据面 虚拟 ≈ 内存 ≫ 本地 ≫ 网络</strong> 是四类文件系统的基本格局。</li>
 </ul>
 <h3 id="92-数据面">9.2 数据面</h3>
@@ -667,7 +667,7 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 <td style="text-align: right;">0.04（no-op）</td>
 </tr>
 <tr>
-<td><strong>Raw</strong></td>
+<td><strong>Virtual</strong></td>
 <td style="text-align: right;">23.6</td>
 <td style="text-align: right;">254（自管页缓存）</td>
 <td style="text-align: right;">1,606</td>
@@ -685,9 +685,9 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 <ul>
 <li><strong>本地三类文件系统数据面带内持平</strong>：追加 1.6 GB/s（设备写上限形态）、顺序读 23-37 GB/s（内存拷贝带宽形态）——
 文件系统选择不由数据面速度决定；</li>
-<li>随机读的缓存提供方不同（OS page cache / 直址 / 自管页缓存 / 桥级 LRU）——Raw 254ns 含共享设施
+<li>随机读的缓存提供方不同（OS page cache / 直址 / 自管页缓存 / 桥级 LRU）——Virtual 254ns 含共享设施
 （游标/epoch/快照），是&quot;带一致性规范的缓存命中&quot;价格；</li>
-<li><strong>fsync 谱系</strong>：Mem 0.04ms（易失）→ Disk 0.33ms（OS fsync）→ Raw 0.38ms（WAL 单屏障 + 载体 fsync）→
+<li><strong>fsync 谱系</strong>：Mem 0.04ms（易失）→ Disk 0.33ms（OS fsync）→ Virtual 0.38ms（WAL 单屏障 + 载体 fsync）→
 Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应。</li>
 </ul>
 <h3 id="93-选型决策数据面持平的前提下按语义选">9.3 选型决策（数据面持平的前提下按语义选）</h3>
@@ -712,7 +712,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 </tr>
 <tr>
 <td>本地持久化主形态</td>
-<td><strong>Raw</strong></td>
+<td><strong>Virtual</strong></td>
 <td>单工件自描述 + 元数据面 11-33× + 精确卷几何 + 断电自恢复 + dd 级迁移</td>
 </tr>
 <tr>
@@ -726,7 +726,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <h2 id="10-并发与扩展性四类文件系统--5-负载形态--1-16-线程梯度prototypesioconcurrencyprobe">10. 并发与扩展性（四类文件系统 × 5 负载形态 × 1-16 线程梯度——<code>prototypes/IoConcurrencyProbe</code>）</h2>
 <blockquote>
 <p>2026-08-19 空闲窗实测（12 核，两轮复跑格局一致）。读维为<strong>每线程独立句柄</strong>（引擎读池形态——
-单句柄多线程读不在 <code>IFileHandle</code> 契约内：Remote 读句柄缓存非线程安全，Mem/Disk/Raw 单句柄
+单句柄多线程读不在 <code>IFileHandle</code> 契约内：Remote 读句柄缓存非线程安全，Mem/Disk/Virtual 单句柄
 并发虽巧可跑、不构成承诺）。追加为同句柄多线程（<code>Append</code> 文件级原子预留——契约内）。</p>
 </blockquote>
 <h3 id="101-并发追加同文件-64kbmbs">10.1 并发追加（同文件 64KB，MB/s）</h3>
@@ -737,7 +737,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <th style="text-align: right;">Disk</th>
 <th style="text-align: right;">Mem(Sparse)</th>
 <th style="text-align: right;">Mem(Reserved)</th>
-<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Virtual</th>
 <th style="text-align: right;">Remote(staging)</th>
 </tr>
 </thead>
@@ -778,8 +778,8 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <li><strong>Mem(Reserved) 追加恒 ~22 MB/s 不是并发问题</strong>：Reserved 追加越过 EOF 必经 Grow 换租
 （O(n) memcpy/次——文件系统固有，io.md §8.10）；原地覆写形态下 Reserved 写 13-26 GB/s（§10.3）；</li>
 <li><strong>Disk 波动大</strong>（内核 inode 锁 + 回写竞争，环境负载敏感）；</li>
-<li><strong>Raw 多线程反扩展</strong>（1,250→~300）：<strong>已知形态</strong>——v1 写路径全局元数据锁（单写者模型，正确性优先），
-多写线程 = 争用税无并行收益。<strong>消费含义：Raw 上的并发写应该用单写者句柄 + <code>Append</code> 原子预留
+<li><strong>Virtual 多线程反扩展</strong>（1,250→~300）：<strong>已知形态</strong>——当前写路径全局元数据锁（单写者模型，正确性优先），
+多写线程 = 争用税无并行收益。<strong>消费含义：Virtual 上的并发写应该用单写者句柄 + <code>Append</code> 原子预留
 （多线程共用一个句柄天然串行化），或上层自己做写聚合</strong>；写路径锁分段是后续优化方向；</li>
 <li>Remote staging 层并发追加 ~150-420 MB/s（内存层 + 连接管理竞争）。</li>
 </ul>
@@ -791,7 +791,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <th style="text-align: right;">Disk</th>
 <th style="text-align: right;">Mem(Sparse)</th>
 <th style="text-align: right;"><strong>Mem(Reserved)</strong></th>
-<th style="text-align: right;"><strong>Raw</strong></th>
+<th style="text-align: right;"><strong>Virtual</strong></th>
 <th style="text-align: right;">Remote</th>
 </tr>
 </thead>
@@ -836,7 +836,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 读者互不阻塞、不被写者阻塞（§10.3 混合形态同样成立）；</li>
 <li><strong>Mem(Sparse) 升级后读也并行</strong>（4-22M）：per-file Gate 从裸 monitor 换 <code>SpinRWLock</code>（LockWord 时代）RW 语义——
 并发读者互不阻塞；16 线程回落 = CAS 读计数热点；</li>
-<li><strong>Raw 读路径并行扩展 3.3-4×</strong>（3.0→12-14.5M ops/s @8 线程）：锁外快照读（区间列表 CoW + epoch
+<li><strong>Virtual 读路径并行扩展 3.3-4×</strong>（3.0→12-14.5M ops/s @8 线程）：锁外快照读（区间列表 CoW + epoch
 延迟回收）的实测兑现；16 线程回落 = 12 核物理上限 + 环境负载；</li>
 <li>Disk 随内核 pread 并行扩展（7.8×@16）；Remote 受连接与缓存装载竞争限制。</li>
 </ul>
@@ -852,7 +852,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <th style="text-align: right;">Disk</th>
 <th style="text-align: right;">Mem(Sparse)†</th>
 <th style="text-align: right;"><strong>Mem(Reserved)</strong></th>
-<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Virtual</th>
 </tr>
 </thead>
 <tbody>
@@ -894,9 +894,9 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 （epoch 锁外读者 + freeze 屏障）；Sparse 2-8 线程内读写并存可用（写 3-19GB/s + 读 6-9M），
 极端读并发（≥16）或写延迟敏感场景仍选 Reserved；</li>
 <li><strong>Disk 混合最均衡</strong>：pread 无锁（读者 8.1M）+ 缓冲写 4-6 GB/s；</li>
-<li><strong>Raw 单写者模型的已知代价</strong>：数据面覆写本身很快（3-6.6 GB/s——无分配无结构变更），但每写过
+<li><strong>Virtual 单写者模型的已知代价</strong>：数据面覆写本身很快（3-6.6 GB/s——无分配无结构变更），但每写过
 全局元数据锁，饱和写者下读者快照捕获排队（0.00-0.03M）；写静止时读并行如常（§10.2 的 12M ops/s）。
-<strong>消费含义：Raw 上读写并发负载 = 写者限速/攒批，或读写分文件（段模型天然如此）</strong>；锁分段是后续优化方向。</li>
+<strong>消费含义：Virtual 上读写并发负载 = 写者限速/攒批，或读写分文件（段模型天然如此）</strong>；锁分段是后续优化方向。</li>
 </ul>
 <h3 id="104-并发-openclosek-opss">10.4 并发 Open/Close（K ops/s）</h3>
 <table>
@@ -905,7 +905,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <th style="text-align: right;">线程</th>
 <th style="text-align: right;">Disk</th>
 <th style="text-align: right;">Mem</th>
-<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Virtual</th>
 <th style="text-align: right;">Remote</th>
 </tr>
 </thead>
@@ -927,7 +927,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 </tbody>
 </table>
 <ul>
-<li><strong>Raw 单线程 3.9M ops/s = Disk 的 36×</strong>（内存元数据直达）；多线程缓降（登记/共享设施竞争）但
+<li><strong>Virtual 单线程 3.9M ops/s = Disk 的 36×</strong>（内存元数据直达）；多线程缓降（登记/共享设施竞争）但
 8 线程仍是 Disk 的 5×；</li>
 <li>Mem 同型态（7.2M 单线程最高，反扩展至 3.2M）；</li>
 <li>网络文件系统每次 Open = 网络往返（2K ops/s）——网络文件系统高频开关是反模式。</li>
@@ -939,7 +939,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 <th style="text-align: right;">线程</th>
 <th style="text-align: right;">Disk</th>
 <th style="text-align: right;">Mem</th>
-<th style="text-align: right;">Raw</th>
+<th style="text-align: right;">Virtual</th>
 <th style="text-align: right;">Remote(staging)</th>
 </tr>
 </thead>
@@ -962,14 +962,14 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 </table>
 <ul>
 <li>Mem 独立文件近线性（数据面隔离 + 逐文件并行）——多文件并发写的主力形态；</li>
-<li><strong>Raw 全局元数据锁在多文件写下争用放大</strong>（每文件追加都过同一把锁——19-24 MB/s）：与 §10.1 同根
-（单写者模型），多文件形态更吃亏；<strong>消费含义：Raw 卷上的多写入者负载应在上层聚合为单写者</strong>
+<li><strong>Virtual 全局元数据锁在多文件写下争用放大</strong>（每文件追加都过同一把锁——19-24 MB/s）：与 §10.1 同根
+（单写者模型），多文件形态更吃亏；<strong>消费含义：Virtual 卷上的多写入者负载应在上层聚合为单写者</strong>
 （这正是存储引擎段模型的标准形态——一个段一个写者）；</li>
 <li>Disk 独立文件并行最好情形 ~1.3 GB/s（内核 per-inode 锁真隔离）。</li>
 </ul>
 <h3 id="106-并发规范总结">10.6 并发规范总结</h3>
 <ol>
-<li><strong>Raw = 单写者模型（v1 已知边界）</strong>：写路径全局锁——并发写（同文件/多文件）反扩展。正确姿势 =
+<li><strong>Virtual = 单写者模型（v1 已知边界）</strong>：写路径全局锁——并发写（同文件/多文件）反扩展。正确姿势 =
 单写句柄 + <code>Append</code> 原子预留（多线程共句柄自然串行）或上层写聚合；读路径锁外快照真并行（3.6×）。</li>
 <li><strong>Mem 模式分工</strong>：Sparse 的 per-file Gate 已是 RW 语义（读共享写独占）——混合负载
 读写并存（2-8 线程写 3-19GB/s + 读 6-9M ops/s）；Reserved 仍是读写双高的生产答案（无锁直址 +
@@ -978,7 +978,7 @@ epoch 锁外读，无饿死面）；≥16 读者极端下 Sparse 写者退化（
 <li><strong>Remote = 并发收益在网络侧不在桥侧</strong>：staging 内存层并发有限；<code>MaxConcurrency</code>（默认 4）才是
 网络文件系统并发的正确旋钮（Flush 并行上传）。</li>
 <li><strong>跨文件系统通用</strong>：<code>Append</code> 同句柄多线程安全（原子预留——契约内）；单句柄多线程 <strong>Read</strong> 不在契约内
-——并发读用多句柄（Raw/Mem/Disk 恰好能跑也不依赖）。</li>
+——并发读用多句柄（Virtual/Mem/Disk 恰好能跑也不依赖）。</li>
 </ol>
 <h3 id="107-生产可用性判定按负载形态逐项给结论">10.7 生产可用性判定（按负载形态逐项给结论）</h3>
 <table>
@@ -991,12 +991,12 @@ epoch 锁外读，无饿死面）；≥16 读者极端下 Sparse 写者退化（
 </thead>
 <tbody>
 <tr>
-<td>单写者追加/日志卷（Raw）</td>
+<td>单写者追加/日志卷（Virtual）</td>
 <td>✅ <strong>生产就绪</strong></td>
 <td>追加 1.2-1.6 GB/s（Disk 持平）；fsync 钉硬件地板（564μs vs Disk 490μs）；断电自恢复契约测试锁定</td>
 </tr>
 <tr>
-<td>多读者并发扫描/点查（Raw）</td>
+<td>多读者并发扫描/点查（Virtual）</td>
 <td>✅ <strong>生产就绪</strong></td>
 <td>读扩展 3.3-4×（14.5M ops/s @8T）；随机读热 240ns/读（Disk 3.8×）</td>
 </tr>
@@ -1006,7 +1006,7 @@ epoch 锁外读，无饿死面）；≥16 读者极端下 Sparse 写者退化（
 <td>Reserved：写 9-22 GB/s 与读 6-28M ops/s 同时成立（§10.3）；Sparse（RW Gate）2-8 线程读写并存可用</td>
 </tr>
 <tr>
-<td>元数据面重负载（Raw）</td>
+<td>元数据面重负载（Virtual）</td>
 <td>✅ <strong>生产就绪</strong></td>
 <td>Open 4.6M ops/s（Disk 35×）；并发 Open/Close 8T 仍 3.2M（Disk 5×）</td>
 </tr>
@@ -1016,12 +1016,12 @@ epoch 锁外读，无饿死面）；≥16 读者极端下 Sparse 写者退化（
 <td>桥层 870 MB/s；增量 Flush 出口流量 O(增量)；网络侧按部署实测</td>
 </tr>
 <tr>
-<td>读写并发同文件（Raw）</td>
+<td>读写并发同文件（Virtual）</td>
 <td>⚠️ <strong>形态受限（有明确姿势）</strong></td>
 <td>饱和写者下读者排队（0.01M）——写者限速/攒批或读写分文件（段模型天然如此）；锁分段是后续优化方向</td>
 </tr>
 <tr>
-<td>多写入者（Raw）</td>
+<td>多写入者（Virtual）</td>
 <td>⚠️ <strong>形态受限（有明确姿势）</strong></td>
 <td>并发写反扩展（单写者模型）——上层聚合为单写者 + <code>Append</code>（存储引擎段模型的标准形态）</td>
 </tr>
@@ -1033,9 +1033,9 @@ epoch 锁外读，无饿死面）；≥16 读者极端下 Sparse 写者退化（
 </tbody>
 </table>
 <p><strong>总判</strong>：IO 层在<strong>契约承诺的负载形态</strong>内全部达到生产性能（数据面带内持平 + 元数据面一个数量级优势 +
-并发读真扩展 + fsync 硬件地板）；两个受限形态（Raw 混合读写/多写者）是 v1 单写者模型的<strong>已知边界而非
+并发读真扩展 + fsync 硬件地板）；两个受限形态（Virtual 混合读写/多写者）是 v1 单写者模型的<strong>已知边界而非
 缺陷</strong>——消费姿势已在 §10.6 钉死，与存储引擎&quot;一个段一个写者&quot;的段模型天然对齐。后续优化方向：
-Raw 写路径锁分段 / Mem Reserved 追加快道（Grow 换租）/ Sparse RW Gate 公平性（极端读者下写者退化——
+Virtual 写路径锁分段 / Mem Reserved 追加快道（Grow 换租）/ Sparse RW Gate 公平性（极端读者下写者退化——
 高并发场景用 Reserved 即绕开）。</p>
 <hr>
 <h2 id="11-方法学规范数字可信的前提">11. 方法学规范（数字可信的前提）</h2>
@@ -1045,17 +1045,17 @@ Raw 写路径锁分段 / Mem Reserved 追加快道（Grow 换租）/ Sparse RW G
 <li><strong>迭代间重置</strong>：追加维每 op 删建文件（<code>IterationSetup</code>）——否则预分配 × 迭代数打满卷（DiskFull 假阴性）。</li>
 <li><strong>空闲机终判 ±5%</strong>：共享机负载波动 3× 时数字失真（Disk 自身可退化 100×）；正式结论 load &lt; 1.2 实测。</li>
 <li><strong>fsync 维沉降</strong>：前序基准的内核回写积压会污染 fsync 段（单 inode fsync 付全部积压 vs 多 inode 的测量不对称）。</li>
-<li><strong>探针 vs BDN</strong>：探针（DiskVsRawProbe）快速肉眼对照；正式数字走 BDN（进程隔离 + 预热 + 多轮）。</li>
+<li><strong>探针 vs BDN</strong>：探针（DiskVsVirtualProbe）快速肉眼对照；正式数字走 BDN（进程隔离 + 预热 + 多轮）。</li>
 </ol>
 <h2 id="12-已知边界">12. 已知边界</h2>
 <ul>
 <li>dev 机基线：绝对值不可外推到生产硬件（NVMe/云盘差异大）；<strong>比值与结论跨硬件稳定</strong>。</li>
-<li>Raw 追加维 0.86×（BDN create 重载形态——每 op 删建文件，建文件路径税 vs ext4 内联建文件；稳态持平）
+<li>Virtual 追加维 0.86×（BDN create 重载形态——每 op 删建文件，建文件路径税 vs ext4 内联建文件；稳态持平）
 ——观察项：海量小文件建卷负载再议。</li>
 <li>4Kn 真扇区/Windows 载体/dm-flakey 故障注入矩阵未跑（需 root/Windows 环境）。</li>
 <li><strong>MinIO loopback ≠ 真云</strong>：RTT &lt; 1ms 掩盖了 WAN 延迟（真云 Range GET p50=48ms——§7.3 COS 对照）；
 §7/§9 的 Remote 数字量化的是<strong>桥层成本结构</strong>（staging/缓存/Flush 编排），网络侧按部署实测。</li>
-<li><strong>Raw 写路径锁分段未做</strong>（§10.1/§10.5 反扩展的根）：单写者模型下多线程写无并行收益——
+<li><strong>Virtual 写路径锁分段未做</strong>（§10.1/§10.5 反扩展的根）：单写者模型下多线程写无并行收益——
 后续优化方向 = 写锁分段（段级/文件级）+ 位图分块锁；当前消费姿势 = 单写者 + Append。</li>
 </ul>
 
