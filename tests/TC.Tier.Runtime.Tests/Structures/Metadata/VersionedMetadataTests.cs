@@ -312,7 +312,7 @@ public class VersionedMetadataTests
     }
 
     /// <summary>
-    /// ★ 冷热分离（用户裁定）：PayloadSize 只参与本次运行的版本几何（Write/Prepare 追加的 record），
+    /// ★ 冷热分离（设计决策）：PayloadSize 只参与本次运行的版本几何（Write/Prepare 追加的 record），
     /// 历史版本恢复按盘上真实大小完整交付。扩容启动（64→128）——加载版本按真实 64B 交付
     /// （不补零到当前 PayloadSize），首次 Write 后切到当前配置 128B。
     /// </summary>

@@ -149,7 +149,7 @@ public abstract partial class SnapshotBase : LifecycleBase<SnapshotRecoveryHints
     /// </summary>
     protected override void OnInitializeBegin()
     {
-        // 水位线归结构层（用户裁定）：引擎自恢复，外部水位注入走结构 Initialize(hints)——
+        // 水位线归结构层（设计决策）：引擎自恢复，外部水位注入走结构 Initialize(hints)——
         // 静态配置透传 committedTailHint 设小了会把有效数据当半写截断，Settings 不暴露
         _engine.Initialize();
         _metaEngine?.Initialize();   // ★ meta 引擎（Managed）并行启动——不等，就绪 join 在恢复核心

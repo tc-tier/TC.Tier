@@ -157,7 +157,7 @@ public abstract partial class MetadataBase
     }
 
     /// <summary>
-    /// 加载指定地址的版本 record 到内存（冷热分离——用户裁定）。
+    /// 加载指定地址的版本 record 到内存（冷热分离——设计决策）。
     /// ★ 按 record 自身 PayloadLength 从自持池租借只读缓冲，热区不写：历史大小 ≠ 当前
     ///   _payloadSize 时不补零、不截断——Read/AsSpan 按盘上真实大小完整交付使用方。
     /// ★ 首次 Write 前：当前内容 = 加载版本（历史真实大小）；Write 后：当前内容 = 热区

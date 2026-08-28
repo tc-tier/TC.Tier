@@ -9,7 +9,7 @@ public abstract partial class LogBase
     /// <summary>
     /// ★ 写元数据（水位提交链统一入口）：水位 + 已登记 opaque 同块原子落盘。
     /// <para>opaque 来自 SetOpaqueMeta 的 stage（策略缓冲保留——结构化水位写不清除），
-    ///   内部提交链不再有独立 opaque 通道（用户裁定：opaque 跟随水位线，无第二条提交路径）。</para>
+    ///   内部提交链不再有独立 opaque 通道（设计决策：opaque 跟随水位线，无第二条提交路径）。</para>
     /// </summary>
     /// <param name="committedOffset">本次提交边界（写入 Payload 的 CommittedOffset 字段）。</param>
     private protected void AppendMeta(LogicalAddress committedOffset)

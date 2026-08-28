@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 namespace TC.Tier.Products.Wal;
 
 /// <summary>
-/// TierWAL opaque 容器头——TierWAL 三段式的"头部"（用户裁定：只记最大/最小 long 及其对应地址，
+/// TierWAL opaque 容器头——TierWAL 三段式的"头部"（设计决策：只记最大/最小 long 及其对应地址，
 /// 段是底层的概念，上层地址空间无限；raft 元数据预留区 = opaque 剩余）。
 /// <para>布局：<c>[Magic 4B][Version 2B][pad 2B][TailIndex 8B][TailAddress 16B][HeadIndex 8B][HeadAddress 16B]</c></para>
 /// <para>★ TailIndex/TailAddress = 最后一条已分配 entry（持久化水位——opaque 随显式提交落盘）；

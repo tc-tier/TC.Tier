@@ -19,15 +19,19 @@ public interface ILifecycle<in THints> where THints : struct
     // ════════════════════════════════════════════════════════════
 
     /// <summary>是否已就绪（恢复完成或无需恢复）。原子可读，并发安全，适合外部轮询自旋。</summary>
+    /// <returns>是否已就绪。</returns>
     bool IsReady { get; }
 
     /// <summary>恢复状态快照（原子可读，并发安全）。Phase 枚举观测恢复进度阶段。</summary>
+    /// <returns>恢复状态快照。</returns>
     RecoveryState RecoveryState { get; }
 
     /// <summary>
     /// 恢复进度变化事件（进度条订阅）。后台恢复推进时触发。
     /// <para>★ 转发内部 IRecovery 的同名事件。</para>
     /// </summary>
+    /// <remarks>可空。</remarks>
+    /// <returns>恢复进度变化事件（进度条订阅）。</returns>
     event Action<RecoveryProgress>? RecoveryProgressChanged;
 
     /// <summary>
@@ -39,6 +43,8 @@ public interface ILifecycle<in THints> where THints : struct
     /// <para>⚠️ <b>禁止在异步上下文调用</b>：UI/ASP.NET 等同步上下文下，同步阻塞后台 Task 会经典死锁。
     ///   异步调用方请用 <see cref="WaitForReadyAsync"/>。</para>
     /// </summary>
+    /// <exception cref="OperationCanceledException">等待被取消（如 <see cref="CancelRecovery"/> 触发）。</exception>
+    /// <exception cref="Exception">恢复失败（后台恢复 task 抛异常）。</exception>
     void WaitForReady();
 
     /// <summary>

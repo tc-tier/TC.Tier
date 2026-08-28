@@ -8,7 +8,7 @@ public abstract partial class MirrorBase
     private protected IMetaPolicy<MirrorMetaHeader, MirrorMetaPayload> MetaPolicy { get; }
 
 
-    /// <summary>★ 登记外部 opaque meta——stage 进策略缓冲，随水位线落盘原子携带（用户裁定：
+    /// <summary>★ 登记外部 opaque meta——stage 进策略缓冲，随水位线落盘原子携带（设计决策：
     /// opaque 搭水位线的车，同一块同一 CRC；无独立提交路径，需确定性持久化点走 Prepare/ConfirmCommitted）。
     /// ⚠️ 写侧拦截：Disabled 抛 InvalidOperationException（禁用即报错）；超 MetaOpaqueBytes 策略抛 ArgumentException。</summary>
     public void SetOpaqueMeta(ReadOnlySpan<byte> data)

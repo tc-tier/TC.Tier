@@ -35,7 +35,7 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
     private readonly LogSettings _settings;
 
     /// <summary>opaque 脏标记——SetOpaqueMeta 置位，AppendMeta 落盘后清零；
-    /// 零数据推进时 CommitCore 凭它仍提交 meta（纯 opaque 提交=完整块，用户裁定）。</summary>
+    /// 零数据推进时 CommitCore 凭它仍提交 meta（纯 opaque 提交=完整块，设计决策）。</summary>
     private protected bool _opaqueDirty;
 
     /// <summary>★ 2PC Abort 回退点：最近一次<b>已确认提交</b>对应的尾（ConfirmCommitted 推进，单调）。
@@ -47,7 +47,7 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
 
     private ILogCodec LogCodec { get; }
 
-    /// <summary>★ 登记外部 opaque meta——stage 进 meta 策略缓冲，<b>随水位线落盘原子携带</b>（用户裁定）。
+    /// <summary>★ 登记外部 opaque meta——stage 进 meta 策略缓冲，<b>随水位线落盘原子携带</b>（设计决策）。
     /// <para>语义：opaque 是外部记录搭内部水位线的车——同一块、同一 CRC 原子持久化；不存在独立的
     ///   opaque 提交路径（旧 WriteOpaqueMeta 自拍 TailAddress 独立成块 = 并发水位回退 + 被内部
     ///   提交冲掉，已废除）。落盘时机归水位线提交链；需确定性持久化点调 <see cref="EntryLog.CommitAsync"/>

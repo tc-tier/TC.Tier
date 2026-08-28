@@ -4,7 +4,7 @@ namespace TC.Tier.Products.Wal;
 /// TierWAL opaque 容器（搭 Meta 边车：Meta 只提供字节容器原子持久化 + CRC 完整性，不解析内容、
 /// 不管布局——容器内格式 TierWAL 自定，与 Meta 头尾格式完全无关）。
 /// <para>布局：<c>[WalOpaqueHeader 54B][raft 元数据预留区]</c>——头部只记最大/最小 long 及其对应地址
-///   （用户裁定：段是底层的概念，上层地址空间无限；给定 index 的定位 = 内存稀疏锚点二分 + 顺序重放）。</para>
+///   （设计决策：段是底层的概念，上层地址空间无限；给定 index 的定位 = 内存稀疏锚点二分 + 顺序重放）。</para>
 /// </summary>
 internal static class WalOpaqueLayout
 {
