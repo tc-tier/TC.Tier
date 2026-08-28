@@ -9,7 +9,7 @@
       <meta name="viewport" content="width=device-width">
       <meta name="title" content="Class MetadataMetaTransport | TC.Tier — .NET 可组合存储运行时 ">
     
-    <meta name="description" content="外部 meta 介质适配器——把 meta 块托管到 （版本链稳定存储）。 ★ 3a（外部隔离）语义的推荐实现（用户裁定）：需要外部独有 meta 存储时，不再自写   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：  - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；  - 持久化点即 （Write + Persist + flush）——对齐   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；  - N=2 轮转自动回收（每次写后 ），空间有界；  - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（   经  注册进 TransactionLog）。 配置约束： 必须 ≥ meta 块上界 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛  （fail-fast，不静默截断）。引擎名须与主结构不同（如 &quot;xxx.meta&quot;）。">
+    <meta name="description" content="外部 meta 介质适配器——把 meta 块托管到 （版本链稳定存储）。 ★ 3a（外部隔离）语义的推荐实现（设计决策）：需要外部独有 meta 存储时，不再自写   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：  - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；  - 持久化点即 （Write + Persist + flush）——对齐   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；  - N=2 轮转自动回收（每次写后 ），空间有界；  - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（   经  注册进 TransactionLog）。 配置约束： 必须 ≥ meta 块上界 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛  （fail-fast，不静默截断）。引擎名须与主结构不同（如 &quot;xxx.meta&quot;）。">
       <link rel="shortcut icon" href="../favicon.ico">
       <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
       <link rel="stylesheet" href="../styles/docfx.css">
@@ -76,7 +76,7 @@
 
   <h1 id="TC_Tier_Runtime_Meta_MetadataMetaTransport" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport" class="text-break">Class MetadataMetaTransport</h1>
   <div class="markdown level0 summary"><p>外部 meta 介质适配器——把 meta 块托管到 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadata.html">VersionedMetadata</a>（版本链稳定存储）。</p>
-<p>★ 3a（外部隔离）语义的<b>推荐实现</b>（用户裁定）：需要外部独有 meta 存储时，不再自写
+<p>★ 3a（外部隔离）语义的<b>推荐实现</b>（设计决策）：需要外部独有 meta 存储时，不再自写
   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、
   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：</p>
 <p> - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；</p>
