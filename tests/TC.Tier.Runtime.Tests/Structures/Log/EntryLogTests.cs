@@ -591,7 +591,7 @@ public class EntryLogTests
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    // ★ opaque meta 公共入口契约（用户裁定：写侧拦截——禁用即报错，不静默吞）
+    // ★ opaque meta 公共入口契约（设计决策：写侧拦截——禁用即报错，不静默吞）
     // ═══════════════════════════════════════════════════════════════════
 
     [Fact]
@@ -615,7 +615,7 @@ public class EntryLogTests
     [Fact]
     public async Task SetOpaqueMeta_RidesWithWatermarkCommit_Transport()
     {
-        // ★ 搭车语义（用户裁定）：SetOpaqueMeta 只登记（stage），随水位线提交原子落盘——
+        // ★ 搭车语义（设计决策）：SetOpaqueMeta 只登记（stage），随水位线提交原子落盘——
         //   登记后由【数据路径的内部提交链】触发落盘（无 opaque 通道），opaque 仍在块里。
         //   回归旧缺陷：内部提交曾把外部 opaque 静默冲掉。
         var (settings, vol) = TestLogSettingsFactory.CreateEntry(logPageSizeBits: 14,
@@ -644,7 +644,7 @@ public class EntryLogTests
     [Fact]
     public async Task SetOpaqueMeta_Only_NoData_CommitStillCompleteBlock()
     {
-        // ★ 纯 opaque 提交（用户裁定语义）：零数据写入时显式 CommitAsync——数据为空，
+        // ★ 纯 opaque 提交（设计决策语义）：零数据写入时显式 CommitAsync——数据为空，
         //   但 meta 块完整自洽（当前水位原样携带 + opaque 同块同 CRC）。
         var (settings, vol) = TestLogSettingsFactory.CreateEntry(logPageSizeBits: 14,
             metaKind: MetaPolicyKind.Transport, payloadCapacity: 64);
@@ -666,7 +666,7 @@ public class EntryLogTests
 
     // ═══════════════════════════════════════════════════════════════════
     // ★ 3a 外部隔离（注入 MetadataMetaTransport——meta 托管 VersionedMetadata 版本链）
-    //   用户裁定：外部独有 meta 存储优先选 VersionedMetadata，避免独自写盘一致性 + 自搭 2PC。
+    //   设计决策：外部独有 meta 存储优先选 VersionedMetadata，避免独自写盘一致性 + 自搭 2PC。
     // ═══════════════════════════════════════════════════════════════════
 
     private static MetadataMetaTransport NewExternalMeta(TestVolume vol, string engineName, bool deleteOnClose)

@@ -44,7 +44,7 @@ public sealed class VersionedMetadataSettings : MetadataSettings
     }
 
     /// <summary>元数据结构体字节数（调用方写入的 Payload 大小，自动向上对齐到扇区）。
-    /// <para>★ 冷热分离（用户裁定）：本配置只决定<b>本次运行</b>的版本几何——Write/Prepare 追加的
+    /// <para>★ 冷热分离（设计决策）：本配置只决定<b>本次运行</b>的版本几何——Write/Prepare 追加的
     ///   新版本 record 大小。恢复载入的历史版本按其盘上真实大小<b>完整交付</b>（不补零、不截断），
     ///   跨重启改大小合法（版本链混尺寸由各 record 头部自述几何支撑）。</para></summary>
     public int PayloadSize { get; init; }

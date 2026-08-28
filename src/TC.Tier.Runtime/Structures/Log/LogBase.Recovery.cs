@@ -3,7 +3,7 @@ namespace TC.Tier.Runtime.Structures.Log;
 /// <summary>
 /// LogBase 恢复嵌套类 DefaultLogRecovery / <see cref="LogRecovery{TLogBase}"/>——
 /// <see cref="RecoveryBase{THints}"/> 模板派生（CAS 闸门/状态机/进度上报/MarkReady 全在模板，
-/// 本类只填层间 join 与恢复算法）。恢复优先级统一（用户裁定）：① hints（外部主动注入，最高）
+/// 本类只填层间 join 与恢复算法）。恢复优先级统一（设计决策）：① hints（外部主动注入，最高）
 /// → ② meta（持久化水位）→ ③ 扫盘——对齐 Metadata/Mirror/Snapshot。
 /// </summary>
 public abstract partial class LogBase
@@ -36,7 +36,7 @@ public abstract partial class LogBase
         /// <summary>
         /// ★ 恢复核心：InitializeForWrites（依赖 SectorSize 的装配，引擎就绪后）→ 三级回退
         /// ① hints（外部主动注入的初始化水位——最高优先级，TailAddress 精确 → FileSize 近似）
-        /// ② meta（结构自管持久化水位）③ 扫盘。与 Metadata/Mirror/Snapshot 统一（用户裁定）。
+        /// ② meta（结构自管持久化水位）③ 扫盘。与 Metadata/Mirror/Snapshot 统一（设计决策）。
         /// </summary>
         protected override async ValueTask OnRecoveryCoreAsync(LogRecoveryHints hints, CancellationToken ct)
         {

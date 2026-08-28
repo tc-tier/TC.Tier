@@ -63,7 +63,7 @@ public abstract partial class MetadataBase
     private readonly AlignedMemoryManager[] _hotVersions;
     private int _hotVersionCount;
 
-    // === 历史版本只读缓冲（恢复载入）——用户裁定：不能无条件截断用户数据 ===
+    // === 历史版本只读缓冲（恢复载入）——设计决策：不能无条件截断用户数据 ===
     // ★ 载入的旧版本按盘上真实 PayloadLength 从自持 PinnedBufferPool 租用（只读产物，
     //   不进按当前配置分配的读写热区——历史大小 ≠ 当前 PayloadSize 时不补零、不截断）。
     // ★ 首次 Write 前：当前内容 = 加载版本（Read/AsSpan 按历史真实大小交付）；
@@ -212,7 +212,7 @@ public abstract partial class MetadataBase
     {
         // 阶段 1：引擎初始化（同步，调用线程）
         // ★ 构造 = 配置（段生长上限/分段开关已在 ctor 传入）；Initialize 只带恢复水位
-        // 水位线归结构层（用户裁定）：引擎自恢复，外部水位注入走结构 Initialize(hints)——
+        // 水位线归结构层（设计决策）：引擎自恢复，外部水位注入走结构 Initialize(hints)——
         // 静态配置透传 committedTailHint 设小了会把有效数据当半写截断，Settings 不暴露
         _engine.Initialize();
         _metaEngine?.Initialize();   // ★ meta 引擎（Managed）并行启动——不等，就绪 join 在恢复核心

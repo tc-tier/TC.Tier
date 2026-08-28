@@ -214,7 +214,7 @@ public abstract partial class MetadataBase
         if (_lowestVersionAddress == _highestVersionAddress) return; // 只有一个版本，不回收
 
         // ★ 保留窗口：[keepAddr, _highestVersionAddress] = 最近 N 个版本；回收 [MinAddress, keepAddr)
-        //   ★★ 逐 record 自身几何推进（用户裁定：配置不参与物理事实）——链上 record 尺寸可能不同
+        //   ★★ 逐 record 自身几何推进（设计决策：配置不参与物理事实）——链上 record 尺寸可能不同
         //   （PayloadSize 跨重启变更后新旧混尺寸），统一 _recordSize 步进会落在旧 record 中段 →
         //   ReclaimHead 掐半活 record → 下次扫盘断链静默丢数据。每条 record 的 header 自述自己的
         //   PayloadLength/PaddingLength（窗口 N 小，读 N 个 header 可忽略）。

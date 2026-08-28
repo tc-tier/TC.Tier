@@ -179,7 +179,7 @@ public abstract partial class MirrorBase : LifecycleBase<MirrorRecoveryHints>, I
     /// </summary>
     protected override void OnInitializeBegin()
     {
-        // 水位线归结构层（用户裁定）：引擎不带双尾修正自恢复（物理真相归引擎）；
+        // 水位线归结构层（设计决策）：引擎不带双尾修正自恢复（物理真相归引擎）；
         // 外部水位注入走结构 Initialize(hints)。静态配置透传 committedTailHint 是脚枪
         // ——设小了引擎按它截断物理尾，结构层水位线全体错乱，Settings 不暴露。
         _engine.Initialize();

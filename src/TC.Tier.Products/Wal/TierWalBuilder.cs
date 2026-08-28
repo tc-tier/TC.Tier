@@ -3,7 +3,7 @@ namespace TC.Tier.Products.Wal;
 /// <summary>
 /// TierWAL 构建者（三段式装配惯例同 StorageEngineBuilder：Options 配置链 → Builder →
 /// StartAsync 一步到位——构建 + 恢复 + WaitForReady 一体）。
-/// <para>★ 注入面开放（用户裁定：委托注入开放——不注入回落默认，Meta 校验兜底不可绕过）。</para>
+/// <para>★ 注入面开放（设计决策：委托注入开放——不注入回落默认，Meta 校验兜底不可绕过）。</para>
 /// <para>★ 启动状态机：只能成功启动一次（重复抛）；失败可重试（销毁重建 EntryLog 实例，对齐
 ///   RecoveryBase"Failed 销毁重建"哲学）。</para>
 /// </summary>

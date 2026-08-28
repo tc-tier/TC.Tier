@@ -12,7 +12,7 @@ namespace TC.Tier.Products.Wal;
 
 /// <summary>
 /// TierWAL——协议中立 WAL 产品（raft/p2p 的存储中线）实现类。
-/// <para>★ 心智模型（用户裁定 2026-08-25）：<b>地址是事实</b>——entry 地址只在 Append 返回值记录，
+/// <para>★ 心智模型（设计决策 2026-08-25）：<b>地址是事实</b>——entry 地址只在 Append 返回值记录，
 ///   绝不解析/推导逻辑地址结构（重启后段几何可能变，推导即错）；<b>不记录段</b>——段是底层的概念，
 ///   上层地址空间无限；index（long）= 顺序值，一条 entry 一个 index 一个地址（单调一一对应）。</para>
 /// <para>★ TierWAL 自己的三段式（每层在自己的槽位定义自己的格式）：</para>
@@ -298,7 +298,7 @@ public sealed class TierWal : LifecycleBase<WalRecoveryHints>, ITierWal
         // ★ 截空（newHeadIndex = AllocatedIndex+1）时第 newHeadIndex 条不存在——head 边界 = 写尾
         //   （恢复扫描从写尾起 = 空；EOF 停驻的最后一条会把残留多算一条）
         var entryAddr = newHeadIndex > allocated ? _log.TailAddress : LocateExactAddress(newHeadIndex);
-        // ★ 头截断边界对齐到段起点（用户裁定层叠）：段内打洞后 PageFrameCursor 从段首读
+        // ★ 头截断边界对齐到段起点（设计决策层叠）：段内打洞后 PageFrameCursor 从段首读
         //   会撞洞（帧头为零 → 停）——底层扫描机制限制；段对齐 = 整段删除，cursor 从新段首
         //   读正常（同段内 < newHeadIndex 的 entry 物理保留、逻辑已删——ReadFrom 从 newHeadIndex 起）。
         var boundaryAddr = new LogicalAddress(entryAddr.SegId, 0);

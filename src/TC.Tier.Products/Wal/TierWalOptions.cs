@@ -14,11 +14,11 @@ public sealed record TierWalOptions
     /// <summary>段上限（引擎段生长上限——TierWAL 自管段 anchor 表按引擎段记录）。</summary>
     public long SegmentGrowthLimit { get; private init; } = 256L * 1024 * 1024;
 
-    /// <summary>★ 默认回落最优模式（用户裁定零决策）：Managed（独立 .meta 引擎、恒单段、单槽覆盖原子语义、O(1) 恢复）。</summary>
+    /// <summary>★ 默认回落最优模式（零决策设计）：Managed（独立 .meta 引擎、恒单段、单槽覆盖原子语义、O(1) 恢复）。</summary>
     public MetaPolicyKind MetaPolicyKind { get; private init; } = MetaPolicyKind.Managed;
 
     /// <summary>
-    /// ★ opaque 容量 TierWAL 自配（用户裁定："配置多大都可以"）——默认 16KB。
+    /// ★ opaque 容量 TierWAL 自配（配置无固定上限）——默认 16KB。
     /// <para>容器布局 = [TailIndex 8B][HeadIndex 8B][段表条目数 4B][pad 4B][段 anchor 表 N×24B][raft 元数据预留区]；
     ///   段表容量 = (MetaOpaqueBytes − 24 − raft 区字节) / 24；raft 预留区 = opaque 剩余（配置表达）。</para>
     /// <para>★ 底层 Settings 基类默认 0——TierWAL 必须显式配置 &gt; 0（0 = 无 opaque 区，搭车通道不可用）。</para>

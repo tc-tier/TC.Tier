@@ -4,7 +4,7 @@ using TC.Tier.Core.Shared;
 namespace TC.Tier.Core.Tests.Shared;
 
 /// <summary>
-/// LifecycleBase.Recovery 创建语义契约测试——钉住"getter 纯读 + Initialize 单一创建点"（用户裁定：
+/// LifecycleBase.Recovery 创建语义契约测试——钉住"getter 纯读 + Initialize 单一创建点"（设计决策：
 /// 懒创建风险不该上层承担，基类直接原子）。
 /// <para>旧实现 <c>_recovery ??= CreateRecovery()</c> 的两宗罪（已废除）：
 /// ① 非原子——并发读双实例竞态；② 副作用——Initialize 前任何 IsReady 观测读都偷跑工厂
