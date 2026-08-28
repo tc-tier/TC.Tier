@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class MetadataMetaTransport | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class MetadataMetaTransport | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="外部 meta 介质适配器——把 meta 块托管到 （版本链稳定存储）。 ★ 3a（外部隔离）语义的推荐实现（设计决策）：需要外部独有 meta 存储时，不再自写   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：  - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；  - 持久化点即 （Write + Persist + flush）——对齐   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；  - N=2 轮转自动回收（每次写后 ），空间有界；  - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（   经  注册进 TransactionLog）。 配置约束： 必须 ≥ meta 块上界 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛  （fail-fast，不静默截断）。引擎名须与主结构不同（如 &quot;xxx.meta&quot;）。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="外部 meta 介质适配器——把 meta 块托管到 （版本链稳定存储）。 ★ 3a（外部隔离）语义的推荐实现（设计决策）：需要外部独有 meta 存储时，不再自写   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：  - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；  - 持久化点即 （Write + Persist + flush）——对齐   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；  - N=2 轮转自动回收（每次写后 ），空间有界；  - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（   经  注册进 TransactionLog）。 配置约束： 必须 ≥ meta 块上界 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛  （fail-fast，不静默截断）。引擎名须与主结构不同（如 &quot;xxx.meta&quot;）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport">
+
+        <article data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport">
 
 
 
-  <h1 id="TC_Tier_Runtime_Meta_MetadataMetaTransport" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport" class="text-break">Class MetadataMetaTransport</h1>
-  <div class="markdown level0 summary"><p>外部 meta 介质适配器——把 meta 块托管到 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadata.html">VersionedMetadata</a>（版本链稳定存储）。</p>
+  <h1 id="TC_Tier_Runtime_Meta_MetadataMetaTransport" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport" class="text-break">
+Class MetadataMetaTransport  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Meta.html">Meta</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>外部 meta 介质适配器——把 meta 块托管到 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadata.html">VersionedMetadata</a>（版本链稳定存储）。</p>
 <p>★ 3a（外部隔离）语义的<b>推荐实现</b>（设计决策）：需要外部独有 meta 存储时，不再自写
   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、
   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：</p>
@@ -89,19 +111,35 @@
 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>
 （fail-fast，不静默截断）。引擎名须与主结构不同（如 "xxx.meta"）。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">MetadataMetaTransport</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class MetadataMetaTransport : IMetaTransport, IDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">MetadataMetaTransport</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -120,313 +158,294 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Meta.html">Meta</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
-  <h5 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class MetadataMetaTransport : IMetaTransport, IDisposable</code></pre>
-  </div>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport__ctor_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.#ctor*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Metadata_VersionedMetadataSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Core.Logging.ILogger)">MetadataMetaTransport(IFileSystem, VersionedMetadataSettings, LightEpoch?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Metadata_VersionedMetadataSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Core.Logging.ILogger)">
+  MetadataMetaTransport(IFileSystem, VersionedMetadataSettings, LightEpoch?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>构造 + 启动（Initialize 非阻塞；首次读写会 WaitForReady 就绪——外部介质归调用方组合根）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public MetadataMetaTransport(IFileSystem fs, VersionedMetadataSettings settings, LightEpoch? epoch = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
-        <td><span class="parametername">fs</span></td>
-        <td><p>组合根文件系统（与主结构同 fs 即可，引擎名隔离子目录）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings.html">VersionedMetadataSettings</a></td>
-        <td><span class="parametername">settings</span></td>
-        <td><p>VersionedMetadata 配置（PayloadSize ≥ meta 块上界；EngineName 与主结构不同）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></td>
-        <td><span class="parametername">epoch</span></td>
-        <td><p>可选共享 epoch。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td><p>可选日志。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>组合根文件系统（与主结构同 fs 即可，引擎名隔离子目录）。</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings.html">VersionedMetadataSettings</a></dt>
+    <dd><p>VersionedMetadata 配置（PayloadSize ≥ meta 块上界；EngineName 与主结构不同）。</p>
+</dd>
+    <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
+    <dd><p>可选共享 epoch。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>可选日志。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Storage_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Storage*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Storage" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Storage">Storage</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Storage" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Storage">
+  Storage
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>底层 VersionedMetadata——高级场景（注册 ITransactionParticipant 进 TransactionLog / 手动 ReclaimOldVersions）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public VersionedMetadata Storage { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadata.html">VersionedMetadata</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadata.html">VersionedMetadata</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Dispose_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Dispose*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Dispose" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Dispose" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放底层 VersionedMetadata（版本链存储托管资产）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlock*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlock">ReadLastBlock()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlock">
+  ReadLastBlock()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读最后一个 meta 块——等待就绪后读当前版本，按自述布局裁剪为精确块；无数据（空链）返回空 Span。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ReadOnlySpan&lt;byte&gt; ReadLastBlock()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><p>精确块视图（有效至本传输下一次调用）；空 Span = 从未写入。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>精确块视图（有效至本传输下一次调用）；空 Span = 从未写入。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlockAsync_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlockAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlockAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlockAsync(System.Threading.CancellationToken)">ReadLastBlockAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlockAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlockAsync(System.Threading.CancellationToken)">
+  ReadLastBlockAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步读最后一个 meta 块（对等同步版 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock">ReadLastBlock()</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadLastBlockAsync(CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
-        <td><p>精确块视图（有效至本传输下一次调用）；空 Memory = 从未写入。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>精确块视图（有效至本传输下一次调用）；空 Memory = 从未写入。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlock*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlock(System.ReadOnlySpan{System.Byte})">WriteBlock(ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlock(System.ReadOnlySpan{System.Byte})">
+  WriteBlock(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>写完整块 = 持久化点：内存镜像推进版本 → 追加版本链 + flush → N=2 轮转回收。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void WriteBlock(ReadOnlySpan&lt;byte&gt; block)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">block</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>block</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlockAsync_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlockAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlockAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlockAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">WriteBlockAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlockAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlockAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  WriteBlockAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步写完整块（实质同步——flush 原生同步，立即返回完成；对等同步版 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_System_ReadOnlySpan_System_Byte__">WriteBlock(ReadOnlySpan&lt;byte&gt;)</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask WriteBlockAsync(ReadOnlyMemory&lt;byte&gt; block, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">block</span></td>
-        <td><p>完整 meta 块（长度不得超过 PayloadSize，超限抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌（当前实现不使用——同步落地）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td><p>表示写完成的 ValueTask。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>block</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>完整 meta 块（长度不得超过 PayloadSize，超限抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（当前实现不使用——同步落地）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>表示写完成的 ValueTask。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

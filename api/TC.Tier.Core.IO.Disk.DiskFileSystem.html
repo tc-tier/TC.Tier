@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class DiskFileSystem | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class DiskFileSystem | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="磁盘文件系统—— 的面向对象封口 + 根空间命名空间平面（层级相对路径，filesystem-root-space-design）。 ★ 构造（动词面 &#167;2.3）： /    /   （懒初始化糖——bind-any 终态；   磁盘根目录是部署决策，无全局单例）。 ★ 卷锁：lock file + FileShare.None（Win）/ flock（Unix）——跨进程互斥、崩溃自愈   （进程死亡后句柄关闭，后来者可重新获取）。 ★ Dispose 契约（磁盘方向）：&quot;离开目录&quot;——仅释放 fs 自持资源（卷锁违约释放并告警）；   不关闭消费者持有的句柄；Dispose 后 Open/命名空间操作抛 。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="磁盘文件系统—— 的面向对象封口 + 根空间命名空间平面（层级相对路径，filesystem-root-space-design）。 ★ 构造（动词面 &#167;2.3）： /    /   （懒初始化糖——bind-any 终态；   磁盘根目录是部署决策，无全局单例）。 ★ 卷锁：lock file + FileShare.None（Win）/ flock（Unix）——跨进程互斥、崩溃自愈   （进程死亡后句柄关闭，后来者可重新获取）。 ★ Dispose 契约（磁盘方向）：&quot;离开目录&quot;——仅释放 fs 自持资源（卷锁违约释放并告警）；   不关闭消费者持有的句柄；Dispose 后 Open/命名空间操作抛 。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem">
+
+        <article data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem">
 
 
 
-  <h1 id="TC_Tier_Core_IO_Disk_DiskFileSystem" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem" class="text-break">Class DiskFileSystem</h1>
-  <div class="markdown level0 summary"><p>磁盘文件系统——<span class="xref">TC.Tier.Core.NativeInterop.FileNative</span> 的面向对象封口 + 根空间命名空间平面（层级相对路径，filesystem-root-space-design）。</p>
+  <h1 id="TC_Tier_Core_IO_Disk_DiskFileSystem" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem" class="text-break">
+Class DiskFileSystem  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a>.<a class="xref" href="TC.Tier.Core.IO.Disk.html">Disk</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>磁盘文件系统——<span class="xref">TC.Tier.Core.NativeInterop.FileNative</span> 的面向对象封口 + 根空间命名空间平面（层级相对路径，filesystem-root-space-design）。</p>
 <p>★ 构造（动词面 §2.3）：<a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html#TC_Tier_Core_IO_Disk_DiskFileSystem_New_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_">New(string, DiskFileSystemOptions?, ILogger?)</a> /
   <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html#TC_Tier_Core_IO_Disk_DiskFileSystem_Open_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_">Open(string, DiskFileSystemOptions?, ILogger?)</a> /
   <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html#TC_Tier_Core_IO_Disk_DiskFileSystem_OpenOrCreate_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_">OpenOrCreate(string, DiskFileSystemOptions?, ILogger?)</a>（懒初始化糖——bind-any 终态；
@@ -85,19 +107,35 @@
 <p>★ Dispose 契约（磁盘方向）："离开目录"——仅释放 fs 自持资源（卷锁违约释放并告警）；
   不关闭消费者持有的句柄；Dispose 后 Open/命名空间操作抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">DiskFileSystem</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class DiskFileSystem : IFileSystem, IDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">DiskFileSystem</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -116,329 +154,378 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a>.<a class="xref" href="TC.Tier.Core.IO.Disk.html">Disk</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_IO_Disk_DiskFileSystem_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class DiskFileSystem : IFileSystem, IDisposable</code></pre>
-  </div>
-  <h3 id="properties">Properties
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Capabilities_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Capabilities*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Capabilities" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Capabilities">Capabilities</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Capabilities" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Capabilities">
+  Capabilities
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>能力协商位——构造时一次性探测（消费者主动避免依赖回退）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public FileSystemCapabilities Capabilities { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html">FileSystemCapabilities</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html">FileSystemCapabilities</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Volume_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Volume*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Volume" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Volume">Volume</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Volume" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Volume">
+  Volume
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>卷几何——SectorSize（DIO 读写对齐基准）与 AllocationUnit（空间操作对齐基准）独立探测。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public VolumeInfo Volume { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.VolumeInfo.html">VolumeInfo</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Volume_remarks">Remarks</h5>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.VolumeInfo.html">VolumeInfo</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_IO_Disk_DiskFileSystem_Volume_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>§5.4 完整自描述：几何自探测基值 + 挂载属性运行时可见；label 惰性读标记一次缓存；
 used = 配额激活后投影精确（未设 = -1 诚实）。</p>
 </div>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_AcquireExclusive_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.AcquireExclusive*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_AcquireExclusive_System_TimeSpan_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.AcquireExclusive(System.TimeSpan)">AcquireExclusive(TimeSpan)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_AcquireExclusive_System_TimeSpan_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.AcquireExclusive(System.TimeSpan)">
+  AcquireExclusive(TimeSpan)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取卷级排他锁（能力位 ExclusiveLock；未置位实现抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_Unsupported">Unsupported</a>——含 MemoryFileSystem）。</p>
 <p>★ 语义：阻塞获取（可带超时）；卷级互斥（同进程多 fs 实例 + 跨进程 lock file）；
   非重入（同持有者二次 Acquire 抛异常）；持锁中 fs.Dispose 视为违约释放并告警。</p>
 <p>★ 返回 IDisposable lease——RAII + 异常安全（Dispose 即释放）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IDisposable AcquireExclusive(TimeSpan timeout)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></td>
-        <td><span class="parametername">timeout</span></td>
-        <td><p>获取锁的超时（默认无限等待）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></td>
-        <td><p>排他锁租约</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_IO_Disk_DiskFileSystem_AcquireExclusive_System_TimeSpan__remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>获取锁的超时（默认无限等待）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>排他锁租约</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_IO_Disk_DiskFileSystem_AcquireExclusive_System_TimeSpan__remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 非重入：持有期间的二次 Acquire（任何线程——重入与跨线程争用不可区分且重入语义易误用）
 按争用处理——轮询至超时抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_SharingViolation">SharingViolation</a>。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_CreateDirectory_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.CreateDirectory*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_CreateDirectory_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.CreateDirectory(System.String)">CreateDirectory(string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_CreateDirectory_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.CreateDirectory(System.String)">
+  CreateDirectory(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>mkdir -p（幂等，登记全部祖先组件）+ 耐久（新建目录与父目录 fsync）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void CreateDirectory(string path)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对目录路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目录路径。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_CreateFile_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.CreateFile*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_CreateFile_System_String_System_Int64_System_ReadOnlyMemory_System_Byte__" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.CreateFile(System.String,System.Int64,System.ReadOnlyMemory{System.Byte})">CreateFile(string, long, ReadOnlyMemory&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_CreateFile_System_String_System_Int64_System_ReadOnlyMemory_System_Byte__" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.CreateFile(System.String,System.Int64,System.ReadOnlyMemory{System.Byte})">
+  CreateFile(string, long, ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>显式提前创建文件（与 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_Open_System_String_TC_Tier_Core_IO_FileOpenOptions_">Open(string, FileOpenOptions)</a> 解耦）——空文件 + 可选预分配（毫秒级真预留）+
 可选 FileExtra（≤<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_MaxFileExtraBytes">MaxFileExtraBytes</a>）+ 目录项 fsync。已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>
 （幂等由消费者 Exists 前置组合——显式创建语义，重复初始化 bug 不静默吞）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void CreateFile(string path, long preallocateSize = 0, ReadOnlyMemory&lt;byte&gt; extra = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对路径（父目录须存在——对齐 Open 的 ENOENT 语义）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">preallocateSize</span></td>
-        <td><p>预分配字节数（0 = 不预分配）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">extra</span></td>
-        <td><p>FileExtra 附加数据（default = 无）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对路径（父目录须存在——对齐 Open 的 ENOENT 语义）。</p>
+</dd>
+    <dt><code>preallocateSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>预分配字节数（0 = 不预分配）。</p>
+</dd>
+    <dt><code>extra</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>FileExtra 附加数据（default = 无）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Delete_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Delete*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Delete_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Delete(System.String)">Delete(string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Delete_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Delete(System.String)">
+  Delete(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>耐久删除文件（=FileNative.DeleteFileDurably 语义）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Delete(string path)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对路径。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_DeleteDirectory_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.DeleteDirectory*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_DeleteDirectory_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.DeleteDirectory(System.String)">DeleteDirectory(string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_DeleteDirectory_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.DeleteDirectory(System.String)">
+  DeleteDirectory(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>删除目录（POSIX rmdir：仅限空——非空抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_DirectoryNotEmpty">DirectoryNotEmpty</a>）+ 父目录 fsync。</p>
 <pre><code>        &lt;p&gt;★ 不提供递归删除（危险操作不藏糖：EnumerateFiles+Delete+DeleteDirectory 显式组合）。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void DeleteDirectory(string path)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对目录路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目录路径。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_DirectoryExists_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.DirectoryExists*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_DirectoryExists_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.DirectoryExists(System.String)">DirectoryExists(string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_DirectoryExists_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.DirectoryExists(System.String)">
+  DirectoryExists(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>目录存在性（Remote：前缀下有对象或子前缀——能力位 EmptyDirectories 未置位时创建后未必可见）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool DirectoryExists(string path)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对目录路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目录路径。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Dispose_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Dispose*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Dispose" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Dispose" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
-  <h5 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Dispose_remarks">Remarks</h5>
+
+
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_IO_Disk_DiskFileSystem_Dispose_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>磁盘方向：&quot;离开目录&quot;——卷锁违约释放（告警）+ IO 缓冲池释放；已开句柄不受影响（OS 句柄归消费者）。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnsureRoot_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnsureRoot*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnsureRoot" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnsureRoot">EnsureRoot()</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnsureRoot" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnsureRoot">
+  EnsureRoot()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>根目录 mkdir -p（幂等）——引擎 Initialize 必经。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void EnsureRoot()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnterMaintenance_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnterMaintenance*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnterMaintenance_System_String_TC_Tier_Core_IO_MaintenanceScope_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnterMaintenance(System.String,TC.Tier.Core.IO.MaintenanceScope,System.Threading.CancellationToken)">EnterMaintenance(string, MaintenanceScope, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnterMaintenance_System_String_TC_Tier_Core_IO_MaintenanceScope_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnterMaintenance(System.String,TC.Tier.Core.IO.MaintenanceScope,System.Threading.CancellationToken)">
+  EnterMaintenance(string, MaintenanceScope, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>进入维护态（能力位 MaintenanceGate 门控；未置位实现抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_Unsupported">Unsupported</a>）——
 采集/还原静默快照的通用前置（raw-medium-and-conversion-design §8）。</p>
 <p>★ 语义：闭门 → 阻塞等待在途<b>变异</b>归零（ct 可取消；消费者业务在途收敛是消费者契约，§8.2）
@@ -451,882 +538,695 @@ used = 配额激活后投影精确（未设 = -1 诚实）。</p>
 <p>★ Flush/FlushRoot 不拒（关闭协议的组成：进维护 → 收敛 → Flush 置 clean）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">reason</span></td>
-        <td><p>维护理由（诊断/可观测）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html">MaintenanceScope</a></td>
-        <td><span class="parametername">scope</span></td>
-        <td><p>拒绝范围。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>在途收敛等待的取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></td>
-        <td><p>维护租约</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reason</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>维护理由（诊断/可观测）。</p>
+</dd>
+    <dt><code>scope</code> <a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html">MaintenanceScope</a></dt>
+    <dd><p>拒绝范围。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>在途收敛等待的取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
+    <dd><p>维护租约</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateDirectories_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateDirectories*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateDirectories_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateDirectories(System.String,System.Boolean)">EnumerateDirectories(string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateDirectories_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateDirectories(System.String,System.Boolean)">
+  EnumerateDirectories(string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>枚举根层子目录。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IEnumerable&lt;FsEntry&gt; EnumerateDirectories(string pattern = &quot;*&quot;, bool recursive = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">pattern</span></td>
-        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">recursive</span></td>
-        <td><p>是否递归枚举全部后代目录。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td><p>枚举条目集合</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</dd>
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否递归枚举全部后代目录。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
+    <dd><p>枚举条目集合</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateDirectories_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateDirectories*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateDirectories_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateDirectories(System.String,System.String,System.Boolean)">EnumerateDirectories(string, string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateDirectories_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateDirectories(System.String,System.String,System.Boolean)">
+  EnumerateDirectories(string, string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>枚举子目录的一层子目录（recursive=true = 全部后代目录）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IEnumerable&lt;FsEntry&gt; EnumerateDirectories(string path, string pattern, bool recursive = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对目录路径。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">pattern</span></td>
-        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">recursive</span></td>
-        <td><p>是否递归枚举全部后代目录。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td><p>枚举条目集合</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目录路径。</p>
+</dd>
+    <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</dd>
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否递归枚举全部后代目录。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
+    <dd><p>枚举条目集合</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateEntries_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateEntries*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateEntries_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateEntries(System.String,System.Boolean)">EnumerateEntries(string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateEntries_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateEntries(System.String,System.Boolean)">
+  EnumerateEntries(string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>混合枚举（文件+目录一次产出——引擎扫盘形态；Remote 单次列举同时出 Objects+CommonPrefixes）。
 契约：同参下结果 = EnumerateFiles ∪ EnumerateDirectories。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IEnumerable&lt;FsEntry&gt; EnumerateEntries(string pattern = &quot;*&quot;, bool recursive = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">pattern</span></td>
-        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">recursive</span></td>
-        <td><p>是否递归枚举全部后代目录。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td><p>枚举条目集合</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</dd>
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否递归枚举全部后代目录。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
+    <dd><p>枚举条目集合</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateEntries_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateEntries*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateEntries_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateEntries(System.String,System.String,System.Boolean)">EnumerateEntries(string, string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateEntries_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateEntries(System.String,System.String,System.Boolean)">
+  EnumerateEntries(string, string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>混合枚举（子目录范围）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IEnumerable&lt;FsEntry&gt; EnumerateEntries(string path, string pattern, bool recursive = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对目录路径。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">pattern</span></td>
-        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">recursive</span></td>
-        <td><p>是否递归枚举全部后代目录。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td><p>枚举条目集合</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目录路径。</p>
+</dd>
+    <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</dd>
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否递归枚举全部后代目录。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
+    <dd><p>枚举条目集合</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateFiles_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateFiles*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateFiles_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateFiles(System.String,System.Boolean)">EnumerateFiles(string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateFiles_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateFiles(System.String,System.Boolean)">
+  EnumerateFiles(string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>枚举根层文件（pattern 缺省 &quot;*&quot; 全匹配；recursive=true 全部后代）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IEnumerable&lt;FsEntry&gt; EnumerateFiles(string pattern = &quot;*&quot;, bool recursive = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">pattern</span></td>
-        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">recursive</span></td>
-        <td><p>是否递归枚举全部后代目录。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td><p>枚举条目集合</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></td>
-        <td><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</dd>
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否递归枚举全部后代目录。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
+    <dd><p>枚举条目集合</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateFiles_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateFiles*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateFiles_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateFiles(System.String,System.String,System.Boolean)">EnumerateFiles(string, string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_EnumerateFiles_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.EnumerateFiles(System.String,System.String,System.Boolean)">
+  EnumerateFiles(string, string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>枚举子目录层文件。Name = 相对所枚举目录的路径（recursive 时多组件）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IEnumerable&lt;FsEntry&gt; EnumerateFiles(string path, string pattern, bool recursive = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对目录路径。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">pattern</span></td>
-        <td><p>通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">recursive</span></td>
-        <td><p>是否递归枚举全部后代目录。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td><p>枚举条目集合</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></td>
-        <td><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目录路径。</p>
+</dd>
+    <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</p>
+</dd>
+    <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否递归枚举全部后代目录。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
+    <dd><p>枚举条目集合</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Exists_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Exists*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Exists_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Exists(System.String)">Exists(string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Exists_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Exists(System.String)">
+  Exists(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>文件存在性（目录存在性见 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_DirectoryExists_System_String_">DirectoryExists(string)</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool Exists(string path)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对路径。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_FlushRoot_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.FlushRoot*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_FlushRoot" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.FlushRoot">FlushRoot()</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_FlushRoot" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.FlushRoot">
+  FlushRoot()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>目录级持久化（父目录 fsync）——新建文件的目录项落盘。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void FlushRoot()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Move_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Move*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Move_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Move(System.String,System.String,System.Boolean)">Move(string, string, bool)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Move_System_String_System_String_System_Boolean_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Move(System.String,System.String,System.Boolean)">
+  Move(string, string, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>文件移动/换名（=MoveFileDurably 语义，内建父目录刷盘——能力位 DurableRename）。</p>
 <p>★ overwrite 必须显式：true=POSIX rename 原子覆盖；false=目标已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Move(string source, string dest, bool overwrite = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">source</span></td>
-        <td><p>相对源路径。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">dest</span></td>
-        <td><p>相对目标路径。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">overwrite</span></td>
-        <td><p>是否覆盖已存在的目标文件。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对源路径。</p>
+</dd>
+    <dt><code>dest</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目标路径。</p>
+</dd>
+    <dt><code>overwrite</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否覆盖已存在的目标文件。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_MoveDirectory_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.MoveDirectory*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_MoveDirectory_System_String_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.MoveDirectory(System.String,System.String)">MoveDirectory(string, string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_MoveDirectory_System_String_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.MoveDirectory(System.String,System.String)">
+  MoveDirectory(string, string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>目录整树移动。dest 已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>（不提供 overwrite——平台语义分歧大）。</p>
 <p>★ 原子性由能力位 <a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html#TC_Tier_Core_IO_FileSystemCapabilities_AtomicDirectoryMove">AtomicDirectoryMove</a> 表达：
   Disk/Mem 原子；Remote 回退 = 逐对象 Copy+Delete（非原子，部分失败有残留）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void MoveDirectory(string source, string dest)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">source</span></td>
-        <td><p>相对源目录路径。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">dest</span></td>
-        <td><p>相对目标目录路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_IO_Disk_DiskFileSystem_MoveDirectory_System_String_System_String__remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对源目录路径。</p>
+</dd>
+    <dt><code>dest</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对目标目录路径。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_IO_Disk_DiskFileSystem_MoveDirectory_System_String_System_String__remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>同根内必同卷 → <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.directory.move">Move(string, string)</a> 原子（能力位 AtomicDirectoryMove 置位）。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_New_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.New*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_New_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.New(System.String,TC.Tier.Core.IO.Disk.DiskFileSystemOptions,TC.Tier.Core.Logging.ILogger)">New(string, DiskFileSystemOptions?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_New_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.New(System.String,TC.Tier.Core.IO.Disk.DiskFileSystemOptions,TC.Tier.Core.Logging.ILogger)">
+  New(string, DiskFileSystemOptions?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>New = 创建空镜像并打开（设计 §2.3：根不存在则建、已存在且非空抛 AlreadyExists、空根幂等成功）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static DiskFileSystem New(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">root</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></td>
-        <td><span class="parametername">options</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>root</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Open_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Open*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Open_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Open(System.String,TC.Tier.Core.IO.Disk.DiskFileSystemOptions,TC.Tier.Core.Logging.ILogger)">Open(string, DiskFileSystemOptions?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Open_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Open(System.String,TC.Tier.Core.IO.Disk.DiskFileSystemOptions,TC.Tier.Core.Logging.ILogger)">
+  Open(string, DiskFileSystemOptions?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>Open = 打开既有（设计 §2.3：根不存在即抛 NotFound——本地文件系统不代建根）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static DiskFileSystem Open(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">root</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></td>
-        <td><span class="parametername">options</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>root</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Open_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Open*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Open_System_String_TC_Tier_Core_IO_FileOpenOptions_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Open(System.String,TC.Tier.Core.IO.FileOpenOptions)">Open(string, FileOpenOptions)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Open_System_String_TC_Tier_Core_IO_FileOpenOptions_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Open(System.String,TC.Tier.Core.IO.FileOpenOptions)">
+  Open(string, FileOpenOptions)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 句柄入口——按显式打开语义打开/创建文件（PreallocateSize&gt;0 时 open 即幂等预分配）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IFileHandle Open(string path, FileOpenOptions options)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>根下相对路径（层级命名空间，经 PathValidator.ValidateRelative 校验）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></td>
-        <td><span class="parametername">options</span></td>
-        <td><p>打开语义四要素 + 预分配。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></td>
-        <td><p>文件句柄</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>根下相对路径（层级命名空间，经 PathValidator.ValidateRelative 校验）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></dt>
+    <dd><p>打开语义四要素 + 预分配。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
+    <dd><p>文件句柄</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_OpenOrCreate_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.OpenOrCreate*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_OpenOrCreate_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.OpenOrCreate(System.String,TC.Tier.Core.IO.Disk.DiskFileSystemOptions,TC.Tier.Core.Logging.ILogger)">OpenOrCreate(string, DiskFileSystemOptions?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_OpenOrCreate_System_String_TC_Tier_Core_IO_Disk_DiskFileSystemOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.OpenOrCreate(System.String,TC.Tier.Core.IO.Disk.DiskFileSystemOptions,TC.Tier.Core.Logging.ILogger)">
+  OpenOrCreate(string, DiskFileSystemOptions?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>OpenOrCreate = 懒初始化糖（设计 §2.3 可选形态——显式表达&quot;我接受两种状态&quot;）：
 根不存在则建（New 语义）、存在则开（Open 语义，不校验空否）——bind-any 场景的终态入口。
 label 语义随形态：既有根 = 校验（不符抛）、新根 = 写入。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static DiskFileSystem OpenOrCreate(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">root</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></td>
-        <td><span class="parametername">options</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>root</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystemOptions.html">DiskFileSystemOptions</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.Disk.DiskFileSystem.html">DiskFileSystem</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_Disk_DiskFileSystem_Stat_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Stat*"></a>
-  <h4 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Stat_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Stat(System.String)">Stat(string)</h4>
+
+  <h3 id="TC_Tier_Core_IO_Disk_DiskFileSystem_Stat_System_String_" data-uid="TC.Tier.Core.IO.Disk.DiskFileSystem.Stat(System.String)">
+  Stat(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>单条目完整信息（基本字段 + 元数据；Name 回显输入路径；文件或目录自动判别）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public FsEntryInfo Stat(string path)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">path</span></td>
-        <td><p>相对路径。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a></td>
-        <td><p>条目信息</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></td>
-        <td><p>IOError.NotFound——条目不存在。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对路径。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a></dt>
+    <dd><p>条目信息</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>IOError.NotFound——条目不存在。</p>
+</dd>
+  </dl>
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class SpinRWLock | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class SpinRWLock | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="写偏向自旋读写锁——单 64 位字 CAS，读共享 / 写排他，等待中的写者挡住新读者（写不饿死）。 ★ 64-bit 位布局：bit63=写持有，bit62=写等待（pending），bits61..32=读计数，bits31..0 保留。 ★ 写偏向协议：写者进门即置 pending，读者 fast path 检查 Writer|Pending 任一置位即退避——   写者最多等「在途读者」退出，不被持续读者流饿死。读者 fast path 仍是一次 CAS。 ★ 临界区约束：排他临界区必须短（纯内存、禁 await——Debug 释放线程校验会抓）；共享可长持/跨 await   （计数语义无线程亲和，读计划锁跨 IO 持有是合法用法）。跨 await 持有越久，写者与被挡读者等待越久。 ★ 演进自 LockWord（终态替代，读优先→写偏向；Monitor Wait/PulseAll 职责删除——生产零调用）。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="写偏向自旋读写锁——单 64 位字 CAS，读共享 / 写排他，等待中的写者挡住新读者（写不饿死）。 ★ 64-bit 位布局：bit63=写持有，bit62=写等待（pending），bits61..32=读计数，bits31..0 保留。 ★ 写偏向协议：写者进门即置 pending，读者 fast path 检查 Writer|Pending 任一置位即退避——   写者最多等「在途读者」退出，不被持续读者流饿死。读者 fast path 仍是一次 CAS。 ★ 临界区约束：排他临界区必须短（纯内存、禁 await——Debug 释放线程校验会抓）；共享可长持/跨 await   （计数语义无线程亲和，读计划锁跨 IO 持有是合法用法）。跨 await 持有越久，写者与被挡读者等待越久。 ★ 演进自 LockWord（终态替代，读优先→写偏向；Monitor Wait/PulseAll 职责删除——生产零调用）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Primitives.SpinRWLock">
+
+        <article data-uid="TC.Tier.Core.Primitives.SpinRWLock">
 
 
 
-  <h1 id="TC_Tier_Core_Primitives_SpinRWLock" data-uid="TC.Tier.Core.Primitives.SpinRWLock" class="text-break">Class SpinRWLock</h1>
-  <div class="markdown level0 summary"><p>写偏向自旋读写锁——单 64 位字 CAS，读共享 / 写排他，等待中的写者挡住新读者（写不饿死）。</p>
+  <h1 id="TC_Tier_Core_Primitives_SpinRWLock" data-uid="TC.Tier.Core.Primitives.SpinRWLock" class="text-break">
+Class SpinRWLock  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>写偏向自旋读写锁——单 64 位字 CAS，读共享 / 写排他，等待中的写者挡住新读者（写不饿死）。</p>
 <p>★ 64-bit 位布局：bit63=写持有，bit62=写等待（pending），bits61..32=读计数，bits31..0 保留。</p>
 <p>★ <b>写偏向协议</b>：写者进门即置 pending，读者 fast path 检查 Writer|Pending 任一置位即退避——
   写者最多等「在途读者」退出，不被持续读者流饿死。读者 fast path 仍是一次 CAS。</p>
@@ -83,14 +105,28 @@
   （计数语义无线程亲和，读计划锁跨 IO 持有是合法用法）。跨 await 持有越久，写者与被挡读者等待越久。</p>
 <p>★ 演进自 LockWord（终态替代，读优先→写偏向；Monitor Wait/PulseAll 职责删除——生产零调用）。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">SpinRWLock</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SpinRWLock</code></pre>
   </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SpinRWLock</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -109,99 +145,152 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Primitives_SpinRWLock_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class SpinRWLock</code></pre>
-  </div>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock__ctor_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock__ctor" data-uid="TC.Tier.Core.Primitives.SpinRWLock.#ctor">SpinRWLock()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock__ctor" data-uid="TC.Tier.Core.Primitives.SpinRWLock.#ctor">
+  SpinRWLock()
+  
+  </h3>
+
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public SpinRWLock()</code></pre>
   </div>
-  <h3 id="properties">Properties
-</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock_IsHeldExclusive_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.IsHeldExclusive*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_IsHeldExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.IsHeldExclusive">IsHeldExclusive</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_IsHeldExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.IsHeldExclusive">
+  IsHeldExclusive
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>是否被排他持有（诊断用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool IsHeldExclusive { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock_ReaderCount_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReaderCount*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_ReaderCount" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReaderCount">ReaderCount</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_ReaderCount" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReaderCount">
+  ReaderCount
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前共享持有计数（诊断用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int ReaderCount { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock_AcquireExclusive_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.AcquireExclusive*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_AcquireExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.AcquireExclusive">AcquireExclusive()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_AcquireExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.AcquireExclusive">
+  AcquireExclusive()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取写锁（独占）——进门先置 pending 挡新读者，再等在途读者退出后 CAS 置写持有位。</p>
 <pre><code>        &lt;p&gt;★ 多写者：pending 位幂等；前一写者释放会连 pending 一并清除，仍在等的写者检测到丢失即重登记
           （条件重登记——自旋循环内不再无条件 Interlocked.Or，减少共享行乒乓）。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void AcquireExclusive()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_SpinRWLock_AcquireShared_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.AcquireShared*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_AcquireShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.AcquireShared">AcquireShared()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_AcquireShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.AcquireShared">
+  AcquireShared()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取读锁（共享）——一次 CAS 递增读计数；写持有或写等待（pending）期间退避自旋。</p>
 <pre><code>        &lt;p&gt;★ 获取必须用 &lt;code&gt;s + ReaderInc&lt;/code&gt;（递增），绝不能 &lt;code&gt;s | ReaderInc&lt;/code&gt;（置位）——ReaderInc 是
           固定单 bit，OR 语义下第 2..N 个并发读者&quot;获取成功&quot;却不加计数，而每个读者的释放都 −1 → 第二个
@@ -209,77 +298,121 @@
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void AcquireShared()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_SpinRWLock_EnterExclusive_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.EnterExclusive*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_EnterExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.EnterExclusive">EnterExclusive()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_EnterExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.EnterExclusive">
+  EnterExclusive()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取写锁——返回 using scope（自动释放）。简化 try/finally 模式。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public SpinRWLock.ExclusiveScope EnterExclusive()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.html">SpinRWLock</a>.<a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.ExclusiveScope.html">ExclusiveScope</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.html">SpinRWLock</a>.<a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.ExclusiveScope.html">ExclusiveScope</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock_EnterShared_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.EnterShared*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_EnterShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.EnterShared">EnterShared()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_EnterShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.EnterShared">
+  EnterShared()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取读锁——返回 using scope（自动释放）。简化 try/finally 模式。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public SpinRWLock.SharedScope EnterShared()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.html">SpinRWLock</a>.<a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.SharedScope.html">SharedScope</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.html">SpinRWLock</a>.<a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.SharedScope.html">SharedScope</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock_ReleaseExclusive_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReleaseExclusive*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_ReleaseExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReleaseExclusive">ReleaseExclusive()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_ReleaseExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReleaseExclusive">
+  ReleaseExclusive()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放写锁（独占）——原子清除写持有 + pending（多写者下由仍在等的写者自行重登记）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReleaseExclusive()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_SpinRWLock_ReleaseShared_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReleaseShared*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_ReleaseShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReleaseShared">ReleaseShared()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_ReleaseShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.ReleaseShared">
+  ReleaseShared()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放读锁（共享）——CAS 循环实现，消除破坏性先修改再回滚窗口。</p>
 <pre><code>        &lt;p&gt;★ 下溢绊线（Debug+Release 永久保留，演进自 LockWord ）：读计数已为 0 = 存在无配对的
           ReleaseShared（bug）——旧实现 Interlocked.Add 先减再检测再回滚，减完到回滚之间锁字短暂呈现
@@ -290,117 +423,112 @@
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReleaseShared()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_SpinRWLock_TryAcquireExclusive_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.TryAcquireExclusive*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_TryAcquireExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.TryAcquireExclusive">TryAcquireExclusive()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_TryAcquireExclusive" data-uid="TC.Tier.Core.Primitives.SpinRWLock.TryAcquireExclusive">
+  TryAcquireExclusive()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>尝试获取写锁，不自旋、不设置 pending 排队闸门，拿到即返回 true。</p>
 <pre><code>        &lt;p&gt;★ 投机语义：失败不登记 pending（不给读者上闸）——适合&quot;拿到就赚、拿不到走别路&quot;的路径；
           需要写偏向保证的排他转换必须用 &lt;xref href=&quot;TC.Tier.Core.Primitives.SpinRWLock.AcquireExclusive&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryAcquireExclusive()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_SpinRWLock_TryAcquireShared_" data-uid="TC.Tier.Core.Primitives.SpinRWLock.TryAcquireShared*"></a>
-  <h4 id="TC_Tier_Core_Primitives_SpinRWLock_TryAcquireShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.TryAcquireShared">TryAcquireShared()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_SpinRWLock_TryAcquireShared" data-uid="TC.Tier.Core.Primitives.SpinRWLock.TryAcquireShared">
+  TryAcquireShared()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>尝试获取读锁，不自旋，立刻返回（投机路径——拿不到不排队不阻碍）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryAcquireShared()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

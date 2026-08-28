@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class CpuSampler | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class CpuSampler | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="通用 CPU 利用率采样 + 限流系数计算（Core/Shared）。继承 —— PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。 ★ 计算模型（明确，不靠概念）：采样本进程 CPU——   raw = ΔProcess.TotalProcessorTime / (Δ实际墙钟 &#215; ProcessorCount)，归一化 0~1   （1.0 = 本进程跑满所有核）。是进程口径而非整机口径：其它进程造成的系统饱和本采样器看不见   （整机口径需性能计数器，跨平台不可用，故明确取进程口径）。 ★ 平滑：EMA——ema&#39; = α&#183;raw + (1−α)&#183;ema，首样本标志位初始化（不拿 ema==0 当哨兵：   旧实现空闲→高载第一个样本直接跳变，无平滑——&quot;不平稳过渡&quot;的根因）。 ★ 限流系数 ：分段线性——CPU ≤ lowCutoff → 0（不限流）；   lowCutoff~highCutoff → 线性 0→1（软降速）；≥ highCutoff → 1（强阻塞）。   系数计算是纯函数（，internal 可测）。 ★ Hub 折叠：注入  后每采样发布   cpu.utilization / cpu.throttle_factor Gauge，档位切换（正常→限流→强阻塞→恢复）打日志——   限流判断进可观测视图，不再隐形。 ★ 热路径零开销：读  /  走 Volatile.Read；   Hub 未注入（默认 Disabled）时指标短路零开销。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="通用 CPU 利用率采样 + 限流系数计算（Core/Shared）。继承 —— PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。 ★ 计算模型（明确，不靠概念）：采样本进程 CPU——   raw = ΔProcess.TotalProcessorTime / (Δ实际墙钟 &#215; ProcessorCount)，归一化 0~1   （1.0 = 本进程跑满所有核）。是进程口径而非整机口径：其它进程造成的系统饱和本采样器看不见   （整机口径需性能计数器，跨平台不可用，故明确取进程口径）。 ★ 平滑：EMA——ema&#39; = α&#183;raw + (1−α)&#183;ema，首样本标志位初始化（不拿 ema==0 当哨兵：   旧实现空闲→高载第一个样本直接跳变，无平滑——&quot;不平稳过渡&quot;的根因）。 ★ 限流系数 ：分段线性——CPU ≤ lowCutoff → 0（不限流）；   lowCutoff~highCutoff → 线性 0→1（软降速）；≥ highCutoff → 1（强阻塞）。   系数计算是纯函数（，internal 可测）。 ★ Hub 折叠：注入  后每采样发布   cpu.utilization / cpu.throttle_factor Gauge，档位切换（正常→限流→强阻塞→恢复）打日志——   限流判断进可观测视图，不再隐形。 ★ 热路径零开销：读  /  走 Volatile.Read；   Hub 未注入（默认 Disabled）时指标短路零开销。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.CpuSampler">
+
+        <article data-uid="TC.Tier.Core.Shared.CpuSampler">
 
 
 
-  <h1 id="TC_Tier_Core_Shared_CpuSampler" data-uid="TC.Tier.Core.Shared.CpuSampler" class="text-break">Class CpuSampler</h1>
-  <div class="markdown level0 summary"><p>通用 CPU 利用率采样 + 限流系数计算（Core/Shared）。继承 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>——
+  <h1 id="TC_Tier_Core_Shared_CpuSampler" data-uid="TC.Tier.Core.Shared.CpuSampler" class="text-break">
+Class CpuSampler  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>通用 CPU 利用率采样 + 限流系数计算（Core/Shared）。继承 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>——
 PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。</p>
 <p>★ <b>计算模型（明确，不靠概念）</b>：采样<b>本进程</b> CPU——
   <code>raw = ΔProcess.TotalProcessorTime / (Δ实际墙钟 × ProcessorCount)</code>，归一化 0~1
@@ -92,20 +114,36 @@ PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。</p>
 <p>★ 热路径零开销：读 <a class="xref" href="TC.Tier.Core.Shared.CpuSampler.html#TC_Tier_Core_Shared_CpuSampler_CpuUtilization">CpuUtilization</a> / <a class="xref" href="TC.Tier.Core.Shared.CpuSampler.html#TC_Tier_Core_Shared_CpuSampler_ThrottleFactor">ThrottleFactor</a> 走 Volatile.Read；
   Hub 未注入（默认 Disabled）时指标短路零开销。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></div>
-    <div class="level2"><span class="xref">CpuSampler</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class CpuSampler : BackgroundWorkerLoop, IDisposable, IAsyncDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></div>
+      <div><span class="xref">CpuSampler</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_Start">BackgroundWorkerLoop.Start()</a>
     </div>
@@ -148,243 +186,202 @@ PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。</p>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Shared_CpuSampler_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class CpuSampler : BackgroundWorkerLoop, IDisposable, IAsyncDisposable</code></pre>
-  </div>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_CpuSampler__ctor_" data-uid="TC.Tier.Core.Shared.CpuSampler.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Shared_CpuSampler__ctor_System_Nullable_System_TimeSpan__System_Double_System_Double_System_Double_TC_Tier_Core_Observability_ObservabilityHub_System_String_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Shared.CpuSampler.#ctor(System.Nullable{System.TimeSpan},System.Double,System.Double,System.Double,TC.Tier.Core.Observability.ObservabilityHub,System.String,TC.Tier.Core.Logging.ILogger)">CpuSampler(TimeSpan?, double, double, double, ObservabilityHub?, string?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_CpuSampler__ctor_System_Nullable_System_TimeSpan__System_Double_System_Double_System_Double_TC_Tier_Core_Observability_ObservabilityHub_System_String_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Shared.CpuSampler.#ctor(System.Nullable{System.TimeSpan},System.Double,System.Double,System.Double,TC.Tier.Core.Observability.ObservabilityHub,System.String,TC.Tier.Core.Logging.ILogger)">
+  CpuSampler(TimeSpan?, double, double, double, ObservabilityHub?, string?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>构造 CPU 采样器（后台采样 → EMA 平滑 → 分段线性限流系数折叠到 hub）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public CpuSampler(TimeSpan? sampleInterval = null, double emaAlpha = 0.5, double throttleLowCutoff = 0.7, double throttleHighCutoff = 0.9, ObservabilityHub? hub = null, string? name = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</td>
-        <td><span class="parametername">sampleInterval</span></td>
-        <td><p>采样周期（默认 1s）。须 &gt; 0。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td><span class="parametername">emaAlpha</span></td>
-        <td><p>EMA 平滑系数（默认 0.5——大=跟手、小=平滑）。须 ∈ (0, 1]。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td><span class="parametername">throttleLowCutoff</span></td>
-        <td><p>不限流阈值（默认 0.70）。须 ∈ [0,1) 且 &lt; highCutoff。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td><span class="parametername">throttleHighCutoff</span></td>
-        <td><p>强阻塞阈值（默认 0.90）。须 ∈ (0,1]。倒挂（low ≥ high）构造即 throw——
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sampleInterval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>采样周期（默认 1s）。须 &gt; 0。</p>
+</dd>
+    <dt><code>emaAlpha</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>EMA 平滑系数（默认 0.5——大=跟手、小=平滑）。须 ∈ (0, 1]。</p>
+</dd>
+    <dt><code>throttleLowCutoff</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>不限流阈值（默认 0.70）。须 ∈ [0,1) 且 &lt; highCutoff。</p>
+</dd>
+    <dt><code>throttleHighCutoff</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>强阻塞阈值（默认 0.90）。须 ∈ (0,1]。倒挂（low ≥ high）构造即 throw——
 否则分段线性斜率为负/除零 → CPU 越高系数越低的反向限流/NaN（算法错误，fail-fast 拒绝）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a></td>
-        <td><span class="parametername">hub</span></td>
-        <td><p>可观测 hub（采样折叠：cpu.utilization / cpu.throttle_factor Gauge + 档位日志）。默认 Disabled。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">name</span></td>
-        <td><p>诊断标识（默认 &quot;CpuSampler&quot;）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td><p>日志（可选）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+</dd>
+    <dt><code>hub</code> <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a></dt>
+    <dd><p>可观测 hub（采样折叠：cpu.utilization / cpu.throttle_factor Gauge + 档位日志）。默认 Disabled。</p>
+</dd>
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>诊断标识（默认 &quot;CpuSampler&quot;）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_CpuSampler_CpuUtilization_" data-uid="TC.Tier.Core.Shared.CpuSampler.CpuUtilization*"></a>
-  <h4 id="TC_Tier_Core_Shared_CpuSampler_CpuUtilization" data-uid="TC.Tier.Core.Shared.CpuSampler.CpuUtilization">CpuUtilization</h4>
+
+  <h3 id="TC_Tier_Core_Shared_CpuSampler_CpuUtilization" data-uid="TC.Tier.Core.Shared.CpuSampler.CpuUtilization">
+  CpuUtilization
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前 CPU 利用率（0~1，EMA 平滑，进程口径）。热路径 Volatile.Read。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public double CpuUtilization { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_CpuSampler_ThrottleFactor_" data-uid="TC.Tier.Core.Shared.CpuSampler.ThrottleFactor*"></a>
-  <h4 id="TC_Tier_Core_Shared_CpuSampler_ThrottleFactor" data-uid="TC.Tier.Core.Shared.CpuSampler.ThrottleFactor">ThrottleFactor</h4>
+
+  <h3 id="TC_Tier_Core_Shared_CpuSampler_ThrottleFactor" data-uid="TC.Tier.Core.Shared.CpuSampler.ThrottleFactor">
+  ThrottleFactor
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>限流系数（0.0~1.0，0=不限流，1.0=强阻塞）。热路径 Volatile.Read。</p>
 <p>消费方按此做三档背压（平稳过渡）：正常（系数 0，放行）→ 限流（系数居中，拒绝/降级）
   → 直接报错（系数 1，抛过载）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public double ThrottleFactor { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_CpuSampler_RunOneCycleAsync_" data-uid="TC.Tier.Core.Shared.CpuSampler.RunOneCycleAsync*"></a>
-  <h4 id="TC_Tier_Core_Shared_CpuSampler_RunOneCycleAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.CpuSampler.RunOneCycleAsync(System.Threading.CancellationToken)">RunOneCycleAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_CpuSampler_RunOneCycleAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.CpuSampler.RunOneCycleAsync(System.Threading.CancellationToken)">
+  RunOneCycleAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>采样循环——PeriodicTimer 驱动；Stop 时 ct.Cancel 让 <code>WaitForNextTickAsync</code> 抛 OCE 正常退出。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override ValueTask&lt;bool&gt; RunOneCycleAsync(CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html#TC_Tier_Core_Shared_BackgroundWorkerLoop_RunOneCycleAsync_System_Threading_CancellationToken_">BackgroundWorkerLoop.RunOneCycleAsync(CancellationToken)</a></div>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

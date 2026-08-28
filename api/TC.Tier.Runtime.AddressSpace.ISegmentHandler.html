@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Interface ISegmentHandler | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Interface ISegmentHandler | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="段处理器——段的事件模型接口（AddressSpace 主类实现）。 ★ SegmentTable 经此接口触发段生命周期事件 + 提交低频后台任务，不直接依赖主类 /   LifecycleCoordinator / ISegmentLifecycle——依赖倒置消除反向依赖。 ★ 主类实现此接口做两件事：① 段生命周期事件适配设备层 ISegmentLifecycle（带优先级队列入队）   ② 低频后台任务由 worker 顺序执行。 ★ 两类回调的区分： 段生命周期事件（OnXXX）：需要设备层（建/满/删/替换物理段），高频，需要优先级后台任务（）：段表自洽的纯内存工作（如区间表压缩），   低频，顺序执行不需要优先级 ★ 单实现 + GDV（Guarded Devirtualization）→ JIT 内联为直接调用，零间接开销。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="段处理器——段的事件模型接口（AddressSpace 主类实现）。 ★ SegmentTable 经此接口触发段生命周期事件 + 提交低频后台任务，不直接依赖主类 /   LifecycleCoordinator / ISegmentLifecycle——依赖倒置消除反向依赖。 ★ 主类实现此接口做两件事：① 段生命周期事件适配设备层 ISegmentLifecycle（带优先级队列入队）   ② 低频后台任务由 worker 顺序执行。 ★ 两类回调的区分： 段生命周期事件（OnXXX）：需要设备层（建/满/删/替换物理段），高频，需要优先级后台任务（）：段表自洽的纯内存工作（如区间表压缩），   低频，顺序执行不需要优先级 ★ 单实现 + GDV（Guarded Devirtualization）→ JIT 内联为直接调用，零间接开销。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler">
+
+        <article data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler">
 
 
 
-  <h1 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler" class="text-break">Interface ISegmentHandler</h1>
-  <div class="markdown level0 summary"><p>段处理器——段的事件模型接口（AddressSpace 主类实现）。</p>
+  <h1 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler" class="text-break">
+Interface ISegmentHandler  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.AddressSpace.html">AddressSpace</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>段处理器——段的事件模型接口（AddressSpace 主类实现）。</p>
 <p>★ SegmentTable 经此接口触发段生命周期事件 + 提交低频后台任务，不直接依赖主类 /
   LifecycleCoordinator / ISegmentLifecycle——依赖倒置消除反向依赖。</p>
 <p>★ 主类实现此接口做两件事：① 段生命周期事件适配设备层 ISegmentLifecycle（带优先级队列入队）
@@ -85,298 +107,278 @@
   低频，顺序执行不需要优先级</li></ul>
 <p>★ 单实现 + GDV（Guarded Devirtualization）→ JIT 内联为直接调用，零间接开销。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.AddressSpace.html">AddressSpace</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
-  <h5 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_syntax">Syntax</h5>
+  <div class="markdown conceptual"></div>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public interface ISegmentHandler</code></pre>
   </div>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentCreate_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentCreate*"></a>
-  <h4 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentCreate_System_Int32_System_Int64_System_Boolean_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentCreate(System.Int32,System.Int64,System.Boolean)">OnSegmentCreate(int, long, bool)</h4>
+
+  <h3 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentCreate_System_Int32_System_Int64_System_Boolean_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentCreate(System.Int32,System.Int64,System.Boolean)">
+  OnSegmentCreate(int, long, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>段创建事件——物理段待建（主类适配 ISegmentLifecycle.CreateSegmentAsync）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void OnSegmentCreate(int segId, long growthLimit, bool isHighPriority)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">segId</span></td>
-        <td><p>段号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">growthLimit</span></td>
-        <td><p>段生长上限（字节，建物理段必须知道多大）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">isHighPriority</span></td>
-        <td><p>true=高优先级（Allocate 缺段强制建，lease 第一阶段等就绪）；
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>segId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>段号。</p>
+</dd>
+    <dt><code>growthLimit</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>段生长上限（字节，建物理段必须知道多大）。</p>
+</dd>
+    <dt><code>isHighPriority</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true=高优先级（Allocate 缺段强制建，lease 第一阶段等就绪）；
 false=普通优先级（段满时预建下一段、恢复时建段）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentDelete_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentDelete*"></a>
-  <h4 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentDelete_System_Int32_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentDelete(System.Int32)">OnSegmentDelete(int)</h4>
+
+  <h3 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentDelete_System_Int32_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentDelete(System.Int32)">
+  OnSegmentDelete(int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>段删除事件——整段物理删除（ReclaimHead 整段回收触发，主类适配 ISegmentLifecycle.DeleteSegmentAsync）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void OnSegmentDelete(int segId)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">segId</span></td>
-        <td><p>段号。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>segId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>段号。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentFull_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentFull*"></a>
-  <h4 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentFull_System_Int32_System_Int64_System_Int64_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentFull(System.Int32,System.Int64,System.Int64)">OnSegmentFull(int, long, long)</h4>
+
+  <h3 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentFull_System_Int32_System_Int64_System_Int64_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentFull(System.Int32,System.Int64,System.Int64)">
+  OnSegmentFull(int, long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>段满事件——通知设备层段已满（主类适配 ISegmentLifecycle.OnSegmentFullAsync）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void OnSegmentFull(int segId, long finalSize, long growthLimit)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">segId</span></td>
-        <td><p>段号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">finalSize</span></td>
-        <td><p>段满时的最终大小（字节）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">growthLimit</span></td>
-        <td><p>段生长上限（字节）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>segId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>段号。</p>
+</dd>
+    <dt><code>finalSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>段满时的最终大小（字节）。</p>
+</dd>
+    <dt><code>growthLimit</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>段生长上限（字节）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentReclaim_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentReclaim*"></a>
-  <h4 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentReclaim_System_Int32_System_Int64_System_Int64_System_Int64_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentReclaim(System.Int32,System.Int64,System.Int64,System.Int64)">OnSegmentReclaim(int, long, long, long)</h4>
+
+  <h3 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentReclaim_System_Int32_System_Int64_System_Int64_System_Int64_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentReclaim(System.Int32,System.Int64,System.Int64,System.Int64)">
+  OnSegmentReclaim(int, long, long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>段回收事件——ReclaimXXX 回收段时触发，通知设备层回收段的物理空间（主类适配 ISegmentLifecycle.ReclaimSegmentAsync）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void OnSegmentReclaim(int segId, long from, long to, long growthLimit)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">segId</span></td>
-        <td><p>段号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>回收起始偏移（字节）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>回收结束偏移（字节）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">growthLimit</span></td>
-        <td><p>段生长上限（字节）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>segId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>段号。</p>
+</dd>
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>回收起始偏移（字节）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>回收结束偏移（字节）。</p>
+</dd>
+    <dt><code>growthLimit</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>段生长上限（字节）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentReplace_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentReplace*"></a>
-  <h4 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentReplace_System_Int32_System_Int64_System_Int64_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentReplace(System.Int32,System.Int64,System.Int64)">OnSegmentReplace(int, long, long)</h4>
+
+  <h3 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_OnSegmentReplace_System_Int32_System_Int64_System_Int64_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.OnSegmentReplace(System.Int32,System.Int64,System.Int64)">
+  OnSegmentReplace(int, long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>段替换事件——Compact 用新参数重建段（主类重建物理段 + 替换槽位）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void OnSegmentReplace(int segId, long growthLimit, long maxOffset)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">segId</span></td>
-        <td><p>段号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">growthLimit</span></td>
-        <td><p>新段生长上限（字节）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">maxOffset</span></td>
-        <td><p>新段最大有效偏移（字节）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>segId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>段号。</p>
+</dd>
+    <dt><code>growthLimit</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>新段生长上限（字节）。</p>
+</dd>
+    <dt><code>maxOffset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>新段最大有效偏移（字节）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_SubmitBackgroundWork_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.SubmitBackgroundWork*"></a>
-  <h4 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_SubmitBackgroundWork_System_Action_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.SubmitBackgroundWork(System.Action)">SubmitBackgroundWork(Action)</h4>
+
+  <h3 id="TC_Tier_Runtime_AddressSpace_ISegmentHandler_SubmitBackgroundWork_System_Action_" data-uid="TC.Tier.Runtime.AddressSpace.ISegmentHandler.SubmitBackgroundWork(System.Action)">
+  SubmitBackgroundWork(Action)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>提交低频后台任务——段表自洽的纯内存工作（如区间表压缩），主类 worker 异步顺序执行。</p>
 <p>★ 低频任务不需要优先级区分——按提交顺序处理。</p>
 <p>★ 不阻塞热路径：段表构建完整工作单元后立即返回，worker 在后台执行。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void SubmitBackgroundWork(Action work)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action">Action</a></td>
-        <td><span class="parametername">work</span></td>
-        <td><p>完整的工作单元（段表闭包捕获所需状态，主类只负责执行）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>work</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action">Action</a></dt>
+    <dd><p>完整的工作单元（段表闭包捕获所需状态，主类只负责执行）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

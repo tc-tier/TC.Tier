@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class TierSession | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class TierSession | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="★ 会话（sealed，单线程会话契约——staged 缓冲与覆盖层无锁；SessionManager 与管线自身完全线程安全）。 读写统一句柄（session-manager-design.md &#167;3.2）：写=Stage 暂存物化委托 → Commit 入管线单飞； 读=EnterReadScope（聚合 epoch）/ 地址直达（无会话，一等公民零税）。 ★ 单飞使用门闩：同一时刻仅一个线程使用本会话（FASTER 同款契约）——staged 快照/覆盖层 无锁数据结构的并发腐蚀防线，违规立即抛；Commit 入队后即释放门闩（await 回执不占）。 会话状态机：Active →（回合物化/Prepare/决策失败回执）Faulted →（Dispose）Disposed。 Faulted 后 Stage/Commit 抛（fault 原因内联）；重开=OpenSession。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="★ 会话（sealed，单线程会话契约——staged 缓冲与覆盖层无锁；SessionManager 与管线自身完全线程安全）。 读写统一句柄（session-manager-design.md &#167;3.2）：写=Stage 暂存物化委托 → Commit 入管线单飞； 读=EnterReadScope（聚合 epoch）/ 地址直达（无会话，一等公民零税）。 ★ 单飞使用门闩：同一时刻仅一个线程使用本会话（FASTER 同款契约）——staged 快照/覆盖层 无锁数据结构的并发腐蚀防线，违规立即抛；Commit 入队后即释放门闩（await 回执不占）。 会话状态机：Active →（回合物化/Prepare/决策失败回执）Faulted →（Dispose）Disposed。 Faulted 后 Stage/Commit 抛（fault 原因内联）；重开=OpenSession。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Transactions.TierSession">
+
+        <article data-uid="TC.Tier.Runtime.Transactions.TierSession">
 
 
 
-  <h1 id="TC_Tier_Runtime_Transactions_TierSession" data-uid="TC.Tier.Runtime.Transactions.TierSession" class="text-break">Class TierSession</h1>
-  <div class="markdown level0 summary"><p>★ 会话（sealed，单线程会话契约——staged 缓冲与覆盖层无锁；SessionManager 与管线自身完全线程安全）。</p>
+  <h1 id="TC_Tier_Runtime_Transactions_TierSession" data-uid="TC.Tier.Runtime.Transactions.TierSession" class="text-break">
+Class TierSession  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Transactions.html">Transactions</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>★ 会话（sealed，单线程会话契约——staged 缓冲与覆盖层无锁；SessionManager 与管线自身完全线程安全）。</p>
 <p>读写统一句柄（session-manager-design.md §3.2）：写=Stage 暂存物化委托 → Commit 入管线单飞；
 读=EnterReadScope（聚合 epoch）/ 地址直达（无会话，一等公民零税）。</p>
 <p>★ 单飞使用门闩：同一时刻仅一个线程使用本会话（FASTER 同款契约）——staged 快照/覆盖层
@@ -83,18 +105,34 @@
 <p>会话状态机：Active →（回合物化/Prepare/决策失败回执）Faulted →（Dispose）Disposed。
 Faulted 后 Stage/Commit 抛（fault 原因内联）；重开=OpenSession。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">TierSession</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierSession : IDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierSession</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -113,402 +151,420 @@ Faulted 后 Stage/Commit 抛（fault 原因内联）；重开=OpenSession。</p>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Transactions.html">Transactions</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
-  <h5 id="TC_Tier_Runtime_Transactions_TierSession_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class TierSession : IDisposable</code></pre>
-  </div>
-  <h3 id="properties">Properties
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_Fault_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Fault*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_Fault" data-uid="TC.Tier.Runtime.Transactions.TierSession.Fault">Fault</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_Fault" data-uid="TC.Tier.Runtime.Transactions.TierSession.Fault">
+  Fault
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>Faulted 原因（仅 Faulted 态非空；诊断/重开决策用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public Exception? Fault { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_Name_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Name*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_Name" data-uid="TC.Tier.Runtime.Transactions.TierSession.Name">Name</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_Name" data-uid="TC.Tier.Runtime.Transactions.TierSession.Name">
+  Name
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>会话名（诊断用，可空）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public string? Name { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_SessionState_" data-uid="TC.Tier.Runtime.Transactions.TierSession.SessionState*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_SessionState" data-uid="TC.Tier.Runtime.Transactions.TierSession.SessionState">SessionState</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_SessionState" data-uid="TC.Tier.Runtime.Transactions.TierSession.SessionState">
+  SessionState
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前会话状态。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public SessionState SessionState { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Transactions.SessionState.html">SessionState</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Transactions.SessionState.html">SessionState</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_StagedCount_" data-uid="TC.Tier.Runtime.Transactions.TierSession.StagedCount*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_StagedCount" data-uid="TC.Tier.Runtime.Transactions.TierSession.StagedCount">StagedCount</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_StagedCount" data-uid="TC.Tier.Runtime.Transactions.TierSession.StagedCount">
+  StagedCount
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>本会话当前 staged 物化委托数（诊断/测试观测）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int StagedCount { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_State_" data-uid="TC.Tier.Runtime.Transactions.TierSession.State*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_State" data-uid="TC.Tier.Runtime.Transactions.TierSession.State">State</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_State" data-uid="TC.Tier.Runtime.Transactions.TierSession.State">
+  State
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>覆盖层挂点（组合层自管：staged 命令表/批号映射等——Runtime 只定协议不定内容）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public object? State { get; set; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_Abort_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Abort*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_Abort" data-uid="TC.Tier.Runtime.Transactions.TierSession.Abort">Abort()</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_Abort" data-uid="TC.Tier.Runtime.Transactions.TierSession.Abort">
+  Abort()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 未决撤销：staged 缓冲清空 + 排队中回合标记出队丢弃（结构零触碰、seq 零消耗）。</p>
 <p>回合中不可打断：在途回合（管线已取走）等终态后返回。</p>
 <p>Abort 后会话保持 Active（可继续 Stage）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Abort()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Transactions_TierSession_CommitAsync_" data-uid="TC.Tier.Runtime.Transactions.TierSession.CommitAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_CommitAsync_System_Object_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TierSession.CommitAsync(System.Object,System.Threading.CancellationToken)">CommitAsync(object?, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_CommitAsync_System_Object_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TierSession.CommitAsync(System.Object,System.Threading.CancellationToken)">
+  CommitAsync(object?, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 提交（TxRound 入口）：staged 快照入管线 → await 自己的 TCS 回执。</p>
 <p>批合并：管线排空当前积压为一批——同批回合共享批 seq、整批一次 Prepare-all+Confirm-all
 （FIFO 全序不变）。空 staged 合法（纯 seq 推进回合）。ct 取消=排队撤销（出队丢弃）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; CommitAsync(object? context = null, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
-        <td><span class="parametername">context</span></td>
-        <td><p>调用方关联上下文（随回执域诊断面可读——协议不解释内容）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌（取消 = 排队撤销：出队丢弃；在途回合不可打断，等终态防登记泄漏）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td><p>域 seq（本回合所在批的共享 seq）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>调用方关联上下文（随回执域诊断面可读——协议不解释内容）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（取消 = 排队撤销：出队丢弃；在途回合不可打断，等终态防登记泄漏）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>域 seq（本回合所在批的共享 seq）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_CommitReplicatedAsync_" data-uid="TC.Tier.Runtime.Transactions.TierSession.CommitReplicatedAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_CommitReplicatedAsync_System_Func_System_Int64_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask_System_Boolean___System_Object_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TierSession.CommitReplicatedAsync(System.Func{System.Int64,System.Threading.CancellationToken,System.Threading.Tasks.ValueTask{System.Boolean}},System.Object,System.Threading.CancellationToken)">CommitReplicatedAsync(Func&lt;long, CancellationToken, ValueTask&lt;bool&gt;&gt;, object?, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_CommitReplicatedAsync_System_Func_System_Int64_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask_System_Boolean___System_Object_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TierSession.CommitReplicatedAsync(System.Func{System.Int64,System.Threading.CancellationToken,System.Threading.Tasks.ValueTask{System.Boolean}},System.Object,System.Threading.CancellationToken)">
+  CommitReplicatedAsync(Func&lt;long, CancellationToken, ValueTask&lt;bool&gt;&gt;, object?, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 复制回合入口（ReplicatedRound——Raft WAL 域形态）：staged 物化 → Prepare-all
 （fsync-before-replicate，参与者落盘语义）→ <b>await awaitDecision(候选 seq)</b>
 （决策注入：多数派共识——Phase 4 自研协议对接位）→ true: Confirm-all（★不可回退点）；
 false/超时/异常: Abort 已 Prepare 者（D2 截断）→ <a class="xref" href="TC.Tier.Runtime.Transactions.RollbackException.html">RollbackException</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; CommitReplicatedAsync(Func&lt;long, CancellationToken, ValueTask&lt;bool&gt;&gt; awaitDecision, object? context = null, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</td>
-        <td><span class="parametername">awaitDecision</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
-        <td><span class="parametername">context</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>awaitDecision</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;&gt;</dt>
+    <dd></dd>
+    <dt><code>context</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_Dispose_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Dispose*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_Dispose" data-uid="TC.Tier.Runtime.Transactions.TierSession.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_Dispose" data-uid="TC.Tier.Runtime.Transactions.TierSession.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>开放状态=隐式 Abort；幂等。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Transactions_TierSession_EnterReadScope_" data-uid="TC.Tier.Runtime.Transactions.TierSession.EnterReadScope*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_EnterReadScope" data-uid="TC.Tier.Runtime.Transactions.TierSession.EnterReadScope">EnterReadScope()</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_EnterReadScope" data-uid="TC.Tier.Runtime.Transactions.TierSession.EnterReadScope">
+  EnterReadScope()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 会话读 scope：聚合域内全部 epoch 读保护参与者（一次进/出），暴露覆盖层（RYW 挂点）。</p>
 <p>需要协调的读（RYW/scope 批量/未来路由）经此入口；地址直达读（自缓冲句柄）无会话零税
 ——一等公民永远保留（设计稿 §3.2 两档）。保护区纪律见 <a class="xref" href="TC.Tier.Runtime.Transactions.SessionReadScope.html">SessionReadScope</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public SessionReadScope EnterReadScope()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Transactions.SessionReadScope.html">SessionReadScope</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Transactions.SessionReadScope.html">SessionReadScope</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Transactions_TierSession_Stage_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Stage*"></a>
-  <h4 id="TC_Tier_Runtime_Transactions_TierSession_Stage_System_Action_System_Object_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Stage(System.Action,System.Object)">Stage(Action, object?)</h4>
+
+  <h3 id="TC_Tier_Runtime_Transactions_TierSession_Stage_System_Action_System_Object_" data-uid="TC.Tier.Runtime.Transactions.TierSession.Stage(System.Action,System.Object)">
+  Stage(Action, object?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 暂存物化委托——结构零触碰（staged 仅存委托；管线回合内按 FIFO 序统一执行）。</p>
 <p>物化委托在管线线程执行：①应为纯缓冲写（Append/Set 类）尽力不抛——抛=管线 Faulted
 （域报废重建，§6 物化失败模型：悬干无法安全清除，续跑会洗白）；②业务校验放 Stage 前
 （此时抛无副作用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Stage(Action materialize, object? tag = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action">Action</a></td>
-        <td><span class="parametername">materialize</span></td>
-        <td><p>物化委托（写结构缓冲——管线回合内执行）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
-        <td><span class="parametername">tag</span></td>
-        <td><p>调用方关联物（诊断/覆盖层映射——组合层自定）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>materialize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action">Action</a></dt>
+    <dd><p>物化委托（写结构缓冲——管线回合内执行）。</p>
+</dd>
+    <dt><code>tag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>调用方关联物（诊断/覆盖层映射——组合层自定）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

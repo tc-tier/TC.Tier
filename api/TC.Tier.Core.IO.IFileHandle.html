@@ -1,135 +1,180 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Interface IFileHandle | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Interface IFileHandle | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="单个文件的访问与操作——Core/IO 数据平面（fd 模型 ∪ overlapped 模型，D7）。 一个 IFileHandle 实例对应一个文件的一种打开语义（Access &#215; Mode &#215; Sharing &#215; Hints）。 ★ 磁盘实现：SafeFileHandle + RandomAccess（内含 DIO 对齐校验与逐句柄探测）。 ★ 内存实现：槽代际寻址（open 时解析一次，热路径零字典开销）。 ★ 位置语义并集：Write/Read(offset) 保持 pwrite/pread 无状态铁律（不读不推进游标）；   句柄同时内建生命周期游标（open 初始化、 原子预留推进、 移动）。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="单个文件的访问与操作——Core/IO 数据平面（fd 模型 ∪ overlapped 模型，D7）。 一个 IFileHandle 实例对应一个文件的一种打开语义（Access &#215; Mode &#215; Sharing &#215; Hints）。 ★ 磁盘实现：SafeFileHandle + RandomAccess（内含 DIO 对齐校验与逐句柄探测）。 ★ 内存实现：槽代际寻址（open 时解析一次，热路径零字典开销）。 ★ 位置语义并集：Write/Read(offset) 保持 pwrite/pread 无状态铁律（不读不推进游标）；   句柄同时内建生命周期游标（open 初始化、 原子预留推进、 移动）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.IO.IFileHandle">
+
+        <article data-uid="TC.Tier.Core.IO.IFileHandle">
 
 
 
-  <h1 id="TC_Tier_Core_IO_IFileHandle" data-uid="TC.Tier.Core.IO.IFileHandle" class="text-break">Interface IFileHandle</h1>
-  <div class="markdown level0 summary"><p>单个文件的访问与操作——Core/IO 数据平面（fd 模型 ∪ overlapped 模型，D7）。</p>
+  <h1 id="TC_Tier_Core_IO_IFileHandle" data-uid="TC.Tier.Core.IO.IFileHandle" class="text-break">
+Interface IFileHandle  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>单个文件的访问与操作——Core/IO 数据平面（fd 模型 ∪ overlapped 模型，D7）。</p>
 <p>一个 IFileHandle 实例对应一个文件的一种打开语义（Access × Mode × Sharing × Hints）。</p>
 <p>★ 磁盘实现：<code>SafeFileHandle + RandomAccess</code>（内含 DIO 对齐校验与逐句柄探测）。</p>
 <p>★ 内存实现：槽代际寻址（open 时解析一次，热路径零字典开销）。</p>
 <p>★ 位置语义并集：<code>Write/Read(offset)</code> 保持 pwrite/pread 无状态铁律（不读不推进游标）；
   句柄同时内建生命周期游标（open 初始化、<a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Append_System_ReadOnlySpan_System_Byte__">Append(ReadOnlySpan&lt;byte&gt;)</a> 原子预留推进、<a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Seek_System_Int64_System_IO_SeekOrigin_">Seek(long, SeekOrigin)</a> 移动）。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IFileHandle : IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">IDisposable.Dispose()</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_IO_IFileHandle_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public interface IFileHandle : IDisposable, IAsyncDisposable</code></pre>
-  </div>
-  <h3 id="properties">Properties
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_AllocatedSize_" data-uid="TC.Tier.Core.IO.IFileHandle.AllocatedSize*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_AllocatedSize" data-uid="TC.Tier.Core.IO.IFileHandle.AllocatedSize">AllocatedSize</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_AllocatedSize" data-uid="TC.Tier.Core.IO.IFileHandle.AllocatedSize">
+  AllocatedSize
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>物理占用大小——Sparse 介质 PunchHole 后 &lt; Length；mem Reserved 模式打洞后按记账口径。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long AllocatedSize { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_FileExtra_" data-uid="TC.Tier.Core.IO.IFileHandle.FileExtra*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_FileExtra" data-uid="TC.Tier.Core.IO.IFileHandle.FileExtra">FileExtra</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_FileExtra" data-uid="TC.Tier.Core.IO.IFileHandle.FileExtra">
+  FileExtra
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ FileExtra 平面（§3.6 终稿）：一份不透明附加数据 ≤<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_MaxFileExtraBytes">MaxFileExtraBytes</a>，
 与 fs 级（<code>IFileSystem.CreateFile(extra:)/Stat→FsEntryInfo.FileExtra</code>）同平面互见。
 心智模型：≤1.5K 的小文件——四成员即其 pread/pwrite/整写投影。</p>
@@ -137,1456 +182,1374 @@
 （写入 staging 随 Flush/PUT 原子提交；读=staging 优先）。无附加数据 = 空。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ReadOnlyMemory&lt;byte&gt; FileExtra { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Length_" data-uid="TC.Tier.Core.IO.IFileHandle.Length*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Length" data-uid="TC.Tier.Core.IO.IFileHandle.Length">Length</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Length" data-uid="TC.Tier.Core.IO.IFileHandle.Length">
+  Length
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>文件逻辑长度（含稀疏洞）；PunchHole 后不变。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long Length { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Path_" data-uid="TC.Tier.Core.IO.IFileHandle.Path*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Path" data-uid="TC.Tier.Core.IO.IFileHandle.Path">Path</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Path" data-uid="TC.Tier.Core.IO.IFileHandle.Path">
+  Path
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>文件路径——本层唯一文件身份（fs 根下的相对名）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">string Path { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Position_" data-uid="TC.Tier.Core.IO.IFileHandle.Position*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Position" data-uid="TC.Tier.Core.IO.IFileHandle.Position">Position</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Position" data-uid="TC.Tier.Core.IO.IFileHandle.Position">
+  Position
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>句柄游标当前值（Tell）——Volatile 读。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long Position { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_RequiredAlignment_" data-uid="TC.Tier.Core.IO.IFileHandle.RequiredAlignment*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_RequiredAlignment" data-uid="TC.Tier.Core.IO.IFileHandle.RequiredAlignment">RequiredAlignment</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_RequiredAlignment" data-uid="TC.Tier.Core.IO.IFileHandle.RequiredAlignment">
+  RequiredAlignment
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>本句柄全部对齐要求的最大值——DIO 三重对齐（offset/length/buffer 地址）的单一事实源。</p>
 <p>★ 平台矩阵：Win=max(扇区, 内存页)；Linux=逻辑块（通常=扇区）；mem=1；缓冲句柄=1。</p>
 <p>★ 消费者从句柄读对齐基准分配缓冲（AlignedMemoryManager/PinnedBufferPool），禁止手写对齐运算。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long RequiredAlignment { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_UnbufferedSupport_" data-uid="TC.Tier.Core.IO.IFileHandle.UnbufferedSupport*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_UnbufferedSupport" data-uid="TC.Tier.Core.IO.IFileHandle.UnbufferedSupport">UnbufferedSupport</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_UnbufferedSupport" data-uid="TC.Tier.Core.IO.IFileHandle.UnbufferedSupport">
+  UnbufferedSupport
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>本句柄无缓冲 IO 探测结果——open 时一次探测并缓存（四态原生枚举，不映射任何上层契约）。</p>
 <p>★ 语义链：请求（Hints.NoBuffering）→ 逐句柄探测 → 结果报告（Supported/BestEffort/Ignored/NotRequested）。</p>
 <p>★ mem 介质恒 <a class="xref" href="TC.Tier.Core.NativeInterop.UnbufferedIoSupport.html#TC_Tier_Core_NativeInterop_UnbufferedIoSupport_NotRequested">NotRequested</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">UnbufferedIoSupport UnbufferedSupport { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.NativeInterop.UnbufferedIoSupport.html">UnbufferedIoSupport</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.NativeInterop.UnbufferedIoSupport.html">UnbufferedIoSupport</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Advise_" data-uid="TC.Tier.Core.IO.IFileHandle.Advise*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Advise_TC_Tier_Core_IO_FileAdvise_" data-uid="TC.Tier.Core.IO.IFileHandle.Advise(TC.Tier.Core.IO.FileAdvise)">Advise(FileAdvise)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Advise_TC_Tier_Core_IO_FileAdvise_" data-uid="TC.Tier.Core.IO.IFileHandle.Advise(TC.Tier.Core.IO.FileAdvise)">
+  Advise(FileAdvise)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>访问提示（posix_fadvise 族；不支持平台 no-op，能力位表达）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Advise(FileAdvise advise)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileAdvise.html">FileAdvise</a></td>
-        <td><span class="parametername">advise</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>advise</code> <a class="xref" href="TC.Tier.Core.IO.FileAdvise.html">FileAdvise</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Append_" data-uid="TC.Tier.Core.IO.IFileHandle.Append*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Append_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.Append(System.ReadOnlySpan{System.Byte})">Append(ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Append_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.Append(System.ReadOnlySpan{System.Byte})">
+  Append(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>原子预留追加——<code>Interlocked</code> 预留游标区间后 pwrite 落地，返回实际写入偏移。</p>
 <p>★ 同一句柄多线程 Append 无覆写、无撕裂（比内核 O_APPEND 更强且任何介质成立）。</p>
 <p>★ 失败语义：预留不回滚（回退=吞噬他人预留），失败区间成为读零稀疏洞；
   异常携带 ReservedOffset（预留落点），句柄不因失败废止。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long Append(ReadOnlySpan&lt;byte&gt; source)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源缓冲</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><p>实际写入偏移（预留落点）</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源缓冲</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>实际写入偏移（预留落点）</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_AppendAsync_" data-uid="TC.Tier.Core.IO.IFileHandle.AppendAsync*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_AppendAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.AppendAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">AppendAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_AppendAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.AppendAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  AppendAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步追加——语义同 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Append_System_ReadOnlySpan_System_Byte__">Append(ReadOnlySpan&lt;byte&gt;)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask&lt;long&gt; AppendAsync(ReadOnlyMemory&lt;byte&gt; source, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源缓冲</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td><p>实际写入偏移（预留落点）</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源缓冲</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>实际写入偏移（预留落点）</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_CloneRange_" data-uid="TC.Tier.Core.IO.IFileHandle.CloneRange*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_CloneRange_TC_Tier_Core_IO_IFileHandle_" data-uid="TC.Tier.Core.IO.IFileHandle.CloneRange(TC.Tier.Core.IO.IFileHandle)">CloneRange(IFileHandle)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_CloneRange_TC_Tier_Core_IO_IFileHandle_" data-uid="TC.Tier.Core.IO.IFileHandle.CloneRange(TC.Tier.Core.IO.IFileHandle)">
+  CloneRange(IFileHandle)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>整文件引用克隆（FICLONE/写时复制）——不支持平台回退 CopyRange 全量。语义同 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_CopyRange_TC_Tier_Core_IO_IFileHandle_System_Int64_System_Int64_System_Int64_">CopyRange(IFileHandle, long, long, long)</a> 的部分失败契约。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long CloneRange(IFileHandle destination)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标句柄（须同一介质）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><p>实际克隆字节数（失败不回滚目标，已完成长度经 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html#TC_Tier_Core_IO_FileIOException_CompletedLength">CompletedLength</a> 携带）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></td>
-        <td><p>不支持克隆的介质或平台（Disk/Mem/Remote）</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>destination</code> <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
+    <dd><p>目标句柄（须同一介质）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>实际克隆字节数（失败不回滚目标，已完成长度经 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html#TC_Tier_Core_IO_FileIOException_CompletedLength">CompletedLength</a> 携带）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>不支持克隆的介质或平台（Disk/Mem/Remote）</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_CollapseRange_" data-uid="TC.Tier.Core.IO.IFileHandle.CollapseRange*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_CollapseRange_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.CollapseRange(System.Int64,System.Int64)">CollapseRange(long, long)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_CollapseRange_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.CollapseRange(System.Int64,System.Int64)">
+  CollapseRange(long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>区间塌缩——[offset, offset+length) 移除且后续数据前移，文件缩短（对齐 AllocationUnit；不支持平台抛 Unsupported）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void CollapseRange(long offset, long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>塌缩起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>塌缩长度</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>塌缩起点</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>塌缩长度</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_CopyRange_" data-uid="TC.Tier.Core.IO.IFileHandle.CopyRange*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_CopyRange_TC_Tier_Core_IO_IFileHandle_System_Int64_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.CopyRange(TC.Tier.Core.IO.IFileHandle,System.Int64,System.Int64,System.Int64)">CopyRange(IFileHandle, long, long, long)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_CopyRange_TC_Tier_Core_IO_IFileHandle_System_Int64_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.CopyRange(TC.Tier.Core.IO.IFileHandle,System.Int64,System.Int64,System.Int64)">
+  CopyRange(IFileHandle, long, long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>高效拷贝区间到目标文件（copy_file_range/FICLONE 加速或用户态回退）——返回实际拷贝字节数。</p>
 <p>★ 不保证原子：失败不回滚目标，已完成长度经 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html#TC_Tier_Core_IO_FileIOException_CompletedLength">CompletedLength</a> 携带。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long CopyRange(IFileHandle destination, long sourceOffset, long destinationOffset, long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标句柄（须同一介质）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">sourceOffset</span></td>
-        <td><p>源区间起点。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">destinationOffset</span></td>
-        <td><p>目标写入起点。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>拷贝长度。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><p>实际拷贝字节数（失败不回滚目标，已完成长度经 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html#TC_Tier_Core_IO_FileIOException_CompletedLength">CompletedLength</a> 携带）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>destination</code> <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
+    <dd><p>目标句柄（须同一介质）。</p>
+</dd>
+    <dt><code>sourceOffset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>源区间起点。</p>
+</dd>
+    <dt><code>destinationOffset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>目标写入起点。</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>拷贝长度。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>实际拷贝字节数（失败不回滚目标，已完成长度经 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html#TC_Tier_Core_IO_FileIOException_CompletedLength">CompletedLength</a> 携带）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRanges_" data-uid="TC.Tier.Core.IO.IFileHandle.EnumerateAllocatedRanges*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRanges" data-uid="TC.Tier.Core.IO.IFileHandle.EnumerateAllocatedRanges">EnumerateAllocatedRanges()</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRanges" data-uid="TC.Tier.Core.IO.IFileHandle.EnumerateAllocatedRanges">
+  EnumerateAllocatedRanges()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>枚举已分配区间——块粒度报告，对齐到 AllocationUnit（mem=PageSize / 磁盘=fs 簇）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IReadOnlyCollection&lt;(long Start, long End)&gt; EnumerateAllocatedRanges()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.end">End</a>)&gt;</td>
-        <td><p>已分配区间列表（闭区间 [Start, End)）</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.end">End</a>)&gt;</dt>
+    <dd><p>已分配区间列表（闭区间 [Start, End)）</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRangesDetailed_" data-uid="TC.Tier.Core.IO.IFileHandle.EnumerateAllocatedRangesDetailed*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRangesDetailed" data-uid="TC.Tier.Core.IO.IFileHandle.EnumerateAllocatedRangesDetailed">EnumerateAllocatedRangesDetailed()</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRangesDetailed" data-uid="TC.Tier.Core.IO.IFileHandle.EnumerateAllocatedRangesDetailed">
+  EnumerateAllocatedRangesDetailed()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>已分配区间带状态（采集管线 unwritten 保真用——raw-medium-and-conversion-design §5.2）。</p>
 <p>★ 语义：区间并集与 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_EnumerateAllocatedRanges">EnumerateAllocatedRanges()</a> 完全一致，额外标注
   <code>Unwritten</code>（预分配未写区间——物理已留、读零、写转换）。不支持区分的介质
   （Disk/Mem/Remote）默认实现恒 <code>false</code>（全部按 written 报告——诚实默认）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IReadOnlyCollection&lt;(long Start, long End, bool Unwritten)&gt; EnumerateAllocatedRangesDetailed()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.boolean-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.boolean-.end">End</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.boolean-.unwritten">Unwritten</a>)&gt;</td>
-        <td><p>已分配区间列表（闭区间 [Start, End) + Unwritten 状态）</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.boolean-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.boolean-.end">End</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.boolean-.unwritten">Unwritten</a>)&gt;</dt>
+    <dd><p>已分配区间列表（闭区间 [Start, End) + Unwritten 状态）</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Flush_" data-uid="TC.Tier.Core.IO.IFileHandle.Flush*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Flush" data-uid="TC.Tier.Core.IO.IFileHandle.Flush">Flush()</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Flush" data-uid="TC.Tier.Core.IO.IFileHandle.Flush">
+  Flush()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>全量刷盘（fsync/FlushFileBuffers/F_FULLFSYNC；mem no-op）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Flush()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_IO_IFileHandle_FlushData_" data-uid="TC.Tier.Core.IO.IFileHandle.FlushData*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_FlushData" data-uid="TC.Tier.Core.IO.IFileHandle.FlushData">FlushData()</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_FlushData" data-uid="TC.Tier.Core.IO.IFileHandle.FlushData">
+  FlushData()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>数据刷盘（fdatasync 语义——不刷元数据）。仅 Linux 能力位置位时与 Flush 可区分；否则 ≡ Flush 全量回退不抛。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void FlushData()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_IO_IFileHandle_InsertRange_" data-uid="TC.Tier.Core.IO.IFileHandle.InsertRange*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_InsertRange_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.InsertRange(System.Int64,System.Int64)">InsertRange(long, long)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_InsertRange_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.InsertRange(System.Int64,System.Int64)">
+  InsertRange(long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>区间插入——在 offset 处插入零洞且后续数据后移，文件增长（对齐 AllocationUnit；不支持平台抛 Unsupported）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void InsertRange(long offset, long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>插入起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>插入长度</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>插入起点</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>插入长度</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Lock_" data-uid="TC.Tier.Core.IO.IFileHandle.Lock*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Lock_System_Int64_System_Int64_TC_Tier_Core_IO_FileLockMode_" data-uid="TC.Tier.Core.IO.IFileHandle.Lock(System.Int64,System.Int64,TC.Tier.Core.IO.FileLockMode)">Lock(long, long, FileLockMode)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Lock_System_Int64_System_Int64_TC_Tier_Core_IO_FileLockMode_" data-uid="TC.Tier.Core.IO.IFileHandle.Lock(System.Int64,System.Int64,TC.Tier.Core.IO.FileLockMode)">
+  Lock(long, long, FileLockMode)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>阻塞获取字节范围锁。同句柄重叠再锁存在平台分歧（Linux OFD 幂等转换；Windows LockFileEx 冲突）——
 可移植契约不依赖同句柄重锁行为。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Lock(long offset, long length, FileLockMode mode)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>锁起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>锁长度</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileLockMode.html">FileLockMode</a></td>
-        <td><span class="parametername">mode</span></td>
-        <td><p>锁模式</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>锁起点</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>锁长度</p>
+</dd>
+    <dt><code>mode</code> <a class="xref" href="TC.Tier.Core.IO.FileLockMode.html">FileLockMode</a></dt>
+    <dd><p>锁模式</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Map_" data-uid="TC.Tier.Core.IO.IFileHandle.Map*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Map_System_Int64_System_Int64_TC_Tier_Core_IO_AccessMode_" data-uid="TC.Tier.Core.IO.IFileHandle.Map(System.Int64,System.Int64,TC.Tier.Core.IO.AccessMode)">Map(long, long, AccessMode)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Map_System_Int64_System_Int64_TC_Tier_Core_IO_AccessMode_" data-uid="TC.Tier.Core.IO.IFileHandle.Map(System.Int64,System.Int64,TC.Tier.Core.IO.AccessMode)">
+  Map(long, long, AccessMode)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>映射区间为内存视图。父句柄被池淘汰/Dispose 不产生野视图（dup/槽引用守护）；
 铁律：<a class="xref" href="TC.Tier.Core.IO.IMappedSection.html">IMappedSection</a> 必须 Dispose（其持有独立 OS 句柄/引用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IMappedSection Map(long offset, long length, AccessMode access)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>映射起点。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>映射长度（offset+length 须 ≤ Length）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.AccessMode.html">AccessMode</a></td>
-        <td><span class="parametername">access</span></td>
-        <td><p>访问模式。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.IMappedSection.html">IMappedSection</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>映射起点。</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>映射长度（offset+length 须 ≤ Length）。</p>
+</dd>
+    <dt><code>access</code> <a class="xref" href="TC.Tier.Core.IO.AccessMode.html">AccessMode</a></dt>
+    <dd><p>访问模式。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.IMappedSection.html">IMappedSection</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Preallocate_" data-uid="TC.Tier.Core.IO.IFileHandle.Preallocate*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Preallocate" data-uid="TC.Tier.Core.IO.IFileHandle.Preallocate">Preallocate()</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Preallocate" data-uid="TC.Tier.Core.IO.IFileHandle.Preallocate">
+  Preallocate()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>幂等预分配到打开语义记录的大小（PreallocateSize&lt;=0 为 no-op）——已分配/文件已有大小则跳过。
 open 时已对 PreallocateSize&gt;0 自动执行；此方法供显式重放（恢复场景）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Preallocate()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_IO_IFileHandle_PunchHole_" data-uid="TC.Tier.Core.IO.IFileHandle.PunchHole*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_PunchHole_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.PunchHole(System.Int64,System.Int64)">PunchHole(long, long)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_PunchHole_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.PunchHole(System.Int64,System.Int64)">
+  PunchHole(long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>物理打洞回收区间——文件大小不变，区间归零。</p>
 <p>★ 对齐契约：offset 与 length 必须按 <code>Volume.AllocationUnit</code> 对齐，未对齐抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlignmentError">AlignmentError</a>（两介质同校验）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void PunchHole(long offset, long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>打洞起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>打洞长度</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>打洞起点</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>打洞长度</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Read_" data-uid="TC.Tier.Core.IO.IFileHandle.Read*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Read_System_Int64_System_Span_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.Read(System.Int64,System.Span{System.Byte})">Read(long, Span&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Read_System_Int64_System_Span_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.Read(System.Int64,System.Span{System.Byte})">
+  Read(long, Span&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>同步读取——返回实际读取字节数（EOF 处可能小于 destination.Length；磁盘 pread 到 EOF 语义）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">int Read(long offset, Span&lt;byte&gt; destination)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>读取起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标缓冲</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>读取起点</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_ReadAsync_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadAsync*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_ReadAsync_System_Int64_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadAsync(System.Int64,System.Memory{System.Byte},System.Threading.CancellationToken)">ReadAsync(long, Memory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_ReadAsync_System_Int64_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadAsync(System.Int64,System.Memory{System.Byte},System.Threading.CancellationToken)">
+  ReadAsync(long, Memory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步读取——语义同 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Read_System_Int64_System_Span_System_Byte__">Read(long, Span&lt;byte&gt;)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask&lt;int&gt; ReadAsync(long offset, Memory&lt;byte&gt; destination, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>读取起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标缓冲</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>读取起点</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_ReadFileExtra_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadFileExtra*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_ReadFileExtra_System_Int64_System_Span_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.ReadFileExtra(System.Int64,System.Span{System.Byte})">ReadFileExtra(long, Span&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_ReadFileExtra_System_Int64_System_Span_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.ReadFileExtra(System.Int64,System.Span{System.Byte})">
+  ReadFileExtra(long, Span&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>偏移读（pread 契约）：返回实际读数；尾段不足返实际量；offset ≥ 长度 → 0（EOF 不抛）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">int ReadFileExtra(long offset, Span&lt;byte&gt; destination)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>读取起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标缓冲区</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><p>实际读取字节数</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>读取起点</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲区</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>实际读取字节数</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_ReadVector_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadVector*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_ReadVector_System_Int64_System_ReadOnlySpan_System_Memory_System_Byte___" data-uid="TC.Tier.Core.IO.IFileHandle.ReadVector(System.Int64,System.ReadOnlySpan{System.Memory{System.Byte}})">ReadVector(long, ReadOnlySpan&lt;Memory&lt;byte&gt;&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_ReadVector_System_Int64_System_ReadOnlySpan_System_Memory_System_Byte___" data-uid="TC.Tier.Core.IO.IFileHandle.ReadVector(System.Int64,System.ReadOnlySpan{System.Memory{System.Byte}})">
+  ReadVector(long, ReadOnlySpan&lt;Memory&lt;byte&gt;&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>向量读取——多片缓冲按序填充，返回总读取字节数（EOF 截断）。语义等价逐片 Read。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">int ReadVector(long offset, ReadOnlySpan&lt;Memory&lt;byte&gt;&gt; destinations)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>读取起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
-        <td><span class="parametername">destinations</span></td>
-        <td><p>目标缓冲片段</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>读取起点</p>
+</dd>
+    <dt><code>destinations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>目标缓冲片段</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_ReadVectorAsync_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadVectorAsync*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_ReadVectorAsync_System_Int64_System_Memory_System_Memory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadVectorAsync(System.Int64,System.Memory{System.Memory{System.Byte}},System.Threading.CancellationToken)">ReadVectorAsync(long, Memory&lt;Memory&lt;byte&gt;&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_ReadVectorAsync_System_Int64_System_Memory_System_Memory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.ReadVectorAsync(System.Int64,System.Memory{System.Memory{System.Byte}},System.Threading.CancellationToken)">
+  ReadVectorAsync(long, Memory&lt;Memory&lt;byte&gt;&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步向量读取——语义同 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_ReadVector_System_Int64_System_ReadOnlySpan_System_Memory_System_Byte___">ReadVector(long, ReadOnlySpan&lt;Memory&lt;byte&gt;&gt;)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask&lt;int&gt; ReadVectorAsync(long offset, Memory&lt;Memory&lt;byte&gt;&gt; destinations, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>读取起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
-        <td><span class="parametername">destinations</span></td>
-        <td><p>目标缓冲片段</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>读取起点</p>
+</dd>
+    <dt><code>destinations</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>目标缓冲片段</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Seek_" data-uid="TC.Tier.Core.IO.IFileHandle.Seek*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Seek_System_Int64_System_IO_SeekOrigin_" data-uid="TC.Tier.Core.IO.IFileHandle.Seek(System.Int64,System.IO.SeekOrigin)">Seek(long, SeekOrigin)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Seek_System_Int64_System_IO_SeekOrigin_" data-uid="TC.Tier.Core.IO.IFileHandle.Seek(System.Int64,System.IO.SeekOrigin)">
+  Seek(long, SeekOrigin)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>移动游标。与 Append 并发是调用方错误（互斥操作，文档纪律声明，不设内部锁）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long Seek(long offset, SeekOrigin origin)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>偏移量</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.seekorigin">SeekOrigin</a></td>
-        <td><span class="parametername">origin</span></td>
-        <td><p>偏移基准</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>偏移量</p>
+</dd>
+    <dt><code>origin</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.seekorigin">SeekOrigin</a></dt>
+    <dd><p>偏移基准</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_SetFileExtra_" data-uid="TC.Tier.Core.IO.IFileHandle.SetFileExtra*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_SetFileExtra_System_ReadOnlyMemory_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.SetFileExtra(System.ReadOnlyMemory{System.Byte})">SetFileExtra(ReadOnlyMemory&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_SetFileExtra_System_ReadOnlyMemory_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.SetFileExtra(System.ReadOnlyMemory{System.Byte})">
+  SetFileExtra(ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>完全覆盖（长度可增可减；空 = 清除）；超限同抛（预算闭环另一增长点）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void SetFileExtra(ReadOnlyMemory&lt;byte&gt; extra)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">extra</span></td>
-        <td><p>源缓冲区</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>extra</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源缓冲区</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_SetLength_" data-uid="TC.Tier.Core.IO.IFileHandle.SetLength*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_SetLength_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.SetLength(System.Int64)">SetLength(long)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_SetLength_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.SetLength(System.Int64)">
+  SetLength(long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>设置逻辑长度（截断或零填充扩展）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void SetLength(long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_TryLock_" data-uid="TC.Tier.Core.IO.IFileHandle.TryLock*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_TryLock_System_Int64_System_Int64_TC_Tier_Core_IO_FileLockMode_" data-uid="TC.Tier.Core.IO.IFileHandle.TryLock(System.Int64,System.Int64,TC.Tier.Core.IO.FileLockMode)">TryLock(long, long, FileLockMode)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_TryLock_System_Int64_System_Int64_TC_Tier_Core_IO_FileLockMode_" data-uid="TC.Tier.Core.IO.IFileHandle.TryLock(System.Int64,System.Int64,TC.Tier.Core.IO.FileLockMode)">
+  TryLock(long, long, FileLockMode)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>非阻塞尝试获取——失败立即返回 false（不抛）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">bool TryLock(long offset, long length, FileLockMode mode)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>锁起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>锁长度</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.FileLockMode.html">FileLockMode</a></td>
-        <td><span class="parametername">mode</span></td>
-        <td><p>锁模式</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>锁起点</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>锁长度</p>
+</dd>
+    <dt><code>mode</code> <a class="xref" href="TC.Tier.Core.IO.FileLockMode.html">FileLockMode</a></dt>
+    <dd><p>锁模式</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Unlock_" data-uid="TC.Tier.Core.IO.IFileHandle.Unlock*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Unlock_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.Unlock(System.Int64,System.Int64)">Unlock(long, long)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Unlock_System_Int64_System_Int64_" data-uid="TC.Tier.Core.IO.IFileHandle.Unlock(System.Int64,System.Int64)">
+  Unlock(long, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放字节范围锁（须与 Lock/TryLock 的区间精确配对）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Unlock(long offset, long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>锁起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>锁长度</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>锁起点</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>锁长度</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_Write_" data-uid="TC.Tier.Core.IO.IFileHandle.Write*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_Write_System_Int64_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.Write(System.Int64,System.ReadOnlySpan{System.Byte})">Write(long, ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_Write_System_Int64_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.Write(System.Int64,System.ReadOnlySpan{System.Byte})">
+  Write(long, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>同步写入——从指定偏移覆写（磁盘=pwrite，内存=MemoryCopy）；越过 EOF 零洞扩展（pwrite 平权）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Write(long offset, ReadOnlySpan&lt;byte&gt; source)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>写入起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源缓冲</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>写入起点</p>
+</dd>
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源缓冲</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_WriteAsync_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteAsync*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_WriteAsync_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteAsync(System.Int64,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">WriteAsync(long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_WriteAsync_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteAsync(System.Int64,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  WriteAsync(long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步写入——语义同 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_Write_System_Int64_System_ReadOnlySpan_System_Byte__">Write(long, ReadOnlySpan&lt;byte&gt;)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask WriteAsync(long offset, ReadOnlyMemory&lt;byte&gt; source, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>写入起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源缓冲</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>写入起点</p>
+</dd>
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源缓冲</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_WriteFileExtra_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteFileExtra*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_WriteFileExtra_System_Int64_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.WriteFileExtra(System.Int64,System.ReadOnlySpan{System.Byte})">WriteFileExtra(long, ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_WriteFileExtra_System_Int64_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.IO.IFileHandle.WriteFileExtra(System.Int64,System.ReadOnlySpan{System.Byte})">
+  WriteFileExtra(long, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>精准字节写（pwrite 契约）：原位覆写；越尾零扩展；扩展后总长超 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_MaxFileExtraBytes">MaxFileExtraBytes</a>
 抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>（预算闭环——仅有的两个长度增长点之一）。并发：同区并发写由调用方协调。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void WriteFileExtra(long offset, ReadOnlySpan&lt;byte&gt; data)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>写入起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">data</span></td>
-        <td><p>源缓冲区</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>写入起点</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源缓冲区</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_WriteVector_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteVector*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_WriteVector_System_Int64_System_ReadOnlySpan_System_ReadOnlyMemory_System_Byte___" data-uid="TC.Tier.Core.IO.IFileHandle.WriteVector(System.Int64,System.ReadOnlySpan{System.ReadOnlyMemory{System.Byte}})">WriteVector(long, ReadOnlySpan&lt;ReadOnlyMemory&lt;byte&gt;&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_WriteVector_System_Int64_System_ReadOnlySpan_System_ReadOnlyMemory_System_Byte___" data-uid="TC.Tier.Core.IO.IFileHandle.WriteVector(System.Int64,System.ReadOnlySpan{System.ReadOnlyMemory{System.Byte}})">
+  WriteVector(long, ReadOnlySpan&lt;ReadOnlyMemory&lt;byte&gt;&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>向量写入——多片缓冲按序写入连续区间（readv/writev 或逐片回退）。语义等价逐片 Write。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void WriteVector(long offset, ReadOnlySpan&lt;ReadOnlyMemory&lt;byte&gt;&gt; sources)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>写入起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
-        <td><span class="parametername">sources</span></td>
-        <td><p>源缓冲片段</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
-        <td><p>sources 为空</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>写入起点</p>
+</dd>
+    <dt><code>sources</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>源缓冲片段</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>sources 为空</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Core_IO_IFileHandle_WriteVectorAsync_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteVectorAsync*"></a>
-  <h4 id="TC_Tier_Core_IO_IFileHandle_WriteVectorAsync_System_Int64_System_ReadOnlyMemory_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteVectorAsync(System.Int64,System.ReadOnlyMemory{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">WriteVectorAsync(long, ReadOnlyMemory&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_IO_IFileHandle_WriteVectorAsync_System_Int64_System_ReadOnlyMemory_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.IO.IFileHandle.WriteVectorAsync(System.Int64,System.ReadOnlyMemory{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">
+  WriteVectorAsync(long, ReadOnlyMemory&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步向量写入——语义同 <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html#TC_Tier_Core_IO_IFileHandle_WriteVector_System_Int64_System_ReadOnlySpan_System_ReadOnlyMemory_System_Byte___">WriteVector(long, ReadOnlySpan&lt;ReadOnlyMemory&lt;byte&gt;&gt;)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask WriteVectorAsync(long offset, ReadOnlyMemory&lt;ReadOnlyMemory&lt;byte&gt;&gt; sources, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">offset</span></td>
-        <td><p>写入起点</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
-        <td><span class="parametername">sources</span></td>
-        <td><p>源缓冲片段</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>写入起点</p>
+</dd>
+    <dt><code>sources</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>源缓冲片段</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

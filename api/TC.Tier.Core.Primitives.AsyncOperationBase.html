@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class AsyncOperationBase | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class AsyncOperationBase | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="一次性后台操作状态句柄的机制基座—— /  共用（docs/sync-async-bridge.md &#167;4）。 ★ 通用后台操作原语（升级）：取代 Storage 层 IReclaimOperation/ICompactOperation   两套同构句柄的手写实现（TCS + 事件 + 时序对齐三层各写一遍）——事件/取消/进度/结果/等待   一套契约一处实现，后台操作统一 new AsyncOperation(...) + Report*。 ★ 实现 （Contracts）——消费面全集见接口（含    状态轮询 /        IAsyncOperation.Wait(int, CancellationToken)      同步兜底 /  终态取异常）。 ★ 三种消费模式：① 轮询 /（多消费者安全）；   ② （异步一等公民，失败/取消重抛）；   ③        Wait(int, CancellationToken)      （同步兜底——内嵌  的   「自旋 → park 分片」分层等待，全程有界，绝不裸 Task.Wait()）。 ★ 事件：（进度）+ （失败/取消终态，含订阅者异常隔离）；   成功终态事件由子类经  触发（无结果变体无 Completed 事件——await 等价）。 ★ 取消： 触发内部链接令牌（构造可链接外部取消——引擎 Dispose 自动取消在途操作）；    供后台 worker 在检查点响应。 ★ 状态机：构造即 （可见性原则）；终态经 CAS 单次转移、   不可逆；首个 Report 生效，后续幂等 no-op（对齐 RecoveryBase&quot;Failed 销毁重建&quot;哲学——重试 = 新建操作）。 ★ 事件时序契约（Storage 历史 flaky 根因区收口）：终态事件先于完成信号置位——等待者   （ 唤醒）苏醒时事件必已投递；订阅竞态经  兜底。 ★ 泄漏绊线：终态 Failed/Canceled 且从未被任何消费模式观察 → 终结器告警（无 logger 静默，   对齐 LifecycleBase 泄漏探测哲学）。 ★ #if DEBUG：状态转移环形记录（最近 16 次：时间戳/线程/方向），    自动携带——对齐 SpinRWLock 值示波器。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="一次性后台操作状态句柄的机制基座—— /  共用（docs/sync-async-bridge.md &#167;4）。 ★ 通用后台操作原语（升级）：取代 Storage 层 IReclaimOperation/ICompactOperation   两套同构句柄的手写实现（TCS + 事件 + 时序对齐三层各写一遍）——事件/取消/进度/结果/等待   一套契约一处实现，后台操作统一 new AsyncOperation(...) + Report*。 ★ 实现 （Contracts）——消费面全集见接口（含    状态轮询 /        IAsyncOperation.Wait(int, CancellationToken)      同步兜底 /  终态取异常）。 ★ 三种消费模式：① 轮询 /（多消费者安全）；   ② （异步一等公民，失败/取消重抛）；   ③        Wait(int, CancellationToken)      （同步兜底——内嵌  的   「自旋 → park 分片」分层等待，全程有界，绝不裸 Task.Wait()）。 ★ 事件：（进度）+ （失败/取消终态，含订阅者异常隔离）；   成功终态事件由子类经  触发（无结果变体无 Completed 事件——await 等价）。 ★ 取消： 触发内部链接令牌（构造可链接外部取消——引擎 Dispose 自动取消在途操作）；    供后台 worker 在检查点响应。 ★ 状态机：构造即 （可见性原则）；终态经 CAS 单次转移、   不可逆；首个 Report 生效，后续幂等 no-op（对齐 RecoveryBase&quot;Failed 销毁重建&quot;哲学——重试 = 新建操作）。 ★ 事件时序契约（Storage 历史 flaky 根因区收口）：终态事件先于完成信号置位——等待者   （ 唤醒）苏醒时事件必已投递；订阅竞态经  兜底。 ★ 泄漏绊线：终态 Failed/Canceled 且从未被任何消费模式观察 → 终结器告警（无 logger 静默，   对齐 LifecycleBase 泄漏探测哲学）。 ★ #if DEBUG：状态转移环形记录（最近 16 次：时间戳/线程/方向），    自动携带——对齐 SpinRWLock 值示波器。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase">
+
+        <article data-uid="TC.Tier.Core.Primitives.AsyncOperationBase">
 
 
 
-  <h1 id="TC_Tier_Core_Primitives_AsyncOperationBase" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase" class="text-break">Class AsyncOperationBase</h1>
-  <div class="markdown level0 summary"><p>一次性后台操作状态句柄的<b>机制基座</b>——<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a> / <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html">AsyncOperation&lt;TResult&gt;</a>
+  <h1 id="TC_Tier_Core_Primitives_AsyncOperationBase" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase" class="text-break">
+Class AsyncOperationBase  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>一次性后台操作状态句柄的<b>机制基座</b>——<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a> / <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html">AsyncOperation&lt;TResult&gt;</a>
 共用（docs/sync-async-bridge.md §4）。</p>
 <p>★ 通用后台操作原语（升级）：取代 Storage 层 IReclaimOperation/ICompactOperation
   两套同构句柄的手写实现（TCS + 事件 + 时序对齐三层各写一遍）——事件/取消/进度/结果/等待
@@ -105,20 +127,41 @@
 <p>★ <code>#if DEBUG</code>：状态转移环形记录（最近 16 次：时间戳/线程/方向），
   <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Describe">Describe()</a> 自动携带——对齐 SpinRWLock 值示波器。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">AsyncOperationBase</span></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html">AsyncOperation</a>&lt;TResult&gt;</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class AsyncOperationBase : IAsyncOperation</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">AsyncOperationBase</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation-1.html">AsyncOperation</a>&lt;TResult&gt;</div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -137,444 +180,621 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Primitives.html">Primitives</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Primitives_AsyncOperationBase_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public abstract class AsyncOperationBase : IAsyncOperation</code></pre>
-  </div>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase__ctor_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase__ctor_System_String_TC_Tier_Core_Logging_ILogger_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.#ctor(System.String,TC.Tier.Core.Logging.ILogger,System.Threading.CancellationToken)">AsyncOperationBase(string?, ILogger?, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase__ctor_System_String_TC_Tier_Core_Logging_ILogger_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.#ctor(System.String,TC.Tier.Core.Logging.ILogger,System.Threading.CancellationToken)">
+  AsyncOperationBase(string?, ILogger?, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>创建已在途的操作（状态立即为 <a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html#TC_Tier_Contracts_Common_AsyncOperationStatus_Running">Running</a>——可见性原则）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected AsyncOperationBase(string? name = null, ILogger? logger = null, CancellationToken externalCancellation = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">name</span></td>
-        <td><p>诊断名（超时/告警现场）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td><p>泄漏绊线告警 logger（可选）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">externalCancellation</span></td>
-        <td><p>外部取消令牌（可选）——如引擎 Dispose 令牌，触发即取消本操作。
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>诊断名（超时/告警现场）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>泄漏绊线告警 logger（可选）。</p>
+</dd>
+    <dt><code>externalCancellation</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>外部取消令牌（可选）——如引擎 Dispose 令牌，触发即取消本操作。
 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_CancellationToken">CancellationToken</a> 与 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Cancel">Cancel()</a> 均反映到同一链接源。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="fields">Fields
-</h3>
+</dd>
+  </dl>
 
 
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase__succeededPayload" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase._succeededPayload">_succeededPayload</h4>
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase__succeededPayload" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase._succeededPayload">
+  _succeededPayload
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>成功载荷（泛型变体结果）——锁内置终态前写，与终态原子发布（仅供子类 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceededWithPayload_System_Object_">ReportSucceededWithPayload(object?)</a> 注入）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected object? _succeededPayload</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.CancellationToken*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_CancellationToken" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.CancellationToken">CancellationToken</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_CancellationToken" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.CancellationToken">
+  CancellationToken
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>操作取消令牌——后台 worker 在检查点响应（抛 OCE → 完成侧 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_ReportCanceled_System_OperationCanceledException_">ReportCanceled(OperationCanceledException)</a>）。
 由 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Cancel">Cancel()</a> 或构造链接的外部令牌触发。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public CancellationToken CancellationToken { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_Exception_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Exception*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Exception" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Exception">Exception</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Exception" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Exception">
+  Exception
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>终态异常（Failed/Canceled 时非 null；Succeeded 为 null）。★ 读取即视为已观察（泄漏绊线）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public Exception? Exception { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_IsCompleted_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.IsCompleted*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_IsCompleted" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.IsCompleted">IsCompleted</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_IsCompleted" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.IsCompleted">
+  IsCompleted
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>是否已到终态（Succeeded/Failed/Canceled）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool IsCompleted { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_Status_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Status*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Status" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Status">Status</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Status" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Status">
+  Status
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前状态（多消费者安全，轮询用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public AsyncOperationStatus Status { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html">AsyncOperationStatus</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html">AsyncOperationStatus</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_Cancel_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Cancel*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Cancel" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Cancel">Cancel()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Cancel" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Cancel">
+  Cancel()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>触发取消——立即返回，后台在下一个检查点中止并回滚（幂等；终态后调用无副作用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Cancel()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_Describe_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Describe*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Describe" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Describe">Describe()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Describe" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Describe">
+  Describe()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>诊断快照（超时/告警现场）：op 名 + 状态 + 年龄（+ DEBUG 转移历史）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public string Describe()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_Finalize_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Finalize*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Finalize" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Finalize">~AsyncOperationBase()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Finalize" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Finalize">
+  ~AsyncOperationBase()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 泄漏绊线：终态 Failed/Canceled 且从未被任何消费模式观察（失败被吞）→ 告警。</p>
 <p>⚠️ Logger 是普通引用——终结器运行时字段可能已被回收（对齐 LifecycleBase 防护）：
   null 判断 + 全吞（终结器抛异常会终止进程）。</p>
 <p>★ 顺带释放内部链接令牌（linked cts 有外部注册，须 Dispose 防泄漏）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected ~AsyncOperationBase()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_MarkObserved_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.MarkObserved*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_MarkObserved" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.MarkObserved">MarkObserved()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_MarkObserved" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.MarkObserved">
+  MarkObserved()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>标记&quot;已被消费模式观察&quot;（泄漏绊线：Failed/Canceled 终态未被观察 → 终结器告警）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void MarkObserved()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_OnSucceeded_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.OnSucceeded*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_OnSucceeded" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.OnSucceeded">OnSucceeded()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_OnSucceeded" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.OnSucceeded">
+  OnSucceeded()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>成功终态钩子——子类触发自己的 Completed 事件（基类无 Completed 事件：无结果操作的完成 = await 等价）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual void OnSucceeded()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportCanceled_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportCanceled*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportCanceled_System_OperationCanceledException_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportCanceled(System.OperationCanceledException)">ReportCanceled(OperationCanceledException)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportCanceled_System_OperationCanceledException_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportCanceled(System.OperationCanceledException)">
+  ReportCanceled(OperationCanceledException)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>上报取消（终态）。首个终态生效，后续调用幂等 no-op。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReportCanceled(OperationCanceledException exception)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
-        <td><span class="parametername">exception</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>exception</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportFailed_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportFailed*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportFailed_System_Exception_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportFailed(System.Exception)">ReportFailed(Exception)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportFailed_System_Exception_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportFailed(System.Exception)">
+  ReportFailed(Exception)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>上报失败（终态）。首个终态生效，后续调用幂等 no-op。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReportFailed(Exception exception)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
-        <td><span class="parametername">exception</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>exception</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportProgress_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportProgress*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportProgress_System_Double_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportProgress(System.Double)">ReportProgress(double)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportProgress_System_Double_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportProgress(System.Double)">
+  ReportProgress(double)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>上报进度（0.0~1.0）——订阅者异常隔离 + 告警，不中断后台工作。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ReportProgress(double progress)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td><span class="parametername">progress</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>progress</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceeded_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportSucceeded*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceeded" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportSucceeded">ReportSucceeded()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceeded" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportSucceeded">
+  ReportSucceeded()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>上报成功（终态）。★ virtual——泛型变体 override 防御无参误用（须携带结果）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public virtual void ReportSucceeded()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceededWithPayload_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportSucceededWithPayload*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceededWithPayload_System_Object_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportSucceededWithPayload(System.Object)">ReportSucceededWithPayload(object?)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ReportSucceededWithPayload_System_Object_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ReportSucceededWithPayload(System.Object)">
+  ReportSucceededWithPayload(object?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>上报成功（终态，携带载荷——泛型变体用）。载荷与终态在锁内原子发布：首个生效，幂等不覆盖。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void ReportSucceededWithPayload(object? succeededPayload)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></td>
-        <td><span class="parametername">succeededPayload</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>succeededPayload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailed_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ThrowIfFailed*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailed" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ThrowIfFailed">ThrowIfFailed()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailed" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ThrowIfFailed">
+  ThrowIfFailed()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>轮询方终态取异常：<a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html#TC_Tier_Contracts_Common_AsyncOperationStatus_Failed">Failed</a>/<a class="xref" href="TC.Tier.Contracts.Common.AsyncOperationStatus.html#TC_Tier_Contracts_Common_AsyncOperationStatus_Canceled">Canceled</a>
 重抛存储的异常，Succeeded 为 no-op。</p>
 <p>⚠️ 仅终态后可调（非终态抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>——防御轮询方漏查 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_IsCompleted">IsCompleted</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ThrowIfFailed()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailedCore_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ThrowIfFailedCore*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailedCore" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ThrowIfFailedCore">ThrowIfFailedCore()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailedCore" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ThrowIfFailedCore">
+  ThrowIfFailedCore()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>终态失败重抛（Status 已终态）。Failed/Canceled 且异常槽意外为空时抛兜底 IOE（不冒充成功）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void ThrowIfFailedCore()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_ToString_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ToString*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_ToString" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ToString">ToString()</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_ToString" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.ToString">
+  ToString()
+  
+  </h3>
+
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a></div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_Wait_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Wait*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Wait_System_Int32_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Wait(System.Int32,System.Threading.CancellationToken)">Wait(int, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Wait_System_Int32_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Wait(System.Int32,System.Threading.CancellationToken)">
+  Wait(int, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 同步兜底等待——分层策略（自旋 → park 分片，内嵌 <see>
 <cref>AsyncManualResetEvent.Wait(int, CancellationToken)</cref>
 </see>
@@ -585,251 +805,207 @@
 <p>⚠️ <code class="paramref">timeoutMs</code> 必须 &gt; 0（同步等待必须有界——docs/sync-async-bridge.md §8.1）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool Wait(int timeoutMs, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">timeoutMs</span></td>
-        <td><p>超时毫秒（必须 &gt; 0）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌（仅取消等待本身，不取消操作）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>完成（含失败）→ true / 超时 → false。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timeoutMs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>超时毫秒（必须 &gt; 0）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（仅取消等待本身，不取消操作）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>完成（含失败）→ true / 超时 → false。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.WaitAsync*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.WaitAsync(System.Threading.CancellationToken)">WaitAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.WaitAsync(System.Threading.CancellationToken)">
+  WaitAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步等待完成（一等公民）。失败/取消在等待结束后<b>重抛</b>原异常（对齐 Task 语义）。</p>
 <p>★ 已完成快路径：终态检查 + 重抛，零分配零等待。</p>
 <p>★ ct 仅取消"等待"本身（不取消操作——用 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Cancel">Cancel()</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask WaitAsync(CancellationToken cancellationToken = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">cancellationToken</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Primitives_AsyncOperationBase_WaitCompletedAsync_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.WaitCompletedAsync*"></a>
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_WaitCompletedAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.WaitCompletedAsync(System.Threading.CancellationToken)">WaitCompletedAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_WaitCompletedAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.WaitCompletedAsync(System.Threading.CancellationToken)">
+  WaitCompletedAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>等完成信号（子类泛型等待复用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected ValueTask WaitCompletedAsync(CancellationToken cancellationToken)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">cancellationToken</span></td>
-        <td><p>取消令牌（仅取消等待本身，不取消操作）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td><p>完成信号 Task（成功/失败/取消均完成）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="events">Events
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（仅取消等待本身，不取消操作）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成信号 Task（成功/失败/取消均完成）。</p>
+</dd>
+  </dl>
 
 
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Failed" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Failed">Failed</h4>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Failed" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Failed">
+  Failed
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>失败/取消终态事件（参数携带原因：异常或 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>）。</p>
 <p>★ 终态 Failed/Canceled 均触发（取消回滚完成 = Failed 语义）；订阅者异常被隔离。</p>
 <p>★ 时序契约：先于完成信号置位——<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_System_Threading_CancellationToken_">WaitAsync(CancellationToken)</a> 等待者苏醒时事件必已投递。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public event EventHandler&lt;Exception&gt;? Failed</code></pre>
   </div>
-  <h5 class="eventType">Event Type</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
 
 
-  <h4 id="TC_Tier_Core_Primitives_AsyncOperationBase_Progress" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Progress">Progress</h4>
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Primitives_AsyncOperationBase_Progress" data-uid="TC.Tier.Core.Primitives.AsyncOperationBase.Progress">
+  Progress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>进度（0.0 ~ 1.0）——后台操作推进时经 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_ReportProgress_System_Double_">ReportProgress(double)</a> 触发；无进度语义不触发。
 ★ 订阅者异常被隔离（不影响操作完成）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public event EventHandler&lt;double&gt;? Progress</code></pre>
   </div>
-  <h5 class="eventType">Event Type</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a>
-  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.eventhandler-1">EventHandler</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class IsolatedTaskScheduler | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class IsolatedTaskScheduler | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="隔离线程 TaskScheduler——在 M 个私有线程上执行任务，与公共线程池（）完全隔离。 ★ 用途：高频 / 关键路径的 worker（如引擎建段 worker）需要线程隔离——其异步 continuation 不与公共池上的   其它任务（写者、其它池工作）争抢池线程，避免饥饿/抖动。 ★ 真&#183;异步友好：任务在私有线程上执行时 TaskScheduler.Current = 本调度器，任务内 await 的   continuation 自动回到本调度器的私有线程（不经公共池）——既得「专用线程」隔离，又无 GetAwaiter().GetResult()   sync-over-async（高频路径禁区）。 ★ 阻塞等待模型：私有线程在  上阻塞等任务（空闲不占 CPU）。 ★ 稀缺资源&#183;受控创建：每实例开 M 个真实 OS 线程（栈 ~1MB/线程）。禁止直接 new——ctor 为   internal，经 （进程级全局单例）或 （工厂 + 防扩散护栏）获取，   使用指南见 &#167;2（使用指南：docs/dedicated-task-scheduler.md，文档站）（选型/旋钮/注意事项/故障排查）。 ★ 释放：调用方须在所有任务结束后（worker 的 WaitForExit 之后）调 ——    + Join 线程。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="隔离线程 TaskScheduler——在 M 个私有线程上执行任务，与公共线程池（）完全隔离。 ★ 用途：高频 / 关键路径的 worker（如引擎建段 worker）需要线程隔离——其异步 continuation 不与公共池上的   其它任务（写者、其它池工作）争抢池线程，避免饥饿/抖动。 ★ 真&#183;异步友好：任务在私有线程上执行时 TaskScheduler.Current = 本调度器，任务内 await 的   continuation 自动回到本调度器的私有线程（不经公共池）——既得「专用线程」隔离，又无 GetAwaiter().GetResult()   sync-over-async（高频路径禁区）。 ★ 阻塞等待模型：私有线程在  上阻塞等任务（空闲不占 CPU）。 ★ 稀缺资源&#183;受控创建：每实例开 M 个真实 OS 线程（栈 ~1MB/线程）。禁止直接 new——ctor 为   internal，经 （进程级全局单例）或 （工厂 + 防扩散护栏）获取，   使用指南见 &#167;2（使用指南：docs/dedicated-task-scheduler.md，文档站）（选型/旋钮/注意事项/故障排查）。 ★ 释放：调用方须在所有任务结束后（worker 的 WaitForExit 之后）调 ——    + Join 线程。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler">
+
+        <article data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler">
 
 
 
-  <h1 id="TC_Tier_Core_Shared_IsolatedTaskScheduler" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler" class="text-break">Class IsolatedTaskScheduler</h1>
-  <div class="markdown level0 summary"><p>隔离线程 TaskScheduler——在 M 个<b>私有</b>线程上执行任务，与公共线程池（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.default">Default</a>）完全隔离。</p>
+  <h1 id="TC_Tier_Core_Shared_IsolatedTaskScheduler" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler" class="text-break">
+Class IsolatedTaskScheduler  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>隔离线程 TaskScheduler——在 M 个<b>私有</b>线程上执行任务，与公共线程池（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.default">Default</a>）完全隔离。</p>
 <p>★ 用途：高频 / 关键路径的 worker（如引擎建段 worker）需要线程隔离——其异步 continuation 不与公共池上的
   其它任务（写者、其它池工作）争抢池线程，避免饥饿/抖动。</p>
 <p>★ <b>真·异步友好</b>：任务在私有线程上执行时 <code>TaskScheduler.Current</code> = 本调度器，任务内 <code>await</code> 的
@@ -88,19 +110,35 @@
 <p>★ 释放：调用方须在所有任务结束后（worker 的 WaitForExit 之后）调 <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Dispose">Dispose()</a>——
   <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1.completeadding">CompleteAdding()</a> + Join 线程。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler">TaskScheduler</a></div>
-    <div class="level2"><span class="xref">IsolatedTaskScheduler</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler">TaskScheduler</a></div>
+      <div><span class="xref">IsolatedTaskScheduler</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.fromcurrentsynchronizationcontext">TaskScheduler.FromCurrentSynchronizationContext()</a>
     </div>
@@ -137,292 +175,355 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable</code></pre>
-  </div>
-  <h3 id="properties">Properties
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_IsBounded_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.IsBounded*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_IsBounded" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.IsBounded">IsBounded</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_IsBounded" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.IsBounded">
+  IsBounded
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>是否有界队列（true=满则阻塞背压；false=无界）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool IsBounded { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Name_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Name*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Name" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Name">Name</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Name" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Name">
+  Name
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>诊断名（线程名前缀 / 日志标识）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public string Name { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueCapacity_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueCapacity*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueCapacity" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueCapacity">QueueCapacity</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueCapacity" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueCapacity">
+  QueueCapacity
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>队列容量（<a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_IsBounded">IsBounded</a>=false 时为 -1）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int QueueCapacity { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueDepth_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueDepth*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueDepth" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueDepth">QueueDepth</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueDepth" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueDepth">
+  QueueDepth
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前任务队列深度（并发下近似，诊断用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int QueueDepth { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_RecommendedThreadCount_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.RecommendedThreadCount*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_RecommendedThreadCount" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.RecommendedThreadCount">RecommendedThreadCount</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_RecommendedThreadCount" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.RecommendedThreadCount">
+  RecommendedThreadCount
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>推荐线程数 = <code>Clamp(ProcessorCount, 2, 4)</code>（§7：保守，为业务/写者留核）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static int RecommendedThreadCount { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Shared_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Shared*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Shared" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Shared">Shared</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Shared" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Shared">
+  Shared
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>进程级全局共享单例（§2.3）。<a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_RecommendedThreadCount">RecommendedThreadCount</a> 线程，全默认 options。</p>
 <p>★ 常见 / 单引擎场景直接用——所有走专用模式的 worker 共用这一个，进程级线程数固定。</p>
 <p>★ 调用方<b>不 Dispose</b>（进程生命期；私有线程 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.thread.isbackground">IsBackground</a>=true 不挡进程退出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static IsolatedTaskScheduler Shared { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_ThreadCount_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.ThreadCount*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_ThreadCount" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.ThreadCount">ThreadCount</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_ThreadCount" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.ThreadCount">
+  ThreadCount
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>专用线程数 M（构造时定）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int ThreadCount { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Create_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Create*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Create_TC_Tier_Core_Shared_IsolatedSchedulerOptions_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Create(TC.Tier.Core.Shared.IsolatedSchedulerOptions)">Create(IsolatedSchedulerOptions?)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Create_TC_Tier_Core_Shared_IsolatedSchedulerOptions_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Create(TC.Tier.Core.Shared.IsolatedSchedulerOptions)">
+  Create(IsolatedSchedulerOptions?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>创建独立实例（需<b>分区隔离</b>时用，§2.3）——多引擎互不干扰时每引擎 own 一个，随 <code>Resources</code> 释放。</p>
 <p>★ 注册 <span class="xref">TC.Tier.Core.Shared.InstanceTracker</span>（泄漏/扩散可见）+ 防扩散 WARN（实例数超阈值）。</p>
 <p>★ 校验 <a class="xref" href="TC.Tier.Core.Shared.IsolatedSchedulerOptions.html#TC_Tier_Core_Shared_IsolatedSchedulerOptions_ThreadCount">ThreadCount</a>（超核 throw、过半核 WARN，§7）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public static IsolatedTaskScheduler Create(IsolatedSchedulerOptions? options = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.IsolatedSchedulerOptions.html">IsolatedSchedulerOptions</a></td>
-        <td><span class="parametername">options</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Shared.IsolatedSchedulerOptions.html">IsolatedSchedulerOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Dispose_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Dispose*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Dispose" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_Dispose" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放——通知线程退出（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1.completeadding">CompleteAdding()</a>）+ Join。</p>
 <p>★ 调用方须先保证所有任务已结束（worker 经 Stop+WaitForExit 后再 Dispose 本调度器）。</p>
 <p>★ <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Shared">Shared</a> 不应被 Dispose（进程意图资源）；仅 <a class="xref" href="TC.Tier.Core.Shared.IsolatedTaskScheduler.html#TC_Tier_Core_Shared_IsolatedTaskScheduler_Create_TC_Tier_Core_Shared_IsolatedSchedulerOptions_">Create(IsolatedSchedulerOptions?)</a> 的实例随 owner 释放。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_GetScheduledTasks_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.GetScheduledTasks*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_GetScheduledTasks" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.GetScheduledTasks">GetScheduledTasks()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_GetScheduledTasks" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.GetScheduledTasks">
+  GetScheduledTasks()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>诊断快照（调试器用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override IEnumerable&lt;Task&gt; GetScheduledTasks()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a>&gt;</td>
-        <td><p>当前队列任务快照（并发下近似）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.getscheduledtasks">TaskScheduler.GetScheduledTasks()</a></div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a>&gt;</dt>
+    <dd><p>当前队列任务快照（并发下近似）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueTask_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueTask*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueTask_System_Threading_Tasks_Task_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueTask(System.Threading.Tasks.Task)">QueueTask(Task)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_QueueTask_System_Threading_Tasks_Task_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.QueueTask(System.Threading.Tasks.Task)">
+  QueueTask(Task)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>入队任务到私有线程消费。</p>
 <p>★ 有界时 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1.add#system-collections-concurrent-blockingcollection-1-add(-0)">Add(T)</a> 在队列满时<b>阻塞调用线程</b>（真生产者背压，§3.3）；
   无界时永不阻塞。</p>
@@ -431,184 +532,130 @@
   <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>，避免抛到入队线程（此时 worker 已停，任务为孤儿）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override void QueueTask(Task task)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
-        <td><span class="parametername">task</span></td>
-        <td><p>入队任务。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.queuetask">TaskScheduler.QueueTask(Task)</a></div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>task</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>入队任务。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_TryDequeue_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.TryDequeue*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_TryDequeue_System_Threading_Tasks_Task_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.TryDequeue(System.Threading.Tasks.Task)">TryDequeue(Task)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_TryDequeue_System_Threading_Tasks_Task_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.TryDequeue(System.Threading.Tasks.Task)">
+  TryDequeue(Task)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>不支持出队——任务一旦入队即在私有线程执行（cancellation 由任务内部 ct 处理）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override bool TryDequeue(Task task)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
-        <td><span class="parametername">task</span></td>
-        <td><p>任务。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.trydequeue">TaskScheduler.TryDequeue(Task)</a></div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>task</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>任务。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_IsolatedTaskScheduler_TryExecuteTaskInline_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.TryExecuteTaskInline*"></a>
-  <h4 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_TryExecuteTaskInline_System_Threading_Tasks_Task_System_Boolean_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.TryExecuteTaskInline(System.Threading.Tasks.Task,System.Boolean)">TryExecuteTaskInline(Task, bool)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_IsolatedTaskScheduler_TryExecuteTaskInline_System_Threading_Tasks_Task_System_Boolean_" data-uid="TC.Tier.Core.Shared.IsolatedTaskScheduler.TryExecuteTaskInline(System.Threading.Tasks.Task,System.Boolean)">
+  TryExecuteTaskInline(Task, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>不内联——所有任务经队列到私有线程执行（保证线程隔离 + 不在调用线程跑 worker 逻辑）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
-        <td><span class="parametername">task</span></td>
-        <td><p>任务。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">taskWasPreviouslyQueued</span></td>
-        <td><p>是否已入队（无用）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.tryexecutetaskinline">TaskScheduler.TryExecuteTaskInline(Task, bool)</a></div>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>task</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>任务。</p>
+</dd>
+    <dt><code>taskWasPreviouslyQueued</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否已入队（无用）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

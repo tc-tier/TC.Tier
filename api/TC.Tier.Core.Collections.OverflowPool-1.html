@@ -1,98 +1,141 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class OverflowPool&lt;T&gt; | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class OverflowPool&lt;T&gt; | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="固定大小溢出对象池。并发安全（基于 ）。 ★ 指标：hits/misses/overflows 计数 + （对齐 PinnedBufferPool 覆盖度）。 容量上限为软约束（Soft cap）：高并发 TryAdd 下可能瞬时超出 size 几个， 因 ConcurrentQueue 的 Count 快照与 Enqueue 非原子。这对当前调用方（disposer 为 no-op， 超出项被丢弃）无正确性影响；如需硬上限须改用自旋锁或 CAS 容量跟踪。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="固定大小溢出对象池。并发安全（基于 ）。 ★ 指标：hits/misses/overflows 计数 + （对齐 PinnedBufferPool 覆盖度）。 容量上限为软约束（Soft cap）：高并发 TryAdd 下可能瞬时超出 size 几个， 因 ConcurrentQueue 的 Count 快照与 Enqueue 非原子。这对当前调用方（disposer 为 no-op， 超出项被丢弃）无正确性影响；如需硬上限须改用自旋锁或 CAS 容量跟踪。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Collections.OverflowPool`1">
+
+        <article data-uid="TC.Tier.Core.Collections.OverflowPool`1">
 
 
 
-  <h1 id="TC_Tier_Core_Collections_OverflowPool_1" data-uid="TC.Tier.Core.Collections.OverflowPool`1" class="text-break">Class OverflowPool&lt;T&gt;</h1>
-  <div class="markdown level0 summary"><p>固定大小溢出对象池。并发安全（基于 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a>）。</p>
+  <h1 id="TC_Tier_Core_Collections_OverflowPool_1" data-uid="TC.Tier.Core.Collections.OverflowPool`1" class="text-break">
+Class OverflowPool&lt;T&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Collections.html">Collections</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>固定大小溢出对象池。并发安全（基于 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.concurrentqueue-1">ConcurrentQueue&lt;T&gt;</a>）。</p>
 <p>★ 指标：hits/misses/overflows 计数 + <a class="xref" href="TC.Tier.Core.Collections.OverflowPool-1.html#TC_Tier_Core_Collections_OverflowPool_1_GetStats">GetStats()</a>（对齐 PinnedBufferPool 覆盖度）。</p>
 <p>容量上限为软约束（Soft cap）：高并发 TryAdd 下可能瞬时超出 <code>size</code> 几个，
 因 ConcurrentQueue 的 Count 快照与 Enqueue 非原子。这对当前调用方（disposer 为 no-op，
 超出项被丢弃）无正确性影响；如需硬上限须改用自旋锁或 CAS 容量跟踪。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">OverflowPool&lt;T&gt;</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class OverflowPool&lt;T&gt; : IDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">OverflowPool&lt;T&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -111,365 +154,357 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Collections.html">Collections</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Collections_OverflowPool_1_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class OverflowPool&lt;T&gt; : IDisposable</code></pre>
-  </div>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">T</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1__ctor_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1__ctor_System_Int32_System_Action__0__" data-uid="TC.Tier.Core.Collections.OverflowPool`1.#ctor(System.Int32,System.Action{`0})">OverflowPool(int, Action&lt;T&gt;?)</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1__ctor_System_Int32_System_Action__0__" data-uid="TC.Tier.Core.Collections.OverflowPool`1.#ctor(System.Int32,System.Action{`0})">
+  OverflowPool(int, Action&lt;T&gt;?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>构造溢出池（有界并发队列——池空 miss、池满 overflow，都无阻塞）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public OverflowPool(int size, Action&lt;T&gt;? disposer = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">size</span></td>
-        <td><p>池容量上限（软约束）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;T&gt;</td>
-        <td><span class="parametername">disposer</span></td>
-        <td><p>被拒/释放时的对象回收回调（null = no-op）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>size</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>池容量上限（软约束）。</p>
+</dd>
+    <dt><code>disposer</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;T&gt;</dt>
+    <dd><p>被拒/释放时的对象回收回调（null = no-op）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1_Count_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Count*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_Count" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Count">Count</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_Count" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Count">
+  Count
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前池中对象数（快照，并发下近似值）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int Count { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1_Hits_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Hits*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_Hits" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Hits">Hits</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_Hits" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Hits">
+  Hits
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>TryGet 命中次数（池成功供出对象）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public long Hits { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1_Misses_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Misses*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_Misses" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Misses">Misses</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_Misses" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Misses">
+  Misses
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>TryGet 未命中次数（池空，调用方需自行分配）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public long Misses { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1_Overflows_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Overflows*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_Overflows" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Overflows">Overflows</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_Overflows" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Overflows">
+  Overflows
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>TryAdd 被拒次数（池满或已释放，对象被 disposer 回收）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public long Overflows { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1_Dispose_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Dispose*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_Dispose" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_Dispose" data-uid="TC.Tier.Core.Collections.OverflowPool`1.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放池：标记已释放，排空并回收所有剩余对象。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Collections_OverflowPool_1_GetStats_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.GetStats*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_GetStats" data-uid="TC.Tier.Core.Collections.OverflowPool`1.GetStats">GetStats()</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_GetStats" data-uid="TC.Tier.Core.Collections.OverflowPool`1.GetStats">
+  GetStats()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>聚合指标快照。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public (long hits, long misses, int count, int size, long overflows) GetStats()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.hits">hits</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.misses">misses</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.count">count</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.size">size</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.overflows">overflows</a>)</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Collections_OverflowPool_1_GetStats_remarks">Remarks</h5>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.hits">hits</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.misses">misses</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.count">count</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.size">size</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.int32,system.int32,system.int64-.overflows">overflows</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Collections_OverflowPool_1_GetStats_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 高并发下 Count 快照为近似值（ConcurrentQueue 非原子）。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_Collections_OverflowPool_1_TryAdd_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.TryAdd*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_TryAdd__0_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.TryAdd(`0)">TryAdd(T)</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_TryAdd__0_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.TryAdd(`0)">
+  TryAdd(T)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>尝试归还对象到池。池未满且未释放返回 true（入池）；否则调 disposer 回收，返回 false（overflow）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryAdd(T item)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">T</span></td>
-        <td><span class="parametername">item</span></td>
-        <td><p>要归还的对象。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>是否成功入池。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Collections_OverflowPool_1_TryAdd__0__remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>item</code> <span class="xref">T</span></dt>
+    <dd><p>要归还的对象。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否成功入池。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Collections_OverflowPool_1_TryAdd__0__remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 高并发下 TryGet/TryAdd 可能瞬时超出 size 几个（软上限），但对调用方无正确性影响。</p>
 </div>
+
+
 
 
   <a id="TC_Tier_Core_Collections_OverflowPool_1_TryGet_" data-uid="TC.Tier.Core.Collections.OverflowPool`1.TryGet*"></a>
-  <h4 id="TC_Tier_Core_Collections_OverflowPool_1_TryGet__0__" data-uid="TC.Tier.Core.Collections.OverflowPool`1.TryGet(`0@)">TryGet(out T?)</h4>
+
+  <h3 id="TC_Tier_Core_Collections_OverflowPool_1_TryGet__0__" data-uid="TC.Tier.Core.Collections.OverflowPool`1.TryGet(`0@)">
+  TryGet(out T?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>尝试从池中取出对象。成功（命中）返回 true；池空（未命中）返回 false。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryGet(out T? item)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">T</span></td>
-        <td><span class="parametername">item</span></td>
-        <td><p>输出对象（池空时为 default(T)）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>是否成功命中池对象。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Collections_OverflowPool_1_TryGet__0___remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>item</code> <span class="xref">T</span></dt>
+    <dd><p>输出对象（池空时为 default(T)）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否成功命中池对象。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Collections_OverflowPool_1_TryGet__0___remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 高并发下 TryGet/TryAdd 可能瞬时超出 size 几个（软上限），但对调用方无正确性影响。</p>
 </div>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

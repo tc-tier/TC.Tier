@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class ManagedMetaPolicy&lt;THeader, TPayload&gt; | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class ManagedMetaPolicy&lt;THeader, TPayload&gt; | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="Managed meta 策略——独立 IStorageEngine + 四段自描述块 + Magic/CRC 校验。 ★ 统一布局：[统一 Header N B][内部水位线（结构化）][外部 opaque（实际用量）][统一 Footer CRC 4B]。 ★ 自描述核心（设计决策 ）：header.PayloadLength = 水位字节数 + opaque 实际用量；   水线位置 = HeaderSize（固定）；opaque 范围 = 其后至 PayloadLength；footer 位 = HeaderSize + PayloadLength。   容量（可变的启动配置）零参与盘上几何——跨重启容量随便调，读侧全按盘上自述定位，水位无条件恢复。 ★ 容量（MetaOpaqueBytes）只做写侧约束：opaque 写入上限 + 缓冲分配 + 引擎段几何。 ★ CRC32C 覆盖 Header + 水位 + 实际 opaque（到 footer 前），存于 Footer。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="Managed meta 策略——独立 IStorageEngine + 四段自描述块 + Magic/CRC 校验。 ★ 统一布局：[统一 Header N B][内部水位线（结构化）][外部 opaque（实际用量）][统一 Footer CRC 4B]。 ★ 自描述核心（设计决策 ）：header.PayloadLength = 水位字节数 + opaque 实际用量；   水线位置 = HeaderSize（固定）；opaque 范围 = 其后至 PayloadLength；footer 位 = HeaderSize + PayloadLength。   容量（可变的启动配置）零参与盘上几何——跨重启容量随便调，读侧全按盘上自述定位，水位无条件恢复。 ★ 容量（MetaOpaqueBytes）只做写侧约束：opaque 写入上限 + 缓冲分配 + 引擎段几何。 ★ CRC32C 覆盖 Header + 水位 + 实际 opaque（到 footer 前），存于 Footer。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2">
+
+        <article data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2">
 
 
 
-  <h1 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2" class="text-break">Class ManagedMetaPolicy&lt;THeader, TPayload&gt;</h1>
-  <div class="markdown level0 summary"><p>Managed meta 策略——独立 <code>IStorageEngine</code> + 四段自描述块 + Magic/CRC 校验。</p>
+  <h1 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2" class="text-break">
+Class ManagedMetaPolicy&lt;THeader, TPayload&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Meta.html">Meta</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Managed meta 策略——独立 <code>IStorageEngine</code> + 四段自描述块 + Magic/CRC 校验。</p>
 <p>★ 统一布局：[统一 Header N B][内部水位线（结构化）][外部 opaque（实际用量）][统一 Footer CRC 4B]。</p>
 <p>★ 自描述核心（设计决策 ）：header.PayloadLength = 水位字节数 + opaque <b>实际用量</b>；
   水线位置 = HeaderSize（固定）；opaque 范围 = 其后至 PayloadLength；footer 位 = HeaderSize + PayloadLength。
@@ -83,20 +105,43 @@
 <p>★ 容量（MetaOpaqueBytes）只做写侧约束：opaque 写入上限 + 缓冲分配 + 引擎段几何。</p>
 <p>★ CRC32C 覆盖 Header + 水位 + 实际 opaque（到 footer 前），存于 Footer。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">ManagedMetaPolicy&lt;THeader, TPayload&gt;</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class ManagedMetaPolicy&lt;THeader, TPayload&gt; : IMetaPolicy&lt;THeader, TPayload&gt;, IDisposable, IAsyncDisposable where THeader : struct where TPayload : struct</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="TC.Tier.Contracts.Meta.IMetaPolicy-2.html">IMetaPolicy</a>&lt;THeader, TPayload&gt;</div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>THeader</code></dt>
+    <dd></dd>
+    <dt><code>TPayload</code></dt>
+    <dd></dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">ManagedMetaPolicy&lt;THeader, TPayload&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Contracts.Meta.IMetaPolicy-2.html">IMetaPolicy</a>&lt;THeader, TPayload&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -115,38 +160,24 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Meta.html">Meta</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
-  <h5 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class ManagedMetaPolicy&lt;THeader, TPayload&gt; : IMetaPolicy&lt;THeader, TPayload&gt;, IDisposable, IAsyncDisposable where THeader : struct where TPayload : struct</code></pre>
-  </div>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">THeader</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><span class="parametername">TPayload</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2__ctor_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.#ctor*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2__ctor_TC_Tier_Contracts_Meta_IMetaLayout__0__1__TC_Tier_Contracts_Storage_IStorageEngine_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.#ctor(TC.Tier.Contracts.Meta.IMetaLayout{`0,`1},TC.Tier.Contracts.Storage.IStorageEngine,TC.Tier.Core.Logging.ILogger)">ManagedMetaPolicy(IMetaLayout&lt;THeader, TPayload&gt;, IStorageEngine, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2__ctor_TC_Tier_Contracts_Meta_IMetaLayout__0__1__TC_Tier_Contracts_Storage_IStorageEngine_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.#ctor(TC.Tier.Contracts.Meta.IMetaLayout{`0,`1},TC.Tier.Contracts.Storage.IStorageEngine,TC.Tier.Core.Logging.ILogger)">
+  ManagedMetaPolicy(IMetaLayout&lt;THeader, TPayload&gt;, IStorageEngine, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>Managed meta 策略——独立 <code>IStorageEngine</code> + 四段自描述块 + Magic/CRC 校验。</p>
 <p>★ 统一布局：[统一 Header N B][内部水位线（结构化）][外部 opaque（实际用量）][统一 Footer CRC 4B]。</p>
 <p>★ 自描述核心（设计决策 ）：header.PayloadLength = 水位字节数 + opaque <b>实际用量</b>；
@@ -156,480 +187,497 @@
 <p>★ CRC32C 覆盖 Header + 水位 + 实际 opaque（到 footer 前），存于 Footer。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ManagedMetaPolicy(IMetaLayout&lt;THeader, TPayload&gt; metaLayout, IStorageEngine metaStorage, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaLayout-2.html">IMetaLayout</a>&lt;THeader, TPayload&gt;</td>
-        <td><span class="parametername">metaLayout</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html">IStorageEngine</a></td>
-        <td><span class="parametername">metaStorage</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>metaLayout</code> <a class="xref" href="TC.Tier.Contracts.Meta.IMetaLayout-2.html">IMetaLayout</a>&lt;THeader, TPayload&gt;</dt>
+    <dd></dd>
+    <dt><code>metaStorage</code> <a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html">IStorageEngine</a></dt>
+    <dd></dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_PayloadSize_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.PayloadSize*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_PayloadSize" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.PayloadSize">PayloadSize</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_PayloadSize" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.PayloadSize">
+  PayloadSize
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>Payload 区总容量（结构化水位 + opaque 扩展，来自 metaLayout——写侧约束/缓冲几何用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int PayloadSize { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Commit_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Commit*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Commit" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Commit">Commit()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Commit" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Commit">
+  Commit()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>同步提交——算 CRC（覆盖 Header+水位+实际 opaque）→ 引擎写块 + Flush，成功后视为已 Load。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Commit()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_CommitAsync_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.CommitAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_CommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.CommitAsync(System.Threading.CancellationToken)">CommitAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_CommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.CommitAsync(System.Threading.CancellationToken)">
+  CommitAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步提交（对等同步版）——算 CRC → 引擎异步写块（取消检查）→ Flush，成功后视为已 Load。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask CommitAsync(CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌（写块后提交前检查一次）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td><p>提交完成的任务。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（写块后提交前检查一次）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>提交完成的任务。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Dispose_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Dispose*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Dispose" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Dispose" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>释放就地缓冲（幂等——重复调用不抛）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_DisposeAsync_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.DisposeAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_DisposeAsync" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.DisposeAsync">DisposeAsync()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_DisposeAsync" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步释放就地缓冲（幂等；缓冲本身无异步资源，直接同步释放后回已完成任务）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td><p>释放完成的任务。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>释放完成的任务。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Load_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Load*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Load" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Load">Load()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_Load" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.Load">
+  Load()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>同步加载——从引擎读盘上自描述块（footer 位 = HeaderSize + 盘上 header.PayloadLength），
 验证 magic/version/CRC 后采纳；盘上块超本启动容量几何时经临时对齐缓冲按盘自述全量读。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool Load()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>true = 读到且验证通过；false = 空/无数据/校验失败（不区分原因）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 读到且验证通过；false = 空/无数据/校验失败（不区分原因）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_LoadAsync_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.LoadAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_LoadAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.LoadAsync(System.Threading.CancellationToken)">LoadAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_LoadAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.LoadAsync(System.Threading.CancellationToken)">
+  LoadAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步加载（对等同步版）——同一自描述读取/验证/采纳路径，读引擎走异步 API。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;bool&gt; LoadAsync(CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</td>
-        <td><p>true = 读到且验证通过；false = 空/无数据/校验失败（不区分原因）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true = 读到且验证通过；false = 空/无数据/校验失败（不区分原因）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadHeader_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadHeader*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadHeader" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadHeader">ReadHeader()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadHeader" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadHeader">
+  ReadHeader()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读就地缓冲中的规范 header（未 Load 返回 null）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public THeader? ReadHeader()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>THeader?</td>
-        <td><p>规范 header；未 Load 时为 null。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>THeader?</dt>
+    <dd><p>规范 header；未 Load 时为 null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadMetaPayload_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadMetaPayload*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadMetaPayload" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadMetaPayload">ReadMetaPayload()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadMetaPayload" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadMetaPayload">
+  ReadMetaPayload()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读就地缓冲中的结构化水位 payload（未 Load 返回 null）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public TPayload? ReadMetaPayload()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>TPayload?</td>
-        <td><p>结构化水位 payload；未 Load 时为 null。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>TPayload?</dt>
+    <dd><p>结构化水位 payload；未 Load 时为 null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadPayload_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadPayload*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadPayload" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadPayload">ReadPayload()</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_ReadPayload" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.ReadPayload">
+  ReadPayload()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读 opaque 扩展字节——盘上自述交付（前次更大容量写入的溢出经 <code>_opaqueOverflow</code> 照付）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ReadOnlySpan&lt;byte&gt; ReadPayload()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><p>opaque 字节视图；未 Load 或无 opaque 时为空。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>opaque 字节视图；未 Load 或无 opaque 时为空。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WriteHeader_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WriteHeader*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WriteHeader__0_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WriteHeader(`0)">WriteHeader(THeader)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WriteHeader__0_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WriteHeader(`0)">
+  WriteHeader(THeader)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>写规范 header 到就地缓冲（validate=true 由 layout 防御性补全 Magic/Version/Flags 规范字段）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void WriteHeader(THeader header)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">THeader</span></td>
-        <td><span class="parametername">header</span></td>
-        <td><p>调用方提供的规范 header。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>header</code> <span class="xref">THeader</span></dt>
+    <dd><p>调用方提供的规范 header。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WritePayload_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WritePayload*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WritePayload_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WritePayload(System.ReadOnlySpan{System.Byte})">WritePayload(ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WritePayload_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WritePayload(System.ReadOnlySpan{System.Byte})">
+  WritePayload(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>写 opaque 扩展字节（受本启动容量约束，写在结构化水位之后；长度记账并同步 header.PayloadLength）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void WritePayload(ReadOnlySpan&lt;byte&gt; opaque)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">opaque</span></td>
-        <td><p>原始扩展字节。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></td>
-        <td><p>opaque 长度超过本启动容量（MetaOpaqueBytes）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>opaque</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>原始扩展字节。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>opaque 长度超过本启动容量（MetaOpaqueBytes）。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WritePayload_" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WritePayload*"></a>
-  <h4 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WritePayload__1__" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WritePayload(`1@)">WritePayload(in TPayload)</h4>
+
+  <h3 id="TC_Tier_Runtime_Meta_ManagedMetaPolicy_2_WritePayload__1__" data-uid="TC.Tier.Runtime.Meta.ManagedMetaPolicy`2.WritePayload(`1@)">
+  WritePayload(in TPayload)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>写结构化水位 payload 到固定几何位，并同步更新 header.PayloadLength（自描述锚点）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void WritePayload(in TPayload payload)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">TPayload</span></td>
-        <td><span class="parametername">payload</span></td>
-        <td><p>结构化水位 payload。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Meta.IMetaPolicy-2.html">IMetaPolicy&lt;THeader, TPayload&gt;</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <span class="xref">TPayload</span></dt>
+    <dd><p>结构化水位 payload。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

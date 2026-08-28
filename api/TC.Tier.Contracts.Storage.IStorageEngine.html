@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Interface IStorageEngine | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Interface IStorageEngine | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="存储引擎接口——提供顺序追加、随机覆写、跨段读取、刷盘、截断、回收、碎片整理等功能。 ★ 继承 （纯信息视图：定位/配置/路径解析）+   （生命周期观测：IsReady/RecoveryState/WaitForReady*）。   本接口在其上追加 IO 行为（Append/Read/Write 等）+ 动态水位（AllocatedTail 等）。   子系统（Meta/Compact）只需依赖  即可，避免与 IO 耦合。 ★ 初始化：不在接口面——启动统一经 StorageEngineBuilder.Start/StartAsync 一步到位   （内部 Initialize + WaitForReady），不允许外部直接调 Initialize（设计决策：接口面消除）。   恢复 hints（，只含恢复水位——段表双尾修正）经 Start(hints) 传入；   段生长上限/分段开关是构造期配置（Options 配置链传入），不经启动入口。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="存储引擎接口——提供顺序追加、随机覆写、跨段读取、刷盘、截断、回收、碎片整理等功能。 ★ 继承 （纯信息视图：定位/配置/路径解析）+   （生命周期观测：IsReady/RecoveryState/WaitForReady*）。   本接口在其上追加 IO 行为（Append/Read/Write 等）+ 动态水位（AllocatedTail 等）。   子系统（Meta/Compact）只需依赖  即可，避免与 IO 耦合。 ★ 初始化：不在接口面——启动统一经 StorageEngineBuilder.Start/StartAsync 一步到位   （内部 Initialize + WaitForReady），不允许外部直接调 Initialize（设计决策：接口面消除）。   恢复 hints（，只含恢复水位——段表双尾修正）经 Start(hints) 传入；   段生长上限/分段开关是构造期配置（Options 配置链传入），不经启动入口。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Contracts.Storage.IStorageEngine">
+
+        <article data-uid="TC.Tier.Contracts.Storage.IStorageEngine">
 
 
 
-  <h1 id="TC_Tier_Contracts_Storage_IStorageEngine" data-uid="TC.Tier.Contracts.Storage.IStorageEngine" class="text-break">Interface IStorageEngine</h1>
-  <div class="markdown level0 summary"><p>存储引擎接口——提供顺序追加、随机覆写、跨段读取、刷盘、截断、回收、碎片整理等功能。</p>
+  <h1 id="TC_Tier_Contracts_Storage_IStorageEngine" data-uid="TC.Tier.Contracts.Storage.IStorageEngine" class="text-break">
+Interface IStorageEngine  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Contracts.html">Contracts</a>.<a class="xref" href="TC.Tier.Contracts.Storage.html">Storage</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Contracts.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>存储引擎接口——提供顺序追加、随机覆写、跨段读取、刷盘、截断、回收、碎片整理等功能。</p>
 <p>★ 继承 <a class="xref" href="TC.Tier.Contracts.Storage.IStorageInfo.html">IStorageInfo</a>（纯信息视图：定位/配置/路径解析）+
   <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>（生命周期观测：IsReady/RecoveryState/WaitForReady*）。
   本接口在其上追加 IO 行为（Append/Read/Write 等）+ 动态水位（AllocatedTail 等）。
@@ -85,9 +107,21 @@
   恢复 hints（<a class="xref" href="TC.Tier.Contracts.Storage.EngineRecoveryHints.html">EngineRecoveryHints</a>，只含恢复水位——段表双尾修正）经 Start(hints) 传入；
   段生长上限/分段开关是构造期配置（Options 配置链传入），不经启动入口。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IStorageEngine : IStorageInfo, ILifecycle&lt;EngineRecoveryHints&gt;, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="TC.Tier.Contracts.Storage.IStorageInfo.html#TC_Tier_Contracts_Storage_IStorageInfo_SegmentFileName_System_Int32_">IStorageInfo.SegmentFileName(int)</a>
     </div>
@@ -133,261 +167,255 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Contracts.html">Contracts</a>.<a class="xref" href="TC.Tier.Contracts.Storage.html">Storage</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Contracts.dll</h6>
-  <h5 id="TC_Tier_Contracts_Storage_IStorageEngine_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public interface IStorageEngine : IStorageInfo, ILifecycle&lt;EngineRecoveryHints&gt;, IDisposable, IAsyncDisposable</code></pre>
-  </div>
-  <h3 id="properties">Properties
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_AllocatedTail_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.AllocatedTail*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_AllocatedTail" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.AllocatedTail">AllocatedTail</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_AllocatedTail" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.AllocatedTail">
+  AllocatedTail
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>地址租借水位（CAS 推进，含未落盘空洞）。Append 的起点；上层据此算剩余容量。</p>
 <pre><code>        &lt;p&gt;★ 注意：此值含「租借未写」的空洞，不是真实已写水位。Read/Scan/Reclaim 的合法上界请用 &lt;xref href=&quot;TC.Tier.Contracts.Storage.IStorageEngine.CommittedTail&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;。&lt;/p&gt;
         &lt;p&gt;语义契约：&lt;xref href=&quot;TC.Tier.Contracts.Storage.IStorageEngine.MinAddress&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; ≤ &lt;xref href=&quot;TC.Tier.Contracts.Storage.IStorageEngine.CommittedTail&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; ≤ AllocatedTail。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">LogicalAddress AllocatedTail { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_CommittedTail_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.CommittedTail*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_CommittedTail" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.CommittedTail">CommittedTail</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_CommittedTail" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.CommittedTail">
+  CommittedTail
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>真实已写水位（pwrite 后推进，数据已写）。所有非 Append 操作的合法上界。</p>
 <pre><code>        &lt;p&gt;类比数据库事务提交=逻辑写入确认（pwrite 完成），不暗示 fsync（fsync 由 Flush 负责）。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">LogicalAddress CommittedTail { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_MinAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.MinAddress*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_MinAddress" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.MinAddress">MinAddress</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_MinAddress" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.MinAddress">
+  MinAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>最小有效地址（头部段被 ReclaimHead 删除后后移）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">LogicalAddress MinAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Allocate_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Allocate*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Allocate_System_Int64_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Allocate(System.Int64)">Allocate(long)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Allocate_System_Int64_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Allocate(System.Int64)">
+  Allocate(long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>预留空间（推进游标，不写数据），返回分配的地址区间 [start, end)。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">(LogicalAddress Start, LogicalAddress End) Allocate(long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>预留字节数（&gt;0）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>(<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,tc.tier.contracts.storage.logicaladdress-.start">Start</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,tc.tier.contracts.storage.logicaladdress-.end">End</a>)</td>
-        <td><p>预留区间的起始和结束 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>预留字节数（&gt;0）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,tc.tier.contracts.storage.logicaladdress-.start">Start</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,tc.tier.contracts.storage.logicaladdress-.end">End</a>)</dt>
+    <dd><p>预留区间的起始和结束 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Append_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Append*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Append_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Append(System.ReadOnlySpan{System.Byte})">Append(ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Append_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Append(System.ReadOnlySpan{System.Byte})">
+  Append(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>追加写入，从当前尾游标 <a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html#TC_Tier_Contracts_Storage_IStorageEngine_AllocatedTail">AllocatedTail</a> 开始，返回写入后的绝对起始地址。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">LogicalAddress Append(ReadOnlySpan&lt;byte&gt; source)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源数据。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><p>写入后的起始 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源数据。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>写入后的起始 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_AppendAsync_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.AppendAsync*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_AppendAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.AppendAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">AppendAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_AppendAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.AppendAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  AppendAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步追加写入，从当前尾游标 <a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html#TC_Tier_Contracts_Storage_IStorageEngine_AllocatedTail">AllocatedTail</a> 开始，返回写入后的绝对起始地址。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask&lt;LogicalAddress&gt; AppendAsync(ReadOnlyMemory&lt;byte&gt; source, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源数据。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td><p>写入后的起始 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
-        <td><p>取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源数据。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>写入后的起始 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>取消。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_CalculationAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.CalculationAddress*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_CalculationAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Int64_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.CalculationAddress(TC.Tier.Contracts.Storage.LogicalAddress,System.Int64)">CalculationAddress(LogicalAddress, long)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_CalculationAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Int64_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.CalculationAddress(TC.Tier.Contracts.Storage.LogicalAddress,System.Int64)">
+  CalculationAddress(LogicalAddress, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>计算给定地址前进指定长度后的新地址。</p>
 <p>★ 纯计算（无空间管理），支持 ±：length ≥ 0 前进（跨段进位正确）；length &lt; 0 回退
   （跨段借位正确，越过 MinAddress 返回 <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html#TC_Tier_Contracts_Storage_LogicalAddress_Invalid">Invalid</a>）。</p>
@@ -402,94 +430,105 @@
   <code>RetreatAddress</code>（跨段进位/借位均正确）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">LogicalAddress CalculationAddress(LogicalAddress address, long length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">address</span></td>
-        <td><p>起始地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">length</span></td>
-        <td><p>前进（正）/回退（负）的字节数。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><p>前进/回退后的地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>起始地址。</p>
+</dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>前进（正）/回退（负）的字节数。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>前进/回退后的地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Flush_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Flush*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Flush" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Flush">Flush()</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Flush" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Flush">
+  Flush()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>全量刷盘（fsync / FlushFileBuffers / F_FULLFSYNC）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Flush()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Flush_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Flush*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Flush_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Flush(TC.Tier.Contracts.Storage.LogicalAddress)">Flush(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Flush_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Flush(TC.Tier.Contracts.Storage.LogicalAddress)">
+  Flush(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>刷到指定地址（floor 到段，刷 [minSeg..upTo.SegId]）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Flush(LogicalAddress upTo)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">upTo</span></td>
-        <td><p>目标地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>upTo</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>目标地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_GetDistance_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetDistance*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_GetDistance_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetDistance(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">GetDistance(LogicalAddress, LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_GetDistance_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetDistance(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  GetDistance(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 计算两个地址之间的字节距离（from → to，跨段自动累加）。</p>
 <p>返回 <code>to - from</code> 的字节数。若 from &gt; to 返回负值。</p>
 <p>★ 这是纯逻辑推算（不分配、不 IO）——委托 <code>LogicalAddressRegistry.GetDistance</code>（跨段进位正确）。</p>
@@ -498,483 +537,415 @@
 <p>★ from/to 必须 ≤ <a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html#TC_Tier_Contracts_Storage_IStorageEngine_AllocatedTail">AllocatedTail</a>（已分配地址空间内）。超出范围抛异常。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">long GetDistance(LogicalAddress from, LogicalAddress to)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>起始地址（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>结束地址（不含）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><p>from 到 to 的字节数。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></td>
-        <td><p>from 或 to 超出已分配空间。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>起始地址（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>结束地址（不含）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>from 到 to 的字节数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>from 或 to 超出已分配空间。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_GetHoleRatio_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetHoleRatio*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_GetHoleRatio_System_Int32_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetHoleRatio(System.Int32)">GetHoleRatio(int)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_GetHoleRatio_System_Int32_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetHoleRatio(System.Int32)">
+  GetHoleRatio(int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>单段空洞率——查询 OS 真实物理分配。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">double GetHoleRatio(int segId)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">segId</span></td>
-        <td><p>段 ID。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td><p>空洞率（0.0 ~ 1.0）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>segId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>段 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>空洞率（0.0 ~ 1.0）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_GetHoleRatio_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetHoleRatio*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_GetHoleRatio_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetHoleRatio(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">GetHoleRatio(LogicalAddress, LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_GetHoleRatio_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.GetHoleRatio(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  GetHoleRatio(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>指定区间空洞率——逐段查询 OS 真实物理分配（稀疏文件 allocated ranges）。</p>
 <pre><code>        &lt;p&gt;★ 0.0 = 无空洞（全部分配），1.0 = 全空洞。返回值始终在 [0.0, 1.0]。&lt;/p&gt;
         &lt;p&gt;★ 与仅用于估算的计数器不同，此方法查询 OS 真实分配，结果精确但有 syscall 开销。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">double GetHoleRatio(LogicalAddress from, LogicalAddress to)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>区间起点（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>区间终点（不含）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></td>
-        <td><p>空洞率（0.0 ~ 1.0）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>区间起点（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>区间终点（不含）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>空洞率（0.0 ~ 1.0）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_OpenSequentialReader_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.OpenSequentialReader*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_OpenSequentialReader_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_ReadDirection_System_Boolean_TC_Tier_Contracts_Storage_SnapshotMode_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.OpenSequentialReader(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.ReadDirection,System.Boolean,TC.Tier.Contracts.Storage.SnapshotMode)">OpenSequentialReader(LogicalAddress, LogicalAddress, ReadDirection, bool, SnapshotMode)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_OpenSequentialReader_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_ReadDirection_System_Boolean_TC_Tier_Contracts_Storage_SnapshotMode_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.OpenSequentialReader(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.ReadDirection,System.Boolean,TC.Tier.Contracts.Storage.SnapshotMode)">
+  OpenSequentialReader(LogicalAddress, LogicalAddress, ReadDirection, bool, SnapshotMode)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取顺序读句柄——游标 + 读/跳分离，自动跨段。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ISequentialReader OpenSequentialReader(LogicalAddress start, LogicalAddress end, ReadDirection direction = ReadDirection.Forward, bool usePageCache = true, SnapshotMode snapshotMode = SnapshotMode.Consistent)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">start</span></td>
-        <td><p>读取窗口起点（正序时 Position 初始值；倒序时从 end 往前读到 start 停）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">end</span></td>
-        <td><p>读取窗口终点（正序读到此处 EOF；倒序时 Position 初始值）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.ReadDirection.html">ReadDirection</a></td>
-        <td><span class="parametername">direction</span></td>
-        <td><p>正序取后续段 / 倒序取前一段。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">usePageCache</span></td>
-        <td><p><a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a> 走 OS 页缓存；<a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">false</a> 走 DirectIO。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.SnapshotMode.html">SnapshotMode</a></td>
-        <td><span class="parametername">snapshotMode</span></td>
-        <td><p>快照一致 vs 脏读。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.ISequentialReader.html">ISequentialReader</a></td>
-        <td><p>顺序读句柄。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>start</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>读取窗口起点（正序时 Position 初始值；倒序时从 end 往前读到 start 停）。</p>
+</dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>读取窗口终点（正序读到此处 EOF；倒序时 Position 初始值）。</p>
+</dd>
+    <dt><code>direction</code> <a class="xref" href="TC.Tier.Contracts.Storage.ReadDirection.html">ReadDirection</a></dt>
+    <dd><p>正序取后续段 / 倒序取前一段。</p>
+</dd>
+    <dt><code>usePageCache</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p><a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">true</a> 走 OS 页缓存；<a href="https://learn.microsoft.com/dotnet/csharp/language-reference/builtin-types/bool">false</a> 走 DirectIO。</p>
+</dd>
+    <dt><code>snapshotMode</code> <a class="xref" href="TC.Tier.Contracts.Storage.SnapshotMode.html">SnapshotMode</a></dt>
+    <dd><p>快照一致 vs 脏读。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.ISequentialReader.html">ISequentialReader</a></dt>
+    <dd><p>顺序读句柄。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Read_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Read*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Read_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Read(TC.Tier.Contracts.Storage.LogicalAddress,System.Span{System.Byte})">Read(LogicalAddress, Span&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Read_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Read(TC.Tier.Contracts.Storage.LogicalAddress,System.Span{System.Byte})">
+  Read(LogicalAddress, Span&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>从给定地址读取，跨段自动查地址表切分。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">int Read(LogicalAddress source, Span&lt;byte&gt; destination)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标缓冲区。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><p>实际所读字节数（越界可能小于 destination.Length，0 = EOF）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>源地址。</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲区。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>实际所读字节数（越界可能小于 destination.Length，0 = EOF）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_ReadAsync_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReadAsync*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_ReadAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReadAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Memory{System.Byte},System.Threading.CancellationToken)">ReadAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_ReadAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReadAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Memory{System.Byte},System.Threading.CancellationToken)">
+  ReadAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步读取。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask&lt;int&gt; ReadAsync(LogicalAddress source, Memory&lt;byte&gt; destination, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标缓冲区。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
-        <td><p>实际所读字节数（越界可能小于 destination.Length，0 = EOF）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
-        <td><p>取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>源地址。</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲区。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>实际所读字节数（越界可能小于 destination.Length，0 = EOF）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>取消。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Reclaim_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Reclaim*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Reclaim_System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Reclaim(System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress},System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress})">Reclaim(LogicalAddress?, LogicalAddress?)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Reclaim_System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Reclaim(System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress},System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress})">
+  Reclaim(LogicalAddress?, LogicalAddress?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>回收指定区间——释放 [from, to) 区间的段文件，推进 MinAddress / AllocatedTail。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Reclaim(LogicalAddress? from, LogicalAddress? to)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</td>
-        <td><span class="parametername">from</span></td>
-        <td><p>回收区间的起始地址（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>回收区间的结束地址（不含）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</dt>
+    <dd><p>回收区间的起始地址（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</dt>
+    <dd><p>回收区间的结束地址（不含）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_ReclaimHead_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReclaimHead*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_ReclaimHead_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReclaimHead(TC.Tier.Contracts.Storage.LogicalAddress)">ReclaimHead(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_ReclaimHead_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReclaimHead(TC.Tier.Contracts.Storage.LogicalAddress)">
+  ReclaimHead(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>回收头部——释放 [MinAddress, address) 区间的段文件，推进 MinAddress。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void ReclaimHead(LogicalAddress address)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">address</span></td>
-        <td><p>回收的目标地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>回收的目标地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_ReclaimTail_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReclaimTail*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_ReclaimTail_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReclaimTail(TC.Tier.Contracts.Storage.LogicalAddress)">ReclaimTail(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_ReclaimTail_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.ReclaimTail(TC.Tier.Contracts.Storage.LogicalAddress)">
+  ReclaimTail(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>回收尾部——释放 [newTail, AllocatedTail) 区间的段文件，推进 AllocatedTail。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void ReclaimTail(LogicalAddress newTail)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">newTail</span></td>
-        <td><p>回收的目标地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>newTail</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>回收的目标地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_StartCompact_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartCompact*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_StartCompact" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartCompact">StartCompact()</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_StartCompact" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartCompact">
+  StartCompact()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动全量 Compact——[MinAddress, CommittedTail] 全部已提交数据搬迁到紧凑新段。
 0 等待返回句柄；取消/超时/等待由调用方控制（op.Cancel / await op.WaitAsync(ct)）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation&lt;CompactResult&gt; StartCompact()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</td>
-        <td><p>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</dt>
+    <dd><p>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_StartRangeCompact_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartRangeCompact*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_StartRangeCompact_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_System_ValueTuple_TC_Tier_Contracts_Storage_LogicalAddress_System_Int64___" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartRangeCompact(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{System.ValueTuple{TC.Tier.Contracts.Storage.LogicalAddress,System.Int64}})">StartRangeCompact(LogicalAddress, LogicalAddress, IReadOnlyList&lt;(LogicalAddress Start, long Length)&gt;)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_StartRangeCompact_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_System_ValueTuple_TC_Tier_Contracts_Storage_LogicalAddress_System_Int64___" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartRangeCompact(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{System.ValueTuple{TC.Tier.Contracts.Storage.LogicalAddress,System.Int64}})">
+  StartRangeCompact(LogicalAddress, LogicalAddress, IReadOnlyList&lt;(LogicalAddress Start, long Length)&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动区间 Compact（申报活区间版——记录粒度精确搬迁）——搬迁规划按使用方申报的活记录区间执行，
 而非物理 allocated 枚举（簇粒度）。</p>
 <p>★ A8/§XVIII：Reclaim 打洞是<b>记录粒度</b>，物理 allocated 是<b>簇粒度</b>（NTFS 簇内有
@@ -986,60 +957,48 @@
   物理 allocated 保守保留。MigrationMap 覆盖全部申报记录的 Start。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation&lt;CompactResult&gt; StartRangeCompact(LogicalAddress from, LogicalAddress to, IReadOnlyList&lt;(LogicalAddress Start, long Length)&gt; liveRecords)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>整理范围起始（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>整理范围结束（不含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;(<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,system.int64-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,system.int64-.length">Length</a>)&gt;</td>
-        <td><span class="parametername">liveRecords</span></td>
-        <td><p>使用方申报的活记录区间集合（Start + Length）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</td>
-        <td><p>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围起始（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围结束（不含）。</p>
+</dd>
+    <dt><code>liveRecords</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;(<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,system.int64-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,system.int64-.length">Length</a>)&gt;</dt>
+    <dd><p>使用方申报的活记录区间集合（Start + Length）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</dt>
+    <dd><p>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_StartRangeCompact_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartRangeCompact*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_StartRangeCompact_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartRangeCompact(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress})">StartRangeCompact(LogicalAddress, LogicalAddress, IReadOnlyList&lt;LogicalAddress&gt;)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_StartRangeCompact_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartRangeCompact(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress})">
+  StartRangeCompact(LogicalAddress, LogicalAddress, IReadOnlyList&lt;LogicalAddress&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动区间 Compact（带地址翻译的磁盘碎片整理）——把 [from,to) 内的有效数据压实，
 消除碎片间隙，压实区末尾到 to 之间 PunchHole 归还（连续空洞）。</p>
 <p>★ <code class="paramref">addresses</code> 是上层需翻译的地址集合（段内偏移量，与长度无关）。
@@ -1047,60 +1006,48 @@
 <p>★ 区间外（from 前、to 后）数据原位不动。CommittedTail 不退。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation&lt;CompactResult&gt; StartRangeCompact(LogicalAddress from, LogicalAddress to, IReadOnlyList&lt;LogicalAddress&gt; addresses)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>整理范围起始（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>整理范围结束（不含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td><span class="parametername">addresses</span></td>
-        <td><p>需翻译的地址集合。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</td>
-        <td><p>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围起始（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围结束（不含）。</p>
+</dd>
+    <dt><code>addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>需翻译的地址集合。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</dt>
+    <dd><p>后台 Compact 操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_StartReclaim_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartReclaim*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_StartReclaim_System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartReclaim(System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress},System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress},System.Threading.CancellationToken)">StartReclaim(LogicalAddress?, LogicalAddress?, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_StartReclaim_System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.StartReclaim(System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress},System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress},System.Threading.CancellationToken)">
+  StartReclaim(LogicalAddress?, LogicalAddress?, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动后台区间回收——立即返回句柄，物理打洞在线程池上执行，调用线程 0 等待。</p>
 <p>★ 命名（决策）：Async 后缀保留给可 await 的方法（返回 Task/ValueTask）；
   本方法返回 <a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a> 句柄，等待走 <code>await op.WaitAsync()</code>——
@@ -1108,234 +1055,158 @@
   携带最后成功打洞地址，调用方据此重试剩余区间。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation StartReclaim(LogicalAddress? from, LogicalAddress? to, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</td>
-        <td><span class="parametername">from</span></td>
-        <td><p>回收区间的起始地址（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</td>
-        <td><span class="parametername">to</span></td>
-        <td><p>回收区间的结束地址（不含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a></td>
-        <td><p>后台回收操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</dt>
+    <dd><p>回收区间的起始地址（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</dt>
+    <dd><p>回收区间的结束地址（不含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation.html">IAsyncOperation</a></dt>
+    <dd><p>后台回收操作句柄（进度 + 事件 + Cancel + WaitAsync）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_Write_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Write*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_Write_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Write(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlySpan{System.Byte})">Write(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_Write_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.Write(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlySpan{System.Byte})">
+  Write(LogicalAddress, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>给定地址覆写。地址在前，数据在后。</p>
 <p>超出当前 <a class="xref" href="TC.Tier.Contracts.Storage.IStorageEngine.html#TC_Tier_Contracts_Storage_IStorageEngine_CommittedTail">CommittedTail</a> 时，空出来的区域利用稀疏文件特性——不写零，
 设备 CAS 推进 _tail 到 destination + length，在 destination 处直接写数据。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">LogicalAddress Write(LogicalAddress destination, ReadOnlySpan&lt;byte&gt; source)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源数据。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><p>写入后的绝对地址（等于 destination）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>destination</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>目标地址。</p>
+</dd>
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源数据。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>写入后的绝对地址（等于 destination）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Contracts_Storage_IStorageEngine_WriteAsync_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.WriteAsync*"></a>
-  <h4 id="TC_Tier_Contracts_Storage_IStorageEngine_WriteAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.WriteAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">WriteAsync(LogicalAddress, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Contracts_Storage_IStorageEngine_WriteAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Contracts.Storage.IStorageEngine.WriteAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  WriteAsync(LogicalAddress, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步覆写。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">ValueTask&lt;LogicalAddress&gt; WriteAsync(LogicalAddress destination, ReadOnlyMemory&lt;byte&gt; source, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>目标地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">source</span></td>
-        <td><p>源数据。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td><p>写入后的绝对地址（等于 destination）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
-        <td><p>取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>destination</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>目标地址。</p>
+</dd>
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>源数据。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>写入后的绝对地址（等于 destination）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>取消。</p>
+</dd>
+  </dl>
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

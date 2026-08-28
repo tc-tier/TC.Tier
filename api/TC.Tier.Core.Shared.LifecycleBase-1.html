@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class LifecycleBase&lt;THints&gt; | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class LifecycleBase&lt;THints&gt; | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="通用生命周期骨架基类（Core 层）。数据结构基类与 IO 引擎基类共同继承本类，获得统一的 ★ 实现 ——统一&quot;同步 void Initialize 启动后台恢复 + 观测/等待&quot;模型，   详见 src/TC.Tier.Core/docs/lifecycle.md。★ Initialize 是类面方法（不在 ILifecycle 接口面）——   设计决策接口面消除：启动入口由各持有者自己的装配面提供（引擎 = StorageEngineBuilder.Start），   接口只保留观测/等待；结构层内部组合面仍经具体类型调用。 ★ 内建 （）——统一资源释放，   子类构造期/钩子里 Resources.Add(...)，Dispose 自动统一转发（消灭各基类 _owner/_disposables 样板）。 ★ Initialize 是固定模板（IO 引擎与数据结构共用同一套 On 钩子模式）：   CAS 闸门 →  →  → 订阅进度事件 → 后台恢复 task。   子类只 override 钩子，不改流程。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="通用生命周期骨架基类（Core 层）。数据结构基类与 IO 引擎基类共同继承本类，获得统一的 ★ 实现 ——统一&quot;同步 void Initialize 启动后台恢复 + 观测/等待&quot;模型，   详见 src/TC.Tier.Core/docs/lifecycle.md。★ Initialize 是类面方法（不在 ILifecycle 接口面）——   设计决策接口面消除：启动入口由各持有者自己的装配面提供（引擎 = StorageEngineBuilder.Start），   接口只保留观测/等待；结构层内部组合面仍经具体类型调用。 ★ 内建 （）——统一资源释放，   子类构造期/钩子里 Resources.Add(...)，Dispose 自动统一转发（消灭各基类 _owner/_disposables 样板）。 ★ Initialize 是固定模板（IO 引擎与数据结构共用同一套 On 钩子模式）：   CAS 闸门 →  →  → 订阅进度事件 → 后台恢复 task。   子类只 override 钩子，不改流程。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.LifecycleBase`1">
+
+        <article data-uid="TC.Tier.Core.Shared.LifecycleBase`1">
 
 
 
-  <h1 id="TC_Tier_Core_Shared_LifecycleBase_1" data-uid="TC.Tier.Core.Shared.LifecycleBase`1" class="text-break">Class LifecycleBase&lt;THints&gt;</h1>
-  <div class="markdown level0 summary"><p>通用生命周期骨架基类（Core 层）。数据结构基类与 IO 引擎基类共同继承本类，获得统一的</p>
+  <h1 id="TC_Tier_Core_Shared_LifecycleBase_1" data-uid="TC.Tier.Core.Shared.LifecycleBase`1" class="text-break">
+Class LifecycleBase&lt;THints&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>通用生命周期骨架基类（Core 层）。数据结构基类与 IO 引擎基类共同继承本类，获得统一的</p>
 <p>★ 实现 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>——统一"同步 void Initialize 启动后台恢复 + 观测/等待"模型，
   详见 src/TC.Tier.Core/docs/lifecycle.md。★ <b>Initialize 是类面方法（不在 ILifecycle 接口面）</b>——
   设计决策接口面消除：启动入口由各持有者自己的装配面提供（引擎 = StorageEngineBuilder.Start），
@@ -86,28 +108,55 @@
   CAS 闸门 → <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeBegin">OnInitializeBegin()</a> → <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CreateRecovery">CreateRecovery()</a> → 订阅进度事件 → 后台恢复 task。
   子类只 override 钩子，不改流程。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">LifecycleBase&lt;THints&gt;</span></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase.html">LifecycleBase</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Metadata.MetadataBase.html">MetadataBase</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html">MirrorBase</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html">ProbingIndexBase&lt;TKey&gt;</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase&lt;TKey&gt;</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a></div>
-      <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html">SortedIndexBase&lt;TKey&gt;</a></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class LifecycleBase&lt;THints&gt; : ILifecycle&lt;THints&gt;, IDisposable, IAsyncDisposable where THints : struct</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;THints&gt;</div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>THints</code></dt>
+    <dd><p>各持有者自己的恢复 hints struct（见 lifecycle-standard.md §5）。</p>
+</dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">LifecycleBase&lt;THints&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;THints&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase.html">LifecycleBase</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.Metadata.MetadataBase.html">MetadataBase</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html">MirrorBase</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html">ProbingIndexBase&lt;TKey&gt;</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase&lt;TKey&gt;</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html">SortedIndexBase&lt;TKey&gt;</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -129,287 +178,341 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public abstract class LifecycleBase&lt;THints&gt; : ILifecycle&lt;THints&gt;, IDisposable, IAsyncDisposable where THints : struct</code></pre>
-  </div>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">THints</span></td>
-        <td><p>各持有者自己的恢复 hints struct（见 lifecycle-standard.md §5）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1__ctor_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1__ctor_TC_Tier_Contracts_Lifecycle_IRecovery__0__TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.#ctor(TC.Tier.Contracts.Lifecycle.IRecovery{`0},TC.Tier.Core.Logging.ILogger)">LifecycleBase(IRecovery&lt;THints&gt;?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1__ctor_TC_Tier_Contracts_Lifecycle_IRecovery__0__TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.#ctor(TC.Tier.Contracts.Lifecycle.IRecovery{`0},TC.Tier.Core.Logging.ILogger)">
+  LifecycleBase(IRecovery&lt;THints&gt;?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>构造（protected，子类继承）。注入可选 <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery&lt;TRecoveryHints&gt;</a> + <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected LifecycleBase(IRecovery&lt;THints&gt;? recovery = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;THints&gt;</td>
-        <td><span class="parametername">recovery</span></td>
-        <td><p>可选的恢复算法实例。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td><p>可选的日志器实例。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="fields">Fields
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>recovery</code> <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;THints&gt;</dt>
+    <dd><p>可选的恢复算法实例。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>可选的日志器实例。</p>
+</dd>
+  </dl>
 
 
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Logger" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Logger">Logger</h4>
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_Logger" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Logger">
+  Logger
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>日志器（可选注入，子类内部用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected readonly ILogger? Logger</code></pre>
   </div>
-  <h5 class="fieldValue">Field Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.HasBackgroundWorker*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.HasBackgroundWorker">HasBackgroundWorker</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.HasBackgroundWorker">
+  HasBackgroundWorker
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>内建 worker 是否已配置（诊断用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected bool HasBackgroundWorker { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_Id_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Id*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Id" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Id">Id</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_Id" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Id">
+  Id
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>实例唯一标识（InstanceTracker 注册时生成，诊断/泄漏定位用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public Guid Id { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.IsDisposed*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.IsDisposed">IsDisposed</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.IsDisposed">
+  IsDisposed
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>对象是否已释放（子类读，防 Dispose 后回调）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected bool IsDisposed { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_IsReady_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.IsReady*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_IsReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.IsReady">IsReady</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_IsReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.IsReady">
+  IsReady
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>是否已就绪（恢复完成或无需恢复）。原子可读，并发安全，适合外部轮询自旋。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool IsReady { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>是否已就绪。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_IsReady_remarks">Remarks</h5>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否已就绪。</p>
+</dd>
+  </dl>
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_IsReady_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 委托 <span class="xref">TC.Tier.Core.Shared.LifecycleBase`1.Recovery</span>（IRecovery 自管状态）。
 Recovery==null 两种情况：① 未 Initialize（_initialized==0）→ 未就绪；② Initialize 过但 CreateRecovery 返回 null（无需恢复）→ 就绪。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.RecoveryState*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.RecoveryState">RecoveryState</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.RecoveryState">
+  RecoveryState
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>恢复状态快照（原子可读，并发安全）。Phase 枚举观测恢复进度阶段。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public RecoveryState RecoveryState { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryState.html">RecoveryState</a></td>
-        <td><p>恢复状态快照。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState_remarks">Remarks</h5>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryState.html">RecoveryState</a></dt>
+    <dd><p>恢复状态快照。</p>
+</dd>
+  </dl>
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 委托 <span class="xref">TC.Tier.Core.Shared.LifecycleBase`1.Recovery</span>.<a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html#TC_Tier_Contracts_Lifecycle_IRecovery_RecoveryState">RecoveryState</a>。
 Recovery==null：未 Initialize → NotStarted；Initialize 过但无需恢复 → Completed/100。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_Resources_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Resources*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Resources" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Resources">Resources</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_Resources" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Resources">
+  Resources
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>资源组——子类 <code>Resources.Add(_engine)</code> / <code>Resources.Add(metaEngine, &quot;meta&quot;)</code>，
 Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected ResourceGroup Resources { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html">ResourceGroup</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html">ResourceGroup</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.CancelRecovery*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.CancelRecovery">CancelRecovery()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.CancelRecovery">
+  CancelRecovery()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>取消恢复（向内部后台恢复发取消信号，不保证立即停止）。</p>
 <p>后台恢复在下一个 checkpoint 检查取消令牌并抛 OperationCanceledException。</p>
 <p>★ 契约：<a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady">WaitForReady()</a> / <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReadyAsync_System_Threading_CancellationToken_">WaitForReadyAsync(CancellationToken)</a> / <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady_System_Int32_">WaitForReady(int)</a>
   在取消恢复时会抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>（取消=等待被中断）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void CancelRecovery()</code></pre>
   </div>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery_remarks">Remarks</h5>
+
+
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 双通道取消：① <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html#TC_Tier_Contracts_Lifecycle_IRecovery_CancelRecovery">CancelRecovery()</a> 显式通知（实现做取消清理）
 + ② <code>_recoveryCts.Cancel()</code> 信号兜底（RecoverAsync 在 checkpoint 检查 ct 收 OCE）。
 两者配合——显式通知覆盖&quot;ct 轮询做不到&quot;的清理（停扫盘/释放扫描资源），信号兜底覆盖长循环。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.ConfigureBackgroundWorker*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Shared_BackgroundWorkerLoop_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.ConfigureBackgroundWorker(TC.Tier.Core.Shared.BackgroundWorkerLoop)">ConfigureBackgroundWorker(BackgroundWorkerLoop)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Shared_BackgroundWorkerLoop_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.ConfigureBackgroundWorker(TC.Tier.Core.Shared.BackgroundWorkerLoop)">
+  ConfigureBackgroundWorker(BackgroundWorkerLoop)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>子类配置内建 worker——在 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeBegin">OnInitializeBegin()</a> 或 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeComplete">OnInitializeComplete()</a> 里调均可。</p>
 <p>★ 传入自定义 <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a> 派生实例（填了 RunOneCycleAsync/ProcessItemAsync 业务逻辑）。</p>
 <p>★ 基类负责：Start（<a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeComplete">OnInitializeComplete()</a> 之后——等恢复完成 + 装配就绪；长任务不在恢复前空转 / 抢资源）
@@ -418,31 +521,35 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
 <p>★ 幂等：重复调只首次生效（CAS）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void ConfigureBackgroundWorker(BackgroundWorkerLoop worker)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></td>
-        <td><span class="parametername">worker</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>worker</code> <a class="xref" href="TC.Tier.Core.Shared.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_CreateRecovery_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.CreateRecovery*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_CreateRecovery" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.CreateRecovery">CreateRecovery()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_CreateRecovery" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.CreateRecovery">
+  CreateRecovery()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>virtual 工厂：子类 override 返回恢复算法（默认实现/注入实例）。</p>
 <pre><code>        &lt;p&gt;对齐 &lt;code&gt;StorageEngineBase.RecoverAndBuildReader&lt;/code&gt; 的 virtual 模式。
         在 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.OnInitializeBegin&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 后由 Initialize 调用，返回值由基类持有。&lt;/p&gt;
@@ -451,29 +558,35 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual IRecovery&lt;THints&gt;? CreateRecovery()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;THints&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;THints&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_Dispose_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Dispose*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Dispose" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_Dispose" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 同步 Dispose——non-virtual 模板（子类不可绕过核心清理）。对齐 lease <code>Dispose(){ Rollback(); }</code> 不可绕过模式。</p>
 <p>★ non-virtual（非 virtual）：子类无法 override；若用 <code>new</code> 隐藏，通过基类引用调用仍走本方法
   （多态不生效），核心清理不可绕过。子类额外清理走 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverride_System_Boolean_">DisposeOverride(bool)</a> 钩子。</p>
@@ -481,126 +594,162 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
   <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverride_System_Boolean_">DisposeOverride(bool)</a>(子类钩子) → Resources.Dispose（核心）→ Unregister → SuppressFinalize。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeAsync*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeAsync">DisposeAsync()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 异步 Dispose——non-virtual 模板（同 Dispose 编排，异步轨）。子类 override <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverrideAsync_System_Boolean_">DisposeOverrideAsync(bool)</a>。</p>
 <p>★ task 等待走 <span class="xref">TC.Tier.Core.Shared.LifecycleBase`1.CancelRecoveryAndCleanupAsync</span>（await 而非 Wait）——不阻塞调用线程。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverride_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeOverride*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeOverride(System.Boolean)">
+  DisposeOverride(bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual void DisposeOverride(bool disposing)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">disposing</span></td>
-        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>disposing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
 本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverrideAsync_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeOverrideAsync*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.DisposeOverrideAsync(System.Boolean)">
+  DisposeOverrideAsync(bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual ValueTask DisposeOverrideAsync(bool disposing)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">disposing</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>disposing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.EnsureReady*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.EnsureReady">EnsureReady()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.EnsureReady">
+  EnsureReady()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 守卫：未就绪（NotStarted/Recovering/Failed）时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>。子类读写入口第一行调用。</p>
 <p>对齐 lifecycle-standard.md §3.2——Ready 前读写抛异常，调用方据此外部自旋等。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void EnsureReady()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_Finalize_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Finalize*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Finalize" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Finalize">~LifecycleBase()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_Finalize" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Finalize">
+  ~LifecycleBase()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 轻量终结器——仅泄漏告警，不释放资源（资源释放走 Dispose；finalize 顺序不可控，不在此做）。</p>
 <p>对齐 lease 防御：实例被 GC 但未 Dispose → logger 告警（无 logger 静默，不冒充）。
   这是 .NET 推荐的 finalize 用法（探测泄漏，非释放资源）。</p>
@@ -609,59 +758,69 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
   若 Logger 已被 finalize，调用它会抛——终结器抛异常会终止进程。故必须先 null 判断防护。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected ~LifecycleBase()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.GetAliveInstances*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.GetAliveInstances(System.String)">GetAliveInstances(string?)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.GetAliveInstances(System.String)">
+  GetAliveInstances(string?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>诊断：当前所有存活的 LifecycleBase 实例快照（对齐 lease GetActiveLeases——泄漏时定位&quot;谁没 Dispose&quot;）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IReadOnlyList&lt;TrackedInstanceInfo&gt; GetAliveInstances(string? typeFilter = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">typeFilter</span></td>
-        <td><p>可选类型名过滤（子串匹配，null = 全部）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Shared.TrackedInstanceInfo.html">TrackedInstanceInfo</a>&gt;</td>
-        <td><p>当前所有存活的 LifecycleBase 实例快照。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>typeFilter</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>可选类型名过滤（子串匹配，null = 全部）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Shared.TrackedInstanceInfo.html">TrackedInstanceInfo</a>&gt;</dt>
+    <dd><p>当前所有存活的 LifecycleBase 实例快照。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_Initialize_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Initialize*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Initialize(`0)">Initialize(THints)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Initialize(`0)">
+  Initialize(THints)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 统一就绪入口（同步 void，启动内部后台恢复后立即返回）。模板方法，子类不改流程、只 override 钩子。</p>
 <p>★ <b>类面方法，不在 ILifecycle 接口面</b>（决策）——外部禁止经接口调 Initialize；
   引擎侧经 StorageEngineBuilder.Start/StartAsync 一步到位，结构层经具体类型内部调用。</p>
@@ -678,31 +837,35 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
   故重试路径（存在旧 _recoverTask）必须等旧 task 彻底结束再继续。首次 Initialize 无旧 task，不阻塞。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Initialize(THints hints = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">THints</span></td>
-        <td><span class="parametername">hints</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>hints</code> <span class="xref">THints</span></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeBegin_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.OnInitializeBegin*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeBegin" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.OnInitializeBegin">OnInitializeBegin()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeBegin" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.OnInitializeBegin">
+  OnInitializeBegin()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子——this 构造完后、后台恢复启动前。</p>
 <pre><code>        &lt;p&gt;子类在此：① &lt;code&gt;_engine.Initialize(...)&lt;/code&gt;（Runtime 层引擎 init）
           ② &lt;code&gt;Resources.Add(_engine)&lt;/code&gt;（注册主引擎到资源组）
@@ -712,14 +875,30 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual void OnInitializeBegin()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeComplete_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.OnInitializeComplete*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeComplete" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.OnInitializeComplete">OnInitializeComplete()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeComplete" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.OnInitializeComplete">
+  OnInitializeComplete()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ Initialize 第二阶段（[后]）钩子——<b>仅在本实例恢复成功完成后</b>调用。</p>
 <pre><code>        &lt;p&gt;★ 不变量：Complete / Ready / 恢复完成 三者同义。每层都用同一 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;，
           故任意嵌套层此不变量都成立——父层在此钩子里可安全读&quot;本层恢复产物&quot;。&lt;/p&gt;
@@ -731,25 +910,57 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual void OnInitializeComplete()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.ThrowIfDisposed*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.ThrowIfDisposed">ThrowIfDisposed()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.ThrowIfDisposed">
+  ThrowIfDisposed()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>已释放则抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void ThrowIfDisposed()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady">WaitForReady()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady">
+  WaitForReady()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>同步等待恢复完成（内部 join 后台恢复 task，阻塞<strong>当前调用线程</strong>直到 Ready）。</p>
 <p>★ 与 <code>Initialize</code> 的关系：Initialize 启动后台恢复后立即返回；
   调用方若需"启动后立即阻塞等就绪"，在 Initialize 后调本方法。</p>
@@ -759,246 +970,193 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
   异步调用方请用 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReadyAsync_System_Threading_CancellationToken_">WaitForReadyAsync(CancellationToken)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void WaitForReady()</code></pre>
   </div>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_remarks">Remarks</h5>
+
+
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>⚠️ <b>禁止在异步上下文调用</b>：UI/ASP.NET 等同步上下文下，同步阻塞后台 Task 会经典死锁。异步调用方用 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">WaitForReadyAsync(CancellationToken)</a>。</p>
 <p>★ 以状态机为准（不以 _recoverTask 是否 null 为准）——消灭"状态已进入 Recovering 但 task 引用未发布"的竞态窗口。</p>
 <p>★ <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Failed">Failed</a> 时本方法重抛恢复异常（不让"已失败"返回成功）。</p>
 <p>★ <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_NotStarted">NotStarted</a>（如取消）时 task 可能为 null——此时等待语义无意义，按未启动处理。</p>
 </div>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
-        <td><p>等待被取消（如 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">CancelRecovery()</a> 触发）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></td>
-        <td><p>恢复失败（后台恢复 task 抛异常）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>等待被取消（如 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">CancelRecovery()</a> 触发）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></dt>
+    <dd><p>恢复失败（后台恢复 task 抛异常）。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady(System.Int32)">WaitForReady(int)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady(System.Int32)">
+  WaitForReady(int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>带超时的同步等待。返回是否在超时内就绪。</p>
 <p>超时未就绪返回 false（不抛异常），调用方可继续轮询或放弃。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool WaitForReady(int timeoutMilliseconds)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">timeoutMilliseconds</span></td>
-        <td><p>超时时间（毫秒）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>是否在超时内就绪。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32__remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timeoutMilliseconds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>超时时间（毫秒）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否在超时内就绪。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32__remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>⚠️ <b>禁止在异步上下文调用</b>（同 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">WaitForReady()</a> 死锁警告）。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReadyAsync*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReadyAsync(System.Threading.CancellationToken)">WaitForReadyAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReadyAsync(System.Threading.CancellationToken)">
+  WaitForReadyAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步等待恢复完成——异步调用方的安全入口（避免 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady">WaitForReady()</a> 在同步上下文死锁）。</p>
 <p>★ 推荐异步调用方使用本方法而非 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady">WaitForReady()</a>：<code>WaitForReady</code> 同步阻塞 Task
   在 UI/ASP.NET 同步上下文下会经典死锁。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public Task WaitForReadyAsync(CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——取消等待时本方法抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken__remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——取消等待时本方法抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken__remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ 异步调用方安全入口（避免 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">WaitForReady()</a> 同步阻塞在同步上下文死锁）。
 用 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task.waitasync#system-threading-tasks-task-waitasync(system-threading-cancellationtoken)">WaitAsync(CancellationToken)</a>（.NET 6+）。同 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">WaitForReady()</a> 的状态机守卫。</p>
 </div>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
-        <td><p>等待被取消（如 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">CancelRecovery()</a> 触发）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="events">Events
-</h3>
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p>等待被取消（如 <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">CancelRecovery()</a> 触发）。</p>
+</dd>
+  </dl>
 
 
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.RecoveryProgressChanged">RecoveryProgressChanged</h4>
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.RecoveryProgressChanged">
+  RecoveryProgressChanged
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>恢复进度变化事件（进度条订阅）。后台恢复推进时触发。</p>
 <p>★ 转发内部 IRecovery 的同名事件。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public event Action&lt;RecoveryProgress&gt;? RecoveryProgressChanged</code></pre>
   </div>
-  <h5 class="eventType">Event Type</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryProgress.html">RecoveryProgress</a>&gt;</td>
-        <td><p>恢复进度变化事件（进度条订阅）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged_remarks">Remarks</h5>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryProgress.html">RecoveryProgress</a>&gt;</dt>
+    <dd><p>恢复进度变化事件（进度条订阅）。</p>
+</dd>
+  </dl>
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>可空。</p>
 </div>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
-  </div>
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

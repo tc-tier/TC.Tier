@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class RingBase&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class RingBase&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="RingBase 寻址 partial——热路径 TryAllocate/Seal/GetPhysicalAddress/GetSpan/GetInfo。 ★ FASTER hybrid log 地址模型（照 AllocatorBase，仅 long→LogicalAddress + 引擎 API）： - 地址单调递增，永远向前；不回退（不需要 ReclaimTail，那是 Log 变长页才用的）。 - 内存固定 PageCount 个 native 槽，slot = pageSeq &amp;amp; PageCountMask 循环复用。 - 写满一圈淘汰旧页（head 推进 FreePage），tail 继续 append（地址继续增长）。 ★ 引擎地址空间提供 100% 确定的地址。Ring 基于 _dataStart + GetDistance 做 100% 正确寻址。 ★ _dataStart 构造时 Allocate 确定（GetDistance 锚点）。pageSeq = GetDistance(_dataStart, addr) / PageSize。 ★ 地址运算只用 CalculationAddress/GetDistance（&#167;8 铁律，不碰 Offset 算术）。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="RingBase 寻址 partial——热路径 TryAllocate/Seal/GetPhysicalAddress/GetSpan/GetInfo。 ★ FASTER hybrid log 地址模型（照 AllocatorBase，仅 long→LogicalAddress + 引擎 API）： - 地址单调递增，永远向前；不回退（不需要 ReclaimTail，那是 Log 变长页才用的）。 - 内存固定 PageCount 个 native 槽，slot = pageSeq &amp;amp; PageCountMask 循环复用。 - 写满一圈淘汰旧页（head 推进 FreePage），tail 继续 append（地址继续增长）。 ★ 引擎地址空间提供 100% 确定的地址。Ring 基于 _dataStart + GetDistance 做 100% 正确寻址。 ★ _dataStart 构造时 Allocate 确定（GetDistance 锚点）。pageSeq = GetDistance(_dataStart, addr) / PageSize。 ★ 地址运算只用 CalculationAddress/GetDistance（&#167;8 铁律，不碰 Offset 算术）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1">
+
+        <article data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1">
 
 
 
-  <h1 id="TC_Tier_Runtime_Structures_Ring_RingBase_1" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1" class="text-break">Class RingBase&lt;TKey&gt;</h1>
-  <div class="markdown level0 summary"><p>RingBase 寻址 partial——热路径 TryAllocate/Seal/GetPhysicalAddress/GetSpan/GetInfo。</p>
+  <h1 id="TC_Tier_Runtime_Structures_Ring_RingBase_1" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1" class="text-break">
+Class RingBase&lt;TKey&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Structures.html">Structures</a>.<a class="xref" href="TC.Tier.Runtime.Structures.Ring.html">Ring</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>RingBase 寻址 partial——热路径 TryAllocate/Seal/GetPhysicalAddress/GetSpan/GetInfo。</p>
 <p>★ FASTER hybrid log 地址模型（照 AllocatorBase，仅 long→LogicalAddress + 引擎 API）：</p>
 <p>- 地址单调递增，永远向前；不回退（不需要 ReclaimTail，那是 Log 变长页才用的）。</p>
 <p>- 内存固定 PageCount 个 native 槽，slot = pageSeq &amp; PageCountMask 循环复用。</p>
@@ -84,25 +106,51 @@
 <p>★ _dataStart 构造时 Allocate 确定（GetDistance 锚点）。pageSeq = GetDistance(_dataStart, addr) / PageSize。</p>
 <p>★ 地址运算只用 CalculationAddress/GetDistance（§8 铁律，不碰 Offset 算术）。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</div>
-    <div class="level2"><span class="xref">RingBase&lt;TKey&gt;</span></div>
-      <div class="level3"><a class="xref" href="TC.Tier.Runtime.Structures.Ring.BlittableRing-1.html">BlittableRing&lt;TKey&gt;</a></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public abstract class RingBase&lt;TKey&gt; : LifecycleBase&lt;RingRecoveryHints&gt;, ILifecycle&lt;RingRecoveryHints&gt;, IDisposable, IAsyncDisposable, ITransactionParticipant, IEpochProtected, IKeyResolver&lt;TKey&gt; where TKey : unmanaged, IEquatable&lt;TKey&gt;</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
-    <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></div>
-    <div><a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html">IEpochProtected</a></div>
-    <div><a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver</a>&lt;TKey&gt;</div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</div>
+      <div><span class="xref">RingBase&lt;TKey&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+      <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></div>
+      <div><a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html">IEpochProtected</a></div>
+      <div><a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver</a>&lt;TKey&gt;</div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.Ring.BlittableRing-1.html">BlittableRing&lt;TKey&gt;</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Logger">LifecycleBase&lt;RingRecoveryHints&gt;.Logger</a>
     </div>
@@ -184,542 +232,609 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Structures.html">Structures</a>.<a class="xref" href="TC.Tier.Runtime.Structures.Ring.html">Ring</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
-  <h5 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public abstract class RingBase&lt;TKey&gt; : LifecycleBase&lt;RingRecoveryHints&gt;, ILifecycle&lt;RingRecoveryHints&gt;, IDisposable, IAsyncDisposable, ITransactionParticipant, IEpochProtected, IKeyResolver&lt;TKey&gt; where TKey : unmanaged, IEquatable&lt;TKey&gt;</code></pre>
-  </div>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">TKey</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1__ctor_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.#ctor*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1__ctor_TC_Tier_Runtime_Structures_Ring_Contracts_IRingCodec_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Ring_RingSettings_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Ring_RingRecoveryHints__TC_Tier_Runtime_Structures_Ring_Contracts_RingCursorFactory_TC_Tier_Runtime_Structures_Ring_Contracts_IRingScanCursor__TC_Tier_Runtime_Structures_Ring_Contracts_IRingSnapshot_TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.#ctor(TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec,TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Ring.RingSettings,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Ring.RingRecoveryHints},TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory{TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor},TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot,TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader,TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Core.Logging.ILogger)">RingBase(IRingCodec, IFileSystem, RingSettings, IRecovery&lt;RingRecoveryHints&gt;?, RingCursorFactory&lt;IRingScanCursor&gt;?, IRingSnapshot?, MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;?, IMetaTransport?, LightEpoch?, ILogger?)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1__ctor_TC_Tier_Runtime_Structures_Ring_Contracts_IRingCodec_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Ring_RingSettings_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Ring_RingRecoveryHints__TC_Tier_Runtime_Structures_Ring_Contracts_RingCursorFactory_TC_Tier_Runtime_Structures_Ring_Contracts_IRingScanCursor__TC_Tier_Runtime_Structures_Ring_Contracts_IRingSnapshot_TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.#ctor(TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec,TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Ring.RingSettings,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Ring.RingRecoveryHints},TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory{TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor},TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot,TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader,TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Core.Logging.ILogger)">
+  RingBase(IRingCodec, IFileSystem, RingSettings, IRecovery&lt;RingRecoveryHints&gt;?, RingCursorFactory&lt;IRingScanCursor&gt;?, IRingSnapshot?, MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;?, IMetaTransport?, LightEpoch?, ILogger?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>构造 Ring 基类——装配主引擎/溢出引擎/meta 引擎（构造期纯 Create 零 IO，启动在 OnInitializeBegin）、
 页几何、8 地址指针初值、环满背压 lag 与冷页缓存容量（页池初始化推迟到 Initialize）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected RingBase(IRingCodec codec, IFileSystem fs, RingSettings settings, IRecovery&lt;RingRecoveryHints&gt;? recovery = null, RingCursorFactory&lt;IRingScanCursor&gt;? cursorFactory = null, IRingSnapshot? ringSnapshot = null, MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;? metaPolicyFactory = null, IMetaTransport? metaTransport = null, LightEpoch? epoch = null, ILogger? logger = null)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec.html">IRingCodec</a></td>
-        <td><span class="parametername">codec</span></td>
-        <td><p>注入的 record 三段式 codec。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
-        <td><span class="parametername">fs</span></td>
-        <td><p>文件系统（组合根注入）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingSettings.html">RingSettings</a></td>
-        <td><span class="parametername">settings</span></td>
-        <td><p>RingSettings（页几何/水位配置，构造时全量校验 fail-fast）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</td>
-        <td><span class="parametername">recovery</span></td>
-        <td><p>恢复策略（null = 默认 DefaultRingRecovery）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory-1.html">RingCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a>&gt;</td>
-        <td><span class="parametername">cursorFactory</span></td>
-        <td><p>扫描游标工厂。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot.html">IRingSnapshot</a></td>
-        <td><span class="parametername">ringSnapshot</span></td>
-        <td><p>快照实现（null = 默认 RingSnapshot）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</td>
-        <td><span class="parametername">metaPolicyFactory</span></td>
-        <td><p>meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></td>
-        <td><span class="parametername">metaTransport</span></td>
-        <td><p>Transport 模式的外部 meta 传输。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></td>
-        <td><span class="parametername">epoch</span></td>
-        <td><p>epoch 保护（null = 自建 LightEpoch）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
-        <td><span class="parametername">logger</span></td>
-        <td><p>日志记录器（可选）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>codec</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec.html">IRingCodec</a></dt>
+    <dd><p>注入的 record 三段式 codec。</p>
+</dd>
+    <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>文件系统（组合根注入）。</p>
+</dd>
+    <dt><code>settings</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingSettings.html">RingSettings</a></dt>
+    <dd><p>RingSettings（页几何/水位配置，构造时全量校验 fail-fast）。</p>
+</dd>
+    <dt><code>recovery</code> <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</dt>
+    <dd><p>恢复策略（null = 默认 DefaultRingRecovery）。</p>
+</dd>
+    <dt><code>cursorFactory</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory-1.html">RingCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a>&gt;</dt>
+    <dd><p>扫描游标工厂。</p>
+</dd>
+    <dt><code>ringSnapshot</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot.html">IRingSnapshot</a></dt>
+    <dd><p>快照实现（null = 默认 RingSnapshot）。</p>
+</dd>
+    <dt><code>metaPolicyFactory</code> <a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</dt>
+    <dd><p>meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。</p>
+</dd>
+    <dt><code>metaTransport</code> <a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></dt>
+    <dd><p>Transport 模式的外部 meta 传输。</p>
+</dd>
+    <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
+    <dd><p>epoch 保护（null = 自建 LightEpoch）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志记录器（可选）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AverageRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AverageRecordSize*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AverageRecordSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AverageRecordSize">AverageRecordSize</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AverageRecordSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AverageRecordSize">
+  AverageRecordSize
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>平均记录大小（溢出阈值/容量估算的锚点值）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected abstract int AverageRecordSize { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_BeginAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.BeginAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_BeginAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.BeginAddress">BeginAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_BeginAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.BeginAddress">
+  BeginAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>头截断边界（= engine.MinAddress，此地址前数据已回收）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress BeginAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ClosedUntilAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ClosedUntilAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ClosedUntilAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ClosedUntilAddress">ClosedUntilAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ClosedUntilAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ClosedUntilAddress">
+  ClosedUntilAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>关页边界——此地址前的页已关闭（新写入不得落在其前）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress ClosedUntilAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FixedRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FixedRecordSize*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FixedRecordSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FixedRecordSize">FixedRecordSize</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FixedRecordSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FixedRecordSize">
+  FixedRecordSize
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>固定记录大小（record 字节几何插槽）；0 = 变长（record 大小由 header 自述 PayloadLength/PaddingLength）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected abstract int FixedRecordSize { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushedUntilAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushedUntilAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushedUntilAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushedUntilAddress">FlushedUntilAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushedUntilAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushedUntilAddress">
+  FlushedUntilAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>落盘边界（此地址前已写引擎）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress FlushedUntilAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushedUntilAddress_remarks">Remarks</h5>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+  <h4 class="section" id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushedUntilAddress_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ LogicalAddress 是 16B struct，Volatile/Interlocked 不直接支持；
 Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 + 推进方负责可见性。</p>
 </div>
 
 
+
+
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_HeadAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.HeadAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_HeadAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.HeadAddress">HeadAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_HeadAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.HeadAddress">
+  HeadAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>驱逐边界——此地址前的旧页已被回收（head 随 flush/驱逐推进）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress HeadAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_LastCommittedSeq_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.LastCommittedSeq*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_LastCommittedSeq" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.LastCommittedSeq">LastCommittedSeq</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_LastCommittedSeq" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.LastCommittedSeq">
+  LastCommittedSeq
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前已提交序号（恢复/运行时读）。-1 = 未参与事务。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public long LastCommittedSeq { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_LastPreparedSeq_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.LastPreparedSeq*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_LastPreparedSeq" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.LastPreparedSeq">LastPreparedSeq</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_LastPreparedSeq" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.LastPreparedSeq">
+  LastPreparedSeq
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>最近一次 Prepare 的 seq（恢复判定悬空事务）。-1 = 从未 Prepare。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public long LastPreparedSeq { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaPolicy_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaPolicy*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaPolicy" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaPolicy">MetaPolicy</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaPolicy" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaPolicy">
+  MetaPolicy
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>meta 策略——构造期装配（构造=配置，Core 完整生命周期），永非 null 纯读。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IMetaPolicy&lt;RingMetaHeader, RingMetaPayload&gt; MetaPolicy { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaPolicy-2.html">IMetaPolicy</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Meta.IMetaPolicy-2.html">IMetaPolicy</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageCount_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageCount*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageCount" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageCount">PageCount</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageCount" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageCount">
+  PageCount
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>页槽数（= MemorySize / PageSize，2 的幂，构造时校验）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int PageCount { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageSize*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageSize">PageSize</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageSize">
+  PageSize
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>页大小（字节，2 的幂）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int PageSize { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageSizeBits_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageSizeBits*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageSizeBits" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageSizeBits">PageSizeBits</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PageSizeBits" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PageSizeBits">
+  PageSizeBits
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>页大小的二进制位数（log2(PageSize)）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int PageSizeBits { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOnlyAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOnlyAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOnlyAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOnlyAddress">ReadOnlyAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOnlyAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOnlyAddress">
+  ReadOnlyAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>只读水位——此地址前页面为 readonly（冻结，等待 flush 后驱逐）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress ReadOnlyAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeHeadAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeHeadAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeHeadAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeHeadAddress">SafeHeadAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeHeadAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeHeadAddress">
+  SafeHeadAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>安全驱逐边界（epoch 保护下的驱逐推进目标）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress SafeHeadAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeReadOnlyAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeReadOnlyAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeReadOnlyAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeReadOnlyAddress">SafeReadOnlyAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeReadOnlyAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeReadOnlyAddress">
+  SafeReadOnlyAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>安全只读水位——readonly 区推进目标（epoch 保护下驱逐推进，读者可安全读至此处）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress SafeReadOnlyAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TailAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TailAddress*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TailAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TailAddress">TailAddress</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TailAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TailAddress">
+  TailAddress
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>写游标——下一条 record 的分配地址（TryAllocate 单调推进）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress TailAddress { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Abort_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Abort*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Abort_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Abort(System.Int64)">Abort(long)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Abort_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Abort(System.Int64)">
+  Abort(long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ Abort（2PC 回滚，D2 决策落地）：TruncateSuffix 回退到<b>上一已确认提交边界</b>，丢弃本轮悬干数据。</p>
 <p>回退点 = <span class="xref">TC.Tier.Runtime.Structures.Ring.RingBase`1._txRollbackTail</span>（ConfirmCommitted 推进的提交尾，随 meta 持久化为
 CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契约：上一提交点之后的全部写入
@@ -733,85 +848,80 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 回退点不可落入已驱逐区（TruncateSuffix fail-fast 守卫）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Abort(long seq)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">seq</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AbortAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AbortAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AbortAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AbortAsync(System.Int64,System.Threading.CancellationToken)">AbortAsync(long, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AbortAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AbortAsync(System.Int64,System.Threading.CancellationToken)">
+  AbortAsync(long, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ AbortAsync（2PC 回滚的异步版，D2 决策落地）：TruncateSuffix 回退到上一已确认提交边界，
 丢弃本轮悬干数据，随后异步 WriteMeta 持久化回退后状态。</p>
 <p>对等 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_Abort_System_Int64_">Abort(long)</a> 的守卫矩阵与窗口契约（回退点 = _txRollbackTail，
 上一提交点之后的全部写入必须属于被回滚事务）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask AbortAsync(long seq, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">seq</span></td>
-        <td><p>要回滚的 Prepare 序号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——异步 meta 落盘途中响应取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td><p>回滚完成的 ValueTask。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>要回滚的 Prepare 序号。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——异步 meta 落盘途中响应取消。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>回滚完成的 ValueTask。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_BeginWriteBatch_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.BeginWriteBatch*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_BeginWriteBatch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.BeginWriteBatch">BeginWriteBatch()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_BeginWriteBatch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.BeginWriteBatch">
+  BeginWriteBatch()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 批量写（ref struct，using 包裹）——大批量 key 写入的常用形态（组合层批量编排）+ 多写者窗口。</p>
 <p><b>窗口模型（多写者无锁分配）</b>：每个批 = 一个独占窗口（整页段）——领取时在
   <code>_tailLock</code> 内把 tail 一次性推进到窗口尾（预留段，批独占）；批内 record 分配
@@ -821,431 +931,465 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
   驱逐按页 flush 零填充无碍）。地址语义与单条 Write 完全一致（批独占连续段）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public RingBase&lt;TKey&gt;.WriteBatch BeginWriteBatch()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;.<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.WriteBatch.html">WriteBatch</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;.<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.WriteBatch.html">WriteBatch</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ConfirmCommitted_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ConfirmCommitted*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ConfirmCommitted_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ConfirmCommitted(System.Int64)">ConfirmCommitted(long)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ConfirmCommitted_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ConfirmCommitted(System.Int64)">
+  ConfirmCommitted(long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ ConfirmCommitted（事务确认提交）：推进 LastCommittedSeq，触发回调。</p>
 <p>★ Abort 支撑：推进成功即更新提交边界 <span class="xref">TC.Tier.Runtime.Structures.Ring.RingBase`1._txRollbackTail</span> = 当前尾
 （协议下 Confirm 时尾 == 本轮 Prepare 落的尾；恢复正向推进路径下尾 == meta 恢复尾）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ConfirmCommitted(long seq)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">seq</span></td>
-        <td><p>确认提交的序号。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>确认提交的序号。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_CreateDefaultRecovery_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.CreateDefaultRecovery*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_CreateDefaultRecovery" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.CreateDefaultRecovery">CreateDefaultRecovery()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_CreateDefaultRecovery" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.CreateDefaultRecovery">
+  CreateDefaultRecovery()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 创建默认恢复策略（实现类可 override 提供专属恢复）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual IRecovery&lt;RingRecoveryHints&gt; CreateDefaultRecovery()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_CreateRecovery_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.CreateRecovery*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_CreateRecovery" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.CreateRecovery">CreateRecovery()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_CreateRecovery" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.CreateRecovery">
+  CreateRecovery()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 恢复算法工厂——默认 DefaultRingRecovery。在 Initialize 的 CAS 闸门内被调一次
 （基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override IRecovery&lt;RingRecoveryHints&gt; CreateRecovery()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><span class="xref">TC.Tier.Core.Shared.LifecycleBase&lt;TC.Tier.Runtime.Structures.Ring.RingRecoveryHints&gt;.CreateRecovery()</span></div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverride*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverride(System.Boolean)">
+  DisposeOverride(bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>同步额外清理钩子（LifecycleBase 模板）：先落盘 mutable 区 [FlushedUntilAddress, TailAddress)
 → 写 meta 落盘 → 释放 meta 策略 → 释放页 native 内存/页池（引擎内存归引擎，引擎以外资源在此收）。
 各步异常吞掉互不阻断（存储底线：尽力落盘）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override void DisposeOverride(bool disposing)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">disposing</span></td>
-        <td><p>true = 用户调 Dispose（可触托管资源）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">LifecycleBase&lt;RingRecoveryHints&gt;.DisposeOverride(bool)</a></div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>disposing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 用户调 Dispose（可触托管资源）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverrideAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverrideAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverrideAsync(System.Boolean)">
+  DisposeOverrideAsync(bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步额外清理钩子（LifecycleBase 模板）：对等 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_System_Boolean_">DisposeOverride(bool)</a> 的异步轨——
 异步落盘 mutable 区 → 异步写 meta → 异步释放 meta 策略 → 释放页 native 内存/页池。
 各步异常吞掉互不阻断（存储底线：尽力落盘）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override ValueTask DisposeOverrideAsync(bool disposing)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">disposing</span></td>
-        <td><p>true = 用户调 DisposeAsync（可触托管资源）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td><p>释放完成的 ValueTask。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="overrides">Overrides</h5>
-  <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">LifecycleBase&lt;RingRecoveryHints&gt;.DisposeOverrideAsync(bool)</a></div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>disposing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 用户调 DisposeAsync（可触托管资源）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>释放完成的 ValueTask。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterEpoch_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.EnterEpoch*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterEpoch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.EnterEpoch">EnterEpoch()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterEpoch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.EnterEpoch">
+  EnterEpoch()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ epoch 读保护协议实现（IEpochProtected——Session 读 scope 聚合入口；ReadScope 转发此真源）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void EnterEpoch()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterReadScope_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.EnterReadScope*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterReadScope" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.EnterReadScope">EnterReadScope()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterReadScope" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.EnterReadScope">
+  EnterReadScope()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ Ring 读 scope（持 epoch）——零拷贝 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_TC_Tier_Contracts_Storage_LogicalAddress_">GetValueSpan(LogicalAddress)</a> 的生命周期护栏：
 页驱逐经 epoch 排水（STORAGE-009 契约），scope 内底层页恒稳。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public RingBase&lt;TKey&gt;.ReadScope EnterReadScope()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;.<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.ReadScope.html">ReadScope</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;.<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.ReadScope.html">ReadScope</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ExitEpoch_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ExitEpoch*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ExitEpoch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ExitEpoch">ExitEpoch()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ExitEpoch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ExitEpoch">
+  ExitEpoch()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>退出 epoch 读保护（IEpochProtected 契约——与 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterEpoch">EnterEpoch()</a> 同线程配对）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ExitEpoch()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntil_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushUntil*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntil_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushUntil(TC.Tier.Contracts.Storage.LogicalAddress)">FlushUntil(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntil_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushUntil(TC.Tier.Contracts.Storage.LogicalAddress)">
+  FlushUntil(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 同步 flush 到指定地址（Prepare 用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void FlushUntil(LogicalAddress untilAddress)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">untilAddress</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>untilAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntilAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushUntilAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntilAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushUntilAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">FlushUntilAsync(LogicalAddress, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntilAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FlushUntilAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  FlushUntilAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 异步 flush 到指定地址（PrepareAsync 用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask FlushUntilAsync(LogicalAddress untilAddress, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">untilAddress</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>untilAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFields_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetFields*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFields_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetFields(TC.Tier.Contracts.Storage.LogicalAddress)">GetFields(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFields_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetFields(TC.Tier.Contracts.Storage.LogicalAddress)">
+  GetFields(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 读 record header 字段。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public RingRecordFields GetFields(LogicalAddress logicalAddress)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">logicalAddress</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingRecordFields.html">RingRecordFields</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>logicalAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingRecordFields.html">RingRecordFields</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFlushedWatermark_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetFlushedWatermark*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFlushedWatermark" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetFlushedWatermark">GetFlushedWatermark()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFlushedWatermark" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetFlushedWatermark">
+  GetFlushedWatermark()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>已落盘水位（IKeyResolver 契约——派生结构后台持久化的 footer 锚点 W）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress GetFlushedWatermark()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKey_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKey*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKey_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKey(TC.Tier.Contracts.Storage.LogicalAddress)">GetKey(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKey_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKey(TC.Tier.Contracts.Storage.LogicalAddress)">
+  GetKey(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读 addr 处 record 的 key（返回指向热区 native 页的 span）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public RecordKey&lt;TKey&gt; GetKey(LogicalAddress addr)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RecordKey-1.html">RecordKey</a>&lt;TKey&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKey_TC_Tier_Contracts_Storage_LogicalAddress__remarks">Remarks</h5>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RecordKey-1.html">RecordKey</a>&lt;TKey&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKey_TC_Tier_Contracts_Storage_LogicalAddress__remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>★ STORAGE-007 设计契约（中间层 epoch 责任划分）：
 本方法（及 GetValue/GetRecord/GetRecords/TryGetKey/TryGetValue）<b>不内部持 _epoch</b>——
 刻意为高性能中间层 API。epoch 保护责任在调用方：</p>
@@ -1260,364 +1404,308 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 </div>
 
 
+
+
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKeyAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKeyAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKeyAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKeyAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">GetKeyAsync(LogicalAddress, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKeyAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKeyAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  GetKeyAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步读单条 key：热区同步快路径直读；冷区异步整页回源后读。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;RecordKey&lt;TKey&gt;&gt; GetKeyAsync(LogicalAddress addr, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td><p>record 的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——冷区异步回源途中响应取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RecordKey-1.html">RecordKey</a>&lt;TKey&gt;&gt;</td>
-        <td><p>record 的 key 封装（Key/ValueLength/Flags/Address）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>record 的起始逻辑地址。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——冷区异步回源途中响应取消。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RecordKey-1.html">RecordKey</a>&lt;TKey&gt;&gt;</dt>
+    <dd><p>record 的 key 封装（Key/ValueLength/Flags/Address）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecordSize*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecordSize_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecordSize(System.Int64)">GetRecordSize(long)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecordSize_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecordSize(System.Int64)">
+  GetRecordSize(long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读物理地址处 record 的实际几何：filled = header + payload + padding 实际字节数，allocated = 对齐后的槽长。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected abstract (int filled, int allocated) GetRecordSize(long phys)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">phys</span></td>
-        <td><p>record 的物理地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32-.filled">filled</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32-.allocated">allocated</a>)</td>
-        <td><p>(实际字节数, 对齐后占用槽长)。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>phys</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>record 的物理地址。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32-.filled">filled</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32-.allocated">allocated</a>)</dt>
+    <dd><p>(实际字节数, 对齐后占用槽长)。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecords_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecords*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecords__1_System_ReadOnlySpan_TC_Tier_Contracts_Storage_LogicalAddress____0_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecords``1(System.ReadOnlySpan{TC.Tier.Contracts.Storage.LogicalAddress},``0)">GetRecords&lt;THandler&gt;(ReadOnlySpan&lt;LogicalAddress&gt;, THandler)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecords__1_System_ReadOnlySpan_TC_Tier_Contracts_Storage_LogicalAddress____0_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecords``1(System.ReadOnlySpan{TC.Tier.Contracts.Storage.LogicalAddress},``0)">
+  GetRecords&lt;THandler&gt;(ReadOnlySpan&lt;LogicalAddress&gt;, THandler)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 批量读 record（按页号聚簇，减少冷区回源次数）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void GetRecords&lt;THandler&gt;(ReadOnlySpan&lt;LogicalAddress&gt; addresses, THandler handler) where THandler : IReadOnlyRecordHandler&lt;TKey&gt;</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td><span class="parametername">addresses</span></td>
-        <td><p>要读取的逻辑地址数组</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">THandler</span></td>
-        <td><span class="parametername">handler</span></td>
-        <td><p>处理每个读取到的 record 的处理器</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">THandler</span></td>
-        <td><p>处理器类型</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>要读取的逻辑地址数组</p>
+</dd>
+    <dt><code>handler</code> <span class="xref">THandler</span></dt>
+    <dd><p>处理每个读取到的 record 的处理器</p>
+</dd>
+  </dl>
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>THandler</code></dt>
+    <dd><p>处理器类型</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRequiredRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRequiredRecordSize*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRequiredRecordSize_System_Int64_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRequiredRecordSize(System.Int64,System.Int32)">GetRequiredRecordSize(long, int)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRequiredRecordSize_System_Int64_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRequiredRecordSize(System.Int64,System.Int32)">
+  GetRequiredRecordSize(long, int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>给定可用字节数下覆盖该 record 所需的最小槽长（估算插槽，实现类按自身 record 形态给出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected abstract int GetRequiredRecordSize(long phys, int availableBytes)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">phys</span></td>
-        <td><p>record 的物理地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">availableBytes</span></td>
-        <td><p>可用字节数。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><p>所需的最小槽长（字节数）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>phys</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>record 的物理地址。</p>
+</dd>
+    <dt><code>availableBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>可用字节数。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>所需的最小槽长（字节数）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetSpan_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetSpan*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetSpan_TC_Tier_Contracts_Storage_LogicalAddress_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetSpan(TC.Tier.Contracts.Storage.LogicalAddress,System.Int32)">GetSpan(LogicalAddress, int)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetSpan_TC_Tier_Contracts_Storage_LogicalAddress_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetSpan(TC.Tier.Contracts.Storage.LogicalAddress,System.Int32)">
+  GetSpan(LogicalAddress, int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ Span（带边界，不暴露 byte*）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public Span&lt;byte&gt; GetSpan(LogicalAddress logicalAddress, int length)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">logicalAddress</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">length</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>logicalAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+    <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValue_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValue*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValue_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValue(TC.Tier.Contracts.Storage.LogicalAddress,System.Span{System.Byte})">GetValue(LogicalAddress, Span&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValue_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValue(TC.Tier.Contracts.Storage.LogicalAddress,System.Span{System.Byte})">
+  GetValue(LogicalAddress, Span&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读 addr 处 record 的 value（拷贝交付到 <code class="paramref">destination</code>）。
 热区直读 native 页拷贝；冷区自动回源后拷贝；溢出 record（FLAG_VALUE_OVERFLOW）从溢出引擎读入。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int GetValue(LogicalAddress addr, Span&lt;byte&gt; destination)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td><p>record 的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>value 字节的拷贝目的地。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><p>写入 destination 的 value 字节数。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>record 的起始逻辑地址。</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>value 字节的拷贝目的地。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>写入 destination 的 value 字节数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Memory{System.Byte},System.Threading.CancellationToken)">GetValueAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Memory{System.Byte},System.Threading.CancellationToken)">
+  GetValueAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步读 value（拷贝交付到 <code class="paramref">destination</code>）：热区同步快路径
 （溢出值走异步溢出引擎读）；冷区异步整页回源后同步拷贝。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;int&gt; GetValueAsync(LogicalAddress addr, Memory&lt;byte&gt; destination, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td><p>record 的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">destination</span></td>
-        <td><p>value 字节的拷贝目的地。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——溢出值/冷区异步读途中响应取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
-        <td><p>写入 destination 的 value 字节数。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>record 的起始逻辑地址。</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>value 字节的拷贝目的地。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——溢出值/冷区异步读途中响应取消。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>写入 destination 的 value 字节数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueSpan*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueSpan(TC.Tier.Contracts.Storage.LogicalAddress)">GetValueSpan(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueSpan(TC.Tier.Contracts.Storage.LogicalAddress)">
+  GetValueSpan(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 零拷贝值交付：value 字节直访切片（热页 native 内存 / 冷区经 ClockCache 缓存页），无 64B 级出参拷贝。</p>
 <p>★ 生命周期契约（与 FASTER InputRef 同语义）：<b>span 须在 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterReadScope">EnterReadScope()</a>
   持有的读 scope 内消费</b>——页驱逐（热页窗口滑移/冷缓存淘汰）经 epoch 排水延迟到 scope 退出，
@@ -1627,283 +1715,287 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
   缓冲拷贝交付（零拷贝纯度让位于正确性；返回 span 有效期同上）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ReadOnlySpan&lt;byte&gt; GetValueSpan(LogicalAddress addr)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_InitializePolicies_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.InitializePolicies*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_InitializePolicies" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.InitializePolicies">InitializePolicies()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_InitializePolicies" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.InitializePolicies">
+  InitializePolicies()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>派生类初始化钩子：装配冷页缓存（ClockCache 容量 = ClockCacheCapacity 或 ColdReadRatio 派生）并恢复溢出尾水位。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected void InitializePolicies()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnCommitted_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnCommitted*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnCommitted_System_Int64_System_Action_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnCommitted(System.Int64,System.Action)">OnCommitted(long, Action)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnCommitted_System_Int64_System_Action_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnCommitted(System.Int64,System.Action)">
+  OnCommitted(long, Action)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ OnCommitted（提交回调注册）：注册 seq 的回调。若已提交到更高 seq，则立即触发。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void OnCommitted(long seq, Action callback)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">seq</span></td>
-        <td><p>注册回调的序号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action">Action</a></td>
-        <td><span class="parametername">callback</span></td>
-        <td><p>提交回调。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></td>
-        <td><p>当 callback 为 null 时抛出。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>注册回调的序号。</p>
+</dd>
+    <dt><code>callback</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action">Action</a></dt>
+    <dd><p>提交回调。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>当 callback 为 null 时抛出。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitialize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitialize*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitialize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitialize">OnInitialize()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitialize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitialize">
+  OnInitialize()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>派生类初始化钩子——引擎就绪后调用。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected virtual void OnInitialize()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitializeBegin_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitializeBegin*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitializeBegin" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitializeBegin">OnInitializeBegin()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitializeBegin" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitializeBegin">
+  OnInitializeBegin()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动期钩子：主引擎/溢出引擎/meta 引擎（Managed）并行 Initialize（均非阻塞），
 引擎就绪等待在恢复核心（RecoverAsync 开头 await WaitForReadyAsync）完成。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">protected override void OnInitializeBegin()</code></pre>
   </div>
-  <h5 class="overrides">Overrides</h5>
-  <div><span class="xref">TC.Tier.Core.Shared.LifecycleBase&lt;TC.Tier.Runtime.Structures.Ring.RingRecoveryHints&gt;.OnInitializeBegin()</span></div>
+
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenScanCursor_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenScanCursor*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenScanCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenScanCursor(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">OpenScanCursor(LogicalAddress, LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenScanCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenScanCursor(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  OpenScanCursor(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 打开扫描游标（工厂注入或默认 SequentialRingScanCursor）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IRingScanCursor OpenScanCursor(LogicalAddress begin = default, LogicalAddress end = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">begin</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">end</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>begin</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenSnapshotReader_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenSnapshotReader*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenSnapshotReader_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenSnapshotReader(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">OpenSnapshotReader(LogicalAddress, LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenSnapshotReader_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenSnapshotReader(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  OpenSnapshotReader(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>创建快照读取器（上层 pull 数据从 Ring 导出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IRingSnapshotReader OpenSnapshotReader(LogicalAddress begin = default, LogicalAddress end = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">begin</span></td>
-        <td><p>快照的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">end</span></td>
-        <td><p>快照的结束逻辑地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshotReader.html">IRingSnapshotReader</a></td>
-        <td><p>返回一个快照读取器实例。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>begin</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>快照的起始逻辑地址。</p>
+</dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>快照的结束逻辑地址。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshotReader.html">IRingSnapshotReader</a></dt>
+    <dd><p>返回一个快照读取器实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenSnapshotWriter_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenSnapshotWriter*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenSnapshotWriter_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenSnapshotWriter(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">OpenSnapshotWriter(LogicalAddress, LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OpenSnapshotWriter_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OpenSnapshotWriter(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  OpenSnapshotWriter(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>创建快照写入器（上层 push 数据填回 Ring 页池）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IRingSnapshotWriter OpenSnapshotWriter(LogicalAddress begin, LogicalAddress end)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">begin</span></td>
-        <td><p>快照的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">end</span></td>
-        <td><p>快照的结束逻辑地址。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshotWriter.html">IRingSnapshotWriter</a></td>
-        <td><p>返回一个快照写入器实例。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>begin</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>快照的起始逻辑地址。</p>
+</dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>快照的结束逻辑地址。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshotWriter.html">IRingSnapshotWriter</a></dt>
+    <dd><p>返回一个快照写入器实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Prepare_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Prepare*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Prepare_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Prepare(System.Int64)">Prepare(long)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Prepare_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Prepare(System.Int64)">
+  Prepare(long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ Prepare（事务准备）：落盘数据 + meta。</p>
 <p>数据 flush 到 TailAddress，meta 落盘（"悬干"状态——崩溃在此后 ConfirmCommitted 前恢复时丢弃）。</p>
 <p>★★ meta 策略分路径（fsync 次数优化）：</p>
@@ -1914,274 +2006,262 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
   meta 说刷到 X 但数据没真刷到，恢复丢数据），<b>2 次 fsync</b>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Prepare(long seq)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">seq</span></td>
-        <td><p>准备提交的序号。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>准备提交的序号。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PrepareAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PrepareAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PrepareAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PrepareAsync(System.Int64,System.Threading.CancellationToken)">PrepareAsync(long, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_PrepareAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.PrepareAsync(System.Int64,System.Threading.CancellationToken)">
+  PrepareAsync(long, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ PrepareAsync（事务准备）：落盘数据 + meta。对等 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_Prepare_System_Int64_">Prepare(long)</a> 的分路径逻辑。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask PrepareAsync(long seq, CancellationToken ct)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">seq</span></td>
-        <td><p>准备提交的序号。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>准备提交的序号。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOpaqueMeta_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOpaqueMeta*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOpaqueMeta" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOpaqueMeta">ReadOpaqueMeta()</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOpaqueMeta" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOpaqueMeta">
+  ReadOpaqueMeta()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>读外部 opaque meta（最近已提交块；Empty = 无数据/未开启——空即答案）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ReadOnlySpan&lt;byte&gt; ReadOpaqueMeta()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync(System.Threading.CancellationToken)">ScanAsync(CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync(System.Threading.CancellationToken)">
+  ScanAsync(CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>全量扫描（IKeyResolver 重载契约）——从 BeginAddress 扫到当前尾（TailAddress）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address)&gt; ScanAsync(CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——冷区异步回源途中响应取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</td>
-        <td><p>(Key, Address) 异步流。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——冷区异步回源途中响应取消。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</dt>
+    <dd><p>(Key, Address) 异步流。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">ScanAsync(LogicalAddress, LogicalAddress, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  ScanAsync(LogicalAddress, LogicalAddress, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>范围扫描（IKeyResolver 契约）——从 begin 扫到 end（开区间），异步迭代器流式回源（冷区真异步 IO，不阻塞调用线程）。
 仅吐用户数据 record（过滤 FLAG_ENTRY_IS_META 的 meta record）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address)&gt; ScanAsync(LogicalAddress begin, LogicalAddress end, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">begin</span></td>
-        <td><p>扫描起点（小于 BeginAddress 时游标自动夹取）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">end</span></td>
-        <td><p>扫描终点（开区间，不含；为 default 时取当前尾）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——冷区异步回源途中响应取消（EnumeratorCancellation）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</td>
-        <td><p>(Key, Address) 异步流。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>begin</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>扫描起点（小于 BeginAddress 时游标自动夹取）。</p>
+</dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>扫描终点（开区间，不含；为 default 时取当前尾）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——冷区异步回源途中响应取消（EnumeratorCancellation）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</dt>
+    <dd><p>(Key, Address) 异步流。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SetOpaqueMeta_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SetOpaqueMeta*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SetOpaqueMeta_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SetOpaqueMeta(System.ReadOnlySpan{System.Byte})">SetOpaqueMeta(ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SetOpaqueMeta_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SetOpaqueMeta(System.ReadOnlySpan{System.Byte})">
+  SetOpaqueMeta(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>写外部 opaque meta（stage 进策略缓冲——随下一次水位提交原子落盘；结构化水位写保留 opaque 记账）。</p>
 <p>★ 唯一消费者形态：TierKV 组合层登记 index 镜像锚点 W（先 Set 锚点、后触发水位提交——
   崩溃窗口内锚点旧于数据，重放一段兜底，绝不锚点新于提交尾）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void SetOpaqueMeta(ReadOnlySpan&lt;byte&gt; data)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">data</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TruncatePrefix_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TruncatePrefix*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TruncatePrefix_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TruncatePrefix(TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean)">TruncatePrefix(LogicalAddress, bool)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TruncatePrefix_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TruncatePrefix(TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean)">
+  TruncatePrefix(LogicalAddress, bool)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 头截断：推进 BeginAddress 到 address + 可选物理段回收（engine.ReclaimHead）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void TruncatePrefix(LogicalAddress address, bool truncateDevice = false)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">address</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><span class="parametername">truncateDevice</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+    <dt><code>truncateDevice</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TruncateSuffix_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TruncateSuffix*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TruncateSuffix_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TruncateSuffix(TC.Tier.Contracts.Storage.LogicalAddress)">TruncateSuffix(LogicalAddress)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TruncateSuffix_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TruncateSuffix(TC.Tier.Contracts.Storage.LogicalAddress)">
+  TruncateSuffix(LogicalAddress)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 尾截断（D2 决策——放松&quot;地址单调不回退&quot;铁律的<b>唯一异常路径</b>）：回退尾水位到 address，
 物理销毁 [address, TailAddress) 区间（引擎 ReclaimTail），回退内存水位/页池/冷缓存。</p>
 <p>调用方：Abort（2PC 回滚悬干数据）。独立公开面供 Raft-leader 式显式回退场景使用。</p>
@@ -2199,413 +2279,305 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     （读路由按 FlushedUntil，Head 只影响背压与驱逐）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void TruncateSuffix(LogicalAddress address)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">address</span></td>
-        <td><p>新的尾边界（[address, TailAddress) 被销毁）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
-        <td><p>地址越界 / 落入已驱逐区。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>新的尾边界（[address, TailAddress) 被销毁）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>地址越界 / 落入已驱逐区。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKey*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_TC_Tier_Contracts_Storage_LogicalAddress__0__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKey(TC.Tier.Contracts.Storage.LogicalAddress,`0@)">TryGetKey(LogicalAddress, out TKey)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_TC_Tier_Contracts_Storage_LogicalAddress__0__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKey(TC.Tier.Contracts.Storage.LogicalAddress,`0@)">
+  TryGetKey(LogicalAddress, out TKey)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>按地址读单条 key（IKeyResolver 契约）——热冷透明：热区直读 native 页，冷区自动整页回源后读。
 key 位置 = record 起始 + header 字节数（定长 sizeof(TKey) 字节）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryGetKey(LogicalAddress addr, out TKey key)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td><p>record 的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><span class="xref">TKey</span></td>
-        <td><span class="parametername">key</span></td>
-        <td><p>输出的 key 值。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>读取成功返回 true（本实现读路径恒成功）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>record 的起始逻辑地址。</p>
+</dd>
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>输出的 key 值。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>读取成功返回 true（本实现读路径恒成功）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKeyAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKeyAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKeyAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKeyAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">TryGetKeyAsync(LogicalAddress, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKeyAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKeyAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  TryGetKeyAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>异步读单条 key（<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_TC_Tier_Contracts_Storage_LogicalAddress__0__">TryGetKey(LogicalAddress, out TKey)</a> 的异步版）：热区同步快路径，冷区异步整页回源后读。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;(TKey Key, bool Success)&gt; TryGetKeyAsync(LogicalAddress addr, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td><p>record 的起始逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td><p>取消令牌——冷区异步回源途中响应取消。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,system.boolean-.key">Key</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,system.boolean-.success">Success</a>)&gt;</td>
-        <td><p>(Key=读到的 key 值, Success=是否成功)。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>record 的起始逻辑地址。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——冷区异步回源途中响应取消。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,system.boolean-.key">Key</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,system.boolean-.success">Success</a>)&gt;</dt>
+    <dd><p>(Key=读到的 key 值, Success=是否成功)。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValue*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValue(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlySpan{System.Byte})">UpdateValue(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValue(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlySpan{System.Byte})">
+  UpdateValue(LogicalAddress, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 原位更新既有 record 的 value（同步）——按「旧/新是否溢出」四分支翻转：
 overflow→overflow 更新溢出帧指针、inline→overflow 补 OVERFLOW 位并写溢出帧、
 overflow→inline 回退（清 OVERFLOW 位 + 容量校验 + 拷值）、inline→inline 重写 payload 长度 + 拷值，
 每分支后重写 header 与 CRC。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void UpdateValue(LogicalAddress addr, ReadOnlySpan&lt;byte&gt; newValue)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td><p>目标 record 的逻辑地址。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">newValue</span></td>
-        <td><p>新 value 字节。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>目标 record 的逻辑地址。</p>
+</dd>
+    <dt><code>newValue</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>新 value 字节。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValueAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValueAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValueAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValueAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">UpdateValueAsync(LogicalAddress, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValueAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValueAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  UpdateValueAsync(LogicalAddress, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 异步更新值：溢出翻转场景（newValue 落溢出引擎）走 <span class="xref">TC.Tier.Runtime.Structures.Ring.RingBase`1.WriteOverflowAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)</span> 真异步；
 纯 inline 翻转（含 overflow→inline 回退）是内存操作，同步完成返回 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask.completedtask">CompletedTask</a>。</p>
 <p>对齐 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__">UpdateValue(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</a> 的 4 分支语义。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask UpdateValueAsync(LogicalAddress addr, ReadOnlyMemory&lt;byte&gt; newValue, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">addr</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">newValue</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>addr</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+    <dt><code>newValue</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Write_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Write*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Write__0_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Write(`0,System.ReadOnlySpan{System.Byte})">Write(TKey, ReadOnlySpan&lt;byte&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_Write__0_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.Write(`0,System.ReadOnlySpan{System.Byte})">
+  Write(TKey, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 公开写入：大 value 自动溢出到溢出引擎（同步）。flags 由引擎内部管理，不对外暴露。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public LogicalAddress Write(TKey key, ReadOnlySpan&lt;byte&gt; value)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">TKey</span></td>
-        <td><span class="parametername">key</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">value</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd></dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.WriteAsync*"></a>
-  <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteAsync__0_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.WriteAsync(`0,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">WriteAsync(TKey, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
+
+  <h3 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteAsync__0_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.WriteAsync(`0,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  WriteAsync(TKey, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>★ 公开异步写入：大 value 走真异步溢出路径（<span class="xref">TC.Tier.Runtime.Structures.Ring.RingBase`1.WriteOverflowAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)</span>），小 value 走同步快路径。</p>
 <p>★ 快/慢路径分离——inline 写是纯内存操作无 I/O，仅溢出落盘需 await。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask&lt;LogicalAddress&gt; WriteAsync(TKey key, ReadOnlyMemory&lt;byte&gt; value, CancellationToken ct = default)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">TKey</span></td>
-        <td><span class="parametername">key</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td><span class="parametername">value</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
-        <td><span class="parametername">ct</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
-  </div>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a>
-  </div>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html">IEpochProtected</a>
-  </div>
-  <div>
-      <a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver&lt;TKey&gt;</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd></dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

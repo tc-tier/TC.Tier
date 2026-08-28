@@ -1,97 +1,135 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class ResourceGroup | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class ResourceGroup | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="资源组——引擎/设备资源的生命周期管理器（组合持有，非继承）。 按名注册/查询去掉旧 this[int] 下标索引（隐式契约脆弱）；用  /  显式按名。后期添加支持构造期 params + 运行期 （解决旧版一次性传死、meta engine 等后期资源只能靠各基类自建 _disposables 列表的分裂）。所有权二态 区分 Owned（我释放）/ Referenced（外部管，只跟踪）。注入引擎等用 Referenced——泄漏可见但不被 Dispose。object 单存储资源可能是 、 或两者都实现（如 IStorageEngine）。   ★  不继承 ，只异步的资源（如 IReadSession）也收；不实现两者其一的资源在 Add 时直接抛。聚合异常Dispose 逐个释放、收集异常，全部尝试完后聚合抛 （不因单个失败跳过其余，也不静默吞）。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="资源组——引擎/设备资源的生命周期管理器（组合持有，非继承）。 按名注册/查询去掉旧 this[int] 下标索引（隐式契约脆弱）；用  /  显式按名。后期添加支持构造期 params + 运行期 （解决旧版一次性传死、meta engine 等后期资源只能靠各基类自建 _disposables 列表的分裂）。所有权二态 区分 Owned（我释放）/ Referenced（外部管，只跟踪）。注入引擎等用 Referenced——泄漏可见但不被 Dispose。object 单存储资源可能是 、 或两者都实现（如 IStorageEngine）。   ★  不继承 ，只异步的资源（如 IReadSession）也收；不实现两者其一的资源在 Add 时直接抛。聚合异常Dispose 逐个释放、收集异常，全部尝试完后聚合抛 （不因单个失败跳过其余，也不静默吞）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Shared.ResourceGroup">
+
+        <article data-uid="TC.Tier.Core.Shared.ResourceGroup">
 
 
 
-  <h1 id="TC_Tier_Core_Shared_ResourceGroup" data-uid="TC.Tier.Core.Shared.ResourceGroup" class="text-break">Class ResourceGroup</h1>
-  <div class="markdown level0 summary"><p>资源组——引擎/设备资源的生命周期管理器（组合持有，非继承）。</p>
+  <h1 id="TC_Tier_Core_Shared_ResourceGroup" data-uid="TC.Tier.Core.Shared.ResourceGroup" class="text-break">
+Class ResourceGroup  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>资源组——引擎/设备资源的生命周期管理器（组合持有，非继承）。</p>
 <ul><li><span class="term">按名注册/查询</span>去掉旧 <code>this[int]</code> 下标索引（隐式契约脆弱）；用 <a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html#TC_Tier_Core_Shared_ResourceGroup_Add__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_">Add&lt;TResource&gt;(TResource, string?, ResourceOwnership)</a> / <a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html#TC_Tier_Core_Shared_ResourceGroup_Get__1_System_String_">Get&lt;T&gt;(string)</a> 显式按名。</li><li><span class="term">后期添加</span>支持构造期 <code>params</code> + 运行期 <a class="xref" href="TC.Tier.Core.Shared.ResourceGroup.html#TC_Tier_Core_Shared_ResourceGroup_Add__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_">Add&lt;TResource&gt;(TResource, string?, ResourceOwnership)</a>（解决旧版一次性传死、meta engine 等后期资源只能靠各基类自建 <code>_disposables</code> 列表的分裂）。</li><li><span class="term">所有权二态</span><a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a> 区分 Owned（我释放）/ Referenced（外部管，只跟踪）。注入引擎等用 Referenced——泄漏可见但不被 Dispose。</li><li><span class="term">object 单存储</span>资源可能是 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>、<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a> 或两者都实现（如 <code>IStorageEngine</code>）。
   ★ <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a> 不继承 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>，只异步的资源（如 <code>IReadSession</code>）也收；不实现两者其一的资源在 Add 时直接抛。</li><li><span class="term">聚合异常</span>Dispose 逐个释放、收集异常，全部尝试完后聚合抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.aggregateexception">AggregateException</a>（不因单个失败跳过其余，也不静默吞）。</li></ul>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">ResourceGroup</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class ResourceGroup : IDisposable, IAsyncDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">ResourceGroup</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -110,19 +148,24 @@
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Shared.html">Shared</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Shared_ResourceGroup_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class ResourceGroup : IDisposable, IAsyncDisposable</code></pre>
-  </div>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup__ctor_" data-uid="TC.Tier.Core.Shared.ResourceGroup.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup__ctor_System_Object___" data-uid="TC.Tier.Core.Shared.ResourceGroup.#ctor(System.Object[])">ResourceGroup(params object[])</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup__ctor_System_Object___" data-uid="TC.Tier.Core.Shared.ResourceGroup.#ctor(System.Object[])">
+  ResourceGroup(params object[])
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>构造资源组（可构造期一次性传入若干资源，向旧 ResourceGroupOwner 用法兼容）。
 构造期对象尚未暴露，无需加锁。</p>
 <pre><code>        &lt;p&gt;⚠️ &lt;b&gt;子类构造器警告&lt;/b&gt;：构造期未加锁依赖&quot;对象尚未暴露&quot;——若子类在构造器里启动线程/回调
@@ -131,89 +174,109 @@
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ResourceGroup(params object[] initial)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</td>
-        <td><span class="parametername">initial</span></td>
-        <td><p>构造期持有的资源——每个须实现 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a> 或 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>（至少其一；按 Type.Name 自动命名，重名追加序号）。默认 <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Owned">Owned</a>。
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>initial</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a>[]</dt>
+    <dd><p>构造期持有的资源——每个须实现 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a> 或 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>（至少其一；按 Type.Name 自动命名，重名追加序号）。默认 <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Owned">Owned</a>。
 不实现两接口的资源在此抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_Id_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Id*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_Id" data-uid="TC.Tier.Core.Shared.ResourceGroup.Id">Id</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_Id" data-uid="TC.Tier.Core.Shared.ResourceGroup.Id">
+  Id
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>组唯一标识（InstanceTracker 注册时生成，诊断用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public Guid Id { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_Names_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Names*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_Names" data-uid="TC.Tier.Core.Shared.ResourceGroup.Names">Names</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_Names" data-uid="TC.Tier.Core.Shared.ResourceGroup.Names">
+  Names
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>已注册的所有资源名快照（诊断/枚举用）。线程安全——返回快照副本，避免外部枚举期间被修改。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IReadOnlyList&lt;string&gt; Names { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_Add_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Add*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_Add__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Add``1(``0,System.String,TC.Tier.Core.Shared.ResourceOwnership)">Add&lt;TResource&gt;(TResource, string?, ResourceOwnership)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_Add__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Add``1(``0,System.String,TC.Tier.Core.Shared.ResourceOwnership)">
+  Add&lt;TResource&gt;(TResource, string?, ResourceOwnership)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>添加资源（重名抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>）。</p>
 <pre><code>        &lt;p&gt;★ 泛型入口：&lt;code class=&quot;typeparamref&quot;&gt;TResource&lt;/code&gt; 约束为 class（编译期类型安全）。
           运行期校验至少实现 &lt;xref href=&quot;System.IDisposable&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 或 &lt;xref href=&quot;System.IAsyncDisposable&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;（泛型约束无法表达&quot;或&quot;关系）。&lt;/p&gt;
@@ -223,112 +286,103 @@
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Add&lt;TResource&gt;(TResource resource, string? name = null, ResourceOwnership ownership = ResourceOwnership.Owned) where TResource : class</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">TResource</span></td>
-        <td><span class="parametername">resource</span></td>
-        <td><p>要添加的资源。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">name</span></td>
-        <td><p>注册名；缺省用 <code>resource.GetType().Name</code>。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a></td>
-        <td><span class="parametername">ownership</span></td>
-        <td><p>所有权模式（Owned=我释放 / Referenced=外部管只跟踪）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">TResource</span></td>
-        <td><p>资源类型——须实现 IDisposable 或 IAsyncDisposable。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>resource</code> <span class="xref">TResource</span></dt>
+    <dd><p>要添加的资源。</p>
+</dd>
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>注册名；缺省用 <code>resource.GetType().Name</code>。</p>
+</dd>
+    <dt><code>ownership</code> <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a></dt>
+    <dd><p>所有权模式（Owned=我释放 / Referenced=外部管只跟踪）。</p>
+</dd>
+  </dl>
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResource</code></dt>
+    <dd><p>资源类型——须实现 IDisposable 或 IAsyncDisposable。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_Contains_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Contains*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_Contains_System_String_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Contains(System.String)">Contains(string)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_Contains_System_String_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Contains(System.String)">
+  Contains(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>是否包含指定名。线程安全。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool Contains(string name)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">name</span></td>
-        <td><p>注册名。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td><p>是否包含。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>注册名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否包含。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_Dispose_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Dispose*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_Dispose" data-uid="TC.Tier.Core.Shared.ResourceGroup.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_Dispose" data-uid="TC.Tier.Core.Shared.ResourceGroup.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
-  <h5 id="TC_Tier_Core_Shared_ResourceGroup_Dispose_remarks">Remarks</h5>
+
+
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Shared_ResourceGroup_Dispose_remarks">Remarks</h4>
   <div class="markdown level1 remarks"><p>逆序释放（后加的先释放）；仅 <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Owned">Owned</a> 资源释放，<a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html#TC_Tier_Core_Shared_ResourceOwnership_Referenced">Referenced</a> 跳过。
 同步路径优先 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>（防同步上下文死锁）。聚合异常展平。</p>
 <pre><code>        &lt;p&gt;★ 只实现 &lt;xref href=&quot;System.IAsyncDisposable&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 的资源在同步 Dispose 里阻塞等异步完成（语义与异步入口一致）。&lt;/p&gt;
@@ -336,256 +390,213 @@
 </div>
 
 
+
+
   <a id="TC_Tier_Core_Shared_ResourceGroup_DisposeAsync_" data-uid="TC.Tier.Core.Shared.ResourceGroup.DisposeAsync*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_DisposeAsync" data-uid="TC.Tier.Core.Shared.ResourceGroup.DisposeAsync">DisposeAsync()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_DisposeAsync" data-uid="TC.Tier.Core.Shared.ResourceGroup.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
   <div class="markdown level1 summary"></div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_GetResources_" data-uid="TC.Tier.Core.Shared.ResourceGroup.GetResources*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_GetResources" data-uid="TC.Tier.Core.Shared.ResourceGroup.GetResources">GetResources()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_GetResources" data-uid="TC.Tier.Core.Shared.ResourceGroup.GetResources">
+  GetResources()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>诊断：当前组内所有资源快照（对齐 lease GetActiveLeases——泄漏时定位&quot;谁加了什么资源&quot;）。
 线程安全——锁内快照副本。含所有权模式（Owned/Referenced）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public IReadOnlyList&lt;ResourceInfo&gt; GetResources()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Shared.ResourceInfo.html">ResourceInfo</a>&gt;</td>
-        <td><p>资源快照列表（按添加顺序）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Shared.ResourceInfo.html">ResourceInfo</a>&gt;</dt>
+    <dd><p>资源快照列表（按添加顺序）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_Get_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Get*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_Get__1_System_String_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Get``1(System.String)">Get&lt;T&gt;(string)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_Get__1_System_String_" data-uid="TC.Tier.Core.Shared.ResourceGroup.Get``1(System.String)">
+  Get&lt;T&gt;(string)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>按名取资源并转型；不存在或类型不匹配返回 null。线程安全。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public T? Get&lt;T&gt;(string name) where T : class</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">name</span></td>
-        <td><p>注册名。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">T</span></td>
-        <td><p>资源实例或 null。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">T</span></td>
-        <td><p>资源类型（class 约束，编译期类型安全）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>注册名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">T</span></dt>
+    <dd><p>资源实例或 null。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd><p>资源类型（class 约束，编译期类型安全）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Shared_ResourceGroup_ThrowIfDisposed_" data-uid="TC.Tier.Core.Shared.ResourceGroup.ThrowIfDisposed*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_ThrowIfDisposed" data-uid="TC.Tier.Core.Shared.ResourceGroup.ThrowIfDisposed">ThrowIfDisposed()</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_ThrowIfDisposed" data-uid="TC.Tier.Core.Shared.ResourceGroup.ThrowIfDisposed">
+  ThrowIfDisposed()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>已释放则抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void ThrowIfDisposed()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Shared_ResourceGroup_TryAdd_" data-uid="TC.Tier.Core.Shared.ResourceGroup.TryAdd*"></a>
-  <h4 id="TC_Tier_Core_Shared_ResourceGroup_TryAdd__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_" data-uid="TC.Tier.Core.Shared.ResourceGroup.TryAdd``1(``0,System.String,TC.Tier.Core.Shared.ResourceOwnership)">TryAdd&lt;TResource&gt;(TResource, string?, ResourceOwnership)</h4>
+
+  <h3 id="TC_Tier_Core_Shared_ResourceGroup_TryAdd__1___0_System_String_TC_Tier_Core_Shared_ResourceOwnership_" data-uid="TC.Tier.Core.Shared.ResourceGroup.TryAdd``1(``0,System.String,TC.Tier.Core.Shared.ResourceOwnership)">
+  TryAdd&lt;TResource&gt;(TResource, string?, ResourceOwnership)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>尝试添加（重名、已释放、或不实现两接口返回 false，不抛）。线程安全。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryAdd&lt;TResource&gt;(TResource resource, string? name = null, ResourceOwnership ownership = ResourceOwnership.Owned) where TResource : class</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="xref">TResource</span></td>
-        <td><span class="parametername">resource</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
-        <td><span class="parametername">name</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a></td>
-        <td><span class="parametername">ownership</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="typeParameters">Type Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><span class="parametername">TResource</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>resource</code> <span class="xref">TResource</span></dt>
+    <dd></dd>
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>ownership</code> <a class="xref" href="TC.Tier.Core.Shared.ResourceOwnership.html">ResourceOwnership</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TResource</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

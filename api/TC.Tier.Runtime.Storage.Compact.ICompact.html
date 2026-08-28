@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Interface ICompact | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Interface ICompact | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="Compact 整理子系统——把散落/有空洞的段搬迁到紧凑新段，回收旧段。 ★ 只依赖契约对象：（含 Chunks——每段带旧段信息）+   （IO 子系统）。不认识 、不认识   ——搬迁所需信息全在 lease 中，无需穿透查段表。 ★ 一律后台句柄形态： /          RangeCompact          返回   ——0 等待；等待/取消/超时由调用方控制   （await op.WaitAsync(ct) / op.Cancel() / 事件订阅）。 ★ 失败现场保留 + marker 续传：Phase 2 失败保留（marker + 临时文件）；   （启动恢复）/ （运行时续传）从 marker 补执行   promote + 段表替换 + 删 marker——零重拷贝。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="Compact 整理子系统——把散落/有空洞的段搬迁到紧凑新段，回收旧段。 ★ 只依赖契约对象：（含 Chunks——每段带旧段信息）+   （IO 子系统）。不认识 、不认识   ——搬迁所需信息全在 lease 中，无需穿透查段表。 ★ 一律后台句柄形态： /          RangeCompact          返回   ——0 等待；等待/取消/超时由调用方控制   （await op.WaitAsync(ct) / op.Cancel() / 事件订阅）。 ★ 失败现场保留 + marker 续传：Phase 2 失败保留（marker + 临时文件）；   （启动恢复）/ （运行时续传）从 marker 补执行   promote + 段表替换 + 删 marker——零重拷贝。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact">
+
+        <article data-uid="TC.Tier.Runtime.Storage.Compact.ICompact">
 
 
 
-  <h1 id="TC_Tier_Runtime_Storage_Compact_ICompact" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact" class="text-break">Interface ICompact</h1>
-  <div class="markdown level0 summary"><p>Compact 整理子系统——把散落/有空洞的段搬迁到紧凑新段，回收旧段。</p>
+  <h1 id="TC_Tier_Runtime_Storage_Compact_ICompact" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact" class="text-break">
+Interface ICompact  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Storage.html">Storage</a>.<a class="xref" href="TC.Tier.Runtime.Storage.Compact.html">Compact</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Compact 整理子系统——把散落/有空洞的段搬迁到紧凑新段，回收旧段。</p>
 <p>★ 只依赖契约对象：<a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a>（含 Chunks——每段带旧段信息）+
   <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a>（IO 子系统）。<b>不认识 <a class="xref" href="TC.Tier.Runtime.AddressSpace.SegmentTable.html">SegmentTable</a>、不认识
   <span class="xref">TC.Tier.Runtime.Storage.StorageEngine</span></b>——搬迁所需信息全在 lease 中，无需穿透查段表。</p>
@@ -89,140 +111,181 @@
   <a class="xref" href="TC.Tier.Runtime.Storage.Compact.ICompact.html#TC_Tier_Runtime_Storage_Compact_ICompact_Recover_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_">Recover(CompactLeaseFactory)</a>（启动恢复）/ <a class="xref" href="TC.Tier.Runtime.Storage.Compact.ICompact.html#TC_Tier_Runtime_Storage_Compact_ICompact_Retry_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_">Retry(CompactLeaseFactory)</a>（运行时续传）从 marker 补执行
   promote + 段表替换 + 删 marker——零重拷贝。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ICompact : IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">IDisposable.Dispose()</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Storage.html">Storage</a>.<a class="xref" href="TC.Tier.Runtime.Storage.Compact.html">Compact</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
-  <h5 id="TC_Tier_Runtime_Storage_Compact_ICompact_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public interface ICompact : IDisposable, IAsyncDisposable</code></pre>
-  </div>
-  <h3 id="properties">Properties
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_IsRunning_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.IsRunning*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_IsRunning" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.IsRunning">IsRunning</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_IsRunning" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.IsRunning">
+  IsRunning
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前是否有整理在跑。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">bool IsRunning { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_Status_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Status*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_Status" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Status">Status</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_Status" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Status">
+  Status
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前子系统状态。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">CompactStatus Status { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.CompactStatus.html">CompactStatus</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.CompactStatus.html">CompactStatus</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_Clear_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Clear*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_Clear" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Clear">Clear()</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_Clear" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Clear">
+  Clear()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>清除任务——放弃当前整理，回到空闲状态（失败后选择&quot;不恢复、不重试，直接放弃&quot;的场景）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Clear()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_Compact_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Compact*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_Compact_TC_Tier_Runtime_AddressSpace_Leases_CompactLease___" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Compact(TC.Tier.Runtime.AddressSpace.Leases.CompactLease[])">Compact(params CompactLease[])</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_Compact_TC_Tier_Runtime_AddressSpace_Leases_CompactLease___" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Compact(TC.Tier.Runtime.AddressSpace.Leases.CompactLease[])">
+  Compact(params CompactLease[])
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动一次整理（批量 lease 原子完成——排他：未完成不允许重复 Compact）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation&lt;CompactResult&gt; Compact(params CompactLease[] leases)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a>[]</td>
-        <td><span class="parametername">leases</span></td>
-        <td><p>一个或多个 Compact lease（Chunks 携带旧段信息，无需查段表；
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>leases</code> <a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a>[]</dt>
+    <dd><p>一个或多个 Compact lease（Chunks 携带旧段信息，无需查段表；
 使用方填 <span class="xref">TC.Tier.Runtime.AddressSpace.Leases.CompactChunk.SetReplacement(System.Int64,System.Int64,TC.Tier.Runtime.AddressSpace.StableState,System.Int64,System.Int64)</span> 或 <span class="xref">TC.Tier.Runtime.AddressSpace.Leases.CompactChunk.MarkInvalid</span> 标记处置）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</td>
-        <td><p>操作句柄（Cancel / WaitAsync / 进度/完成/失败事件）。
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</dt>
+    <dd><p>操作句柄（Cancel / WaitAsync / 进度/完成/失败事件）。
 ★ 仅 Phase 1（拷贝）可取消；Phase 2（rename 后）已开始提交，不可取消——否则段表不一致。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_RangeCompact_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.RangeCompact*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_RangeCompact_TC_Tier_Runtime_AddressSpace_Leases_CompactLease_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.RangeCompact(TC.Tier.Runtime.AddressSpace.Leases.CompactLease,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress})">RangeCompact(CompactLease, LogicalAddress, LogicalAddress, IReadOnlyList&lt;LogicalAddress&gt;)</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_RangeCompact_TC_Tier_Runtime_AddressSpace_Leases_CompactLease_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.RangeCompact(TC.Tier.Runtime.AddressSpace.Leases.CompactLease,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress})">
+  RangeCompact(CompactLease, LogicalAddress, LogicalAddress, IReadOnlyList&lt;LogicalAddress&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>启动区间 Compact（带地址翻译的磁盘碎片整理）——把 [from,to) 内的有效数据压实，
 消除碎片间隙，压实区末尾到 to 之间 PunchHole 归还（连续空洞）。</p>
 <p>★ <code class="paramref">addresses</code> 是上层需翻译的地址集合——每个不同的请求地址都进入
@@ -230,66 +293,51 @@
 <p>★ 区间外（from 前、to 后）数据原位不动；CommittedTail 不退。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation&lt;CompactResult&gt; RangeCompact(CompactLease lease, LogicalAddress from, LogicalAddress to, IReadOnlyList&lt;LogicalAddress&gt; addresses)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a></td>
-        <td><span class="parametername">lease</span></td>
-        <td><p>整理区间 lease（引擎造——排他占住 [from 段@0, 尾段 GrowthLimit]，数据窗 [from,to)）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>整理范围起始（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>整理范围结束（不含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td><span class="parametername">addresses</span></td>
-        <td><p>需翻译的地址集合（段内偏移量，与长度无关）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</td>
-        <td><p>后台操作句柄——成功携带 <a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>（NewLow/NewHigh WaterMark + MigrationMap）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>lease</code> <a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a></dt>
+    <dd><p>整理区间 lease（引擎造——排他占住 [from 段@0, 尾段 GrowthLimit]，数据窗 [from,to)）。</p>
+</dd>
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围起始（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围结束（不含）。</p>
+</dd>
+    <dt><code>addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>需翻译的地址集合（段内偏移量，与长度无关）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</dt>
+    <dd><p>后台操作句柄——成功携带 <a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>（NewLow/NewHigh WaterMark + MigrationMap）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_RangeCompact_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.RangeCompact*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_RangeCompact_TC_Tier_Runtime_AddressSpace_Leases_CompactLease_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__System_Collections_Generic_IReadOnlyDictionary_System_Int32_System_Collections_Generic_List_System_ValueTuple_System_Int64_System_Int64____" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.RangeCompact(TC.Tier.Runtime.AddressSpace.Leases.CompactLease,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress},System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Collections.Generic.List{System.ValueTuple{System.Int64,System.Int64}}})">RangeCompact(CompactLease, LogicalAddress, LogicalAddress, IReadOnlyList&lt;LogicalAddress&gt;, IReadOnlyDictionary&lt;int, List&lt;(long Start, long End)&gt;&gt;?)</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_RangeCompact_TC_Tier_Runtime_AddressSpace_Leases_CompactLease_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__System_Collections_Generic_IReadOnlyDictionary_System_Int32_System_Collections_Generic_List_System_ValueTuple_System_Int64_System_Int64____" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.RangeCompact(TC.Tier.Runtime.AddressSpace.Leases.CompactLease,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress},System.Collections.Generic.IReadOnlyDictionary{System.Int32,System.Collections.Generic.List{System.ValueTuple{System.Int64,System.Int64}}})">
+  RangeCompact(CompactLease, LogicalAddress, LogicalAddress, IReadOnlyList&lt;LogicalAddress&gt;, IReadOnlyDictionary&lt;int, List&lt;(long Start, long End)&gt;&gt;?)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>申报活区间版 <see>
 <cref>RangeCompact</cref>
 </see>
@@ -297,182 +345,139 @@
 <p>★ 未申报的已分配区间视为洞不搬迁（A8 信任模型：记录粒度真相只在使用方）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">IAsyncOperation&lt;CompactResult&gt; RangeCompact(CompactLease lease, LogicalAddress from, LogicalAddress to, IReadOnlyList&lt;LogicalAddress&gt; addresses, IReadOnlyDictionary&lt;int, List&lt;(long Start, long End)&gt;&gt;? livePlan)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a></td>
-        <td><span class="parametername">lease</span></td>
-        <td><p>整理区间 lease（同无 livePlan 重载）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">from</span></td>
-        <td><p>整理范围起始（含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td><span class="parametername">to</span></td>
-        <td><p>整理范围结束（不含）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
-        <td><span class="parametername">addresses</span></td>
-        <td><p>需翻译的地址集合（段内偏移量，与长度无关）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.end">End</a>)&gt;&gt;</td>
-        <td><span class="parametername">livePlan</span></td>
-        <td><p>段 → 申报活区间（段内文件偏移），null/缺段 = 该段回退物理枚举。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</td>
-        <td><p>后台操作句柄——成功携带 <a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>（NewLow/NewHigh WaterMark + MigrationMap）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>lease</code> <a class="xref" href="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.html">CompactLease</a></dt>
+    <dd><p>整理区间 lease（同无 livePlan 重载）。</p>
+</dd>
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围起始（含）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>整理范围结束（不含）。</p>
+</dd>
+    <dt><code>addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>需翻译的地址集合（段内偏移量，与长度无关）。</p>
+</dd>
+    <dt><code>livePlan</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.start">Start</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.end">End</a>)&gt;&gt;</dt>
+    <dd><p>段 → 申报活区间（段内文件偏移），null/缺段 = 该段回退物理枚举。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Common.IAsyncOperation-1.html">IAsyncOperation</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>&gt;</dt>
+    <dd><p>后台操作句柄——成功携带 <a class="xref" href="TC.Tier.Contracts.Storage.CompactResult.html">CompactResult</a>（NewLow/NewHigh WaterMark + MigrationMap）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_Recover_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Recover*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_Recover_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Recover(TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory)">Recover(CompactLeaseFactory)</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_Recover_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Recover(TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory)">
+  Recover(CompactLeaseFactory)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>崩溃恢复——引擎重启后补执行未完成的 Compact（marker 记录的 Phase 2 崩溃）：
 临时文件 → promote → 段表替换 → 删 marker。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Recover(CompactLeaseFactory leaseFactory)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory.html">CompactLeaseFactory</a></td>
-        <td><span class="parametername">leaseFactory</span></td>
-        <td><p>lease 构造委托（基类按 marker 区间造新 lease）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>leaseFactory</code> <a class="xref" href="TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory.html">CompactLeaseFactory</a></dt>
+    <dd><p>lease 构造委托（基类按 marker 区间造新 lease）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Runtime_Storage_Compact_ICompact_Retry_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Retry*"></a>
-  <h4 id="TC_Tier_Runtime_Storage_Compact_ICompact_Retry_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Retry(TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory)">Retry(CompactLeaseFactory)</h4>
+
+  <h3 id="TC_Tier_Runtime_Storage_Compact_ICompact_Retry_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_" data-uid="TC.Tier.Runtime.Storage.Compact.ICompact.Retry(TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory)">
+  Retry(CompactLeaseFactory)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>运行时失败续传——从 marker 补执行上次失败的 Compact（与 <a class="xref" href="TC.Tier.Runtime.Storage.Compact.ICompact.html#TC_Tier_Runtime_Storage_Compact_ICompact_Recover_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_">Recover(CompactLeaseFactory)</a> 同核心，
 零重拷贝）。区别仅在触发时机：Recover = 启动恢复；Retry = 同进程内运行时失败
 （引擎 op.Failed 分流，句柄冲突关句柄后调用）。</p>
 <p>★ marker 不存在（Phase 1 失败已清理现场）= no-op，调用方重新发起 Compact。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">void Retry(CompactLeaseFactory leaseFactory)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory.html">CompactLeaseFactory</a></td>
-        <td><span class="parametername">leaseFactory</span></td>
-        <td><p>lease 构造委托（同 <a class="xref" href="TC.Tier.Runtime.Storage.Compact.ICompact.html#TC_Tier_Runtime_Storage_Compact_ICompact_Recover_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_">Recover(CompactLeaseFactory)</a>）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>leaseFactory</code> <a class="xref" href="TC.Tier.Runtime.Storage.Compact.CompactLeaseFactory.html">CompactLeaseFactory</a></dt>
+    <dd><p>lease 构造委托（同 <a class="xref" href="TC.Tier.Runtime.Storage.Compact.ICompact.html#TC_Tier_Runtime_Storage_Compact_ICompact_Recover_TC_Tier_Runtime_Storage_Compact_CompactLeaseFactory_">Recover(CompactLeaseFactory)</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>

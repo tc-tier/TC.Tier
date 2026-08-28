@@ -1,81 +1,103 @@
 <!DOCTYPE html>
-<!--[if IE]><![endif]-->
 <html>
-
   <head>
     <meta charset="utf-8">
-      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
       <title>Class HazardDomain | TC.Tier — .NET 可组合存储运行时 </title>
-      <meta name="viewport" content="width=device-width">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class HazardDomain | TC.Tier — .NET 可组合存储运行时 ">
-    
-    <meta name="description" content="HazardPointers 原语——无锁结构的退休安全回收层（与  同层级的通用机制）。 语义：读者在解引用前 （发布 + 验证来源未变）取得对具体句柄的保护； 删除者物理摘除后 ； 快照全部 hazard 槽，无指向者的退休项执行 reclaim（结构性恰好一次）并复用。 ★ 获取纪律（设计 &#167;3.3，正确性核心）：只发布不验证保护不了任何东西——扫描可能在发布前已过。 TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞态以新值重试，不构成错误。 ★ 活性契约（设计 &#167;3.4）：水位顺带扫描是策略非保证——依赖回收前进的调用方（槽池等）必须在 资源耗尽路径显式 （本原语在退休记录池耗尽时自动强制）。 ★ reclaim 契约：恰好执行一次（结构性保证，禁止调用方假设幂等）；必须纯内存、无异常、 不阻塞。reclaim 内允许 Retire（扫描互斥可重入 + 分层快照缓冲，不自锁）。 ★ 生命周期：.NET 无线程退出回调——长线程负责 Register/Dispose 配对；瞬态线程漏注销的后果是 退休滞留（悬挂 hazard，非内存损坏），由水位看门狗检测。">
-      <link rel="shortcut icon" href="../favicon.ico">
-      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
-      <link rel="stylesheet" href="../styles/docfx.css">
-      <link rel="stylesheet" href="../styles/main.css">
-      <meta property="docfx:navrel" content="../toc.html">
-      <meta property="docfx:tocrel" content="toc.html">
-    
-    <meta property="docfx:rel" content="../">
-    
+      
+      <meta name="description" content="HazardPointers 原语——无锁结构的退休安全回收层（与  同层级的通用机制）。 语义：读者在解引用前 （发布 + 验证来源未变）取得对具体句柄的保护； 删除者物理摘除后 ； 快照全部 hazard 槽，无指向者的退休项执行 reclaim（结构性恰好一次）并复用。 ★ 获取纪律（设计 &#167;3.3，正确性核心）：只发布不验证保护不了任何东西——扫描可能在发布前已过。 TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞态以新值重试，不构成错误。 ★ 活性契约（设计 &#167;3.4）：水位顺带扫描是策略非保证——依赖回收前进的调用方（槽池等）必须在 资源耗尽路径显式 （本原语在退休记录池耗尽时自动强制）。 ★ reclaim 契约：恰好执行一次（结构性保证，禁止调用方假设幂等）；必须纯内存、无异常、 不阻塞。reclaim 内允许 Retire（扫描互斥可重入 + 分层快照缓冲，不自锁）。 ★ 生命周期：.NET 无线程退出回调——长线程负责 Register/Dispose 配对；瞬态线程漏注销的后果是 退休滞留（悬挂 hazard，非内存损坏），由水位看门狗检测。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'dark'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
   </head>
-  <body data-spy="scroll" data-target="#affix" data-offset="120">
-    <div id="wrapper">
-      <header>
 
-        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
-          <div class="container">
-            <div class="navbar-header">
-
-              <a class="navbar-brand" href="../index.html">
-                <img id="logo" class="svg" src="../logo.svg" alt="">
-              </a>
-            </div>
-            <div class="navbar-right" id="search">
-              <form class="navbar-form" role="search">
-                <div class="form-group">
-                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
-                </div>
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="">
+            
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
               </form>
             </div>
           </div>
-        </nav>
+        </div>
+      </nav>
+    </header>
 
-        <div class="subnav navbar navbar-default">
-          <div class="container hide-when-search" id="breadcrumb">
-            <ul class="breadcrumb">
-              <li></li>
-            </ul>
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
           </div>
         </div>
-      </header>
-      <div class="container body-content">
-
-        <div id="search-results">
-          <div class="search-list">Search Results for <span></span></div>
-          <div class="sr-items">
-            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
-          </div>
-          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
-        </div>
       </div>
-      <div role="main" class="container body-content hide-when-search">
 
-      <div class="sidenav hide-when-search">
-        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
-        <div class="sidetoggle collapse" id="sidetoggle">
-          <div id="sidetoc"></div>
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
         </div>
-      </div>
-        <div class="article row grid-right">
-          <div class="col-md-10">
-            <article class="content wrap" id="_content" data-uid="TC.Tier.Core.Hazards.HazardDomain">
+
+        <article data-uid="TC.Tier.Core.Hazards.HazardDomain">
 
 
 
-  <h1 id="TC_Tier_Core_Hazards_HazardDomain" data-uid="TC.Tier.Core.Hazards.HazardDomain" class="text-break">Class HazardDomain</h1>
-  <div class="markdown level0 summary"><p>HazardPointers 原语——无锁结构的<b>退休安全</b>回收层（与 <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a> 同层级的通用机制）。</p>
+  <h1 id="TC_Tier_Core_Hazards_HazardDomain" data-uid="TC.Tier.Core.Hazards.HazardDomain" class="text-break">
+Class HazardDomain  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Hazards.html">Hazards</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>HazardPointers 原语——无锁结构的<b>退休安全</b>回收层（与 <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a> 同层级的通用机制）。</p>
 <p>语义：读者在解引用前 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_TryProtect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64__System_Int64__">TryProtect(HazardRegistration, int, ref long, out long)</a>（发布 + 验证来源未变）取得对<b>具体句柄</b>的保护；
 删除者物理摘除后 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_Retire_System_Int64_System_Action_System_Int64__">Retire(long, Action&lt;long&gt;)</a>；<a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_Scan">Scan()</a> 快照全部 hazard 槽，无指向者的退休项执行
 reclaim（结构性恰好一次）并复用。</p>
@@ -88,18 +110,34 @@ TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞�
 <p>★ 生命周期：.NET 无线程退出回调——长线程负责 Register/Dispose 配对；瞬态线程漏注销的后果是
 <b>退休滞留</b>（悬挂 hazard，非内存损坏），由水位看门狗检测。</p>
 </div>
-  <div class="markdown level0 conceptual"></div>
-  <div class="inheritance">
-    <h5>Inheritance</h5>
-    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-    <div class="level1"><span class="xref">HazardDomain</span></div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class HazardDomain : IDisposable</code></pre>
   </div>
-  <div class="implements">
-    <h5>Implements</h5>
-    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
-  </div>
-  <div class="inheritedMembers">
-    <h5>Inherited Members</h5>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">HazardDomain</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
     </div>
@@ -118,304 +156,343 @@ TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞�
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
     </div>
-  </div>
-  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Hazards.html">Hazards</a></h6>
-  <h6><strong>Assembly</strong>: TC.Tier.Core.dll</h6>
-  <h5 id="TC_Tier_Core_Hazards_HazardDomain_syntax">Syntax</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public sealed class HazardDomain : IDisposable</code></pre>
-  </div>
-  <h3 id="constructors">Constructors
-</h3>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain__ctor_" data-uid="TC.Tier.Core.Hazards.HazardDomain.#ctor*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain__ctor_System_Int32_System_Int32_System_Int32_System_Int32_" data-uid="TC.Tier.Core.Hazards.HazardDomain.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">HazardDomain(int, int, int, int)</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain__ctor_System_Int32_System_Int32_System_Int32_System_Int32_" data-uid="TC.Tier.Core.Hazards.HazardDomain.#ctor(System.Int32,System.Int32,System.Int32,System.Int32)">
+  HazardDomain(int, int, int, int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>创建 HP 域。一个域可服务一个或多个无锁结构（推荐共享——扫描按域摊销）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public HazardDomain(int maxThreads = 0, int hazardSlotsPerThread = 2, int retireThreshold = 64, int retireCapacity = 0)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">maxThreads</span></td>
-        <td><p>线程表容量；0 = max(128, 2×CPU)（LightEpoch KTableSize 同式）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">hazardSlotsPerThread</span></td>
-        <td><p>每线程 hazard 槽数（1..7；链表遍历 2 槽轮换）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">retireThreshold</span></td>
-        <td><p>水位阈值（默认 64）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">retireCapacity</span></td>
-        <td><p>退休记录池容量；0 = max(4096, 16×阈值)。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="properties">Properties
-</h3>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>maxThreads</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>线程表容量；0 = max(128, 2×CPU)（LightEpoch KTableSize 同式）。</p>
+</dd>
+    <dt><code>hazardSlotsPerThread</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>每线程 hazard 槽数（1..7；链表遍历 2 槽轮换）。</p>
+</dd>
+    <dt><code>retireThreshold</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>水位阈值（默认 64）。</p>
+</dd>
+    <dt><code>retireCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>退休记录池容量；0 = max(4096, 16×阈值)。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_MaxThreads_" data-uid="TC.Tier.Core.Hazards.HazardDomain.MaxThreads*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_MaxThreads" data-uid="TC.Tier.Core.Hazards.HazardDomain.MaxThreads">MaxThreads</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_MaxThreads" data-uid="TC.Tier.Core.Hazards.HazardDomain.MaxThreads">
+  MaxThreads
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前线程在本域注册上下文（幂等——同线程同域返回同一实例）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int MaxThreads { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_RetireThreshold_" data-uid="TC.Tier.Core.Hazards.HazardDomain.RetireThreshold*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_RetireThreshold" data-uid="TC.Tier.Core.Hazards.HazardDomain.RetireThreshold">RetireThreshold</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_RetireThreshold" data-uid="TC.Tier.Core.Hazards.HazardDomain.RetireThreshold">
+  RetireThreshold
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>水位阈值（退休数达到即顺带触发 Scan）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int RetireThreshold { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_RetiredCount_" data-uid="TC.Tier.Core.Hazards.HazardDomain.RetiredCount*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_RetiredCount" data-uid="TC.Tier.Core.Hazards.HazardDomain.RetiredCount">RetiredCount</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_RetiredCount" data-uid="TC.Tier.Core.Hazards.HazardDomain.RetiredCount">
+  RetiredCount
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前未回收退休数（链上 + 在途私批 = 累计退休 − 累计回收）——水位看门狗用。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public long RetiredCount { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_SlotsPerThread_" data-uid="TC.Tier.Core.Hazards.HazardDomain.SlotsPerThread*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_SlotsPerThread" data-uid="TC.Tier.Core.Hazards.HazardDomain.SlotsPerThread">SlotsPerThread</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_SlotsPerThread" data-uid="TC.Tier.Core.Hazards.HazardDomain.SlotsPerThread">
+  SlotsPerThread
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>每线程 hazard 槽数。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public int SlotsPerThread { get; }</code></pre>
   </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="methods">Methods
-</h3>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_Dispose_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Dispose*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_Dispose" data-uid="TC.Tier.Core.Hazards.HazardDomain.Dispose">Dispose()</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_Dispose" data-uid="TC.Tier.Core.Hazards.HazardDomain.Dispose">
+  Dispose()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>清理域。★ DEBUG 绊线：<b>悬挂 hazard</b>（漏注销的实质危害——退休永久滞留）或
 退休链未清空（泄漏）一律抛异常。瞬态线程池线程的<b>净占用</b>（hazard 全空）是设计 §3.2
 允许的隐式滞留——只损失表容量，不产生滞留，不绊。调用方须保证 Dispose 时无并发操作。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Hazards_HazardDomain_Publish_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Publish*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_Publish_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Publish(TC.Tier.Core.Hazards.HazardRegistration,System.Int32,System.Int64)">Publish(HazardRegistration, int, long)</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_Publish_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Publish(TC.Tier.Core.Hazards.HazardRegistration,System.Int32,System.Int64)">
+  Publish(HazardRegistration, int, long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>裸发布：仅限指针新鲜性已有结构性证明的场景（如对同一已验证引用换槽重发布）。
 常规获取一律走 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_TryProtect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64__System_Int64__">TryProtect(HazardRegistration, int, ref long, out long)</a>。slotRef = 0 即清空（等价 <a class="xref" href="TC.Tier.Core.Hazards.HazardDomain.html#TC_Tier_Core_Hazards_HazardDomain_Unprotect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_">Unprotect(HazardRegistration, int)</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Publish(HazardRegistration reg, int hazardSlot, long slotRef)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></td>
-        <td><span class="parametername">reg</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">hazardSlot</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">slotRef</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reg</code> <a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></dt>
+    <dd></dd>
+    <dt><code>hazardSlot</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>slotRef</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_Register_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Register*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_Register" data-uid="TC.Tier.Core.Hazards.HazardDomain.Register">Register()</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_Register" data-uid="TC.Tier.Core.Hazards.HazardDomain.Register">
+  Register()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>当前线程在本域注册上下文。幂等：同线程同域重复调用返回同一实例。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public HazardRegistration Register()</code></pre>
   </div>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="exceptions">Exceptions</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Condition</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a></td>
-        <td><p>域已释放。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a></dt>
+    <dd><p>域已释放。</p>
+</dd>
+  </dl>
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_Retire_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Retire*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_Retire_System_Int64_System_Action_System_Int64__" data-uid="TC.Tier.Core.Hazards.HazardDomain.Retire(System.Int64,System.Action{System.Int64})">Retire(long, Action&lt;long&gt;)</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_Retire_System_Int64_System_Action_System_Int64__" data-uid="TC.Tier.Core.Hazards.HazardDomain.Retire(System.Int64,System.Action{System.Int64})">
+  Retire(long, Action&lt;long&gt;)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>登记退休（1 CAS push 即返）。达到水位顺带触发 Scan（策略非保证，见活性契约）。</p>
 <pre><code>        &lt;p&gt;★ reclaim 恰好执行一次由 Scan 结构性保证；delegate 由调用方缓存（零分配纪律）；
         必须纯内存、无异常、不阻塞。记录池耗尽时自动强制 Scan 推进（活性兜底）。&lt;/p&gt;
 </code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Retire(long slotRef, Action&lt;long&gt; reclaim)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">slotRef</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td><span class="parametername">reclaim</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>slotRef</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>reclaim</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_Scan_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Scan*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_Scan" data-uid="TC.Tier.Core.Hazards.HazardDomain.Scan">Scan()</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_Scan" data-uid="TC.Tier.Core.Hazards.HazardDomain.Scan">
+  Scan()
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>扫描（整链交换私批——设计 §3.4）：① Exchange 原子摘走整条退休链（并发 push 只挂新链）
 → ② 快照全部 hazard 槽（排序）→ ③ 私批比对：无指向者执行 reclaim 并复用记录；幸存者 CAS 推回。</p>
 <p>★ 恰好一次是结构保证：批次脱离共享链 + 交换原子 + 并发 Scan 经 <code>_scanGate</code> 串行
@@ -424,14 +501,30 @@ TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞�
 "验证成功 ⟹ 后续扫描必见发布"。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Scan()</code></pre>
   </div>
 
 
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_Hazards_HazardDomain_TryProtect_" data-uid="TC.Tier.Core.Hazards.HazardDomain.TryProtect*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_TryProtect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64__System_Int64__" data-uid="TC.Tier.Core.Hazards.HazardDomain.TryProtect(TC.Tier.Core.Hazards.HazardRegistration,System.Int32,System.Int64@,System.Int64@)">TryProtect(HazardRegistration, int, ref long, out long)</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_TryProtect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_System_Int64__System_Int64__" data-uid="TC.Tier.Core.Hazards.HazardDomain.TryProtect(TC.Tier.Core.Hazards.HazardRegistration,System.Int32,System.Int64@,System.Int64@)">
+  TryProtect(HazardRegistration, int, ref long, out long)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>获取保护（发布 + 验证——正确性内建，设计 §3.3）。</p>
 <p>语义：读 <code class="paramref">source</code> → 发布 → <b>重读 source 验证未变</b>；验证失败 = 正常竞态，
 以最新值重试；source 为空返回 false。返回 true 时 <code class="paramref">slotRef</code> 已验证新鲜，
@@ -441,150 +534,99 @@ TryProtect 内建「发布 → 重读来源验证」，验证失败 = 正常竞�
 ⟹ 摘除尚未发生 ⟹ 其后的扫描必见本次发布。与消费方"先物理摘除后 Retire"的程序序配对成立。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool TryProtect(HazardRegistration reg, int hazardSlot, ref long source, out long slotRef)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></td>
-        <td><span class="parametername">reg</span></td>
-        <td><p>本域注册。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">hazardSlot</span></td>
-        <td><p>hazard 槽位（线程内轮换，如链表遍历 curr/next 两槽）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">source</span></td>
-        <td><p>共享来源位置（如结构边）。</p>
-</td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td><span class="parametername">slotRef</span></td>
-        <td><p>输出的被保护句柄（0 = 来源为空）。</p>
-</td>
-      </tr>
-    </tbody>
-  </table>
-  <h5 class="returns">Returns</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reg</code> <a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></dt>
+    <dd><p>本域注册。</p>
+</dd>
+    <dt><code>hazardSlot</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>hazard 槽位（线程内轮换，如链表遍历 curr/next 两槽）。</p>
+</dd>
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>共享来源位置（如结构边）。</p>
+</dd>
+    <dt><code>slotRef</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出的被保护句柄（0 = 来源为空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
 
 
   <a id="TC_Tier_Core_Hazards_HazardDomain_Unprotect_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Unprotect*"></a>
-  <h4 id="TC_Tier_Core_Hazards_HazardDomain_Unprotect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Unprotect(TC.Tier.Core.Hazards.HazardRegistration,System.Int32)">Unprotect(HazardRegistration, int)</h4>
+
+  <h3 id="TC_Tier_Core_Hazards_HazardDomain_Unprotect_TC_Tier_Core_Hazards_HazardRegistration_System_Int32_" data-uid="TC.Tier.Core.Hazards.HazardDomain.Unprotect(TC.Tier.Core.Hazards.HazardRegistration,System.Int32)">
+  Unprotect(HazardRegistration, int)
+  
+  </h3>
+
   <div class="markdown level1 summary"><p>解除保护（等价 Publish(reg, hazardSlot, 0)）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
+
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Unprotect(HazardRegistration reg, int hazardSlot)</code></pre>
   </div>
-  <h5 class="parameters">Parameters</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Name</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></td>
-        <td><span class="parametername">reg</span></td>
-        <td></td>
-      </tr>
-      <tr>
-        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td><span class="parametername">hazardSlot</span></td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
-  <h3 id="implements">Implements</h3>
-  <div>
-      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
-  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reg</code> <a class="xref" href="TC.Tier.Core.Hazards.HazardRegistration.html">HazardRegistration</a></dt>
+    <dd></dd>
+    <dt><code>hazardSlot</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
 
 </article>
-          </div>
 
-          <div class="hidden-sm col-md-2" role="complementary">
-            <div class="sideaffix">
-              <div class="contribution">
-                <ul class="nav">
-                </ul>
-              </div>
-              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
-                <h5>In this article</h5>
-                <div></div>
-              </nav>
-            </div>
-          </div>
+        <div class="contribution d-print-none">
         </div>
+
+
       </div>
 
-      <footer>
-        <div class="grad-bottom"></div>
-        <div class="footer">
-          <div class="container">
-            <span class="pull-right">
-              <a href="#top">Back to top</a>
-            </span>
-      MIT License — TC.Tier Contributors
-      
-          </div>
-        </div>
-      </footer>
-    </div>
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
 
-    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
-    <script type="text/javascript" src="../styles/docfx.js"></script>
-    <script type="text/javascript" src="../styles/main.js"></script>
-    <script>
-      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
-      (function expandAllToc() {
-        var tries = 0;
-        (function poll() {
-          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
-          if (groups.length > 0 || tries > 50) {
-            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
-              if (li.querySelector(':scope > ul')) li.classList.add('in');
-            });
-          } else {
-            tries++;
-            setTimeout(poll, 100);
-          }
-        })();
-      })();
-    </script>
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          MIT License — TC.Tier Contributors
+        </div>
+      </div>
+    </footer>
   </body>
 </html>
