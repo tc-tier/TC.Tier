@@ -9,7 +9,7 @@
       <meta name="viewport" content="width=device-width">
       <meta name="title" content="Class MetadataMetaTransport | TC.Tier — .NET 可组合存储运行时 ">
     
-    <meta name="description" content="外部 meta 介质适配器——把 meta 块托管到 （版本链稳定存储）。 ★ 3a（外部隔离）语义的推荐实现（用户裁定）：需要外部独有 meta 存储时，不再自写   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：  - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；  - 持久化点即 （Write + Persist + flush）——对齐   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；  - N=2 轮转自动回收（每次写后 VersionedMetadata.ReclaimOldVersions），空间有界；  - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（   经  注册进 TransactionLog）。 配置约束： 必须 ≥ meta 块上界 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛  （fail-fast，不静默截断）。引擎名须与主结构不同（如 &quot;xxx.meta&quot;）。">
+    <meta name="description" content="外部 meta 介质适配器——把 meta 块托管到 （版本链稳定存储）。 ★ 3a（外部隔离）语义的推荐实现（用户裁定）：需要外部独有 meta 存储时，不再自写   单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、   崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：  - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；  - 持久化点即 （Write + Persist + flush）——对齐   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；  - N=2 轮转自动回收（每次写后 ），空间有界；  - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（   经  注册进 TransactionLog）。 配置约束： 必须 ≥ meta 块上界 （12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛  （fail-fast，不静默截断）。引擎名须与主结构不同（如 &quot;xxx.meta&quot;）。">
       <link rel="shortcut icon" href="../favicon.ico">
       <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
       <link rel="stylesheet" href="../styles/docfx.css">
@@ -82,7 +82,7 @@
 <p> - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；</p>
 <p> - 持久化点即 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_System_ReadOnlySpan_System_Byte__">WriteBlock(ReadOnlySpan&lt;byte&gt;)</a>（Write + Persist + flush）——对齐
   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；</p>
-<p> - N=2 轮转自动回收（每次写后 VersionedMetadata.ReclaimOldVersions），空间有界；</p>
+<p> - N=2 轮转自动回收（每次写后 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.MetadataBase.html#TC_Tier_Runtime_Structures_Metadata_MetadataBase_ReclaimOldVersions">ReclaimOldVersions()</a>），空间有界；</p>
 <p> - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（
   经 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_Storage">Storage</a> 注册进 TransactionLog）。</p>
 <p>配置约束：<a class="xref" href="TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings.html#TC_Tier_Runtime_Structures_Metadata_VersionedMetadataSettings_PayloadSize">PayloadSize</a> 必须 ≥ meta 块上界
@@ -210,7 +210,8 @@
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Dispose_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Dispose*"></a>
   <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_Dispose" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.Dispose">Dispose()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>释放底层 VersionedMetadata（版本链存储托管资产）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -220,7 +221,7 @@
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlock*"></a>
   <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlock">ReadLastBlock()</h4>
-  <div class="markdown level1 summary"><p>读回最后一条 meta block（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1.isempty">IsEmpty</a> = 无）。</p>
+  <div class="markdown level1 summary"><p>读最后一个 meta 块——等待就绪后读当前版本，按自述布局裁剪为精确块；无数据（空链）返回空 Span。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -238,7 +239,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
-        <td></td>
+        <td><p>精确块视图（有效至本传输下一次调用）；空 Span = 从未写入。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -246,7 +248,7 @@
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlockAsync_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlockAsync*"></a>
   <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlockAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.ReadLastBlockAsync(System.Threading.CancellationToken)">ReadLastBlockAsync(CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>读回最后一条 meta block（异步对等版；空 Memory = 无）。</p>
+  <div class="markdown level1 summary"><p>异步读最后一个 meta 块（对等同步版 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_ReadLastBlock">ReadLastBlock()</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -266,7 +268,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -281,7 +284,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
-        <td></td>
+        <td><p>精确块视图（有效至本传输下一次调用）；空 Memory = 从未写入。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -317,7 +321,7 @@
 
   <a id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlockAsync_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlockAsync*"></a>
   <h4 id="TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlockAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlockAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">WriteBlockAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>写完整 meta block（异步对等版）。</p>
+  <div class="markdown level1 summary"><p>异步写完整块（实质同步——flush 原生同步，立即返回完成；对等同步版 <a class="xref" href="TC.Tier.Runtime.Meta.MetadataMetaTransport.html#TC_Tier_Runtime_Meta_MetadataMetaTransport_WriteBlock_System_ReadOnlySpan_System_Byte__">WriteBlock(ReadOnlySpan&lt;byte&gt;)</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -337,12 +341,14 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">block</span></td>
-        <td></td>
+        <td><p>完整 meta 块（长度不得超过 PayloadSize，超限抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌（当前实现不使用——同步落地）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -357,7 +363,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
+        <td><p>表示写完成的 ValueTask。</p>
+</td>
       </tr>
     </tbody>
   </table>

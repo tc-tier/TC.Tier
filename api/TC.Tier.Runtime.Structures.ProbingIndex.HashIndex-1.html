@@ -177,9 +177,6 @@
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Recovery</a>
-    </div>
-    <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Id</a>
     </div>
     <div>
@@ -246,7 +243,7 @@
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1__ctor_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.#ctor*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_ProbingIndex_HashIndexSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Contracts_Structures_IKeyResolver__0__" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Contracts.Structures.IKeyResolver{`0})">HashIndex(IFileSystem, HashIndexSettings, LightEpoch?, IKeyResolver&lt;TKey&gt;?)</h4>
-  <div class="markdown level1 summary"><p>ctor 收 protected internal——开放泛型不落消费面闸门（同 BlittableRing）：
+  <div class="markdown level1 summary"><p>ctor 收 <code>protected internal</code>——开放泛型不落消费面闸门（同 BlittableRing）：
 外部直接 new 即 CS0122，用 [RingKey] 生成封闭类型（HashOfT 经 protected 肢）；内核测试经 IVT。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
@@ -292,7 +289,7 @@
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_CurrentEntryCount_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.CurrentEntryCount*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_CurrentEntryCount" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.CurrentEntryCount">CurrentEntryCount</h4>
-  <div class="markdown level1 summary"><p>当前条目数（后台策略触发用）。</p>
+  <div class="markdown level1 summary"><p>当前条目数（Volatile 读写者计数——后台 dump 策略触发用）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -348,7 +345,7 @@
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_IndexSize_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.IndexSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_IndexSize" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.IndexSize">IndexSize</h4>
-  <div class="markdown level1 summary"><p>索引内存占用（字节）。</p>
+  <div class="markdown level1 summary"><p>索引内存占用估算（字节）——当前代表桶区 + 溢出池（128B/桶 × 桶数）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -378,7 +375,7 @@
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_ComputeBodyLength_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.ComputeBodyLength*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_ComputeBodyLength" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.ComputeBodyLength">ComputeBodyLength()</h4>
-  <div class="markdown level1 summary"><p>体长（头 BodyLength 字段——写头时先知：几何 + 结构内容）。</p>
+  <div class="markdown level1 summary"><p>体长 = 几何 32B + 桶区 size×128B + 溢出池 ofbCap×128B（头 BodyLength 字段——写头时先知，帧长可推导）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -396,7 +393,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
+        <td><p>体字节数。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -406,7 +404,8 @@
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Delete_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.Delete*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Delete__0_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.Delete(`0)">Delete(TKey)</h4>
-  <div class="markdown level1 summary"><p>删除条目。</p>
+  <div class="markdown level1 summary"><p>删除条目：tag 命中后经 KeyResolver 读回真 key 判等确认（避免误删同 tag 异 key 条目），
+CAS 清槽 + 条目计数递减。epoch 读保护内完成。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -426,7 +425,8 @@
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>条目键。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -441,7 +441,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>true = 真删到；false = 不存在（含 tag 冲突未命中）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -451,7 +452,7 @@
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Find_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.Find*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Find__0_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.Find(`0)">Find(TKey)</h4>
-  <div class="markdown level1 summary"><p>点查 key → value 的逻辑地址（Empty = 不存在）。</p>
+  <div class="markdown level1 summary"><p>点查 key → value 逻辑地址（epoch 读保护内完成——Resume → <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex-1.html#TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_FindNoEpoch__0_">FindNoEpoch(TKey)</a> → Suspend）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -471,7 +472,8 @@
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>查找键。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -486,7 +488,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
+        <td><p>命中 = value 逻辑地址；未命中 = <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html#TC_Tier_Contracts_Storage_LogicalAddress_Empty">Empty</a>。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -563,7 +566,7 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_InitializeIndex_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.InitializeIndex*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_InitializeIndex" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.InitializeIndex">InitializeIndex()</h4>
-  <div class="markdown level1 summary"><p>建空索引结构（建空表/head 节点）——恢复核心第一步（主存储不可用时）。</p>
+  <div class="markdown level1 summary"><p>恢复钩子：索引初始化——记录引擎 MinAddress 为探测起始地址（探测索引只在内存，只锚定地址空间起点）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -576,7 +579,10 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Insert_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.Insert*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Insert__0_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.Insert(`0,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">Insert(TKey, LogicalAddress, LogicalAddress)</h4>
-  <div class="markdown level1 summary"><p>插入条目（key → valueAddress），返回插入后地址。</p>
+  <div class="markdown level1 summary"><p>插入条目（key → valueAddress；tag 命中后经 KeyResolver 读回真 key 判等，同 key 覆写 value 不增计数）。
+epoch 读保护内完成。</p>
+<p>★ 增长在<b>本次插入之前</b>触发（装载超阈值）——此刻全部既有条目已返回调用方且注册完成，
+  rehash 逐条 TryGetKey 必可解析；若在插入后触发，刚落位条目可能尚未注册而被 rehash 静默丢弃。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -596,17 +602,20 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>条目键。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">valueAddress</span></td>
-        <td></td>
+        <td><p>条目 value 逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">beginAddress</span></td>
-        <td></td>
+        <td><p>探测下限地址——槽内旧条目地址小于它视为陈旧，可覆写落位（重放路径约定参数）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -621,7 +630,8 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
+        <td><p>插入后地址（新条目=落位地址；同 key 覆写=新 value 地址）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -631,7 +641,7 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_OnMaterialized_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.OnMaterialized*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_OnMaterialized_System_Int64_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.OnMaterialized(System.Int64)">OnMaterialized(long)</h4>
-  <div class="markdown level1 summary"><p>物化后回调（子类设置条目计数——fuzzy 帧实收为准）。</p>
+  <div class="markdown level1 summary"><p>物化后回调——重数实收结果写回写者维护的条目计数（fuzzy 帧实收为准）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -651,7 +661,8 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">entryCount</span></td>
-        <td></td>
+        <td><p>物化实收条目数。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -661,8 +672,8 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_TryMaterializeFrame_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.TryMaterializeFrame*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_TryMaterializeFrame_TC_Tier_Contracts_Storage_LogicalAddress_System_Int64__" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.TryMaterializeFrame(TC.Tier.Contracts.Storage.LogicalAddress,System.Int64@)">TryMaterializeFrame(LogicalAddress, out long)</h4>
-  <div class="markdown level1 summary"><p>物化最新完整帧（读几何 → 重建结构 → 重数实收）。返回 true 且 <code class="paramref">entryCount</code>
-给出物化后条目数（fuzzy 帧实收为准）。</p>
+  <div class="markdown level1 summary"><p>物化最新完整帧：读头（codec 全校验）→ 读几何（尺寸 2 的幂/池容量校验 + 体长核对）→
+整读体重建表+溢出池 → 重数实收（fuzzy 帧内可能混入 dump 期间新插条目，计数以实收为准）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -682,12 +693,14 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">head</span></td>
-        <td></td>
+        <td><p>帧头地址（基类帧走链定位的最新完整帧）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">entryCount</span></td>
-        <td></td>
+        <td><p>物化后条目数（实收计数——仅成功返回时有意义）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -702,7 +715,8 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>true = 物化成功；false = 任一校验失败（恢复核心走全量重放 fail-safe）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -712,7 +726,8 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_WriteBody_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.WriteBody*"></a>
   <h4 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_WriteBody" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.WriteBody">WriteBody()</h4>
-  <div class="markdown level1 summary"><p>写体内容（几何 + 结构内容全在体内——fuzzy 逐槽拷贝归子类，分片经 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_WriteBodyChunk_System_ReadOnlySpan_System_Byte__">WriteBodyChunk(ReadOnlySpan&lt;byte&gt;)</a>）。</p>
+  <div class="markdown level1 summary"><p>写体：几何（表尺寸/溢出池容量/条目数）→ 桶区 → 溢出池（fuzzy 逐槽 128bit 原子读拷贝，
+Tentative/Empty 槽写零、Occupied/链指针原样收），分片经 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_WriteBodyChunk_System_ReadOnlySpan_System_Byte__">WriteBodyChunk(ReadOnlySpan&lt;byte&gt;)</a>。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>

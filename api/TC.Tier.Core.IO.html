@@ -265,6 +265,12 @@ Enums
       <h4><a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html">MaintenanceScope</a></h4>
       <section><p>维护门闩的作用范围（<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_EnterMaintenance_System_String_TC_Tier_Core_IO_MaintenanceScope_System_Threading_CancellationToken_">EnterMaintenance(string, MaintenanceScope, CancellationToken)</a> 的 scope 参数）。</p>
 </section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.PreallocationMode.html">PreallocationMode</a></h4>
+      <section><p>预分配方式轴（IS-04 统一词汇——四介质同一套语义；缺省 = 现行行为）。</p>
+<p><a class="xref" href="TC.Tier.Core.IO.PreallocationMode.html#TC_Tier_Core_IO_PreallocationMode_Metadata">Metadata</a>：逻辑占位（稀疏——未写区域不占物理块；创建快、写时按需分配）。</p>
+<p><a class="xref" href="TC.Tier.Core.IO.PreallocationMode.html#TC_Tier_Core_IO_PreallocationMode_Full">Full</a>：物理占位（非稀疏——创建时物化全部空间，一次性成本显式化由部署方承担，
+  换运行时零分配抖动；生产数据库形态"raw + 预分配 + 非稀疏 + DIO"的预分配维度）。</p>
+</section>
       <h4><a class="xref" href="TC.Tier.Core.IO.StorageNature.html">StorageNature</a></h4>
       <section><p>介质本性（medium-protocol-and-parity-design §1.5/§2.1）——spec 协议头的值域，四类封闭（平权完备族）。</p>
 <p>★ 三层一套词汇：文档标准术语 = spec 协议头 = <code>VolumeInfo.Nature</code> 观测值。</p>
@@ -274,6 +280,12 @@ Enums
 </section>
       <h4><a class="xref" href="TC.Tier.Core.IO.TierFsVerb.html">TierFsVerb</a></h4>
       <section><p>工厂动词（medium-protocol-and-parity-design §2.3）——New = 创建空镜像并打开（已存在即抛）；Open = 打开既有（不存在即抛）；OpenOrCreate = 懒初始化糖（bind-any——两态显式表达）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Core.IO.WriteConcurrencyMode.html">WriteConcurrencyMode</a></h4>
+      <section><p>同文件写并发档（V2 §2.1——实测判定门两极显式旋钮；virtual 介质挂载级）。</p>
+<p>判定门实测（2026-08-26，`--tier-volume-write-probe same`，64KB 覆写，本机快速载体）：
+Serial 4 写者 ≈ 1×（全串行零争用）、Parallel ≈ 0.57×（争用损失——规划/提交串行 + 载体句柄
+共享的代价大于数据段并行收益）；慢载体（真磁盘 IO 主导数据段）Parallel 收益大——按消费形态选档。</p>
 </section>
 
 

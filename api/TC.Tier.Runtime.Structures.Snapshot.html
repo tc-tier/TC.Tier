@@ -79,6 +79,21 @@
     <h3 id="classes">
 Classes
 </h3>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.html">IncrementalSnapshot</a></h4>
+      <section><p>IncrementalSnapshot——增量快照结构（镜像快照设计稿 §3.3——方案 A：段增量）。</p>
+<p>★ 语义：段（Segment）= 一次快照增量 = 一帧 [Header 14B][N₀ 8B 前缀 + 条目流][Footer 28B]；
+  新段 append 不重写旧段（raft 定期压缩——快照越频繁写省越多，基准实测 8 次快照 4.5× 字节差）；
+  读 = 段表驱动逐段顺序拼接 = 最新快照；段累积达阈值 → 合并为新基线段（低频全量重写，raft 只需最新快照）。</p>
+<p>★ 段表（各段起点 + N₀——恢复 O(1) 定位）：内存列表 + opaque meta 原子落盘（搭水位线同一块
+  同一 CRC——AppendSegment 完成后 SetOpaqueMeta + WriteMeta）。</p>
+<p>★ 容错：段级帧 CRC64——崩溃 = 旧段完好、半写段恢复期忽略（尾部检查 = 段表物理尾 vs 引擎
+  CommittedTail，不依赖 meta 水位）；段内 N₀ 前缀自描述（独立读一段可知覆盖点）。</p>
+<p>★ 生命周期：继承 <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a>（引擎/生命周期/事务参与基类能力）——恢复核心 =
+  <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.html">IncrementalSnapshot.IncrementalRecovery</a>（RecoveryBase 模板派生：join 引擎 + meta 段表 + 尾部检查）。</p>
+</section>
+      <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings.html">IncrementalSnapshotSettings</a></h4>
+      <section><p>IncrementalSnapshot 专属配置——段累积合并阈值（opaque 段表容量走基类 MetaOpaqueBytes，调用方显式配置）。</p>
+</section>
       <h4><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a></h4>
       <section><p>核心机制 partial：append/Overwrite/读 + 截断 + 2PC + 会话工厂。</p>
 </section>

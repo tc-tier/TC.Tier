@@ -9,7 +9,7 @@
       <meta name="viewport" content="width=device-width">
       <meta name="title" content="Class RingBase&lt;TKey&gt;.MetaLayout | TC.Tier — .NET 可组合存储运行时 ">
     
-    
+    <meta name="description" content="Ring meta 块布局实现（ 规范实现）—— Header 12B 规范字段 + Payload（结构化水位 + opaque 插槽）大小自述，codec 委托 RingMetaHeaderCodec/RingMetaPayloadCodec；读旧块短 payload 时零扩展降级。">
       <link rel="shortcut icon" href="../favicon.ico">
       <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
       <link rel="stylesheet" href="../styles/docfx.css">
@@ -75,7 +75,10 @@
 
 
   <h1 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout" class="text-break">Class RingBase&lt;TKey&gt;.MetaLayout</h1>
-  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 summary"><p>Ring meta 块布局实现（<a class="xref" href="TC.Tier.Contracts.Meta.IMetaLayout-2.html">IMetaLayout&lt;THeader, TPayload&gt;</a> 规范实现）——
+Header 12B 规范字段 + Payload（结构化水位 + opaque 插槽）大小自述，codec 委托
+RingMetaHeaderCodec/RingMetaPayloadCodec；读旧块短 payload 时零扩展降级。</p>
+</div>
   <div class="markdown level0 conceptual"></div>
   <div class="inheritance">
     <h5>Inheritance</h5>
@@ -119,7 +122,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout__ctor_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.#ctor*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout__ctor_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.#ctor(System.Int32)">MetaLayout(int)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>构造布局——按 settings.MetaOpaqueBytes 定 PayloadOpaqueSize（随水位原子携带的外部 opaque 容量）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -138,7 +142,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
         <td><span class="parametername">payloadOpaqueSize</span></td>
-        <td></td>
+        <td><p>opaque 插槽字节数（settings.MetaOpaqueBytes）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -200,7 +205,7 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_HeaderSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.HeaderSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_HeaderSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.HeaderSize">HeaderSize</h4>
-  <div class="markdown level1 summary"><p>规范 header 字节大小（12B 规范字段布局）。</p>
+  <div class="markdown level1 summary"><p>规范 header 字节大小（RingMetaHeaderCodec 定长 12B）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -226,7 +231,7 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_Magic_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.Magic*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_Magic" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.Magic">Magic</h4>
-  <div class="markdown level1 summary"><p>Magic 常量（由使用方定义，用于块身份校验）。</p>
+  <div class="markdown level1 summary"><p>Magic 常量（块身份校验）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -252,7 +257,7 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_PayloadOpaqueSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.PayloadOpaqueSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_PayloadOpaqueSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.PayloadOpaqueSize">PayloadOpaqueSize</h4>
-  <div class="markdown level1 summary"><p>结构化 payload Opaque 字节大小</p>
+  <div class="markdown level1 summary"><p>opaque 插槽字节大小（构造注入，≤ 策略 PayloadCapacity 的扩展区）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -278,7 +283,7 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_PayloadSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.PayloadSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_PayloadSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.PayloadSize">PayloadSize</h4>
-  <div class="markdown level1 summary"><p>结构化 payload 字节大小（Log=64, Ring=112, Blob=56）。</p>
+  <div class="markdown level1 summary"><p>结构化 payload 字节大小（RingMetaPayloadCodec 定长 + opaque 插槽）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -306,7 +311,7 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_CreateDefaultHeader_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.CreateDefaultHeader*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_CreateDefaultHeader" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.CreateDefaultHeader">CreateDefaultHeader()</h4>
-  <div class="markdown level1 summary"><p>创建一个填好规范字段（Magic/Version/Flags）的默认 header。</p>
+  <div class="markdown level1 summary"><p>创建填好规范字段（Magic/Version/Flags）的默认 header。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -324,7 +329,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
-        <td></td>
+        <td><p>默认 RingMetaHeader。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -332,7 +338,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_GetMagicValue_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.GetMagicValue*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_GetMagicValue_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.GetMagicValue(TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader@)">GetMagicValue(in RingMetaHeader)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>读 header 的 MagicValue（用于校验）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -351,7 +358,8 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
         <td><span class="parametername">header</span></td>
-        <td></td>
+        <td><p>header 值。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -366,7 +374,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></td>
-        <td></td>
+        <td><p>MagicValue。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -374,7 +383,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_GetPayloadLength_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.GetPayloadLength*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_GetPayloadLength_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.GetPayloadLength(TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader@)">GetPayloadLength(in RingMetaHeader)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>读 header 的 PayloadLength（用于计算 opaque 长度）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -393,7 +403,8 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
         <td><span class="parametername">header</span></td>
-        <td></td>
+        <td><p>header 值。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -408,7 +419,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></td>
-        <td></td>
+        <td><p>PayloadLength。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -416,7 +428,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_GetVersion_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.GetVersion*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_GetVersion_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.GetVersion(TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader@)">GetVersion(in RingMetaHeader)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>读 header 的 Version（用于校验）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -435,7 +448,8 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
         <td><span class="parametername">header</span></td>
-        <td></td>
+        <td><p>header 值。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -450,7 +464,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></td>
-        <td></td>
+        <td><p>Version。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -478,7 +493,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">src</span></td>
-        <td></td>
+        <td><p>源缓冲。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -493,7 +509,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
-        <td></td>
+        <td><p>解析出的 RingMetaHeader。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -501,7 +518,7 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_ReadPayload_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.ReadPayload*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_ReadPayload_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.ReadPayload(System.ReadOnlySpan{System.Byte})">ReadPayload(ReadOnlySpan&lt;byte&gt;)</h4>
-  <div class="markdown level1 summary"><p>从 Span 反序列化 payload。</p>
+  <div class="markdown level1 summary"><p>从 Span 反序列化 payload（旧块短于当前布局时零扩展解读——新字段读默认值，优雅降级不抛）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -521,7 +538,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">src</span></td>
-        <td></td>
+        <td><p>源缓冲。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -536,7 +554,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a></td>
-        <td></td>
+        <td><p>解析出的 RingMetaPayload。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -544,7 +563,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_WithPayloadLength_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.WithPayloadLength*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_WithPayloadLength_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader__System_UInt16_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.WithPayloadLength(TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader@,System.UInt16)">WithPayloadLength(in RingMetaHeader, ushort)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>设置 header 的 PayloadLength（WritePayload 后更新）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -563,12 +583,14 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
         <td><span class="parametername">header</span></td>
-        <td></td>
+        <td><p>header 值。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></td>
         <td><span class="parametername">payloadLength</span></td>
-        <td></td>
+        <td><p>新的 payload 长度。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -583,7 +605,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
-        <td></td>
+        <td><p>更新后的 header 副本。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -591,7 +614,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_WriteHeader_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.WriteHeader*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_WriteHeader_System_Span_System_Byte__TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader__System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.WriteHeader(System.Span{System.Byte},TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader@,System.Boolean)">WriteHeader(Span&lt;byte&gt;, in RingMetaHeader, bool)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>序列化 header 到 Span（validate=true 时校验 Magic/Version）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -610,17 +634,20 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">dst</span></td>
-        <td></td>
+        <td><p>目标缓冲。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a></td>
         <td><span class="parametername">header</span></td>
-        <td></td>
+        <td><p>header 值。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">validate</span></td>
-        <td></td>
+        <td><p>是否校验 Magic/Version。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -628,7 +655,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_WritePayload_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.WritePayload*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_MetaLayout_WritePayload_System_Span_System_Byte__TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaPayload__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.MetaLayout.WritePayload(System.Span{System.Byte},TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload@)">WritePayload(Span&lt;byte&gt;, in RingMetaPayload)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>序列化 payload 到 Span。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -647,12 +675,14 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">dst</span></td>
-        <td></td>
+        <td><p>目标缓冲。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a></td>
         <td><span class="parametername">payload</span></td>
-        <td></td>
+        <td><p>payload 值。</p>
+</td>
       </tr>
     </tbody>
   </table>

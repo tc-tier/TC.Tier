@@ -187,7 +187,7 @@
   <a id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run*"></a>
   <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask},TC.Tier.Core.Shared.SyncBridgeOptions,System.Threading.CancellationToken)">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</h4>
   <div class="markdown level1 summary"><p>一次性同步桥接：发起 + 有界等待 + 失败重抛。</p>
-<p>★ 超时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>（含 AsyncOperation.Describe 现场 + WARN 日志）——
+<p>★ 超时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>（含 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Describe">Describe()</a> 现场 + WARN 日志）——
   同步 API 有界纪律的机器强制。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
@@ -208,20 +208,26 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</td>
         <td><span class="parametername">work</span></td>
-        <td></td>
+        <td><p>异步工作体（协作式契约：await 让出、不阻塞、不再入同池同步等待）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.Shared.SyncBridgeOptions.html">SyncBridgeOptions</a></td>
         <td><span class="parametername">options</span></td>
-        <td></td>
+        <td><p>桥选项（null = 全默认）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">cancellationToken</span></td>
-        <td></td>
+        <td><p>传给 work 的取消令牌（取消由 work 协作响应）。</p>
+</td>
       </tr>
     </tbody>
   </table>
+  <h5 id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken__remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>★ 便捷入口：替代裸 <code>GetAwaiter().GetResult()</code>，对齐 docs/sync-async-bridge.md §6.1。</p>
+</div>
 
 
   <a id="TC_Tier_Core_Shared_SyncAsyncBridge_Run_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Run*"></a>
@@ -247,17 +253,20 @@ Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;T&gt;&gt;</td>
         <td><span class="parametername">work</span></td>
-        <td></td>
+        <td><p>异步工作体（协作式契约 ：await 让出、不阻塞、不再入同池同步等待）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.Shared.SyncBridgeOptions.html">SyncBridgeOptions</a></td>
         <td><span class="parametername">options</span></td>
-        <td></td>
+        <td><p>桥选项（null = 全默认）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">cancellationToken</span></td>
-        <td></td>
+        <td><p>传给 work 的取消令牌（取消由 work 协作响应）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -272,7 +281,8 @@ Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</p>
     <tbody>
       <tr>
         <td><span class="xref">T</span></td>
-        <td></td>
+        <td><p>work 的返回值（同步可见）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -287,7 +297,8 @@ Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</p>
     <tbody>
       <tr>
         <td><span class="parametername">T</span></td>
-        <td></td>
+        <td><p>返回值类型。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -296,7 +307,7 @@ Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</p>
   <a id="TC_Tier_Core_Shared_SyncAsyncBridge_Start_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Start*"></a>
   <h4 id="TC_Tier_Core_Shared_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Shared.SyncAsyncBridge.Start(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask},TC.Tier.Core.Shared.SyncBridgeOptions,System.Threading.CancellationToken)">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</h4>
   <div class="markdown level1 summary"><p>在独立池上发起异步工作，立即返回状态句柄。</p>
-<p>★ 可见性原则：返回时 AsyncOperation.Status 必为 Running——"已受理"不依赖被调度。</p>
+<p>★ 可见性原则：返回时 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Status">Status</a> 必为 Running——"已受理"不依赖被调度。</p>
 <p>★ 高级形态（"Start 早、Wait 晚"）：发起后继续本地逻辑，最后时刻才 Wait。常规同步桥接直接用 <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html#TC_Tier_Core_Shared_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Shared_SyncBridgeOptions_System_Threading_CancellationToken_">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>。</p>
 <p>⚠️ 有界队列满时 <code>StartNew</code> 阻塞入队线程（生产者背压，防御性有界——docs/sync-async-bridge.md §6.2）。</p>
 </div>
@@ -346,7 +357,8 @@ Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a></td>
-        <td></td>
+        <td><p>状态句柄（可 Wait / Cancel / Describe / LeakDetect）。</p>
+</td>
       </tr>
     </tbody>
   </table>

@@ -117,8 +117,8 @@ var st   = fs.Stat(&quot;struct1/eng0/data.0&quot;);                       // �
 <li>命名空间平面 <code>IFileSystem</code>（目录/创建/枚举/FileExtra/卷锁——一个实例 = 根空间）；</li>
 <li>数据平面 <code>IFileHandle</code>（pread/pwrite/追加/空间管理/映射/锁）；</li>
 <li>四类文件系统：本地（<code>DiskFileSystem</code> · <code>local://</code>）/ 内存（<code>MemoryFileSystem</code> · <code>memory:</code>）/
-网络（<code>RemoteFileSystem</code> · <code>network://</code>，对象存储协议）/ 虚拟（<code>RawFileSystem</code> · <code>virtual://</code>，
-<code>.raw</code> 文件 / Linux 块设备，自持一致性 + 自管页缓存；深指南 <a href="virtual-file-system.html"><code>virtual-file-system.md</code></a>）；</li>
+网络（<code>RemoteFileSystem</code> · <code>network://</code>，对象存储协议）/ 虚拟（<code>TierVolumeFs</code> · <code>virtual://</code>，
+<code>.tier</code> 文件 / Linux 块设备，自持一致性 + 自管页缓存；深指南 <a href="virtual-file-system.html"><code>virtual-file-system.md</code></a>）；</li>
 <li>一个注入点：网络文件系统的扩展面 = <code>IObjectStore</code>（厂商实现它即接入完整网络文件系统栈；
 S3 参考实现见 <a href="../../TC.Tier.Core.IO.S3/docs/network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a>）。</li>
 </ul>
@@ -210,7 +210,7 @@ S3 参考实现见 <a href="../../TC.Tier.Core.IO.S3/docs/network-file-system-s3
 <h3 id="21-构造spec--动词--options-三件套">2.1 构造（spec / 动词 / options 三件套）</h3>
 <pre><code class="lang-csharp">using var db  = TierFs.New (&quot;local:///var/lib/tier?quota=100G&amp;label=prod&quot;);
 using var mem = TierFs.Open(&quot;memory:?label=test-a&quot;);
-using var vol = TierFs.New (&quot;virtual:///data/vol.raw?label=wal-a&quot;);        // 无 quota = 按需自动扩容
+using var vol = TierFs.New (&quot;virtual:///data/vol.tier?label=wal-a&quot;);        // 无 quota = 按需自动扩容
 using var s3  = TierFs.Open(&quot;network:///s3/cos.example.com/bucket/pfx?vhost=1&amp;cred=env:TIER_S3&quot;);
 
 // 工厂 × options 合流（spec 定身份 + options 补调优；优先级 = spec 显式胜出 → options → 类型缺省）
@@ -218,7 +218,7 @@ using var db2 = TierFs.New(&quot;local:///var/lib/tier&quot;, new DiskFileSystem
 
 // 类型层直构（工厂底座——三段式签名 (位置[, options][, 日志])）
 using var d3 = DiskFileSystem.New(&quot;/var/lib/tier&quot;, new DiskFileSystemOptions { QuotaBytes = 100L &lt;&lt; 30 });
-using var v3 = RawFileSystem.New(RawCarrier.File(&quot;/data/vol.raw&quot;), new RawFormatOptions { BlockSize = 4096 });
+using var v3 = TierVolumeFs.New(TierVolumeCarrier.File(&quot;/data/vol.tier&quot;), new TierVolumeFormatOptions { BlockSize = 4096 });
 </code></pre>
 <p><strong>动词</strong>：<code>New</code> = 创建空镜像（已存在且非空抛 AlreadyExists）；<code>Open</code> = 打开既有（不存在抛 NotFound）；
 <code>OpenOrCreate</code> = 懒初始化糖。四类文件系统全部同契约。</p>
@@ -226,7 +226,7 @@ using var v3 = RawFileSystem.New(RawCarrier.File(&quot;/data/vol.raw&quot;), new
 <pre><code>local:///var/...        本地文件系统（绝对）      local:data/tier   相对（构造时对 CWD 固化）
 local:///C:/data        Windows 盘符             local://host/share  UNC
 local | local:          快捷：CWD 为根           memory:            内存文件系统（私有卷）
-virtual:///data/v.raw   虚拟文件系统·文件载体     virtual:///dev/nvme0n1  设备载体
+virtual:///data/v.tier   虚拟文件系统·文件载体     virtual:///dev/nvme0n1  设备载体
 network:///s3/host[:port]/bucket/prefix           网络文件系统（协议首段必填——s3 随 IO.S3 程序集自动注册）
 ?label=..&amp;quota=100G&amp;access=ro|wo|rw&amp;exclusive=1&amp;cred=env:NAME&amp;spill=local:///var/tmp
 </code></pre>
@@ -323,7 +323,7 @@ h.FlushData();                      // fdatasync 语义（仅 Linux 与 Flush �
 产物两种形态：</p>
 <ul>
 <li><strong>TCA1 结构化流</strong>（清单 + 数据帧 + CRC）——<strong>内容镜像，可跨文件系统</strong>（内存 → 本地 / 本地 → 网络等）；</li>
-<li><strong>字节直拷快道</strong>（<code>ContiguousCapture</code>）——<strong>整卷镜像</strong>（仅虚拟 ↔ 虚拟，<code>.raw</code> 文件 ↔ 块设备互拷，
+<li><strong>字节直拷快道</strong>（<code>ContiguousCapture</code>）——<strong>整卷镜像</strong>（仅虚拟 ↔ 虚拟，<code>.tier</code> 文件 ↔ 块设备互拷，
 dd 快道；镜像后目标重载内存态）。</li>
 </ul>
 <pre><code class="lang-csharp">using TC.Tier.Core.IO.Image;                              // RootSpaceImage
@@ -366,7 +366,7 @@ var summary = RootSpaceImage.Transfer(sourceFs, targetFs, options);
 <tr>
 <td><strong>制成存档卷</strong></td>
 <td>虚拟文件系统</td>
-<td>还原进 <code>.raw</code> = 单工件（<strong>存档即活卷</strong>——可只读挂载检视/抽取）</td>
+<td>还原进 <code>.tier</code> = 单工件（<strong>存档即活卷</strong>——可只读挂载检视/抽取）</td>
 </tr>
 <tr>
 <td>云归档</td>
@@ -394,7 +394,7 @@ var summary = RootSpaceImage.Transfer(sourceFs, targetFs, options);
 <td><a href="../../TC.Tier.Core.IO.S3/docs/network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a> 与源码 <code>IO/Remote/</code></td>
 </tr>
 <tr>
-<td>虚拟文件系统（Raw 深指南：多载体/两档 IO/维护门闩/dd 快道）</td>
+<td>虚拟文件系统（TierVolume 深指南：多载体/两档 IO/维护门闩/dd 快道）</td>
 <td><a href="virtual-file-system.html"><code>virtual-file-system.md</code></a></td>
 </tr>
 <tr>

@@ -9,7 +9,7 @@
       <meta name="viewport" content="width=device-width">
       <meta name="title" content="Class RootSpaceImage | TC.Tier — .NET 可组合存储运行时 ">
     
-    <meta name="description" content="根空间采集/还原管线（raw-medium-and-conversion-design &#167;5）——四态互转的唯一机构。 ★ 只依赖 /IFileHandle 接口平面：对根空间内部住着谁一无所知，   任意介质 ↔ 任意介质（含 Raw 载体——virtual 介质的 .raw 文件/块设备载体层，已落地点亮）。 ★ 采集契约：枚举（ 递归）→   Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（&#167;5.5）：    且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。 ★ 还原契约：目标根空间必须为空（非空即拒——显式失败优于静默合并，&#167;5.3）；目录（父先）→   文件（帧落位 → SetLength 定逻辑长度 → FileExtra 回填）→ 逐句柄 Flush（Remote 介质 Flush 即持久化）。 ★ Stat 时间戳仅入清单审计（ModifiedTicks），不承诺还原——IFileSystem 无时间戳写入平面（&#167;5.2 诚实表达）。">
+    <meta name="description" content="根空间采集/还原管线（raw-medium-and-conversion-design &#167;5）——四态互转的唯一机构。 ★ 只依赖 /IFileHandle 接口平面：对根空间内部住着谁一无所知，   任意介质 ↔ 任意介质（含 TierVolume 载体——virtual 介质的 .tier 文件/块设备载体层，已落地点亮）。 ★ 采集契约：枚举（ 递归）→   Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（&#167;5.5）：    且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。 ★ 还原契约：目标根空间必须为空（非空即拒——显式失败优于静默合并，&#167;5.3）；目录（父先）→   文件（帧落位 → SetLength 定逻辑长度 → FileExtra 回填）→ 逐句柄 Flush（Remote 介质 Flush 即持久化）。 ★ Stat 时间戳仅入清单审计（ModifiedTicks），不承诺还原——IFileSystem 无时间戳写入平面（&#167;5.2 诚实表达）。">
       <link rel="shortcut icon" href="../favicon.ico">
       <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
       <link rel="stylesheet" href="../styles/docfx.css">
@@ -77,7 +77,7 @@
   <h1 id="TC_Tier_Core_IO_Image_RootSpaceImage" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage" class="text-break">Class RootSpaceImage</h1>
   <div class="markdown level0 summary"><p>根空间采集/还原管线（raw-medium-and-conversion-design §5）——四态互转的唯一机构。</p>
 <p>★ 只依赖 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a>/IFileHandle 接口平面：对根空间内部住着谁一无所知，
-  任意介质 ↔ 任意介质（含 Raw 载体——virtual 介质的 .raw 文件/块设备载体层，已落地点亮）。</p>
+  任意介质 ↔ 任意介质（含 TierVolume 载体——virtual 介质的 .tier 文件/块设备载体层，已落地点亮）。</p>
 <p>★ 采集契约：枚举（<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_EnumerateEntries_System_String_System_String_System_Boolean_">EnumerateEntries(string, string, bool)</a> 递归）→
   Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（§5.5）：
   <a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html#TC_Tier_Core_IO_Image_ImageOptions_QuietSource">QuietSource</a> 且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。</p>
@@ -125,6 +125,59 @@
 </h3>
 
 
+  <a id="TC_Tier_Core_IO_Image_RootSpaceImage_ApplyDelta_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.ApplyDelta*"></a>
+  <h4 id="TC_Tier_Core_IO_Image_RootSpaceImage_ApplyDelta_System_IO_Stream_TC_Tier_Core_IO_IFileSystem_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.ApplyDelta(System.IO.Stream,TC.Tier.Core.IO.IFileSystem)">ApplyDelta(Stream, IFileSystem)</h4>
+  <div class="markdown level1 summary"><p>增量还原（V2 §1.2）：目标须为同基线日志化卷（基线 = 卷 UUID + 头对齐 + 可选镜像 CRC）。
+三级备份形态：全量（Capture/快照挂载采集）· 增量（本路径）· dd 快道（Transfer 载体直拷——
+dd 副本保卷身份，恰是增量链路的全量基座：副本打开重放至拷贝时刻头 = 基点）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static SnapshotDeltaSummary ApplyDelta(Stream input, IFileSystem destination)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
+        <td><span class="parametername">input</span></td>
+        <td><p>输入流（任意可读流）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">destination</span></td>
+        <td><p>目标根空间（须日志化卷）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.html">SnapshotDeltaSummary</a></td>
+        <td><p>增量还原摘要（清单条目数 + 数据帧数 + 原始字节数）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
   <a id="TC_Tier_Core_IO_Image_RootSpaceImage_Capture_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Capture*"></a>
   <h4 id="TC_Tier_Core_IO_Image_RootSpaceImage_Capture_TC_Tier_Core_IO_IFileSystem_System_IO_Stream_TC_Tier_Core_IO_Image_ImageOptions_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.Capture(TC.Tier.Core.IO.IFileSystem,System.IO.Stream,TC.Tier.Core.IO.Image.ImageOptions)">Capture(IFileSystem, Stream, ImageOptions?)</h4>
   <div class="markdown level1 summary"><p>采集根空间 → TCA1 流。源须已静默（或 <a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html#TC_Tier_Core_IO_Image_ImageOptions_QuietSource">QuietSource</a> 自动门闩）。</p>
@@ -147,17 +200,20 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
         <td><span class="parametername">source</span></td>
-        <td></td>
+        <td><p>源根空间（任意 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a> 介质）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
         <td><span class="parametername">output</span></td>
-        <td></td>
+        <td><p>输出流（任意可写流）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html">ImageOptions</a></td>
         <td><span class="parametername">options</span></td>
-        <td></td>
+        <td><p>采集选项（可空 = 默认）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -172,7 +228,67 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></td>
-        <td></td>
+        <td><p>采集摘要（清单条目数 + 数据帧数 + 原始字节数）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Core_IO_Image_RootSpaceImage_ExportDelta_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.ExportDelta*"></a>
+  <h4 id="TC_Tier_Core_IO_Image_RootSpaceImage_ExportDelta_TC_Tier_Core_IO_IFileSystem_System_IO_Stream_System_UInt64_" data-uid="TC.Tier.Core.IO.Image.RootSpaceImage.ExportDelta(TC.Tier.Core.IO.IFileSystem,System.IO.Stream,System.UInt64)">ExportDelta(IFileSystem, Stream, ulong)</h4>
+  <div class="markdown level1 summary"><p>增量导出（V2 §1.2——journal delta 帧）：源须为日志化卷（<span class="xref">TC.Tier.Core.IO.IJournaledVolume</span>——
+现役 = TierVolume）。基点 = 快照/检查点 LSN；delta = (baseLsn, 已提交头] 操作级记录流
+（无数据面扫描——导出体积 ∝ 变更量；qcow2 dirty bitmap 是块级，我们 op 级）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static SnapshotDeltaSummary ExportDelta(IFileSystem source, Stream output, ulong baseLsn)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">source</span></td>
+        <td><p>源根空间（须日志化卷）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
+        <td><span class="parametername">output</span></td>
+        <td><p>输出流（任意可写流）。</p>
+</td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></td>
+        <td><span class="parametername">baseLsn</span></td>
+        <td><p>基点 LSN（快照/检查点）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.html">SnapshotDeltaSummary</a></td>
+        <td><p>增量导出摘要（清单条目数 + 数据帧数 + 原始字节数）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -200,17 +316,20 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></td>
         <td><span class="parametername">input</span></td>
-        <td></td>
+        <td><p>输入流（任意可读流）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
         <td><span class="parametername">destination</span></td>
-        <td></td>
+        <td><p>目标根空间（任意 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a> 介质）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html">ImageOptions</a></td>
         <td><span class="parametername">options</span></td>
-        <td></td>
+        <td><p>还原选项（可空 = 默认）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -225,7 +344,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></td>
-        <td></td>
+        <td><p>还原摘要（清单条目数 + 数据帧数 + 原始字节数）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -260,17 +380,20 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
         <td><span class="parametername">source</span></td>
-        <td></td>
+        <td><p>源根空间（任意 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a> 介质）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
         <td><span class="parametername">target</span></td>
-        <td></td>
+        <td><p>目标根空间（任意 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a> 介质）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageOptions.html">ImageOptions</a></td>
         <td><span class="parametername">options</span></td>
-        <td></td>
+        <td><p>采集选项（可空 = 默认）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -285,7 +408,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></td>
-        <td></td>
+        <td><p>转移摘要（清单条目数 + 数据帧数 + 原始字节数）。</p>
+</td>
       </tr>
     </tbody>
   </table>

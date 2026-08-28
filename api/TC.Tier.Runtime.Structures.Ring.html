@@ -103,9 +103,14 @@ Classes
 <p>★ 地址运算只用 CalculationAddress/GetDistance（§8 铁律，不碰 Offset 算术）。</p>
 </section>
       <h4><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.MetaHost.html">RingBase&lt;TKey&gt;.MetaHost</a></h4>
-      <section></section>
+      <section><p>Transport 策略回落的 meta 传输适配器——meta block 嵌入 ring 流：
+写 = 追加一条 IS_META record 到 ring 流末尾；读 = 倒序扫 ring 流找最后一条有效 IS_META record 的 payload。</p>
+</section>
       <h4><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.MetaLayout.html">RingBase&lt;TKey&gt;.MetaLayout</a></h4>
-      <section></section>
+      <section><p>Ring meta 块布局实现（<a class="xref" href="TC.Tier.Contracts.Meta.IMetaLayout-2.html">IMetaLayout&lt;THeader, TPayload&gt;</a> 规范实现）——
+Header 12B 规范字段 + Payload（结构化水位 + opaque 插槽）大小自述，codec 委托
+RingMetaHeaderCodec/RingMetaPayloadCodec；读旧块短 payload 时零扩展降级。</p>
+</section>
       <h4><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.RingScanCursor-1.html">RingBase&lt;TKey&gt;.RingScanCursor&lt;TRingBase&gt;</a></h4>
       <section><p>扫描游标基类（嵌套泛型抽象，持 Owner）。</p>
 </section>
@@ -126,7 +131,10 @@ Preallocate/OverflowPolicy/MinOverflowSize）是 Ring 独有。</p>
 Structs
 </h3>
       <h4><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.ReadScope.html">RingBase&lt;TKey&gt;.ReadScope</a></h4>
-      <section></section>
+      <section><p>★ 零拷贝读 scope（ref struct 栈护栏）——构造时进入 epoch 读保护，<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.ReadScope.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadScope_Dispose">Dispose()</a> 时退出。
+持有期间（即 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_TC_Tier_Contracts_Storage_LogicalAddress_">GetValueSpan(LogicalAddress)</a> 返回 span 的有效期）热页驱逐/冷缓存淘汰经 epoch 排水被阻塞，
+底层页恒稳不被释放/复用；跨 scope 持有 span = 未定义。</p>
+</section>
       <h4><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.WriteBatch.html">RingBase&lt;TKey&gt;.WriteBatch</a></h4>
       <section><p>批量 ref struct——独占窗口（领取预留 + 批内无锁），Dispose 释放 epoch。</p>
 </section>

@@ -140,9 +140,6 @@
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;LogRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;LogRecoveryHints&gt;.Recovery</a>
-    </div>
-    <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;LogRecoveryHints&gt;.Id</a>
     </div>
     <div>
@@ -194,7 +191,10 @@
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase__ctor_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.#ctor*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase__ctor_TC_Tier_Runtime_Structures_Log_Contracts_ILogCodec_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Log_LogSettings_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Log_LogRecoveryHints__TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_TC_Tier_Runtime_Structures_Log_Contracts_ILogCursor__TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaHeader_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.#ctor(TC.Tier.Runtime.Structures.Log.Contracts.ILogCodec,TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Log.LogSettings,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Log.LogRecoveryHints},TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory{TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor},TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Log.Contracts.LogMetaHeader,TC.Tier.Runtime.Structures.Log.Contracts.LogMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport,TC.Tier.Core.Logging.ILogger)">LogBase(ILogCodec, IFileSystem, LogSettings, IRecovery&lt;LogRecoveryHints&gt;?, LogCursorFactory&lt;ILogCursor&gt;?, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;?, IMetaTransport?, ILogger?)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Log 基类构造：接入主引擎 + 装配 codec/设置/meta 策略。</p>
+<p>★ 构造 = 配置（Core 完整生命周期）：主引擎纯 Create（启动在 <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OnInitializeBegin">OnInitializeBegin()</a>）；
+Managed 模式另建 meta 引擎（同构纯 Create）；meta 策略按工厂注入或默认映射装配（??= 收口）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -213,42 +213,50 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCodec.html">ILogCodec</a></td>
         <td><span class="parametername">codec</span></td>
-        <td></td>
+        <td><p>entry 头尾编解码器（消除虚分发）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
         <td><span class="parametername">fs</span></td>
-        <td></td>
+        <td><p>文件系统（主引擎 + Managed meta 引擎共用）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogSettings.html">LogSettings</a></td>
         <td><span class="parametername">settings</span></td>
-        <td></td>
+        <td><p>Log 设置（页位宽 / 主引擎配置 / meta 模式与 opaque 容量）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</td>
         <td><span class="parametername">recovery</span></td>
-        <td></td>
+        <td><p>恢复器（LifecycleBase 模板参数，null = 无恢复）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory-1.html">LogCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor.html">ILogCursor</a>&gt;</td>
         <td><span class="parametername">cursorFactory</span></td>
-        <td></td>
+        <td><p>扫描游标工厂（扫描读与 MetaHost 找最后 meta 用）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogMetaHeader.html">LogMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogMetaPayload.html">LogMetaPayload</a>&gt;</td>
         <td><span class="parametername">metaPolicyFactory</span></td>
-        <td></td>
+        <td><p>meta 策略工厂（null = 默认映射 CreateMetaPolicyDefault）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></td>
         <td><span class="parametername">metaTransport</span></td>
-        <td></td>
+        <td><p>Transport 模式的传输实例（null = 回落 MetaHost 嵌入 log 流）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
         <td><span class="parametername">logger</span></td>
-        <td></td>
+        <td><p>日志器。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -258,7 +266,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_BeginAddress_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.BeginAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_BeginAddress" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.BeginAddress">BeginAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>★ 起始地址 = 引擎 MinAddress（第一个 entry 的起始——水位读引擎，Log 不自存）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -335,7 +344,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_LogPageSizeBits_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.LogPageSizeBits*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_LogPageSizeBits" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.LogPageSizeBits">LogPageSizeBits</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>页大小位宽（log2(PageSize)，来自 LogSettings.LogPageSizeBits）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -386,7 +396,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_PageSize_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.PageSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_PageSize" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.PageSize">PageSize</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>页大小（2^LogPageSizeBits）——页攒批单位（一页组装一个 frame 写窗口）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -411,7 +422,9 @@
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_TailAddress_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.TailAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_TailAddress" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.TailAddress">TailAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>★ 尾地址 = 当前写游标——最后一个已追加 entry 的尾地址（含页缓冲内未落盘 entry；
+写未初始化或空页时 = 已落盘水位 _logicalTail）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -473,7 +486,11 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_AbortAsync_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.AbortAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_AbortAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.AbortAsync(System.Int64,System.Threading.CancellationToken)">AbortAsync(long, CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>★ Abort 异步对等版（同步 <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Abort_System_Int64_">Abort(long)</a>）：TruncateSuffix 回退到上一已确认提交边界
+（<span class="xref">TC.Tier.Runtime.Structures.Log.LogBase._txRollbackTail</span>），丢弃本轮悬干数据，随后 AppendMetaAsync 持久化回退后状态。</p>
+<p>守卫矩阵同同步版：seq 已提交 → no-op；陈旧 Abort → 仅复位记账；无既有提交边界 /
+边界已被头截断回收 / 无悬干数据 → 仅复位记账。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -492,12 +509,14 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">seq</span></td>
-        <td></td>
+        <td><p>回滚的 Prepare 序号。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -699,7 +718,8 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_DisposeOverride_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.DisposeOverride*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
-  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>★ Dispose 钩子——刷末页后释放写引擎资源：等在途 FlushPage 任务（同步阻塞）、
+有未落盘 entry 则 FlushPage、释放双页缓冲与 frame 池，最后走基类编排。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -719,8 +739,7 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
-本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+        <td><p>true = 显式 Dispose（false = 终结器路径，本实现忽略）。</p>
 </td>
       </tr>
     </tbody>
@@ -731,7 +750,8 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_DisposeOverrideAsync_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.DisposeOverrideAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
-  <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>★ 异步 Dispose 钩子（对等 DisposeOverride）——等在途 FlushPage 任务、
+异步刷末页、释放双页缓冲与 frame 池，最后走基类异步编排。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -751,7 +771,8 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td></td>
+        <td><p>true = 显式 Dispose（false = 终结器路径，本实现忽略）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1035,13 +1056,7 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_OnInitializeBegin_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.OnInitializeBegin*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_OnInitializeBegin" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.OnInitializeBegin">OnInitializeBegin()</h4>
-  <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子——this 构造完后、后台恢复启动前。</p>
-<pre><code>        &lt;p&gt;子类在此：① &lt;code&gt;_engine.Initialize(...)&lt;/code&gt;（Runtime 层引擎 init）
-          ② &lt;code&gt;Resources.Add(_engine)&lt;/code&gt;（注册主引擎到资源组）
-          ③ 创建 MetaPolicy（按 MetaPolicyKind）
-          ④ 后期资源 &lt;code&gt;Resources.Add(metaEngine/overflowEngine, ...)&lt;/code&gt;&lt;/p&gt;
-        &lt;p&gt;此时 this 已完全构造，虚方法安全；&lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.CreateRecovery&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 紧随其后被基类调用。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子——双引擎并行启动（均非阻塞）：主引擎带恢复水位 hint；Managed meta 引擎自恢复。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -1117,6 +1132,34 @@ PreparedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口契
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_LogBase_OnTailTruncated_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.OnTailTruncated*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_OnTailTruncated_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.OnTailTruncated(TC.Tier.Contracts.Storage.LogicalAddress)">OnTailTruncated(LogicalAddress)</h4>
+  <div class="markdown level1 summary"><p>尾截断完成回调（默认空——EntryLog 夹 CommittedOffset 用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual void OnTailTruncated(LogicalAddress rollbackTail)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
+        <td><span class="parametername">rollbackTail</span></td>
         <td></td>
       </tr>
     </tbody>
@@ -1210,9 +1253,10 @@ PreparedTailAddress 字段）——本轮 Prepare 窗口的回退点跨崩溃可
 
   <a id="TC_Tier_Runtime_Structures_Log_LogBase_PrepareAsync_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.PrepareAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Log_LogBase_PrepareAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.PrepareAsync(System.Int64,System.Threading.CancellationToken)">PrepareAsync(long, CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>★ Prepare（预备）：把数据写到设备并 Flush（真正持久化），附 seq，但 lastCommittedSeq 不推进。</p>
-<p>数据持久化但"悬空"——未被 commit record 确认。崩溃在此后 Commit 前恢复时丢弃。</p>
-<p>★ 必须包含 Flush——WriteAsync 不保证落盘。</p>
+  <div class="markdown level1 summary"><p>★ Prepare 异步对等版（同步 <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Prepare_System_Int64_">Prepare(long)</a>）：FlushUntilAsync 数据落盘 +
+AppendMetaAsync 写 meta（TailAddress 作 committedOffset；opaque 由 SetOpaqueMeta stage 自动带入）。</p>
+<p>★ Abort 支撑：meta 同块持久化当前提交边界（<span class="xref">TC.Tier.Runtime.Structures.Log.LogBase._txRollbackTail</span> →
+PreparedTailAddress 字段）——本轮 Prepare 窗口的回退点跨崩溃可用。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -1232,12 +1276,14 @@ PreparedTailAddress 字段）——本轮 Prepare 窗口的回退点跨崩溃可
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">seq</span></td>
-        <td></td>
+        <td><p>准备提交的序号。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>

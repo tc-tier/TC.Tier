@@ -205,6 +205,12 @@ OnCommitted/Abort 的事务参与协议（§4）；帧 = 持久化格式的三�
 <td>流式帧文件快照</td>
 <td>无版本概念</td>
 </tr>
+<tr>
+<td><strong>增量快照</strong>（<code>IncrementalSnapshot</code>）</td>
+<td>段 = 帧的增量快照：新段 append 不重写旧段 + 段表 O(1) 恢复 + 阈值合并</td>
+<td>raft 日志压缩（镜像快照第三部件——TierWAL 内部快照）</td>
+<td>段累积需合并（raft 只需最新快照）；合并 = 低频全量重写</td>
+</tr>
 </tbody>
 </table>
 <p><strong>索引三选</strong>：点查 → Hash；有序遍历/range → BTree/SkipList；高写并发小记录 → SkipList（无分裂重排）。

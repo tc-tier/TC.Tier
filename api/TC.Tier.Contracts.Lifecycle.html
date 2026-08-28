@@ -92,11 +92,11 @@ Structs
 Interfaces
 </h3>
       <h4><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a></h4>
-      <section><p>生命周期持有者统一接口。全部 LifecycleBase&lt;THints&gt; 派生类实现此接口——
+      <section><p>生命周期持有者统一接口。全部 <code>LifecycleBase&lt;THints&gt;</code> 派生类实现此接口——
 数据结构基类（Log/Ring/Index/Metadata/Blob）与 IO 引擎（StorageEngine）。
 泛型参数 <code class="typeparamref">THints</code> 为各持有者自己的恢复 hints struct。</p>
 <p>★ 接口面只保留<b>观测/等待</b>契约（IsReady / RecoveryState / 事件 / WaitForReady* / CancelRecovery）；
-  LifecycleBase&lt;THints&gt;.Initialize 启动入口<b>不在接口面</b>——启动由各持有者自己的装配面提供
+  <code>LifecycleBase&lt;THints&gt;.Initialize</code> 启动入口<b>不在接口面</b>——启动由各持有者自己的装配面提供
   （引擎 = <code>StorageEngineBuilder.Start/StartAsync</code> 一步到位；结构 = 组合器/生成代码内部调用），
   <b>不允许外部经接口直接调 Initialize</b>（详见 src/TC.Tier.Core/docs/lifecycle.md）。</p>
 <p>★ 与 <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery&lt;TRecoveryHints&gt;</a> 正交：ILifecycle 是生命周期持有者对外观测契约，
@@ -112,7 +112,7 @@ Interfaces
 Enums
 </h3>
       <h4><a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html">RecoveryPhase</a></h4>
-      <section><p>★ 恢复阶段（持有者中立——所有 Shared.LifecycleBase&lt;T&gt; 派生类共享同一套通用恢复状态语义）。</p>
+      <section><p>★ 恢复阶段（持有者中立——所有 <code>LifecycleBase&lt;THints&gt;</code> 派生类共享同一套通用恢复状态语义）。</p>
 <p>严格顺序推进，不可回退：<a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_NotStarted">NotStarted</a> → <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Recovering">Recovering</a> →
   <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Completed">Completed</a>（成功）/ <a class="xref" href="TC.Tier.Contracts.Lifecycle.RecoveryPhase.html#TC_Tier_Contracts_Lifecycle_RecoveryPhase_Failed">Failed</a>（失败）。</p>
 <p>★ 恢复进行中的细分步骤（读 meta/配置、扫数据源定位边界、应用恢复结果等）<b>不</b>另设阶段枚举——

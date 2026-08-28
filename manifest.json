@@ -402,6 +402,16 @@
     },
     {
       "type": "Conceptual",
+      "source_relative_path": "../src/TC.Tier.Runtime/docs/perf/tierwal-contracts.md",
+      "output": {
+        ".html": {
+          "relative_path": "docs/src/TC.Tier.Runtime/docs/perf/tierwal-contracts.html"
+        }
+      },
+      "version": ""
+    },
+    {
+      "type": "Conceptual",
       "source_relative_path": "../src/TC.Tier.Runtime/docs/segment-table.md",
       "output": {
         ".html": {
@@ -620,7 +630,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Contracts.Lifecycle.ILifecycle<THints>",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Contracts.Lifecycle.ILifecycle-1.yml\" sourcestartlinenumber=\"1\">生命周期持有者统一接口。全部 LifecycleBase&lt;THints&gt; 派生类实现此接口——\n数据结构基类（Log/Ring/Index/Metadata/Blob）与 IO 引擎（StorageEngine）。\n泛型参数 <code class=\"typeparamref\">THints</code> 为各持有者自己的恢复 hints struct。</p>\n<p>★ 接口面只保留<b>观测/等待</b>契约（IsReady / RecoveryState / 事件 / WaitForReady* / CancelRecovery）；\n  LifecycleBase&lt;THints&gt;.Initialize 启动入口<b>不在接口面</b>——启动由各持有者自己的装配面提供\n  （引擎 = <code>StorageEngineBuilder.Start/StartAsync</code> 一步到位；结构 = 组合器/生成代码内部调用），\n  <b>不允许外部经接口直接调 Initialize</b>（详见 src/TC.Tier.Core/docs/lifecycle.md）。</p>\n<p>★ 与 <xref href=\"TC.Tier.Contracts.Lifecycle.IRecovery%601\" data-throw-if-not-resolved=\"false\"></xref> 正交：ILifecycle 是生命周期持有者对外观测契约，\n  IRecovery 是恢复算法契约（可注入替换），LifecycleBase.Initialize 内部委托 IRecovery.Recover。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Contracts.Lifecycle.ILifecycle-1.yml\" sourcestartlinenumber=\"1\">生命周期持有者统一接口。全部 <code>LifecycleBase&lt;THints&gt;</code> 派生类实现此接口——\n数据结构基类（Log/Ring/Index/Metadata/Blob）与 IO 引擎（StorageEngine）。\n泛型参数 <code class=\"typeparamref\">THints</code> 为各持有者自己的恢复 hints struct。</p>\n<p>★ 接口面只保留<b>观测/等待</b>契约（IsReady / RecoveryState / 事件 / WaitForReady* / CancelRecovery）；\n  <code>LifecycleBase&lt;THints&gt;.Initialize</code> 启动入口<b>不在接口面</b>——启动由各持有者自己的装配面提供\n  （引擎 = <code>StorageEngineBuilder.Start/StartAsync</code> 一步到位；结构 = 组合器/生成代码内部调用），\n  <b>不允许外部经接口直接调 Initialize</b>（详见 src/TC.Tier.Core/docs/lifecycle.md）。</p>\n<p>★ 与 <xref href=\"TC.Tier.Contracts.Lifecycle.IRecovery%601\" data-throw-if-not-resolved=\"false\"></xref> 正交：ILifecycle 是生命周期持有者对外观测契约，\n  IRecovery 是恢复算法契约（可注入替换），LifecycleBase.Initialize 内部委托 IRecovery.Recover。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -662,7 +672,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Contracts.Lifecycle.RecoveryPhase",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Contracts.Lifecycle.RecoveryPhase.yml\" sourcestartlinenumber=\"1\">★ 恢复阶段（持有者中立——所有 Shared.LifecycleBase&lt;T&gt; 派生类共享同一套通用恢复状态语义）。</p>\n<p>严格顺序推进，不可回退：<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.NotStarted\" data-throw-if-not-resolved=\"false\"></xref> → <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Recovering\" data-throw-if-not-resolved=\"false\"></xref> →\n  <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Completed\" data-throw-if-not-resolved=\"false\"></xref>（成功）/ <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Failed\" data-throw-if-not-resolved=\"false\"></xref>（失败）。</p>\n<p>★ 恢复进行中的细分步骤（读 meta/配置、扫数据源定位边界、应用恢复结果等）<b>不</b>另设阶段枚举——\n  一律处于 <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Recovering\" data-throw-if-not-resolved=\"false\"></xref>，由 <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryProgress\" data-throw-if-not-resolved=\"false\"></xref> 的 <code>Percent</code>(0-100) + <code>Detail</code>\n  表达粒度。这样枚举对任何持有者（IO 引擎 / Log / Ring / Index / Metadata / Blob）都通用，\n  无需按域分别解释阶段语义。</p>\n<p>★ 生产代码<b>不</b>按 <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Recovering\" data-throw-if-not-resolved=\"false\"></xref> 内部的细分做分支判断——细分仅供进度展示；\n  控制流只认终态（<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Completed\" data-throw-if-not-resolved=\"false\"></xref>/<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Failed\" data-throw-if-not-resolved=\"false\"></xref>/<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.NotStarted\" data-throw-if-not-resolved=\"false\"></xref>）。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Contracts.Lifecycle.RecoveryPhase.yml\" sourcestartlinenumber=\"1\">★ 恢复阶段（持有者中立——所有 <code>LifecycleBase&lt;THints&gt;</code> 派生类共享同一套通用恢复状态语义）。</p>\n<p>严格顺序推进，不可回退：<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.NotStarted\" data-throw-if-not-resolved=\"false\"></xref> → <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Recovering\" data-throw-if-not-resolved=\"false\"></xref> →\n  <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Completed\" data-throw-if-not-resolved=\"false\"></xref>（成功）/ <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Failed\" data-throw-if-not-resolved=\"false\"></xref>（失败）。</p>\n<p>★ 恢复进行中的细分步骤（读 meta/配置、扫数据源定位边界、应用恢复结果等）<b>不</b>另设阶段枚举——\n  一律处于 <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Recovering\" data-throw-if-not-resolved=\"false\"></xref>，由 <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryProgress\" data-throw-if-not-resolved=\"false\"></xref> 的 <code>Percent</code>(0-100) + <code>Detail</code>\n  表达粒度。这样枚举对任何持有者（IO 引擎 / Log / Ring / Index / Metadata / Blob）都通用，\n  无需按域分别解释阶段语义。</p>\n<p>★ 生产代码<b>不</b>按 <xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Recovering\" data-throw-if-not-resolved=\"false\"></xref> 内部的细分做分支判断——细分仅供进度展示；\n  控制流只认终态（<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Completed\" data-throw-if-not-resolved=\"false\"></xref>/<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.Failed\" data-throw-if-not-resolved=\"false\"></xref>/<xref href=\"TC.Tier.Contracts.Lifecycle.RecoveryPhase.NotStarted\" data-throw-if-not-resolved=\"false\"></xref>）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -1894,7 +1904,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.IO.Image.RootSpaceImage",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Image.RootSpaceImage.yml\" sourcestartlinenumber=\"1\">根空间采集/还原管线（raw-medium-and-conversion-design §5）——四态互转的唯一机构。</p>\n<p>★ 只依赖 <xref href=\"TC.Tier.Core.IO.IFileSystem\" data-throw-if-not-resolved=\"false\"></xref>/IFileHandle 接口平面：对根空间内部住着谁一无所知，\n  任意介质 ↔ 任意介质（含 Raw 载体——virtual 介质的 .raw 文件/块设备载体层，已落地点亮）。</p>\n<p>★ 采集契约：枚举（<xref href=\"TC.Tier.Core.IO.IFileSystem.EnumerateEntries(System.String%2cSystem.String%2cSystem.Boolean)\" data-throw-if-not-resolved=\"false\"></xref> 递归）→\n  Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（§5.5）：\n  <xref href=\"TC.Tier.Core.IO.Image.ImageOptions.QuietSource\" data-throw-if-not-resolved=\"false\"></xref> 且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。</p>\n<p>★ 还原契约：目标根空间必须为空（非空即拒——显式失败优于静默合并，§5.3）；目录（父先）→\n  文件（帧落位 → SetLength 定逻辑长度 → FileExtra 回填）→ 逐句柄 Flush（Remote 介质 Flush 即持久化）。</p>\n<p>★ Stat 时间戳仅入清单审计（<code>ModifiedTicks</code>），不承诺还原——IFileSystem 无时间戳写入平面（§5.2 诚实表达）。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Image.RootSpaceImage.yml\" sourcestartlinenumber=\"1\">根空间采集/还原管线（raw-medium-and-conversion-design §5）——四态互转的唯一机构。</p>\n<p>★ 只依赖 <xref href=\"TC.Tier.Core.IO.IFileSystem\" data-throw-if-not-resolved=\"false\"></xref>/IFileHandle 接口平面：对根空间内部住着谁一无所知，\n  任意介质 ↔ 任意介质（含 TierVolume 载体——virtual 介质的 .tier 文件/块设备载体层，已落地点亮）。</p>\n<p>★ 采集契约：枚举（<xref href=\"TC.Tier.Core.IO.IFileSystem.EnumerateEntries(System.String%2cSystem.String%2cSystem.Boolean)\" data-throw-if-not-resolved=\"false\"></xref> 递归）→\n  Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（§5.5）：\n  <xref href=\"TC.Tier.Core.IO.Image.ImageOptions.QuietSource\" data-throw-if-not-resolved=\"false\"></xref> 且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。</p>\n<p>★ 还原契约：目标根空间必须为空（非空即拒——显式失败优于静默合并，§5.3）；目录（父先）→\n  文件（帧落位 → SetLength 定逻辑长度 → FileExtra 回填）→ 逐句柄 Flush（Remote 介质 Flush 即持久化）。</p>\n<p>★ Stat 时间戳仅入清单审计（<code>ModifiedTicks</code>），不承诺还原——IFileSystem 无时间戳写入平面（§5.2 诚实表达）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -1950,7 +1960,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.IO.Mem.MemoryAllocationMode",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Mem.MemoryAllocationMode.yml\" sourcestartlinenumber=\"1\">内存分配模式。</p>\n<p><xref href=\"TC.Tier.Core.IO.Mem.MemoryAllocationMode.Sparse\" data-throw-if-not-resolved=\"false\"></xref>：真稀疏——按页写时分配，用多少占多少（PunchHole 真释放页归还池）。</p>\n<p><xref href=\"TC.Tier.Core.IO.Mem.MemoryAllocationMode.Reserved\" data-throw-if-not-resolved=\"false\"></xref>：创建即占——文件单块连续直址（保留现状槽直址语义），Map 零拷贝；\n  建议配 MemoryFileSystemOptions.QuotaBytes 形成硬配额。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Mem.MemoryAllocationMode.yml\" sourcestartlinenumber=\"1\">内存分配模式。</p>\n<p><xref href=\"TC.Tier.Core.IO.Mem.MemoryAllocationMode.Sparse\" data-throw-if-not-resolved=\"false\"></xref>：真稀疏——按页写时分配，用多少占多少（PunchHole 真释放页归还池）。</p>\n<p><xref href=\"TC.Tier.Core.IO.Mem.MemoryAllocationMode.Reserved\" data-throw-if-not-resolved=\"false\"></xref>：创建即占——文件单块连续直址（保留现状槽直址语义），Map 零拷贝；\n  建议配 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.QuotaBytes\" data-throw-if-not-resolved=\"false\"></xref> 形成硬配额。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2038,73 +2048,17 @@
     },
     {
       "type": "ManagedReference",
-      "source_relative_path": "api/TC.Tier.Core.IO.Raw.RawCarrier.yml",
+      "source_relative_path": "api/TC.Tier.Core.IO.PreallocationMode.yml",
       "output": {
         ".html": {
-          "relative_path": "api/TC.Tier.Core.IO.Raw.RawCarrier.html"
+          "relative_path": "api/TC.Tier.Core.IO.PreallocationMode.html"
         }
       },
       "version": "",
       "Uid": null,
       "IsMRef": true,
-      "Title": "TC.Tier.Core.IO.Raw.RawCarrier",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Raw.RawCarrier.yml\" sourcestartlinenumber=\"1\">载体描述（raw-medium-and-conversion-design §2.1）——两种物理形态，一份逻辑布局。</p>\n<p>★ 文件载体：OS 文件系统上的 `.raw` 单文件（跨进程锁 = 伴生锁文件）。</p>\n<p>★ 设备载体：Linux 块设备/裸分区路径（`/dev/...`；跨进程锁 = flock——Windows 物理盘不在\n  支持范围，能力诚实降级，§14.4）。</p>\n"
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/TC.Tier.Core.IO.Raw.RawFileSystem.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/TC.Tier.Core.IO.Raw.RawFileSystem.html"
-        }
-      },
-      "version": "",
-      "Uid": null,
-      "IsMRef": true,
-      "Title": "TC.Tier.Core.IO.Raw.RawFileSystem",
-      "Summary": null
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/TC.Tier.Core.IO.Raw.RawFormatOptions.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/TC.Tier.Core.IO.Raw.RawFormatOptions.html"
-        }
-      },
-      "version": "",
-      "Uid": null,
-      "IsMRef": true,
-      "Title": "TC.Tier.Core.IO.Raw.RawFormatOptions",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Raw.RawFormatOptions.yml\" sourcestartlinenumber=\"1\">虚拟文件系统格式化选项（medium-protocol-and-parity-design §6——继承 FileSystemOptions 基类）。</p>\n<p>★ 一词制：基类 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.QuotaBytes\" data-throw-if-not-resolved=\"false\"></xref> 即供给（原 CapacityBytes——New 时刻物化，\n  位图按此预留）；<xref href=\"TC.Tier.Core.IO.FileSystemOptions.Label\" data-throw-if-not-resolved=\"false\"></xref> New = 写入 superblock。</p>\n"
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/TC.Tier.Core.IO.Raw.RawOpenOptions.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/TC.Tier.Core.IO.Raw.RawOpenOptions.html"
-        }
-      },
-      "version": "",
-      "Uid": null,
-      "IsMRef": true,
-      "Title": "TC.Tier.Core.IO.Raw.RawOpenOptions",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Raw.RawOpenOptions.yml\" sourcestartlinenumber=\"1\">虚拟文件系统打开选项（medium-protocol-and-parity-design §6——继承 FileSystemOptions 基类）。</p>\n<p>★ 原布尔 <code>ReadOnly</code> 并入基类 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.Access\" data-throw-if-not-resolved=\"false\"></xref>（G2 三态化——\n  Read = 只读打开[dirty 降级形态]，ReadWrite = 缺省；Write = 纯摄入——虚拟卷无此概念，Open 即拒）。</p>\n<p>★ 基类 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.QuotaBytes\" data-throw-if-not-resolved=\"false\"></xref> = 挂载收紧：有效上限 = min(quota, 供给)（§5.3）；\n  <xref href=\"TC.Tier.Core.IO.FileSystemOptions.Label\" data-throw-if-not-resolved=\"false\"></xref> = Open 校验（不符即抛 fail-fast）。</p>\n"
-    },
-    {
-      "type": "ManagedReference",
-      "source_relative_path": "api/TC.Tier.Core.IO.Raw.yml",
-      "output": {
-        ".html": {
-          "relative_path": "api/TC.Tier.Core.IO.Raw.html"
-        }
-      },
-      "version": "",
-      "Uid": null,
-      "IsMRef": true,
-      "Title": "TC.Tier.Core.IO.Raw",
-      "Summary": null
+      "Title": "TC.Tier.Core.IO.PreallocationMode",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.PreallocationMode.yml\" sourcestartlinenumber=\"1\">预分配方式轴（IS-04 统一词汇——四介质同一套语义；缺省 = 现行行为）。</p>\n<p><xref href=\"TC.Tier.Core.IO.PreallocationMode.Metadata\" data-throw-if-not-resolved=\"false\"></xref>：逻辑占位（稀疏——未写区域不占物理块；创建快、写时按需分配）。</p>\n<p><xref href=\"TC.Tier.Core.IO.PreallocationMode.Full\" data-throw-if-not-resolved=\"false\"></xref>：物理占位（非稀疏——创建时物化全部空间，一次性成本显式化由部署方承担，\n  换运行时零分配抖动；生产数据库形态\"raw + 预分配 + 非稀疏 + DIO\"的预分配维度）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2300,7 +2254,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.IO.Remote.RemoteFileSystem",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Remote.RemoteFileSystem.yml\" sourcestartlinenumber=\"1\">远程文件系统——<xref href=\"TC.Tier.Core.IO.IFileSystem\" data-throw-if-not-resolved=\"false\"></xref> 第三介质桥（B3.3/B3.4）：注入的 <xref href=\"TC.Tier.Core.IO.Remote.IObjectStore\" data-throw-if-not-resolved=\"false\"></xref>\n升格为文件语义（staging 写回层 / 延迟加载 / multipart 编排 / fencing 卷锁）。</p>\n<p>★ 构造：Create(IObjectStore, RemoteFileSystemOptions?, ILogger?)——store 注入\n  （S3ObjectStore / MemoryObjectStore / 任意实现），桥对厂商零知识。</p>\n<p>★ 键模型：对象键 = <code>{KeyPrefix}{path}</code>（多引擎共桶隔离）；path 经 <xref href=\"TC.Tier.Core.IO.Shared.PathValidator\" data-throw-if-not-resolved=\"false\"></xref>\n  （三介质同一实现——越出前缀即 <xref href=\"System.ArgumentException\" data-throw-if-not-resolved=\"false\"></xref>，不可能访问同桶其他前缀对象）。</p>\n<p>★ Dispose 契约（磁盘方向）：\"离开目录\"——Dispose 后 Open 抛 <xref href=\"System.ObjectDisposedException\" data-throw-if-not-resolved=\"false\"></xref>；\n  已开句柄继续可用（staging 自持——远程数据在云端不在 fs 内存）；store 归调用方所有不代释放。</p>\n<p>★ AcquireExclusive = <b>尽力型 fencing</b>（lock 对象 + 条件 PUT；仅防意外双开，不构成正确性保证——\n  时钟漂移可致提前抢锁、崩溃后保护真空 = 心跳超时窗口；引擎正确性由段表 lease 单写者协议承担）。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.Remote.RemoteFileSystem.yml\" sourcestartlinenumber=\"1\">远程文件系统——<xref href=\"TC.Tier.Core.IO.IFileSystem\" data-throw-if-not-resolved=\"false\"></xref> 第三介质桥（B3.3/B3.4）：注入的 <xref href=\"TC.Tier.Core.IO.Remote.IObjectStore\" data-throw-if-not-resolved=\"false\"></xref>\n升格为文件语义（staging 写回层 / 延迟加载 / multipart 编排 / fencing 卷锁）。</p>\n<p>★ 构造：<xref href=\"TC.Tier.Core.IO.Remote.RemoteFileSystem.New(TC.Tier.Core.IO.Remote.IObjectStore%2cTC.Tier.Core.IO.Remote.RemoteFileSystemOptions%2cTC.Tier.Core.Logging.ILogger)\" data-throw-if-not-resolved=\"false\"></xref> /\n  <xref href=\"TC.Tier.Core.IO.Remote.RemoteFileSystem.Open(TC.Tier.Core.IO.Remote.IObjectStore%2cTC.Tier.Core.IO.Remote.RemoteFileSystemOptions%2cTC.Tier.Core.Logging.ILogger)\" data-throw-if-not-resolved=\"false\"></xref> /\n  <xref href=\"TC.Tier.Core.IO.Remote.RemoteFileSystem.OpenOrCreate(TC.Tier.Core.IO.Remote.IObjectStore%2cTC.Tier.Core.IO.Remote.RemoteFileSystemOptions%2cTC.Tier.Core.Logging.ILogger)\" data-throw-if-not-resolved=\"false\"></xref>——store 注入\n  （S3ObjectStore / MemoryObjectStore / 任意实现），桥对厂商零知识。</p>\n<p>★ 键模型：对象键 = <code>{KeyPrefix}{path}</code>（多引擎共桶隔离）；path 经 <xref href=\"TC.Tier.Core.IO.Shared.PathValidator\" data-throw-if-not-resolved=\"false\"></xref>\n  （三介质同一实现——越出前缀即 <xref href=\"System.ArgumentException\" data-throw-if-not-resolved=\"false\"></xref>，不可能访问同桶其他前缀对象）。</p>\n<p>★ Dispose 契约（磁盘方向）：\"离开目录\"——Dispose 后 Open 抛 <xref href=\"System.ObjectDisposedException\" data-throw-if-not-resolved=\"false\"></xref>；\n  已开句柄继续可用（staging 自持——远程数据在云端不在 fs 内存）；store 归调用方所有不代释放。</p>\n<p>★ AcquireExclusive = <b>尽力型 fencing</b>（lock 对象 + 条件 PUT；仅防意外双开，不构成正确性保证——\n  时钟漂移可致提前抢锁、崩溃后保护真空 = 心跳超时窗口；引擎正确性由段表 lease 单写者协议承担）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2444,6 +2398,104 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.yml\" sourcestartlinenumber=\"1\">增量导出/还原摘要（V2 §1.2——体积与范围信息）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.SnapshotInfo.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.SnapshotInfo.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume.SnapshotInfo",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.SnapshotInfo.yml\" sourcestartlinenumber=\"1\">快照信息（V2 §1.1——CreateSnapshot/ListSnapshots 返回）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume.TierVolumeCarrier",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml\" sourcestartlinenumber=\"1\">载体描述（raw-medium-and-conversion-design §2.1）——两种物理形态，一份逻辑布局。</p>\n<p>★ 文件载体：OS 文件系统上的 `.tier` 单文件（跨进程锁 = 伴生锁文件）。</p>\n<p>★ 设备载体：裸块设备/裸分区（跨进程排他 = 卷级独占）——\n  Linux：`/dev/...`（原生 open(2) + flock(LOCK_EX|LOCK_NB) + O_DIRECT）；</p>\n<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml\" sourcestartlinenumber=\"7\">Windows（2026-08-26 补齐）：<code sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml\" sourcestartlinenumber=\"7\">virtual:///dev/C:</code>（卷 → <code sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml\" sourcestartlinenumber=\"7\">\\\\.\\C:</code>，CreateFile share=0 独占 +\nFSCTL_LOCK_VOLUME 锁卷）或 <code sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml\" sourcestartlinenumber=\"8\">virtual:///dev/PhysicalDriveN</code>（物理盘 → <code sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.yml\" sourcestartlinenumber=\"8\">\\\\.\\PhysicalDriveN</code>，\n独占句柄排他）；NO_BUFFERING 直 IO + WRITE_THROUGH 写穿档（IS-03 同机制）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeFormatOptions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeFormatOptions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume.TierVolumeFormatOptions",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeFormatOptions.yml\" sourcestartlinenumber=\"1\">虚拟文件系统格式化选项（medium-protocol-and-parity-design §6——继承 FileSystemOptions 基类）。</p>\n<p>★ 一词制：基类 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.QuotaBytes\" data-throw-if-not-resolved=\"false\"></xref> 即供给（原 CapacityBytes——New 时刻物化，\n  位图按此预留）；<xref href=\"TC.Tier.Core.IO.FileSystemOptions.Label\" data-throw-if-not-resolved=\"false\"></xref> New = 写入 superblock。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeFs.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeFs.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume.TierVolumeFs",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeFs.yml\" sourcestartlinenumber=\"1\">位图 partial——空间事实的真相源（§2.3 铁律 / §3.1 统一块空间）。</p>\n<p>★ 容量成比例（1 bit/块）、格式化时静态定长——是几何不是台阶（§3.1）。</p>\n<p>★ v1 分配 = 起点提示 + 线性扫描 first-fit（分配是元数据路径非数据热路径——§3.4 单锁足够）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeOpenOptions.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.TierVolumeOpenOptions.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume.TierVolumeOpenOptions",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.TierVolume.TierVolumeOpenOptions.yml\" sourcestartlinenumber=\"1\">虚拟文件系统打开选项（medium-protocol-and-parity-design §6——继承 FileSystemOptions 基类）。</p>\n<p>★ 原布尔 <code>ReadOnly</code> 并入基类 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.Access\" data-throw-if-not-resolved=\"false\"></xref>（G2 三态化——\n  Read = 只读打开[dirty 降级形态]，ReadWrite = 缺省；Write = 纯摄入——虚拟卷无此概念，Open 即拒）。</p>\n<p>★ 基类 <xref href=\"TC.Tier.Core.IO.FileSystemOptions.QuotaBytes\" data-throw-if-not-resolved=\"false\"></xref> = 挂载收紧：有效上限 = min(quota, 供给)（§5.3）；\n  <xref href=\"TC.Tier.Core.IO.FileSystemOptions.Label\" data-throw-if-not-resolved=\"false\"></xref> = Open 校验（不符即抛 fail-fast）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.TierVolume.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.TierVolume.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.TierVolume",
+      "Summary": null
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/TC.Tier.Core.IO.VirtualSpec.yml",
       "output": {
         ".html": {
@@ -2469,6 +2521,20 @@
       "IsMRef": true,
       "Title": "TC.Tier.Core.IO.VolumeInfo",
       "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.VolumeInfo.yml\" sourcestartlinenumber=\"1\">卷几何信息——两个独立探测、职责不同的对齐基准（可不同：512B 逻辑扇区+4K 簇；NTFS 4K 扇区+64K 簇）。</p>\n<p>★ <xref href=\"TC.Tier.Core.IO.VolumeInfo.SectorSize\" data-throw-if-not-resolved=\"false\"></xref> = 物理扇区——DIO 读写对齐基准（Win DIO 句柄的 RequiredAlignment 升为 max(sector, 内存页)）。</p>\n<p>★ <xref href=\"TC.Tier.Core.IO.VolumeInfo.AllocationUnit\" data-throw-if-not-resolved=\"false\"></xref> = fs 簇/分配单元——空间操作（PunchHole/Collapse/Insert）对齐基准；mem = PageSize。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Core.IO.WriteConcurrencyMode.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Core.IO.WriteConcurrencyMode.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Core.IO.WriteConcurrencyMode",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.IO.WriteConcurrencyMode.yml\" sourcestartlinenumber=\"1\">同文件写并发档（V2 §2.1——实测判定门两极显式旋钮；virtual 介质挂载级）。</p>\n<p>判定门实测（2026-08-26，`--tier-volume-write-probe same`，64KB 覆写，本机快速载体）：\nSerial 4 写者 ≈ 1×（全串行零争用）、Parallel ≈ 0.57×（争用损失——规划/提交串行 + 载体句柄\n共享的代价大于数据段并行收益）；慢载体（真磁盘 IO 主导数据段）Parallel 收益大——按消费形态选档。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2538,7 +2604,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.Logging.LoggerExtensions",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Logging.LoggerExtensions.yml\" sourcestartlinenumber=\"1\">Logger 扩展方法 — 提供 LogInformation/LogWarning/LogError 等便捷方法。</p>\n<p>★ 零开销短路：每个重载内部先 <xref href=\"TC.Tier.Core.Logging.ILogger.IsEnabled(TC.Tier.Core.Logging.LogLevel)\" data-throw-if-not-resolved=\"false\"></xref> 再格式化——<b>调用方无需手写 IsEnabled</b>。\n  0~3 参数用强类型重载（关闭时不装箱、不分配、不格式化）。</p>\n<p>★ 超过 3 个参数走 <code>params</code> 重载：内部仍判 IsEnabled（不格式化），但数组+装箱在<b>调用点</b>\n  发生（进扩展之前）——正确性无恙，仅<b>热路径</b>值得先手动 <code>IsEnabled</code> 保护或拆成 ≤3 参。</p>\n<p>★ 格式化用 <xref href=\"System.String.Format(System.IFormatProvider%2cSystem.String%2cSystem.Object)\" data-throw-if-not-resolved=\"false\"></xref>（仅 IsEnabled true 时）。\n  命名占位符（<code>{name}</code>）按参数顺序映射为数字索引，兼容 M.E.Logging 惯例。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Logging.LoggerExtensions.yml\" sourcestartlinenumber=\"1\">Logger 扩展方法 — 提供 LogInformation/LogWarning/LogError 等便捷方法。</p>\n<p>★ 零开销短路：每个重载内部先 <xref href=\"TC.Tier.Core.Logging.ILogger.IsEnabled(TC.Tier.Core.Logging.LogLevel)\" data-throw-if-not-resolved=\"false\"></xref> 再格式化——<b>调用方无需手写 IsEnabled</b>。\n  0~3 参数用强类型重载（关闭时不装箱、不分配、不格式化）。</p>\n<p>★ 超过 3 个参数走 <code>params</code> 重载：内部仍判 IsEnabled（不格式化），但数组+装箱在<b>调用点</b>\n  发生（进扩展之前）——正确性无恙，仅<b>热路径</b>值得先手动 <code>IsEnabled</code> 保护或拆成 ≤3 参。</p>\n<p>★ 格式化用 <code>string.Format</code>（仅 IsEnabled true 时）。\n  命名占位符（<code>{name}</code>）按参数顺序映射为数字索引，兼容 M.E.Logging 惯例。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2552,7 +2618,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.Logging.NullLogger",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Logging.NullLogger.yml\" sourcestartlinenumber=\"1\">零开销空 Logger —— 默认实现。<xref href=\"TC.Tier.Core.Logging.NullLogger.Log(TC.Tier.Core.Logging.LogLevel%2cSystem.String%2cSystem.Exception)\" data-throw-if-not-resolved=\"false\"></xref> 空操作，<xref href=\"TC.Tier.Core.Logging.NullLogger.IsEnabled(TC.Tier.Core.Logging.LogLevel)\" data-throw-if-not-resolved=\"false\"></xref> 恒 false。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2566,7 +2632,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.Logging.NullLoggerFactory",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Logging.NullLoggerFactory.yml\" sourcestartlinenumber=\"1\">零开销空 Logger 工厂 —— 默认实现。<xref href=\"TC.Tier.Core.Logging.NullLoggerFactory.CreateLogger(System.String)\" data-throw-if-not-resolved=\"false\"></xref> 恒返回 <xref href=\"TC.Tier.Core.Logging.NullLogger.Instance\" data-throw-if-not-resolved=\"false\"></xref>。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -2888,7 +2954,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.Primitives.AsyncCountDown",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Primitives.AsyncCountDown.yml\" sourcestartlinenumber=\"1\">异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。</p>\n<p>底层基于 <xref href=\"TC.Tier.Core.Primitives.AsyncManualResetEvent\" data-throw-if-not-resolved=\"false\"></xref>（ManualResetValueTaskSourceCore&lt;TResult&gt;），\n常规等待路径零堆分配（传统 <xref href=\"System.Threading.Tasks.TaskCompletionSource%601\" data-throw-if-not-resolved=\"false\"></xref> 方案每次等待有一次堆分配，\n且 <code>nextTcs</code> 赋值非原子存在竞态；本实现消除分配并修复竞态）。</p>\n<p>语义：初始/计数归零时事件 set（等待立即返回）；<xref href=\"TC.Tier.Core.Primitives.AsyncCountDown.Add\" data-throw-if-not-resolved=\"false\"></xref> 使计数 &gt; 0，\n事件 reset（等待阻塞）。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Primitives.AsyncCountDown.yml\" sourcestartlinenumber=\"1\">异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。</p>\n<p>底层基于 <xref href=\"TC.Tier.Core.Primitives.AsyncManualResetEvent\" data-throw-if-not-resolved=\"false\"></xref>（<xref href=\"System.Threading.Tasks.Sources.ManualResetValueTaskSourceCore%601\" data-throw-if-not-resolved=\"false\"></xref>），\n常规等待路径零堆分配（传统 <xref href=\"System.Threading.Tasks.TaskCompletionSource%601\" data-throw-if-not-resolved=\"false\"></xref> 方案每次等待有一次堆分配，\n且 <code>nextTcs</code> 赋值非原子存在竞态；本实现消除分配并修复竞态）。</p>\n<p>语义：初始/计数归零时事件 set（等待立即返回）；<xref href=\"TC.Tier.Core.Primitives.AsyncCountDown.Add\" data-throw-if-not-resolved=\"false\"></xref> 使计数 &gt; 0，\n事件 reset（等待阻塞）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -3084,7 +3150,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Core.Primitives.SectorAlignment",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Primitives.SectorAlignment.yml\" sourcestartlinenumber=\"1\">提供对齐操作的扩展方法，用于将值向上或向下对齐到指定的倍数。默认对齐到 4K 或 2G。</p>\n<p>★ <code class=\"paramref\">alignment</code> 必须是 2 的幂且为正——底层位运算 <code>(value + mask) &amp; ~mask</code>\n  仅对 2 幂成立：传 0 会静默返回 0、传非 2 幂/负数会静默产生错位对齐值，极难排查\n  （IO 对齐错误会引发 O_DIRECT 失败、数据错位等连锁问题）。</p>\n<p>★ 入口用 <xref href=\"System.Numerics.BitOperations.IsPow2(System.Int32)\" data-throw-if-not-resolved=\"false\"></xref> 校验（单条 CPU intrinsic，纳秒级，分支预测下几乎零开销）+\n  Utilities.ThrowHelper（<code>[DoesNotReturn]</code> + <code>NoInlining</code>）隔离冷 throw 路径，\n  热路径内联不受影响。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Core.Primitives.SectorAlignment.yml\" sourcestartlinenumber=\"1\">提供对齐操作的扩展方法，用于将值向上或向下对齐到指定的倍数。默认对齐到 4K 或 2G。</p>\n<p>★ <code>alignment</code> 必须是 2 的幂且为正——底层位运算 <code>(value + mask) &amp; ~mask</code>\n  仅对 2 幂成立：传 0 会静默返回 0、传非 2 幂/负数会静默产生错位对齐值，极难排查\n  （IO 对齐错误会引发 O_DIRECT 失败、数据错位等连锁问题）。</p>\n<p>★ 入口用 <xref href=\"System.Numerics.BitOperations.IsPow2(System.Int32)\" data-throw-if-not-resolved=\"false\"></xref> 校验（单条 CPU intrinsic，纳秒级，分支预测下几乎零开销）+\n  <xref href=\"TC.Tier.Core.Primitives.ThrowHelper\" data-throw-if-not-resolved=\"false\"></xref>（<code>[DoesNotReturn]</code> + <code>NoInlining</code>）隔离冷 throw 路径，\n  热路径内联不受影响。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -3910,7 +3976,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.AddressSpace.SegmentEntry",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.AddressSpace.SegmentEntry.yml\" sourcestartlinenumber=\"1\">段条目——段 ID + 段规格的不可变组合（段表的公开条目形态）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -4092,7 +4158,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Meta.MetadataMetaTransport",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Meta.MetadataMetaTransport.yml\" sourcestartlinenumber=\"1\">外部 meta 介质适配器——把 meta 块托管到 <xref href=\"TC.Tier.Runtime.Structures.Metadata.VersionedMetadata\" data-throw-if-not-resolved=\"false\"></xref>（版本链稳定存储）。</p>\n<p>★ 3a（外部隔离）语义的<b>推荐实现</b>（用户裁定）：需要外部独有 meta 存储时，不再自写\n  单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、\n  崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：</p>\n<p> - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；</p>\n<p> - 持久化点即 <xref href=\"TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlock(System.ReadOnlySpan%7bSystem.Byte%7d)\" data-throw-if-not-resolved=\"false\"></xref>（Write + Persist + flush）——对齐\n  TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；</p>\n<p> - N=2 轮转自动回收（每次写后 VersionedMetadata.ReclaimOldVersions），空间有界；</p>\n<p> - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（\n  经 <xref href=\"TC.Tier.Runtime.Meta.MetadataMetaTransport.Storage\" data-throw-if-not-resolved=\"false\"></xref> 注册进 TransactionLog）。</p>\n<p>配置约束：<xref href=\"TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings.PayloadSize\" data-throw-if-not-resolved=\"false\"></xref> 必须 ≥ meta 块上界\n（12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛 <xref href=\"System.ArgumentException\" data-throw-if-not-resolved=\"false\"></xref>\n（fail-fast，不静默截断）。引擎名须与主结构不同（如 \"xxx.meta\"）。</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Meta.MetadataMetaTransport.yml\" sourcestartlinenumber=\"1\">外部 meta 介质适配器——把 meta 块托管到 <xref href=\"TC.Tier.Runtime.Structures.Metadata.VersionedMetadata\" data-throw-if-not-resolved=\"false\"></xref>（版本链稳定存储）。</p>\n<p>★ 3a（外部隔离）语义的<b>推荐实现</b>（用户裁定）：需要外部独有 meta 存储时，不再自写\n  单槽文件/KV——独自写盘要自己解决 torn write 原子性、落盘顺序（data 先 meta 后）、\n  崩溃恢复一致性，还得自搭 2PC 提交链路。托管到 VersionedMetadata 后：</p>\n<p> - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；</p>\n<p> - 持久化点即 <xref href=\"TC.Tier.Runtime.Meta.MetadataMetaTransport.WriteBlock(System.ReadOnlySpan%7bSystem.Byte%7d)\" data-throw-if-not-resolved=\"false\"></xref>（Write + Persist + flush）——对齐\n  TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；</p>\n<p> - N=2 轮转自动回收（每次写后 <xref href=\"TC.Tier.Runtime.Structures.Metadata.MetadataBase.ReclaimOldVersions\" data-throw-if-not-resolved=\"false\"></xref>），空间有界；</p>\n<p> - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（\n  经 <xref href=\"TC.Tier.Runtime.Meta.MetadataMetaTransport.Storage\" data-throw-if-not-resolved=\"false\"></xref> 注册进 TransactionLog）。</p>\n<p>配置约束：<xref href=\"TC.Tier.Runtime.Structures.Metadata.VersionedMetadataSettings.PayloadSize\" data-throw-if-not-resolved=\"false\"></xref> 必须 ≥ meta 块上界\n（12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾）；超限写抛 <xref href=\"System.ArgumentException\" data-throw-if-not-resolved=\"false\"></xref>\n（fail-fast，不静默截断）。引擎名须与主结构不同（如 \"xxx.meta\"）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -4414,7 +4480,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy",
-      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.yml\" sourcestartlinenumber=\"1\">提交策略接口——EntryLog group 提交引擎按策略判定&quot;何时&quot;触发提交（不决定&quot;怎么&quot;提交）。</p>\n<p>★ 策略只决定\"何时\"，提交执行链（FlushUntilAsync + MetaPolicy.Commit + 推进 CommittedOffset）由 EntryLog 内部闭环。\n参见 EntryLog.md §3.5。</p>\n<p>内置策略：</p>\n<p>- <xref href=\"TC.Tier.Runtime.Structures.Log.GroupCommitPolicy\" data-throw-if-not-resolved=\"false\"></xref>：三维度阈值兜底（数据量/时间/记录数任一满足）</p>\n<p>- SynchronousCommitPolicy：恒 true（每次 Append 立即提交，单条强制）</p>\n<p>- ExternalCommitPolicy：恒 false（不自动提交，靠手动 CommitAsync 或 2PC）</p>\n"
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.yml\" sourcestartlinenumber=\"1\">提交策略接口——EntryLog group 提交引擎按策略判定&quot;何时&quot;触发提交（不决定&quot;怎么&quot;提交）。</p>\n<p>★ 策略只决定\"何时\"，提交执行链（FlushUntilAsync + MetaPolicy.Commit + 推进 CommittedOffset）由 EntryLog 内部闭环。\n参见 EntryLog.md §3.5。</p>\n<p>内置策略：</p>\n<p>- <xref href=\"TC.Tier.Runtime.Structures.Log.GroupCommitPolicy\" data-throw-if-not-resolved=\"false\"></xref>：三维度阈值兜底（数据量/时间/记录数任一满足）</p>\n<p>- Synchronous：恒 true（每次 Append 立即提交，单条强制）</p>\n<p>- External：恒 false（不自动提交，靠手动 CommitAsync 或 2PC）</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -5324,7 +5390,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings.yml\" sourcestartlinenumber=\"1\">HashIndex 配置——探测族 hash 表形态参数（基类收持久化机制配置，本件只填表容量/溢出池参数）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -5366,7 +5432,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase<TKey>.IndexScope",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.IndexScope.yml\" sourcestartlinenumber=\"1\">读保护 scope（ref struct——EnterScope 创建即 Resume epoch，Dispose 即 Suspend；Find 走 FindNoEpoch 零进出开销）。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -5814,7 +5880,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.Ring.RingBase<TKey>.MetaHost",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Ring.RingBase-1.MetaHost.yml\" sourcestartlinenumber=\"1\">Transport 策略回落的 meta 传输适配器——meta block 嵌入 ring 流：\n写 = 追加一条 IS_META record 到 ring 流末尾；读 = 倒序扫 ring 流找最后一条有效 IS_META record 的 payload。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -5828,7 +5894,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.Ring.RingBase<TKey>.MetaLayout",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Ring.RingBase-1.MetaLayout.yml\" sourcestartlinenumber=\"1\">Ring meta 块布局实现（<xref href=\"TC.Tier.Contracts.Meta.IMetaLayout%602\" data-throw-if-not-resolved=\"false\"></xref> 规范实现）——\nHeader 12B 规范字段 + Payload（结构化水位 + opaque 插槽）大小自述，codec 委托\nRingMetaHeaderCodec/RingMetaPayloadCodec；读旧块短 payload 时零扩展降级。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -5842,7 +5908,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.Ring.RingBase<TKey>.ReadScope",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Ring.RingBase-1.ReadScope.yml\" sourcestartlinenumber=\"1\">★ 零拷贝读 scope（ref struct 栈护栏）——构造时进入 epoch 读保护，<xref href=\"TC.Tier.Runtime.Structures.Ring.RingBase%601.ReadScope.Dispose\" data-throw-if-not-resolved=\"false\"></xref> 时退出。\n持有期间（即 <xref href=\"TC.Tier.Runtime.Structures.Ring.RingBase%601.GetValueSpan(TC.Tier.Contracts.Storage.LogicalAddress)\" data-throw-if-not-resolved=\"false\"></xref> 返回 span 的有效期）热页驱逐/冷缓存淘汰经 epoch 排水被阻塞，\n底层页恒稳不被释放/复用；跨 scope 持有 span = 未定义。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -6098,6 +6164,34 @@
     },
     {
       "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.yml\" sourcestartlinenumber=\"1\">IncrementalSnapshot——增量快照结构（镜像快照设计稿 §3.3——方案 A：段增量）。</p>\n<p>★ 语义：段（Segment）= 一次快照增量 = 一帧 [Header 14B][N₀ 8B 前缀 + 条目流][Footer 28B]；\n  新段 append 不重写旧段（raft 定期压缩——快照越频繁写省越多，基准实测 8 次快照 4.5× 字节差）；\n  读 = 段表驱动逐段顺序拼接 = 最新快照；段累积达阈值 → 合并为新基线段（低频全量重写，raft 只需最新快照）。</p>\n<p>★ 段表（各段起点 + N₀——恢复 O(1) 定位）：内存列表 + opaque meta 原子落盘（搭水位线同一块\n  同一 CRC——AppendSegment 完成后 SetOpaqueMeta + WriteMeta）。</p>\n<p>★ 容错：段级帧 CRC64——崩溃 = 旧段完好、半写段恢复期忽略（尾部检查 = 段表物理尾 vs 引擎\n  CommittedTail，不依赖 meta 水位）；段内 N₀ 前缀自描述（独立读一段可知覆盖点）。</p>\n<p>★ 生命周期：继承 <xref href=\"TC.Tier.Runtime.Structures.Snapshot.SnapshotBase\" data-throw-if-not-resolved=\"false\"></xref>（引擎/生命周期/事务参与基类能力）——恢复核心 =\n  <xref href=\"TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.IncrementalRecovery\" data-throw-if-not-resolved=\"false\"></xref>（RecoveryBase 模板派生：join 引擎 + meta 段表 + 尾部检查）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
+      "source_relative_path": "api/TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings.yml",
+      "output": {
+        ".html": {
+          "relative_path": "api/TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings.html"
+        }
+      },
+      "version": "",
+      "Uid": null,
+      "IsMRef": true,
+      "Title": "TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings",
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings.yml\" sourcestartlinenumber=\"1\">IncrementalSnapshot 专属配置——段累积合并阈值（opaque 段表容量走基类 MetaOpaqueBytes，调用方显式配置）。</p>\n"
+    },
+    {
+      "type": "ManagedReference",
       "source_relative_path": "api/TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.yml",
       "output": {
         ".html": {
@@ -6276,7 +6370,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.SortedIndex.BTreeIndexSettings",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.SortedIndex.BTreeIndexSettings.yml\" sourcestartlinenumber=\"1\">BTreeIndex B+树索引设置——引擎选项直构（继承 SortedIndexSettings）+ 节点容量/填充率。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -6500,7 +6594,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.SortedIndex.SkipListIndexSettings",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.SortedIndex.SkipListIndexSettings.yml\" sourcestartlinenumber=\"1\">SkipListIndex 跳表索引设置——引擎选项直构（继承 SortedIndexSettings）+ 层几何/回收策略。</p>\n"
     },
     {
       "type": "ManagedReference",
@@ -6528,7 +6622,7 @@
       "Uid": null,
       "IsMRef": true,
       "Title": "TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase<TKey>.IndexScope",
-      "Summary": null
+      "Summary": "<p sourcefile=\"api/TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.IndexScope.yml\" sourcestartlinenumber=\"1\">读保护 scope（ref struct——EnterScope 创建即 Resume epoch，Dispose 即 Suspend；Find 走 FindNoEpoch 零进出开销）。</p>\n"
     },
     {
       "type": "ManagedReference",

@@ -177,7 +177,8 @@ DataEnd 裁剪，防 PreallocateFile 预分配幻影区（未提交占位）被�
 
   <a id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_End_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.End*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_End" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.End">End</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Compact 区间结束逻辑地址（不包含）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -202,7 +203,8 @@ DataEnd 裁剪，防 PreallocateFile 预分配幻影区（未提交占位）被�
 
   <a id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Start_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Start*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Start" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Start">Start</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Compact 区间起始逻辑地址（包含）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -227,7 +229,8 @@ DataEnd 裁剪，防 PreallocateFile 预分配幻影区（未提交占位）被�
 
   <a id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_State_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.State*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_State" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.State">State</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>lease 状态（Active / Committed / RolledBack——原子读）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -254,17 +257,36 @@ DataEnd 裁剪，防 PreallocateFile 预分配幻影区（未提交占位）被�
 
   <a id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Commit_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Commit*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Commit" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Commit">Commit()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>整体原子提交（不支持 chunk 分阶段提交）——先校验全部 chunk 已填终态（半填拒绝提交），
+CAS 进 Committed 后先 CompactCommit（原位换内脏，锁内清场）再释放区间所有权。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public void Commit()</code></pre>
   </div>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></td>
+        <td><p>任一 chunk 仍 Pending（漏填 SetReplacement/MarkInvalid）。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
 
 
   <a id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Dispose_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Dispose*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Dispose" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Dispose">Dispose()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>释放——仍 Active 的 lease 自动走 Rollback（未提交的占住区间回滚）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -274,7 +296,8 @@ DataEnd 裁剪，防 PreallocateFile 预分配幻影区（未提交占位）被�
 
   <a id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Rollback_" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Rollback*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_Leases_CompactLease_Rollback" data-uid="TC.Tier.Runtime.AddressSpace.Leases.CompactLease.Rollback">Rollback()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>整体回滚——CAS 进 RolledBack 后逐一回滚 extent、通知源 CompactRollback、释放数组。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">

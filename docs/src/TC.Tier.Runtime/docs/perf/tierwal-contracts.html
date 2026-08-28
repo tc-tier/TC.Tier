@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>TierWAL 三份性能契约基线 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="TierWAL 三份性能契约基线 | TC.Tier — .NET 可组合存储运行时 ">
+    
+    
+      <link rel="shortcut icon" href="../../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../../../../../styles/docfx.css">
+      <link rel="stylesheet" href="../../../../../styles/main.css">
+      <meta property="docfx:navrel" content="../../../../../toc.html">
+      <meta property="docfx:tocrel" content="../../../../../toc.html">
+    
+    <meta property="docfx:rel" content="../../../../../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+
+              <a class="navbar-brand" href="../../../../../index.html">
+                <img id="logo" class="svg" src="../../../../../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="navbar-right" id="search">
+              <form class="navbar-form" role="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="">
+<h1 id="tierwal-三份性能契约基线">TierWAL 三份性能契约基线</h1>
+
+<blockquote>
+<p>实测于本机（12 逻辑核 / .NET 8.0.30 / Windows 11 / NTFS）：机械盘 = F: WD10EZEX，SSD = C: NVMe；
+探针运行介质经 <code>TMP/TEMP</code> 重定向控制（磁盘口径 = 机械盘 F:，最坏介质）。日期：2026-08-26。
+判定口径（设计稿 §3）：① 元数据槽原子写 p99 &lt;10ms 级、抖动不触发选举失败（p99.9 &lt;150ms 窗口下界）；
+② 磁盘随机起点重放吞吐（RTO 外推）；③ 快照导出+导入+增量重放收敛时间。</p>
+</blockquote>
+<h2 id="契约-选举窗口--元数据持久化--wal-meta-probe">契约① 选举窗口 ↔ 元数据持久化（<code>--wal-meta-probe</code>）</h2>
+<ul>
+<li>形态：128B term/vote 元数据，<code>WriteMetaAsync</code> = stage + 一次提交 = 应答持久化；1000 迭代。</li>
+<li>运行：
+<pre><code class="lang-bash">dotnet run --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-meta-probe virtual 1000 all        # 基线
+dotnet run --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-meta-probe virtual 1000 all true   # 载体写穿档（第 4 参）
+</code></pre>
+</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>IO 模式</th>
+<th style="text-align: right;">基线 p50</th>
+<th style="text-align: right;">基线 p99.9</th>
+<th style="text-align: right;">写穿档 p50</th>
+<th style="text-align: right;">写穿档 p99.9</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>buffered</td>
+<td style="text-align: right;">20.2ms</td>
+<td style="text-align: right;">163.9ms</td>
+<td style="text-align: right;"><strong>0.198ms</strong></td>
+<td style="text-align: right;"><strong>1.08ms</strong></td>
+<td>写穿档达标</td>
+</tr>
+<tr>
+<td>WriteThrough</td>
+<td style="text-align: right;">30.6ms</td>
+<td style="text-align: right;">232.4ms</td>
+<td style="text-align: right;"><strong>0.179ms</strong></td>
+<td style="text-align: right;"><strong>1.74ms</strong></td>
+<td>写穿档达标</td>
+</tr>
+<tr>
+<td>DIO</td>
+<td style="text-align: right;">16.7ms</td>
+<td style="text-align: right;">125.1ms</td>
+<td style="text-align: right;"><strong>0.176ms</strong></td>
+<td style="text-align: right;"><strong>1.06ms</strong></td>
+<td>写穿档达标</td>
+</tr>
+<tr>
+<td>DIO+WriteThrough</td>
+<td style="text-align: right;">30.9ms</td>
+<td style="text-align: right;">233.4ms</td>
+<td style="text-align: right;"><strong>0.169ms</strong></td>
+<td style="text-align: right;"><strong>0.58ms</strong></td>
+<td>写穿档达标</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>现状选型：virtual 介质 + raft 语义持久化 → 挂载 <code>CarrierWriteThrough=true</code>（载体句柄级写穿，
+journal 提交免独立 fsync——写穿完成即单屏障）；基线四格 p99.9 全 ≥150ms 不达标。</li>
+</ul>
+<h2 id="契约-重放吞吐--rto--wal-replay-probe">契约② 重放吞吐 ↔ RTO（<code>--wal-replay-probe</code>）</h2>
+<ul>
+<li>形态：50 万条 × 64B 组提交写入 → 从 count/2 随机起点全量重放（段表二分 + 段内扫帧）。</li>
+<li>运行：<code>dotnet run --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-replay-probe &lt;virtual|local&gt; 500000 64</code></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th style="text-align: right;">写入（组提交）</th>
+<th style="text-align: right;">重放吞吐</th>
+<th style="text-align: right;">RTO 外推（100 万条）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>virtual</td>
+<td style="text-align: right;">328K 条/s</td>
+<td style="text-align: right;"><strong>2.67M 条/s / 163.2MB/s</strong></td>
+<td style="text-align: right;"><strong>0.37s</strong></td>
+</tr>
+<tr>
+<td>local</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;"><strong>2.54M 条/s / 155.2MB/s</strong></td>
+<td style="text-align: right;"><strong>0.39s</strong></td>
+</tr>
+</tbody>
+</table>
+<h2 id="契约-冷节点追赶--收敛--wal-catchup-probe">契约③ 冷节点追赶 ↔ 收敛（<code>--wal-catchup-probe</code>）</h2>
+<ul>
+<li>形态（镜像快照接线后——快照 = 主数据镜像帧流 + 注入传输面）：20 万条主节点 → 一体快照（N₀=20 万，
+镜像 12.97MB）→ 导出（经注入传输面）→ 增量 2 万条 → 冷节点导入 → 从 N₀+1 增量重放。</li>
+<li>运行：<code>dotnet run --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-catchup-probe &lt;local|virtual&gt; 200000 20000 64</code></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th style="text-align: right;">快照导出</th>
+<th style="text-align: right;">导入</th>
+<th style="text-align: right;">增量重放</th>
+<th style="text-align: right;">收敛合计</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>local</td>
+<td style="text-align: right;">0.10s（124.5MB/s，192 万条/s）</td>
+<td style="text-align: right;">0.052s</td>
+<td style="text-align: right;">0.01s（1.92M 条/s）</td>
+<td style="text-align: right;"><strong>0.17s</strong></td>
+</tr>
+<tr>
+<td>virtual</td>
+<td style="text-align: right;">0.11s（115.9MB/s，179 万条/s）</td>
+<td style="text-align: right;">0.057s</td>
+<td style="text-align: right;">0.01s（1.76M 条/s）</td>
+<td style="text-align: right;"><strong>0.18s</strong></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>判定：镜像快照（第三部件）与旧形态（主数据 [Head..N₀] 导出）同量级——快照生成+导出+安装+重放
+全链收敛 &lt;0.2s，冷节点追赶不构成 RTO 瓶颈。</li>
+</ul>
+<h2 id="快照存储选型--wal-snapshot-store-probe镜像快照设计稿-34">快照存储选型（<code>--wal-snapshot-store-probe</code>，镜像快照设计稿 §3.4）</h2>
+<ul>
+<li>形态：方案 A（段增量——每次只写增量段）vs 方案 B（全量重写——每次重写整个镜像）；条目流 64B/条。</li>
+<li>运行：<code>dotnet run --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-snapshot-store-probe &lt;local|virtual&gt; &lt;imageMb&gt; &lt;snapshots&gt; 64</code></li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th style="text-align: right;">A 写</th>
+<th style="text-align: right;">B 写</th>
+<th style="text-align: right;">A 读（拼接）</th>
+<th style="text-align: right;">B 读（单段）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>256MB × 4 快照（local）</td>
+<td style="text-align: right;">256MB / 0.36s</td>
+<td style="text-align: right;">640MB / 0.92s（2.6× 字节差）</td>
+<td style="text-align: right;">2404MB/s</td>
+<td style="text-align: right;">2062MB/s</td>
+</tr>
+<tr>
+<td>256MB × 8 快照（local）</td>
+<td style="text-align: right;">256MB / 0.31s</td>
+<td style="text-align: right;">1152MB / 1.74s（<strong>4.5× 字节差</strong>）</td>
+<td style="text-align: right;">2853MB/s</td>
+<td style="text-align: right;">2332MB/s</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>结论（数字定案）：<strong>方案 A 胜</strong>——写侧 = 镜像总量（恒增量）vs 累计全量（Σk×delta），快照越频繁省得越多；
+读侧持平（拼接开销可忽略）；A 的段累积合并成本 = B 单次全量写（低频触发，raft 只需最新快照）。
+→ 落地面 = <strong>IncrementalSnapshot</strong>（段 = 帧 + 段表 meta O(1) 恢复 + 阈值合并）。</li>
+</ul>
+<h2 id="稳定性矩阵--wal-append-probef-机械盘-local第-5-参--载体写穿档is-03virtual-专属">稳定性矩阵（<code>--wal-append-probe</code>，F: 机械盘 local；第 5 参 = 载体写穿档——IS-03，virtual 专属）</h2>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th style="text-align: right;">提交形态</th>
+<th style="text-align: right;">p50</th>
+<th style="text-align: right;">p99/p50 抖动</th>
+<th style="text-align: right;">吞吐</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>virtual（句柄级）</td>
+<td style="text-align: right;">组提交（批 100）</td>
+<td style="text-align: right;">0.054ms</td>
+<td style="text-align: right;">2.2×</td>
+<td style="text-align: right;">200K 条/s</td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td style="text-align: right;">组提交（批 100）</td>
+<td style="text-align: right;">0.054ms</td>
+<td style="text-align: right;">2.2×</td>
+<td style="text-align: right;"><strong>239K 条/s</strong></td>
+</tr>
+<tr>
+<td>local</td>
+<td style="text-align: right;">组提交（批 100）</td>
+<td style="text-align: right;">0.053ms</td>
+<td style="text-align: right;">2.4×</td>
+<td style="text-align: right;">362K 条/s</td>
+</tr>
+<tr>
+<td>virtual（句柄级）</td>
+<td style="text-align: right;">单条（每写 fsync）</td>
+<td style="text-align: right;">33.4ms</td>
+<td style="text-align: right;">3.3×</td>
+<td style="text-align: right;">28 条/s</td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td style="text-align: right;">单条（每写 fsync）</td>
+<td style="text-align: right;"><strong>0.792ms</strong></td>
+<td style="text-align: right;">2.5×</td>
+<td style="text-align: right;"><strong>984 条/s</strong></td>
+</tr>
+<tr>
+<td>local buffered</td>
+<td style="text-align: right;">单条（每写 fsync）</td>
+<td style="text-align: right;">41.6ms</td>
+<td style="text-align: right;">2.6×</td>
+<td style="text-align: right;">25 条/s</td>
+</tr>
+<tr>
+<td>local WriteThrough</td>
+<td style="text-align: right;">单条（每写 fsync）</td>
+<td style="text-align: right;">0.519ms</td>
+<td style="text-align: right;">2.3×</td>
+<td style="text-align: right;">1702 条/s</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>★ virtual 完整能力 = 挂载级载体写穿档（<code>--wal-append-probe virtual 1000 5000 none true</code>）——
+<strong>单条提交 33.4ms → 0.79ms（42×）</strong>——与 local WriteThrough（0.52ms）同量级（免 fsync 生效）；
+句柄级形态（无第 5 参）= RM-07 逐写 journal 提交（每写仍付 fsync——非功能缺失）。</li>
+<li>组提交（raft 主路径）p50 全介质全形态有界（0.05ms——内存快路径）；吞吐 virtual 写穿档 239K vs
+local 362K（journal 记录成本残余——非 fsync）；单条提交 = IO 模式/写穿档主导变量。</li>
+<li>复现说明：机械盘单条提交 33-42ms 为 fsync 物理地板（非缺陷）；组提交形态下 p99.9 偶发单次峰
+（~318ms，页 flush 提交刺），探针报告化时已加预热复核。</li>
+</ul>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                  <li>
+                    <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/perf/tierwal-contracts.md/#L1" class="contribution-link">Edit this page</a>
+                  </li>
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../../../../../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../../../../../styles/docfx.js"></script>
+    <script type="text/javascript" src="../../../../../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

@@ -138,9 +138,6 @@
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;MirrorRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;MirrorRecoveryHints&gt;.Recovery</a>
-    </div>
-    <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;MirrorRecoveryHints&gt;.Id</a>
     </div>
     <div>
@@ -622,7 +619,11 @@ N=2 立即头截断回收最老 + 刷新 meta + 触发回调。</p>
 
   <a id="TC_Tier_Runtime_Structures_Mirror_MirrorBase_Prepare_" data-uid="TC.Tier.Runtime.Structures.Mirror.MirrorBase.Prepare*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Mirror_MirrorBase_Prepare_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Mirror.MirrorBase.Prepare(System.Int64)">Prepare(long)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Prepare：flush 已写数据 + meta.Commit（记录 LastPreparedSeq + 悬干水位）。</p>
+<p>★ checkpoint 数据由子类写门面（Begin/Chunk/End 或 WritePage）先行写盘——Prepare 是 2PC 持久化点
+（数据 fsync 先于 meta fsync，断电时 meta 绝不标记 data 未落盘的 commit 点）。</p>
+<p>崩溃在 Prepare 后 Commit 前：seq 未推进 → 恢复按 meta 裁决尾截断悬干（一致）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">

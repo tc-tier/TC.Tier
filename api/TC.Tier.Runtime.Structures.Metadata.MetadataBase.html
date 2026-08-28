@@ -137,9 +137,6 @@
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;MetadataRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;MetadataRecoveryHints&gt;.Recovery</a>
-    </div>
-    <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;MetadataRecoveryHints&gt;.Id</a>
     </div>
     <div>
@@ -422,7 +419,9 @@
 
   <a id="TC_Tier_Runtime_Structures_Metadata_MetadataBase_AbortAsync_" data-uid="TC.Tier.Runtime.Structures.Metadata.MetadataBase.AbortAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Metadata_MetadataBase_AbortAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Metadata.MetadataBase.AbortAsync(System.Int64,System.Threading.CancellationToken)">AbortAsync(long, CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>Abort 异步对等版——回退逻辑复用同步 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.MetadataBase.html#TC_Tier_Runtime_Structures_Metadata_MetadataBase_Abort_System_Int64_">Abort(long)</a>（内存窗口回退零 IO +
+尾截断回退悬干新版本 + meta），异步轨仅包一层已完成 Task（引擎 flush 原生同步）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -441,12 +440,14 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">seq</span></td>
-        <td></td>
+        <td><p>回滚的 Prepare 序号。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌（本实现同步完成，不参与取消）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -631,7 +632,9 @@
 
   <a id="TC_Tier_Runtime_Structures_Metadata_MetadataBase_GetRef_" data-uid="TC.Tier.Runtime.Structures.Metadata.MetadataBase.GetRef*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Metadata_MetadataBase_GetRef__1" data-uid="TC.Tier.Runtime.Structures.Metadata.MetadataBase.GetRef``1">GetRef&lt;T&gt;()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>强类型引用视图——返回当前版本 payload 起始的 <code class="typeparamref">T</code> 引用
+（加载版本 slice 或热区 [0]，热路径 GetRefUnsafe 零校验）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -648,7 +651,8 @@
     <tbody>
       <tr>
         <td><span class="xref">T</span></td>
-        <td></td>
+        <td><p>当前内容首字节按 <code class="typeparamref">T</code> 重解释的引用。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -663,7 +667,8 @@
     <tbody>
       <tr>
         <td><span class="parametername">T</span></td>
-        <td></td>
+        <td><p>非托管目标类型（大小必须 ≤ 当前内容大小，裸调危险）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -805,9 +810,9 @@
 
   <a id="TC_Tier_Runtime_Structures_Metadata_MetadataBase_PrepareAsync_" data-uid="TC.Tier.Runtime.Structures.Metadata.MetadataBase.PrepareAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Metadata_MetadataBase_PrepareAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Metadata.MetadataBase.PrepareAsync(System.Int64,System.Threading.CancellationToken)">PrepareAsync(long, CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>★ Prepare（预备）：把数据写到设备并 Flush（真正持久化），附 seq，但 lastCommittedSeq 不推进。</p>
-<p>数据持久化但"悬空"——未被 commit record 确认。崩溃在此后 Commit 前恢复时丢弃。</p>
-<p>★ 必须包含 Flush——WriteAsync 不保证落盘。</p>
+  <div class="markdown level1 summary"><p>Prepare 异步对等版（同步 <a class="xref" href="TC.Tier.Runtime.Structures.Metadata.MetadataBase.html#TC_Tier_Runtime_Structures_Metadata_MetadataBase_Prepare_System_Int64_">Prepare(long)</a>）——记录回退快照 → 追加新版本到磁盘链头
+（内容未变跳过追加）→ 写 meta。★ 数据 flush 原生同步（AppendVersionToDisk 同步执行），
+仅 meta 走异步轨（MetaPolicy.CommitAsync）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -827,12 +832,14 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">seq</span></td>
-        <td></td>
+        <td><p>准备提交的序号。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>

@@ -488,7 +488,7 @@
 
   <a id="TC_Tier_Runtime_Transactions_SessionManager_DisposeOverride_" data-uid="TC.Tier.Runtime.Transactions.SessionManager.DisposeOverride*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_SessionManager_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Transactions.SessionManager.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
-  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>同步 Dispose——关管线通道后同步有界等待管线排空（超时强制排水），再释放注入 txn。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -508,8 +508,7 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
-本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+        <td><p>true = 主动 Dispose；false = 终结器路径（本实现无终结器，不做处理）。</p>
 </td>
       </tr>
     </tbody>
@@ -520,7 +519,7 @@
 
   <a id="TC_Tier_Runtime_Transactions_SessionManager_DisposeOverrideAsync_" data-uid="TC.Tier.Runtime.Transactions.SessionManager.DisposeOverrideAsync*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_SessionManager_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Transactions.SessionManager.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
-  <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>异步 Dispose——关管线通道后有界等待管线排空（超时强制排水），再释放注入 txn。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -540,7 +539,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td></td>
+        <td><p>true = 主动 Dispose；false = 终结器路径（本实现无终结器，不做处理）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -658,15 +658,7 @@ plan 收当前已提交水位 seq；回执=该水位。</p>
 
   <a id="TC_Tier_Runtime_Transactions_SessionManager_OnInitializeComplete_" data-uid="TC.Tier.Runtime.Transactions.SessionManager.OnInitializeComplete*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_SessionManager_OnInitializeComplete" data-uid="TC.Tier.Runtime.Transactions.SessionManager.OnInitializeComplete">OnInitializeComplete()</h4>
-  <div class="markdown level1 summary"><p>★ Initialize 第二阶段（[后]）钩子——<b>仅在本实例恢复成功完成后</b>调用。</p>
-<pre><code>        &lt;p&gt;★ 不变量：Complete / Ready / 恢复完成 三者同义。每层都用同一 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;，
-          故任意嵌套层此不变量都成立——父层在此钩子里可安全读&quot;本层恢复产物&quot;。&lt;/p&gt;
-        &lt;p&gt;★ 执行线程：有恢复时在后台 LongRunning task 内（串行接在 &lt;code&gt;await RecoverAsync&lt;/code&gt; 之后）；
-          无恢复（&lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.CreateRecovery&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 返回 null）时在调用线程同步执行。&lt;/p&gt;
-        &lt;p&gt;★ 异常策略：恢复已 MarkReady、实例可用——钩子内抛异常只 log，不 fault 主 task。&lt;/p&gt;
-        &lt;p&gt;★ 需配 &lt;xref href=&quot;TC.Tier.Core.Shared.BackgroundWorkerLoop&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 的子类：在 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.OnInitializeBegin&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 或本钩子里调
-          &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.ConfigureBackgroundWorker(TC.Tier.Core.Shared.BackgroundWorkerLoop)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 均可——worker.Start 在本钩子&lt;b&gt;之后&lt;/b&gt;跑（等恢复完成 + 装配就绪）。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>启动序收口——协调器悬挂裁决（ReconcileStartup）+ 启动提交管线。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>

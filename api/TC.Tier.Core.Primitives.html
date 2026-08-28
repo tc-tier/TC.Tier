@@ -88,7 +88,7 @@ Classes
 </section>
       <h4><a class="xref" href="TC.Tier.Core.Primitives.AsyncCountDown.html">AsyncCountDown</a></h4>
       <section><p>异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。</p>
-<p>底层基于 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a>（ManualResetValueTaskSourceCore&lt;TResult&gt;），
+<p>底层基于 <a class="xref" href="TC.Tier.Core.Primitives.AsyncManualResetEvent.html">AsyncManualResetEvent</a>（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.sources.manualresetvaluetasksourcecore-1">ManualResetValueTaskSourceCore&lt;TResult&gt;</a>），
 常规等待路径零堆分配（传统 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskcompletionsource-1">TaskCompletionSource&lt;TResult&gt;</a> 方案每次等待有一次堆分配，
 且 <code>nextTcs</code> 赋值非原子存在竞态；本实现消除分配并修复竞态）。</p>
 <p>语义：初始/计数归零时事件 set（等待立即返回）；<a class="xref" href="TC.Tier.Core.Primitives.AsyncCountDown.html#TC_Tier_Core_Primitives_AsyncCountDown_Add">Add()</a> 使计数 &gt; 0，
@@ -210,11 +210,11 @@ tryAcquire/业务逻辑负责），门只做两件事：<b>让后来者不插队
 </section>
       <h4><a class="xref" href="TC.Tier.Core.Primitives.SectorAlignment.html">SectorAlignment</a></h4>
       <section><p>提供对齐操作的扩展方法，用于将值向上或向下对齐到指定的倍数。默认对齐到 4K 或 2G。</p>
-<p>★ <code class="paramref">alignment</code> 必须是 2 的幂且为正——底层位运算 <code>(value + mask) &amp; ~mask</code>
+<p>★ <code>alignment</code> 必须是 2 的幂且为正——底层位运算 <code>(value + mask) &amp; ~mask</code>
   仅对 2 幂成立：传 0 会静默返回 0、传非 2 幂/负数会静默产生错位对齐值，极难排查
   （IO 对齐错误会引发 O_DIRECT 失败、数据错位等连锁问题）。</p>
 <p>★ 入口用 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.numerics.bitoperations.ispow2#system-numerics-bitoperations-ispow2(system-int32)">IsPow2(int)</a> 校验（单条 CPU intrinsic，纳秒级，分支预测下几乎零开销）+
-  Utilities.ThrowHelper（<code>[DoesNotReturn]</code> + <code>NoInlining</code>）隔离冷 throw 路径，
+  <a class="xref" href="TC.Tier.Core.Primitives.ThrowHelper.html">ThrowHelper</a>（<code>[DoesNotReturn]</code> + <code>NoInlining</code>）隔离冷 throw 路径，
   热路径内联不受影响。</p>
 </section>
       <h4><a class="xref" href="TC.Tier.Core.Primitives.SpinRWLock.html">SpinRWLock</a></h4>

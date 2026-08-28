@@ -1397,7 +1397,15 @@
 
   <a id="TC_Tier_Runtime_AddressSpace_SegmentTable_SaveAddressTable_" data-uid="TC.Tier.Runtime.AddressSpace.SegmentTable.SaveAddressTable*"></a>
   <h4 id="TC_Tier_Runtime_AddressSpace_SegmentTable_SaveAddressTable_TC_Tier_Runtime_AddressSpace_IAddressTableWriter_" data-uid="TC.Tier.Runtime.AddressSpace.SegmentTable.SaveAddressTable(TC.Tier.Runtime.AddressSpace.IAddressTableWriter)">SaveAddressTable(IAddressTableWriter)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>保存地址表到持久化——写入段表 + 两水位。</p>
+<p>★ 跳过 Invalid 段（已回收的头部段，地址空间无意义，恢复时不需要）——否则 LoadAddressTable
+  会从第一个 Invalid 段推断 MinSegId，导致头部回收后保存恢复丢失回收事实。</p>
+<p>★ M3 修复（）：保存期间持<b>双尾水位独占</b>（TryHoldTailWatermark）——
+  并发 Append 的尾推进被挡（TryUpdateAllocated 前检失败自旋重试）、并发 ReclaimTail 回退被拒——
+  快照 = 段列表 + 双尾的一致性视图（原实现遍历段表与读 footer 之间水位可被推进 → 恢复时
+  footer 水位超前于段列表 = 已提交数据被当洞覆盖）。推进者的段在推进前已 EnsureSegmentsForLength
+  在表——hold 后遍历见完整几何。hold 失败（回退者持有时）有界自旋（回退是短操作——截断毫秒级）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">

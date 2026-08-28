@@ -9,7 +9,7 @@
       <meta name="viewport" content="width=device-width">
       <meta name="title" content="Class RemoteFileSystem | TC.Tier — .NET 可组合存储运行时 ">
     
-    <meta name="description" content="远程文件系统—— 第三介质桥（B3.3/B3.4）：注入的  升格为文件语义（staging 写回层 / 延迟加载 / multipart 编排 / fencing 卷锁）。 ★ 构造：Create(IObjectStore, RemoteFileSystemOptions?, ILogger?)——store 注入   （S3ObjectStore / MemoryObjectStore / 任意实现），桥对厂商零知识。 ★ 键模型：对象键 = {KeyPrefix}{path}（多引擎共桶隔离）；path 经    （三介质同一实现——越出前缀即 ，不可能访问同桶其他前缀对象）。 ★ Dispose 契约（磁盘方向）：&quot;离开目录&quot;——Dispose 后 Open 抛 ；   已开句柄继续可用（staging 自持——远程数据在云端不在 fs 内存）；store 归调用方所有不代释放。 ★ AcquireExclusive = 尽力型 fencing（lock 对象 + 条件 PUT；仅防意外双开，不构成正确性保证——   时钟漂移可致提前抢锁、崩溃后保护真空 = 心跳超时窗口；引擎正确性由段表 lease 单写者协议承担）。">
+    <meta name="description" content="远程文件系统—— 第三介质桥（B3.3/B3.4）：注入的  升格为文件语义（staging 写回层 / 延迟加载 / multipart 编排 / fencing 卷锁）。 ★ 构造： /    /   ——store 注入   （S3ObjectStore / MemoryObjectStore / 任意实现），桥对厂商零知识。 ★ 键模型：对象键 = {KeyPrefix}{path}（多引擎共桶隔离）；path 经    （三介质同一实现——越出前缀即 ，不可能访问同桶其他前缀对象）。 ★ Dispose 契约（磁盘方向）：&quot;离开目录&quot;——Dispose 后 Open 抛 ；   已开句柄继续可用（staging 自持——远程数据在云端不在 fs 内存）；store 归调用方所有不代释放。 ★ AcquireExclusive = 尽力型 fencing（lock 对象 + 条件 PUT；仅防意外双开，不构成正确性保证——   时钟漂移可致提前抢锁、崩溃后保护真空 = 心跳超时窗口；引擎正确性由段表 lease 单写者协议承担）。">
       <link rel="shortcut icon" href="../favicon.ico">
       <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
       <link rel="stylesheet" href="../styles/docfx.css">
@@ -77,7 +77,9 @@
   <h1 id="TC_Tier_Core_IO_Remote_RemoteFileSystem" data-uid="TC.Tier.Core.IO.Remote.RemoteFileSystem" class="text-break">Class RemoteFileSystem</h1>
   <div class="markdown level0 summary"><p>远程文件系统——<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a> 第三介质桥（B3.3/B3.4）：注入的 <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a>
 升格为文件语义（staging 写回层 / 延迟加载 / multipart 编排 / fencing 卷锁）。</p>
-<p>★ 构造：Create(IObjectStore, RemoteFileSystemOptions?, ILogger?)——store 注入
+<p>★ 构造：<a class="xref" href="TC.Tier.Core.IO.Remote.RemoteFileSystem.html#TC_Tier_Core_IO_Remote_RemoteFileSystem_New_TC_Tier_Core_IO_Remote_IObjectStore_TC_Tier_Core_IO_Remote_RemoteFileSystemOptions_TC_Tier_Core_Logging_ILogger_">New(IObjectStore, RemoteFileSystemOptions?, ILogger?)</a> /
+  <a class="xref" href="TC.Tier.Core.IO.Remote.RemoteFileSystem.html#TC_Tier_Core_IO_Remote_RemoteFileSystem_Open_TC_Tier_Core_IO_Remote_IObjectStore_TC_Tier_Core_IO_Remote_RemoteFileSystemOptions_TC_Tier_Core_Logging_ILogger_">Open(IObjectStore, RemoteFileSystemOptions?, ILogger?)</a> /
+  <a class="xref" href="TC.Tier.Core.IO.Remote.RemoteFileSystem.html#TC_Tier_Core_IO_Remote_RemoteFileSystem_OpenOrCreate_TC_Tier_Core_IO_Remote_IObjectStore_TC_Tier_Core_IO_Remote_RemoteFileSystemOptions_TC_Tier_Core_Logging_ILogger_">OpenOrCreate(IObjectStore, RemoteFileSystemOptions?, ILogger?)</a>——store 注入
   （S3ObjectStore / MemoryObjectStore / 任意实现），桥对厂商零知识。</p>
 <p>★ 键模型：对象键 = <code>{KeyPrefix}{path}</code>（多引擎共桶隔离）；path 经 <span class="xref">TC.Tier.Core.IO.Shared.PathValidator</span>
   （三介质同一实现——越出前缀即 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>，不可能访问同桶其他前缀对象）。</p>
@@ -196,10 +198,7 @@ FreeSpace/TotalSpace 不可知（厂商配额）→ -1。</p>
 
   <a id="TC_Tier_Core_IO_Remote_RemoteFileSystem_AcquireExclusive_" data-uid="TC.Tier.Core.IO.Remote.RemoteFileSystem.AcquireExclusive*"></a>
   <h4 id="TC_Tier_Core_IO_Remote_RemoteFileSystem_AcquireExclusive_System_TimeSpan_" data-uid="TC.Tier.Core.IO.Remote.RemoteFileSystem.AcquireExclusive(System.TimeSpan)">AcquireExclusive(TimeSpan)</h4>
-  <div class="markdown level1 summary"><p>获取卷级排他锁（能力位 ExclusiveLock；未置位实现抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_Unsupported">Unsupported</a>——含 MemoryFileSystem）。</p>
-<p>★ 语义：阻塞获取（可带超时）；卷级互斥（同进程多 fs 实例 + 跨进程 lock file）；
-  非重入（同持有者二次 Acquire 抛异常）；持锁中 fs.Dispose 视为违约释放并告警。</p>
-<p>★ 返回 IDisposable lease——RAII + 异常安全（Dispose 即释放）。</p>
+  <div class="markdown level1 summary"><p>尽力型 fencing 独占锁（lock 对象 + 条件 PUT 抢建 / 心跳超时接管 / 条件删除防误删）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -219,7 +218,8 @@ FreeSpace/TotalSpace 不可知（厂商配额）→ -1。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></td>
         <td><span class="parametername">timeout</span></td>
-        <td></td>
+        <td><p>抢锁等待上限（超时抛 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a>（SharingViolation））。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -234,10 +234,15 @@ FreeSpace/TotalSpace 不可知（厂商配额）→ -1。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></td>
-        <td></td>
+        <td><p>租约（RAII——Dispose 即释放停跳）。</p>
+</td>
       </tr>
     </tbody>
   </table>
+  <h5 id="TC_Tier_Core_IO_Remote_RemoteFileSystem_AcquireExclusive_System_TimeSpan__remarks">Remarks</h5>
+  <div class="markdown level1 remarks"><p>★ <b>仅防意外双开</b>——无即死释放（崩溃后保护真空 = 心跳超时窗口）、
+时钟漂移可提前接管；正确性由段表 lease 单写者协议承担（锁只是运营护栏）。</p>
+</div>
 
 
   <a id="TC_Tier_Core_IO_Remote_RemoteFileSystem_CreateDirectory_" data-uid="TC.Tier.Core.IO.Remote.RemoteFileSystem.CreateDirectory*"></a>
@@ -342,7 +347,8 @@ FreeSpace/TotalSpace 不可知（厂商配额）→ -1。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对路径。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -375,7 +381,8 @@ FreeSpace/TotalSpace 不可知（厂商配额）→ -1。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对目录路径。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -408,7 +415,8 @@ FreeSpace/TotalSpace 不可知（厂商配额）→ -1。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对目录路径。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -519,15 +527,11 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></td>
-        <td></td>
+        <td><p>维护租约</p>
+</td>
       </tr>
     </tbody>
   </table>
-  <h5 id="TC_Tier_Core_IO_Remote_RemoteFileSystem_EnterMaintenance_System_String_TC_Tier_Core_IO_MaintenanceScope_System_Threading_CancellationToken__remarks">Remarks</h5>
-  <div class="markdown level1 remarks"><p>★ 尽力型 fencing（§4.6）：lock 对象 + 条件 PUT 抢建 / 心跳超时接管（IfMatch CAS）/
-条件删除防误删。<b>仅防意外双开</b>——无即死释放（崩溃后保护真空 = 心跳超时窗口）、
-时钟漂移可提前接管；正确性由段表 lease 单写者协议承担（锁只是运营护栏）。</p>
-</div>
 
 
   <a id="TC_Tier_Core_IO_Remote_RemoteFileSystem_EnumerateDirectories_" data-uid="TC.Tier.Core.IO.Remote.RemoteFileSystem.EnumerateDirectories*"></a>
@@ -552,12 +556,14 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">pattern</span></td>
-        <td></td>
+        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">recursive</span></td>
-        <td></td>
+        <td><p>是否递归枚举全部后代目录。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -572,7 +578,8 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td></td>
+        <td><p>枚举条目集合</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -600,17 +607,20 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对目录路径。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">pattern</span></td>
-        <td></td>
+        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">recursive</span></td>
-        <td></td>
+        <td><p>是否递归枚举全部后代目录。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -625,7 +635,8 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td></td>
+        <td><p>枚举条目集合</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -654,12 +665,14 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">pattern</span></td>
-        <td></td>
+        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">recursive</span></td>
-        <td></td>
+        <td><p>是否递归枚举全部后代目录。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -674,7 +687,8 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td></td>
+        <td><p>枚举条目集合</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -702,17 +716,20 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对目录路径。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">pattern</span></td>
-        <td></td>
+        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">recursive</span></td>
-        <td></td>
+        <td><p>是否递归枚举全部后代目录。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -727,7 +744,8 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td></td>
+        <td><p>枚举条目集合</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -755,12 +773,14 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">pattern</span></td>
-        <td></td>
+        <td><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">recursive</span></td>
-        <td></td>
+        <td><p>是否递归枚举全部后代目录。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -775,7 +795,8 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td></td>
+        <td><p>枚举条目集合</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -819,17 +840,20 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对目录路径。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">pattern</span></td>
-        <td></td>
+        <td><p>通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">recursive</span></td>
-        <td></td>
+        <td><p>是否递归枚举全部后代目录。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -844,7 +868,24 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</td>
-        <td></td>
+        <td><p>枚举条目集合</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></td>
+        <td><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -872,7 +913,8 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对路径。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -930,17 +972,20 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">source</span></td>
-        <td></td>
+        <td><p>相对源路径。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">dest</span></td>
-        <td></td>
+        <td><p>相对目标路径。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">overwrite</span></td>
-        <td></td>
+        <td><p>是否覆盖已存在的目标文件。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -974,12 +1019,14 @@ store 归调用方（不代释放）。</p>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">source</span></td>
-        <td></td>
+        <td><p>相对源目录路径。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">dest</span></td>
-        <td></td>
+        <td><p>相对目标目录路径。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1087,7 +1134,8 @@ store 归调用方（不代释放）。</p>
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></td>
-        <td></td>
+        <td><p>文件句柄</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1227,7 +1275,8 @@ label 语义：标记既有且不符即抛（校验）、缺省则写入（G1 �
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">path</span></td>
-        <td></td>
+        <td><p>相对路径。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1242,7 +1291,8 @@ label 语义：标记既有且不符即抛（校验）、缺省则写入（G1 �
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a></td>
-        <td></td>
+        <td><p>条目信息</p>
+</td>
       </tr>
     </tbody>
   </table>

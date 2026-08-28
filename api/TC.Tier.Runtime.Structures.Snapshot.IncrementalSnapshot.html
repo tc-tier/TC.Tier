@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<!--[if IE]><![endif]-->
+<html>
+
+  <head>
+    <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <title>Class IncrementalSnapshot | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width">
+      <meta name="title" content="Class IncrementalSnapshot | TC.Tier — .NET 可组合存储运行时 ">
+    
+    <meta name="description" content="IncrementalSnapshot——增量快照结构（镜像快照设计稿 &#167;3.3——方案 A：段增量）。 ★ 语义：段（Segment）= 一次快照增量 = 一帧 [Header 14B][N₀ 8B 前缀 + 条目流][Footer 28B]；   新段 append 不重写旧段（raft 定期压缩——快照越频繁写省越多，基准实测 8 次快照 4.5&#215; 字节差）；   读 = 段表驱动逐段顺序拼接 = 最新快照；段累积达阈值 → 合并为新基线段（低频全量重写，raft 只需最新快照）。 ★ 段表（各段起点 + N₀——恢复 O(1) 定位）：内存列表 + opaque meta 原子落盘（搭水位线同一块   同一 CRC——AppendSegment 完成后 SetOpaqueMeta + WriteMeta）。 ★ 容错：段级帧 CRC64——崩溃 = 旧段完好、半写段恢复期忽略（尾部检查 = 段表物理尾 vs 引擎   CommittedTail，不依赖 meta 水位）；段内 N₀ 前缀自描述（独立读一段可知覆盖点）。 ★ 生命周期：继承 （引擎/生命周期/事务参与基类能力）——恢复核心 =   （RecoveryBase 模板派生：join 引擎 + meta 段表 + 尾部检查）。">
+      <link rel="shortcut icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../styles/docfx.vendor.min.css">
+      <link rel="stylesheet" href="../styles/docfx.css">
+      <link rel="stylesheet" href="../styles/main.css">
+      <meta property="docfx:navrel" content="../toc.html">
+      <meta property="docfx:tocrel" content="toc.html">
+    
+    <meta property="docfx:rel" content="../">
+    
+  </head>
+  <body data-spy="scroll" data-target="#affix" data-offset="120">
+    <div id="wrapper">
+      <header>
+
+        <nav id="autocollapse" class="navbar navbar-inverse ng-scope" role="navigation">
+          <div class="container">
+            <div class="navbar-header">
+
+              <a class="navbar-brand" href="../index.html">
+                <img id="logo" class="svg" src="../logo.svg" alt="">
+              </a>
+            </div>
+            <div class="navbar-right" id="search">
+              <form class="navbar-form" role="search">
+                <div class="form-group">
+                  <input type="text" class="form-control" id="search-query" placeholder="Search" autocomplete="off">
+                </div>
+              </form>
+            </div>
+          </div>
+        </nav>
+
+        <div class="subnav navbar navbar-default">
+          <div class="container hide-when-search" id="breadcrumb">
+            <ul class="breadcrumb">
+              <li></li>
+            </ul>
+          </div>
+        </div>
+      </header>
+      <div class="container body-content">
+
+        <div id="search-results">
+          <div class="search-list">Search Results for <span></span></div>
+          <div class="sr-items">
+            <p><i class="glyphicon glyphicon-refresh index-loading"></i></p>
+          </div>
+          <ul id="pagination" data-first=First data-prev=Previous data-next=Next data-last=Last></ul>
+        </div>
+      </div>
+      <div role="main" class="container body-content hide-when-search">
+
+      <div class="sidenav hide-when-search">
+        <a class="btn toc-toggle collapse" data-toggle="collapse" href="#sidetoggle" aria-expanded="false" aria-controls="sidetoggle">Show / Hide Table of Contents</a>
+        <div class="sidetoggle collapse" id="sidetoggle">
+          <div id="sidetoc"></div>
+        </div>
+      </div>
+        <div class="article row grid-right">
+          <div class="col-md-10">
+            <article class="content wrap" id="_content" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot">
+
+
+
+  <h1 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot" class="text-break">Class IncrementalSnapshot</h1>
+  <div class="markdown level0 summary"><p>IncrementalSnapshot——增量快照结构（镜像快照设计稿 §3.3——方案 A：段增量）。</p>
+<p>★ 语义：段（Segment）= 一次快照增量 = 一帧 [Header 14B][N₀ 8B 前缀 + 条目流][Footer 28B]；
+  新段 append 不重写旧段（raft 定期压缩——快照越频繁写省越多，基准实测 8 次快照 4.5× 字节差）；
+  读 = 段表驱动逐段顺序拼接 = 最新快照；段累积达阈值 → 合并为新基线段（低频全量重写，raft 只需最新快照）。</p>
+<p>★ 段表（各段起点 + N₀——恢复 O(1) 定位）：内存列表 + opaque meta 原子落盘（搭水位线同一块
+  同一 CRC——AppendSegment 完成后 SetOpaqueMeta + WriteMeta）。</p>
+<p>★ 容错：段级帧 CRC64——崩溃 = 旧段完好、半写段恢复期忽略（尾部检查 = 段表物理尾 vs 引擎
+  CommittedTail，不依赖 meta 水位）；段内 N₀ 前缀自描述（独立读一段可知覆盖点）。</p>
+<p>★ 生命周期：继承 <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a>（引擎/生命周期/事务参与基类能力）——恢复核心 =
+  <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.html">IncrementalSnapshot.IncrementalRecovery</a>（RecoveryBase 模板派生：join 引擎 + meta 段表 + 尾部检查）。</p>
+</div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="inheritance">
+    <h5>Inheritance</h5>
+    <div class="level0"><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+    <div class="level1"><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotRecoveryHints.html">SnapshotRecoveryHints</a>&gt;</div>
+    <div class="level2"><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html">SnapshotBase</a></div>
+    <div class="level3"><span class="xref">IncrementalSnapshot</span></div>
+  </div>
+  <div class="implements">
+    <h5>Implements</h5>
+    <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotRecoveryHints.html">SnapshotRecoveryHints</a>&gt;</div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    <div><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></div>
+  </div>
+  <div class="inheritedMembers">
+    <h5>Inherited Members</h5>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_Append_System_ReadOnlySpan_System_Byte__">SnapshotBase.Append(ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_AppendAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">SnapshotBase.AppendAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_Overwrite_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__">SnapshotBase.Overwrite(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_OverwriteAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">SnapshotBase.OverwriteAsync(LogicalAddress, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_Read_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__">SnapshotBase.Read(LogicalAddress, Span&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_ReadAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_">SnapshotBase.ReadAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_TruncatePrefix_TC_Tier_Contracts_Storage_LogicalAddress_">SnapshotBase.TruncatePrefix(LogicalAddress)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_TruncateSuffix_TC_Tier_Contracts_Storage_LogicalAddress_">SnapshotBase.TruncateSuffix(LogicalAddress)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_ReclaimRange_System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__">SnapshotBase.ReclaimRange(LogicalAddress?, LogicalAddress?)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_Prepare_System_Int64_">SnapshotBase.Prepare(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_PrepareAsync_System_Int64_System_Threading_CancellationToken_">SnapshotBase.PrepareAsync(long, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_ConfirmCommitted_System_Int64_">SnapshotBase.ConfirmCommitted(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_Abort_System_Int64_">SnapshotBase.Abort(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_AbortAsync_System_Int64_System_Threading_CancellationToken_">SnapshotBase.AbortAsync(long, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_OnCommitted_System_Int64_System_Action_">SnapshotBase.OnCommitted(long, Action)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_SetOpaqueMeta_System_ReadOnlySpan_System_Byte__">SnapshotBase.SetOpaqueMeta(ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_ReadOpaqueMeta">SnapshotBase.ReadOpaqueMeta()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_WriteAddress">SnapshotBase.WriteAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_PhysicalWriteAddress">SnapshotBase.PhysicalWriteAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_TruncatedAddress">SnapshotBase.TruncatedAddress</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_Size">SnapshotBase.Size</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_SectorSize">SnapshotBase.SectorSize</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;SnapshotRecoveryHints&gt;.GetAliveInstances(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;SnapshotRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;SnapshotRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;SnapshotRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;SnapshotRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;SnapshotRecoveryHints&gt;.Initialize(SnapshotRecoveryHints)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;SnapshotRecoveryHints&gt;.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;SnapshotRecoveryHints&gt;.DisposeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;SnapshotRecoveryHints&gt;.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;SnapshotRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;SnapshotRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;SnapshotRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </div>
+  <h6><strong>Namespace</strong>: <a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Runtime.html">Runtime</a>.<a class="xref" href="TC.Tier.Runtime.Structures.html">Structures</a>.<a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.html">Snapshot</a></h6>
+  <h6><strong>Assembly</strong>: TC.Tier.Runtime.dll</h6>
+  <h5 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_syntax">Syntax</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class IncrementalSnapshot : SnapshotBase, ILifecycle&lt;SnapshotRecoveryHints&gt;, IDisposable, IAsyncDisposable, ITransactionParticipant</code></pre>
+  </div>
+  <h3 id="constructors">Constructors
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot__ctor_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.#ctor*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshotSettings_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Snapshot_Contracts_SnapshotRecoveryHints__TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Snapshot_Contracts_SnapshotMetaHeader_TC_Tier_Runtime_Structures_Snapshot_Contracts_SnapshotMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotRecoveryHints},TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotMetaHeader,TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport,TC.Tier.Core.Logging.ILogger)">IncrementalSnapshot(IFileSystem, IncrementalSnapshotSettings, IRecovery&lt;SnapshotRecoveryHints&gt;?, MetaPolicyFactory&lt;SnapshotMetaHeader, SnapshotMetaPayload&gt;?, IMetaTransport?, ILogger?)</h4>
+  <div class="markdown level1 summary"><p>构造（参数序同 SnapshotBase：codec 内建——fs → settings → 可选注入）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IncrementalSnapshot(IFileSystem fileSystem, IncrementalSnapshotSettings settings, IRecovery&lt;SnapshotRecoveryHints&gt;? recovery = null, MetaPolicyFactory&lt;SnapshotMetaHeader, SnapshotMetaPayload&gt;? metaPolicyFactory = null, IMetaTransport? metaTransport = null, ILogger? logger = null)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
+        <td><span class="parametername">fileSystem</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshotSettings.html">IncrementalSnapshotSettings</a></td>
+        <td><span class="parametername">settings</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotRecoveryHints.html">SnapshotRecoveryHints</a>&gt;</td>
+        <td><span class="parametername">recovery</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotMetaHeader.html">SnapshotMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotMetaPayload.html">SnapshotMetaPayload</a>&gt;</td>
+        <td><span class="parametername">metaPolicyFactory</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></td>
+        <td><span class="parametername">metaTransport</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
+        <td><span class="parametername">logger</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="properties">Properties
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_LatestN0_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.LatestN0*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_LatestN0" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.LatestN0">LatestN0</h4>
+  <div class="markdown level1 summary"><p>最新段覆盖点 N₀（无段 = 0——无快照）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long LatestN0 { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_SegmentCount_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.SegmentCount*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_SegmentCount" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.SegmentCount">SegmentCount</h4>
+  <div class="markdown level1 summary"><p>段数（内存段表——含最新段）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int SegmentCount { get; }</code></pre>
+  </div>
+  <h5 class="propertyValue">Property Value</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="methods">Methods
+</h3>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_AppendSegmentAsync_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.AppendSegmentAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_AppendSegmentAsync_System_Int64_System_Collections_Generic_IAsyncEnumerable_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.AppendSegmentAsync(System.Int64,System.Collections.Generic.IAsyncEnumerable{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">AppendSegmentAsync(long, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>追加增量段：[N₀ 8B] + 条目流写入新帧（append 不重写旧段）→ 2PC 提交 → 段表注册 + meta 原子落盘 →
+段数达阈值自触发合并。返回 N₀。</p>
+<p>★ 单写者契约（raft 快照低频串行）；并发/重入抛 InvalidOperationException。</p>
+<p>★ 事务语义（会话模式——底层 2PC）：写帧 → Prepare(seq) → ConfirmCommitted(seq) → 段表注册；
+  chunk 流异常 = Abort(seq)——尾截断回滚到上次提交点（新段物理清除，旧段完好）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; AppendSegmentAsync(long n0, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; chunks, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">n0</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
+        <td><span class="parametername">chunks</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ClearAsync_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ClearAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ClearAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ClearAsync(System.Threading.CancellationToken)">ClearAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>清空全部段（快照替换语义用——导入新快照前清旧；截断全量 + 段表空 + meta 落盘）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask ClearAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_CompactSegmentsAsync_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.CompactSegmentsAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_CompactSegmentsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.CompactSegmentsAsync(System.Threading.CancellationToken)">CompactSegmentsAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>合并全部段为新基线段（读全段拼接 → 写新帧 → 截旧段 → 段表 = 单段 + meta 落盘）。
+低频（阈值触发/显式调）——成本 = 一次全量写（基准对照 B 单次快照）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask CompactSegmentsAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_CreateRecovery_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.CreateRecovery*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_CreateRecovery" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.CreateRecovery">CreateRecovery()</h4>
+  <div class="markdown level1 summary"><p>★ 恢复核心 = IncrementalRecovery（RecoveryBase 模板派生——meta 段表 + 尾部检查）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IRecovery&lt;SnapshotRecoveryHints&gt; CreateRecovery()</code></pre>
+  </div>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.Contracts.SnapshotRecoveryHints.html">SnapshotRecoveryHints</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="overrides">Overrides</h5>
+  <div><a class="xref" href="TC.Tier.Runtime.Structures.Snapshot.SnapshotBase.html#TC_Tier_Runtime_Structures_Snapshot_SnapshotBase_CreateRecovery">SnapshotBase.CreateRecovery()</a></div>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_GetSegmentN0_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.GetSegmentN0*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_GetSegmentN0_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.GetSegmentN0(System.Int32)">GetSegmentN0(int)</h4>
+  <div class="markdown level1 summary"><p>段 i 的覆盖点（越界抛）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long GetSegmentN0(int index)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">index</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ImportSegmentAsync_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ImportSegmentAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ImportSegmentAsync_System_Int64_System_Collections_Generic_IAsyncEnumerable_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ImportSegmentAsync(System.Int64,System.Collections.Generic.IAsyncEnumerable{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">ImportSegmentAsync(long, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>★ 导入段（替换语义——raft 快照安装）：流式写完整镜像段 → 2PC 提交 → 段表替换为单段
+（旧段内容被新镜像包含）+ 旧段物理回收。chunk 流异常（如外部 Footer 校验失败）= Abort 回滚——
+新段物理清除、旧快照完好（失败即清理，会话模式）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ImportSegmentAsync(long n0, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; chunks, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
+        <td><span class="parametername">n0</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
+        <td><span class="parametername">chunks</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ReadAllChunksAsync_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ReadAllChunksAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ReadAllChunksAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ReadAllChunksAsync(System.Threading.CancellationToken)">ReadAllChunksAsync(CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>顺序流式读回全部段（跳过段内 N₀ 前缀）= 最新快照的条目流——GB/TB 级不驻内存，
+段级帧 CRC64 增量校验（读多少验多少——校验失败抛 InvalidDataException）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadAllChunksAsync(CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+
+
+  <a id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ReadSegmentDataAsync_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ReadSegmentDataAsync*"></a>
+  <h4 id="TC_Tier_Runtime_Structures_Snapshot_IncrementalSnapshot_ReadSegmentDataAsync_System_Int32_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Snapshot.IncrementalSnapshot.ReadSegmentDataAsync(System.Int32,System.Threading.CancellationToken)">ReadSegmentDataAsync(int, CancellationToken)</h4>
+  <div class="markdown level1 summary"><p>段 i 的数据流（测试/诊断——同上校验语义；越界抛）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+  <h5 class="declaration">Declaration</h5>
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadSegmentDataAsync(int index, CancellationToken ct = default)</code></pre>
+  </div>
+  <h5 class="parameters">Parameters</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Name</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
+        <td><span class="parametername">index</span></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
+        <td><span class="parametername">ct</span></td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="returns">Returns</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Description</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</td>
+        <td></td>
+      </tr>
+    </tbody>
+  </table>
+  <h3 id="implements">Implements</h3>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle&lt;THints&gt;</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a>
+  </div>
+
+</article>
+          </div>
+
+          <div class="hidden-sm col-md-2" role="complementary">
+            <div class="sideaffix">
+              <div class="contribution">
+                <ul class="nav">
+                </ul>
+              </div>
+              <nav class="bs-docs-sidebar hidden-print hidden-xs hidden-sm affix" id="affix">
+                <h5>In this article</h5>
+                <div></div>
+              </nav>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer>
+        <div class="grad-bottom"></div>
+        <div class="footer">
+          <div class="container">
+            <span class="pull-right">
+              <a href="#top">Back to top</a>
+            </span>
+      MIT License — TC.Tier Contributors
+      
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script type="text/javascript" src="../styles/docfx.vendor.min.js"></script>
+    <script type="text/javascript" src="../styles/docfx.js"></script>
+    <script type="text/javascript" src="../styles/main.js"></script>
+    <script>
+      // 默认展开全部导航组（docfx 默认收起——使用者需要看到导航内容；点击 +/- 可收起）
+      (function expandAllToc() {
+        var tries = 0;
+        (function poll() {
+          var groups = document.querySelectorAll('#sidetoc .nav > li > ul');
+          if (groups.length > 0 || tries > 50) {
+            document.querySelectorAll('#sidetoc .nav > li').forEach(function (li) {
+              if (li.querySelector(':scope > ul')) li.classList.add('in');
+            });
+          } else {
+            tries++;
+            setTimeout(poll, 100);
+          }
+        })();
+      })();
+    </script>
+  </body>
+</html>

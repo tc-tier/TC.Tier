@@ -194,7 +194,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
 
   <a id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_Count_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.Count*"></a>
   <h4 id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_Count" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.Count">Count</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>当前队列元素数（原子计数快照）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -221,7 +222,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
 
   <a id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_DequeueAsync_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.DequeueAsync*"></a>
   <h4 id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_DequeueAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.DequeueAsync(System.Threading.CancellationToken)">DequeueAsync(CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>异步出队——快路径直接 TryDequeue，队列空则挂在 <code>_signal</code> 上等待元素到达或取消。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -240,7 +242,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">cancellationToken</span></td>
-        <td></td>
+        <td><p>取消令牌（取消时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -255,7 +258,24 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;T&gt;</td>
-        <td></td>
+        <td><p>出队的元素。</p>
+</td>
+      </tr>
+    </tbody>
+  </table>
+  <h5 class="exceptions">Exceptions</h5>
+  <table class="table table-bordered table-condensed">
+    <thead>
+      <tr>
+        <th>Type</th>
+        <th>Condition</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></td>
+        <td><p>cancellationToken 被取消。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -263,7 +283,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
 
   <a id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_Dispose_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.Dispose*"></a>
   <h4 id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_Dispose" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.Dispose">Dispose()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>释放队列——置 disposed 标志（防重复释放）并唤醒全部挂起的异步出队等待者（幂等）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -273,7 +294,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
 
   <a id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_Enqueue_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.Enqueue*"></a>
   <h4 id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_Enqueue__0_System_Int64_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.Enqueue(`0,System.Int64)">Enqueue(T, long)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>入队——按 (priority, sequence) 键插入 skip-list；同优先级按入队顺序 FIFO。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -292,12 +314,14 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
       <tr>
         <td><span class="xref">T</span></td>
         <td><span class="parametername">item</span></td>
-        <td></td>
+        <td><p>入队元素。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">priority</span></td>
-        <td></td>
+        <td><p>优先级（任意 long，值小者先出）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -305,7 +329,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
 
   <a id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_TryDequeue_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.TryDequeue*"></a>
   <h4 id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_TryDequeue__0__" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.TryDequeue(`0@)">TryDequeue(out T)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>出队——摘除并返回优先级最小的元素（同优先级 FIFO）。队列空返回 false。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -324,7 +349,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
       <tr>
         <td><span class="xref">T</span></td>
         <td><span class="parametername">item</span></td>
-        <td></td>
+        <td><p>出队元素（成功时为最小优先级元素）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -339,7 +365,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>true = 出队成功；false = 队列为空。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -347,7 +374,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
 
   <a id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_TryPeek_" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.TryPeek*"></a>
   <h4 id="TC_Tier_Core_Collections_SkipListPriorityQueue_1_TryPeek__0__" data-uid="TC.Tier.Core.Collections.SkipListPriorityQueue`1.TryPeek(`0@)">TryPeek(out T)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>查看队头（最小优先级元素，同优先级 FIFO）——不加锁纯读，不出队。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -366,7 +394,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
       <tr>
         <td><span class="xref">T</span></td>
         <td><span class="parametername">item</span></td>
-        <td></td>
+        <td><p>队头元素（成功时）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -381,7 +410,8 @@ O(n)（实测 maxLevel=5 @ 20 万条 = 54µs/op vs 31 层 = 1.1µs/op）。默�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>true = 有队头元素；false = 队列为空。</p>
+</td>
       </tr>
     </tbody>
   </table>

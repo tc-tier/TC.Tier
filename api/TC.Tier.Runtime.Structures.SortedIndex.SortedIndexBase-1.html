@@ -142,9 +142,6 @@
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Recovery</a>
-    </div>
-    <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Id</a>
     </div>
     <div>
@@ -293,7 +290,8 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_BeginAddress_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.BeginAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_BeginAddress" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.BeginAddress">BeginAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>结构起始地址（引擎 MinAddress——比较族固定锚点槽所在地，节点分配在锚点之后）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -344,7 +342,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EntryCount_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EntryCount*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EntryCount" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EntryCount">EntryCount</h4>
-  <div class="markdown level1 summary"><p>条目数。</p>
+  <div class="markdown level1 summary"><p>条目数（写者维护计数——O(1)）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -370,7 +368,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_IndexSize_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.IndexSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_IndexSize" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.IndexSize">IndexSize</h4>
-  <div class="markdown level1 summary"><p>索引内存占用（字节）。</p>
+  <div class="markdown level1 summary"><p>索引内存占用估算（字节——子类按结构形态估算）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -424,12 +422,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CreateRecovery_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CreateRecovery*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CreateRecovery" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.CreateRecovery">CreateRecovery()</h4>
-  <div class="markdown level1 summary"><p>virtual 工厂：子类 override 返回恢复算法（默认实现/注入实例）。</p>
-<pre><code>        &lt;p&gt;对齐 &lt;code&gt;StorageEngineBase.RecoverAndBuildReader&lt;/code&gt; 的 virtual 模式。
-        在 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.OnInitializeBegin&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 后由 Initialize 调用，返回值由基类持有。&lt;/p&gt;
-        &lt;p&gt;默认返回 null——null 语义：跳过后台恢复、直接置 Ready（无需恢复的结构）。
-          需恢复的结构子类 override 返回 &lt;code&gt;new DefaultXxxRecovery(this)&lt;/code&gt;。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>创建默认恢复实现（RecoveryBase 模板派生——只填恢复算法：hints → 主存储帧 → 全量重放三级回退）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -447,7 +440,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints.html">SortedIndexRecoveryHints</a>&gt;</td>
-        <td></td>
+        <td><p>默认比较族恢复实例。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -500,7 +494,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Delete_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Delete*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Delete__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Delete(`0)">Delete(TKey)</h4>
-  <div class="markdown level1 summary"><p>删除条目。</p>
+  <div class="markdown level1 summary"><p>删除条目（epoch 读保护内完成）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -520,7 +514,8 @@
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>条目键。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -535,7 +530,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>true = 真删到；false = 不存在。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -543,7 +539,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverride_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverride*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
-  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>同步额外清理钩子（LifecycleBase 模板）——比较族无引擎外原生资源（引擎/arena 归 Resources 统一释放），空实现。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -563,8 +559,7 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
-本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+        <td><p>true = 用户调 Dispose（可触托管资源）。</p>
 </td>
       </tr>
     </tbody>
@@ -575,7 +570,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverrideAsync_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverrideAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
-  <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>异步额外清理钩子（LifecycleBase 模板）——对等 <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_DisposeOverride_System_Boolean_">DisposeOverride(bool)</a> 的异步轨，空实现。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -595,7 +590,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td></td>
+        <td><p>true = 用户调 DisposeAsync（可触托管资源）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -610,7 +606,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
+        <td><p>释放完成的 ValueTask。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -631,7 +628,8 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterScope_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EnterScope*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterScope" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.EnterScope">EnterScope()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>进入读保护 scope（ref struct <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.IndexScope.html">SortedIndexBase&lt;TKey&gt;.IndexScope</a>——创建即 Resume epoch，Dispose 即 Suspend；scope 内 Find 省逐次 epoch 进出）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -648,7 +646,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html">SortedIndexBase</a>&lt;TKey&gt;.<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.IndexScope.html">IndexScope</a></td>
-        <td></td>
+        <td><p>读保护 scope。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -656,7 +655,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ExitEpoch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ExitEpoch*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ExitEpoch" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.ExitEpoch">ExitEpoch()</h4>
-  <div class="markdown level1 summary"><p>退出 epoch 读保护（与 <a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html#TC_Tier_Contracts_Transactions_IEpochProtected_EnterEpoch">EnterEpoch()</a> 同线程配对）。</p>
+  <div class="markdown level1 summary"><p>退出 epoch 读保护（与 <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterEpoch">EnterEpoch()</a> 成对——Session 读 scope 聚合入口转发）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -667,7 +666,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Find_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Find*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Find__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Find(`0)">Find(TKey)</h4>
-  <div class="markdown level1 summary"><p>点查 key → value 的逻辑地址（Empty = 不存在）。</p>
+  <div class="markdown level1 summary"><p>点查 key → value 逻辑地址（epoch 读保护内完成）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -687,7 +686,8 @@
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>查找键。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -702,7 +702,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
+        <td><p>命中 = value 逻辑地址；未命中 = <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html#TC_Tier_Contracts_Storage_LogicalAddress_Empty">Empty</a>。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -710,7 +711,8 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindBatch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindBatch*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindBatch_System_ReadOnlySpan__0__System_Span_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindBatch(System.ReadOnlySpan{`0},System.Span{TC.Tier.Contracts.Storage.LogicalAddress})">FindBatch(ReadOnlySpan&lt;TKey&gt;, Span&lt;LogicalAddress&gt;)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>批量点查（keys → results，同一轮 epoch 内完成——零逐查 Resume/Suspend 开销）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -729,12 +731,14 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;TKey&gt;</td>
         <td><span class="parametername">keys</span></td>
-        <td></td>
+        <td><p>输入键集合。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</td>
         <td><span class="parametername">results</span></td>
-        <td></td>
+        <td><p>输出地址数组（长度须 ≥ keys 长度，不足抛 ArgumentException）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -742,7 +746,9 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindNoEpoch_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindNoEpoch*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindNoEpoch__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.FindNoEpoch(`0)">FindNoEpoch(TKey)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>★ 不含 epoch 进出的查找——epoch 由调用方经 <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_EnterScope">EnterScope()</a> / <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_FindBatch_System_ReadOnlySpan__0__System_Span_TC_Tier_Contracts_Storage_LogicalAddress__">FindBatch(ReadOnlySpan&lt;TKey&gt;, Span&lt;LogicalAddress&gt;)</a> 在外层持有。
+子类实现零拷贝下降（跳表塔链 / B+树扁平缓存下降）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -761,7 +767,8 @@
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>查找键。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -776,7 +783,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
+        <td><p>命中 = value 逻辑地址；未命中 = <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html#TC_Tier_Contracts_Storage_LogicalAddress_Empty">Empty</a>。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -795,7 +803,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Insert_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Insert*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_Insert__0_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.Insert(`0,TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">Insert(TKey, LogicalAddress, LogicalAddress)</h4>
-  <div class="markdown level1 summary"><p>插入条目（key → valueAddress），返回插入后地址。</p>
+  <div class="markdown level1 summary"><p>插入条目（key → valueAddress；同 key 覆写 value 不增计数），返回插入后地址（epoch 读保护内完成）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -815,17 +823,20 @@
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>条目键。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">valueAddress</span></td>
-        <td></td>
+        <td><p>条目 value 逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">beginAddress</span></td>
-        <td></td>
+        <td><p>结构起始地址（重放路径约定参数——比较族插入不消费，保留接口对称）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -840,7 +851,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
-        <td></td>
+        <td><p>插入后地址。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -848,13 +860,7 @@
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeBegin_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnInitializeBegin*"></a>
   <h4 id="TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeBegin" data-uid="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.OnInitializeBegin">OnInitializeBegin()</h4>
-  <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子——this 构造完后、后台恢复启动前。</p>
-<pre><code>        &lt;p&gt;子类在此：① &lt;code&gt;_engine.Initialize(...)&lt;/code&gt;（Runtime 层引擎 init）
-          ② &lt;code&gt;Resources.Add(_engine)&lt;/code&gt;（注册主引擎到资源组）
-          ③ 创建 MetaPolicy（按 MetaPolicyKind）
-          ④ 后期资源 &lt;code&gt;Resources.Add(metaEngine/overflowEngine, ...)&lt;/code&gt;&lt;/p&gt;
-        &lt;p&gt;此时 this 已完全构造，虚方法安全；&lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.CreateRecovery&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 紧随其后被基类调用。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>启动主引擎（非阻塞——就绪由族恢复核心开头 await 保证；水位线归结构层，引擎自恢复不下传 hint）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>

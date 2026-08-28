@@ -648,7 +648,7 @@ O(记录数) → 总 O(n²)。修复：<code>CompleteAndMergeEager</code> 收口
 <code>dotnet $B --filter '*NewDeviceIoParallelBench*'</code>。</li>
 </ul>
 <h2 id="36-虚拟文件系统virtual-单文件卷vs-本地文件系统目录local">3.6 虚拟文件系统（virtual: 单文件卷）vs 本地文件系统目录（local:）</h2>
-<p><code>TC_BENCH_FS_SPEC=virtual:///…</code>（BenchVolume 自动每卷唯一 .raw 文件）零重编译切换，同套基准。</p>
+<p><code>TC_BENCH_FS_SPEC=virtual:///…</code>（BenchVolume 自动每卷唯一 .tier 文件）零重编译切换，同套基准。</p>
 <h3 id="小-ionewlocalstorageenginebenchappendroundtrip">小 IO（NewLocalStorageEngineBench，Append/roundtrip）</h3>
 <table>
 <thead>
@@ -786,10 +786,10 @@ O(记录数) → 总 O(n²)。修复：<code>CompleteAndMergeEager</code> 收口
 <h3 id="结论-1">结论</h3>
 <ul>
 <li><strong>virtual 单文件卷的小 IO 优于本地文件系统目录</strong>：512B Append 1.74 vs 2.75 µs（<strong>快 37%</strong>）——
-Raw 卷内自管元数据（页缓存直址），少一层目录文件系统开销。极速运行时（mem+导出）/嵌入式/单工件分发场景收益直接。</li>
-<li><strong>virtual 的 Buffered 大块写是弱项</strong>（≤415 MB/s，仅 local 的 1/4）：Raw 卷写日志 + 元数据
+TierVolume 卷内自管元数据（页缓存直址），少一层目录文件系统开销。极速运行时（mem+导出）/嵌入式/单工件分发场景收益直接。</li>
+<li><strong>virtual 的 Buffered 大块写是弱项</strong>（≤415 MB/s，仅 local 的 1/4）：TierVolume 卷写日志 + 元数据
 双写路径；<strong>但 virtual 的 DIO 读反超一切</strong>（64K-1M 处 9.9-13.5 GB/s vs local DIO 1.9-2.6）——
-Raw 页缓存 64MB 自管命中路径更短。大块写密集选 local 目录 + DIO；读密集/单工件选 virtual。</li>
+TierVolume 页缓存 64MB 自管命中路径更短。大块写密集选 local 目录 + DIO；读密集/单工件选 virtual。</li>
 <li><strong>virtual 对 WT（每写落盘）不友好</strong>（Mode B/D 全面慢于 local：写透钉在卷日志双 fsync）——
 每写必稳的 WAL 类负载当前文件系统选 local。</li>
 <li>与 Core 侧结论一致（io-performance.md §9：本地三类文件系统数据面带内持平、差异在元数据面与

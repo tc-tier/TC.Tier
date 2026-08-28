@@ -323,47 +323,9 @@
     </tbody>
   </table>
   <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_IsReady_remarks">Remarks</h5>
-  <div class="markdown level1 remarks"><p>★ 委托 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">Recovery</a>（IRecovery 自管状态）。
+  <div class="markdown level1 remarks"><p>★ 委托 <span class="xref">TC.Tier.Core.Shared.LifecycleBase`1.Recovery</span>（IRecovery 自管状态）。
 Recovery==null 两种情况：① 未 Initialize（_initialized==0）→ 未就绪；② Initialize 过但 CreateRecovery 返回 null（无需恢复）→ 就绪。</p>
 </div>
-
-
-  <a id="TC_Tier_Core_Shared_LifecycleBase_1_Recovery_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Recovery*"></a>
-  <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_Recovery" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.Recovery">Recovery</h4>
-  <div class="markdown level1 summary"><p>恢复算法实例。构造期注入（ctor 参数）或 Initialize 内由 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CreateRecovery">CreateRecovery()</a> 工厂创建、一次性赋值。</p>
-<pre><code>        &lt;p&gt;★ 不是构造期注入（默认 Recovery 需 this，构造期 this 未就绪）；不是 protected set（防运行期替换）。
-        为 null 时 Initialize 跳过后台恢复、直接置 Ready（适用于无需恢复的场景）。&lt;/p&gt;
-        &lt;p&gt;⚠️ &lt;b&gt;竞态契约&lt;/b&gt;：Recovery 非 null **不代表恢复已开始**——赋值发生在后台 task 启动前。
-          &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.OnInitializeComplete&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 在恢复成功后的后台 task 内执行（非同线程、非调度即完成）；
-          并发线程读到 Recovery 非 null 但 task 可能尚未跑 Recover。判断&quot;是否就绪/恢复中&quot;一律以
-          &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.RecoveryState&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; / &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.IsReady&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 为准，不以 Recovery 非 null 为准。&lt;/p&gt;
-        &lt;p&gt;★ &lt;b&gt;纯读语义&lt;/b&gt;：getter 只 &lt;code&gt;Volatile.Read&lt;/code&gt;，零副作用——任意线程任意时刻读安全；
-          默认实例的创建收在 Initialize 的 CAS 闸门内（单一创建点，天然互斥）。
-          早期实现 &lt;code&gt;_recovery ??= CreateRecovery()&lt;/code&gt; 在 getter 懒创建：并发读双实例竞态 +
-          Initialize 前任何 &lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.IsReady&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 观测读都会偷跑工厂（Dispose 前查一下也凭空建出
-          Recovery）——已废除（设计决策：风险不该上层承担，基类直接原子）。&lt;/p&gt;
-</code></pre>
-</div>
-  <div class="markdown level1 conceptual"></div>
-  <h5 class="declaration">Declaration</h5>
-  <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">protected IRecovery&lt;THints&gt;? Recovery { get; }</code></pre>
-  </div>
-  <h5 class="propertyValue">Property Value</h5>
-  <table class="table table-bordered table-condensed">
-    <thead>
-      <tr>
-        <th>Type</th>
-        <th>Description</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;THints&gt;</td>
-        <td></td>
-      </tr>
-    </tbody>
-  </table>
 
 
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.RecoveryState*"></a>
@@ -391,7 +353,7 @@ Recovery==null 两种情况：① 未 Initialize（_initialized==0）→ 未就�
     </tbody>
   </table>
   <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState_remarks">Remarks</h5>
-  <div class="markdown level1 remarks"><p>★ 委托 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">Recovery</a>.<a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html#TC_Tier_Contracts_Lifecycle_IRecovery_RecoveryState">RecoveryState</a>。
+  <div class="markdown level1 remarks"><p>★ 委托 <span class="xref">TC.Tier.Core.Shared.LifecycleBase`1.Recovery</span>.<a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery.html#TC_Tier_Contracts_Lifecycle_IRecovery_RecoveryState">RecoveryState</a>。
 Recovery==null：未 Initialize → NotStarted；Initialize 过但无需恢复 → Completed/100。</p>
 </div>
 
@@ -673,7 +635,8 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">typeFilter</span></td>
-        <td></td>
+        <td><p>可选类型名过滤（子串匹配，null = 全部）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -688,7 +651,8 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Shared.TrackedInstanceInfo.html">TrackedInstanceInfo</a>&gt;</td>
-        <td></td>
+        <td><p>当前所有存活的 LifecycleBase 实例快照。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -785,7 +749,7 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
   <a id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady*"></a>
   <h4 id="TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady" data-uid="TC.Tier.Core.Shared.LifecycleBase`1.WaitForReady">WaitForReady()</h4>
   <div class="markdown level1 summary"><p>同步等待恢复完成（内部 join 后台恢复 task，阻塞<strong>当前调用线程</strong>直到 Ready）。</p>
-<p>★ 与 Initialize 的关系：Initialize 启动后台恢复后立即返回；
+<p>★ 与 <code>Initialize</code> 的关系：Initialize 启动后台恢复后立即返回；
   调用方若需"启动后立即阻塞等就绪"，在 Initialize 后调本方法。</p>
 <p>★ 不阻塞其他数据结构，只阻塞调用本方法的线程。</p>
 <p>★ 若恢复已失败（Failed），本方法重抛恢复异常。</p>
@@ -828,7 +792,8 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
         <td><span class="parametername">timeoutMilliseconds</span></td>
-        <td></td>
+        <td><p>超时时间（毫秒）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -843,7 +808,8 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>是否在超时内就绪。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -945,7 +911,7 @@ Dispose 统一转发（逆序、异步优先、聚合异常、防双释放）。
     </tbody>
   </table>
   <h5 id="TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged_remarks">Remarks</h5>
-  <div class="markdown level1 remarks"><p>转发内部 <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">Recovery</a> 的事件。</p>
+  <div class="markdown level1 remarks"><p>转发内部 <span class="xref">TC.Tier.Core.Shared.LifecycleBase`1.Recovery</span> 的事件。</p>
 </div>
   <h3 id="implements">Implements</h3>
   <div>

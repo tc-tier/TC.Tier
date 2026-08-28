@@ -5,9 +5,9 @@
   <head>
     <meta charset="utf-8">
       <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
-      <title>虚拟文件系统使用指南（RawFileSystem &#183; virtual://——TC.Tier.Core.IO.Raw） | TC.Tier — .NET 可组合存储运行时 </title>
+      <title>虚拟文件系统使用指南（TierVolumeFs &#183; virtual://——TC.Tier.Core.IO.TierVolume） | TC.Tier — .NET 可组合存储运行时 </title>
       <meta name="viewport" content="width=device-width">
-      <meta name="title" content="虚拟文件系统使用指南（RawFileSystem &#183; virtual://——TC.Tier.Core.IO.Raw） | TC.Tier — .NET 可组合存储运行时 ">
+      <meta name="title" content="虚拟文件系统使用指南（TierVolumeFs &#183; virtual://——TC.Tier.Core.IO.TierVolume） | TC.Tier — .NET 可组合存储运行时 ">
     
     
       <link rel="shortcut icon" href="../../../../favicon.ico">
@@ -71,7 +71,7 @@
         <div class="article row grid-right">
           <div class="col-md-10">
             <article class="content wrap" id="_content" data-uid="">
-<h1 id="虚拟文件系统使用指南rawfilesystem--virtualtctiercoreioraw">虚拟文件系统使用指南（RawFileSystem · virtual://——TC.Tier.Core.IO.Raw）</h1>
+<h1 id="虚拟文件系统使用指南tiervolumefs--virtualtctiercoreiotiervolume">虚拟文件系统使用指南（TierVolumeFs · virtual://——TC.Tier.Core.IO.TierVolume）</h1>
 
 <blockquote>
 <p><strong>状态</strong>：正式文档（自包含——不依赖设计/开发过程文档）
@@ -80,9 +80,9 @@
 </blockquote>
 <hr>
 <h2 id="0-一句话">0. 一句话</h2>
-<p><strong>虚拟文件系统（第四类文件系统 · Raw 格式实现）：一个自描述的单工件（<code>.raw</code> 文件或 Linux 块设备），既是活卷又是存档。</strong> 你得到一个 <code>RawFileSystem</code> 对象，它实现完整的 <code>IFileSystem</code>——命名空间、数据面、FileExtra、崩溃一致性全部内建，跨平台（Linux/macOS/Windows 的文件载体 + Linux 设备载体），零 BCL <code>File</code>/<code>Directory</code> 依赖。</p>
-<pre><code class="lang-csharp">using var fs = RawFileSystem.New(RawCarrier.File(&quot;/data/vol.raw&quot;),
-    new RawFormatOptions { QuotaBytes = 10L &lt;&lt; 30 });           // New 即格式化；QuotaBytes 缺省 -1 = 按需自动扩容
+<p><strong>虚拟文件系统（第四类文件系统 · TierVolume 格式实现）：一个自描述的单工件（<code>.tier</code> 文件或 Linux 块设备），既是活卷又是存档。</strong> 你得到一个 <code>TierVolumeFs</code> 对象，它实现完整的 <code>IFileSystem</code>——命名空间、数据面、FileExtra、崩溃一致性全部内建，跨平台（Linux/macOS/Windows 的文件载体 + Linux 设备载体），零 BCL <code>File</code>/<code>Directory</code> 依赖。</p>
+<pre><code class="lang-csharp">using var fs = TierVolumeFs.New(TierVolumeCarrier.File(&quot;/data/vol.tier&quot;),
+    new TierVolumeFormatOptions { QuotaBytes = 10L &lt;&lt; 30 });           // New 即格式化；QuotaBytes 缺省 -1 = 按需自动扩容
 
 using var h = fs.Open(&quot;docs/hello.txt&quot;, new FileOpenOptions
 {
@@ -105,7 +105,7 @@ h.Flush();
 <tbody>
 <tr>
 <td><strong>载体</strong></td>
-<td><code>.raw</code> 文件 或 Linux 块设备/裸分区——一份逻辑布局，两种物理形态</td>
+<td><code>.tier</code> 文件 或 Linux 块设备/裸分区——一份逻辑布局，两种物理形态</td>
 </tr>
 <tr>
 <td><strong>自持一致性</strong></td>
@@ -136,16 +136,21 @@ h.Flush();
 <hr>
 <h2 id="2-载体与格式化">2. 载体与格式化</h2>
 <h3 id="21-两种载体">2.1 两种载体</h3>
-<pre><code class="lang-csharp">RawCarrier.File(&quot;/data/vol.raw&quot;)        // 文件载体：容量声明内按需增长，稀疏友好
-RawCarrier.Device(&quot;/dev/nvme0n1p3&quot;)     // 设备载体：固定几何（Linux；O_DIRECT 强制）
+<pre><code class="lang-csharp">TierVolumeCarrier.File(&quot;/data/vol.tier&quot;)        // 文件载体：容量声明内按需增长，稀疏友好
+TierVolumeCarrier.Device(&quot;/dev/nvme0n1p3&quot;)     // 设备载体：固定几何（Linux；O_DIRECT 强制）
+TierVolumeCarrier.Device(&quot;/dev/C:&quot;)            // 设备载体（Windows 卷 → \.\C:；CreateFile share=0 + FSCTL_LOCK_VOLUME）
+TierVolumeCarrier.Device(&quot;/dev/PhysicalDrive1&quot;)// 设备载体（Windows 物理盘 → \.\PhysicalDrive1；独占句柄排他）
 </code></pre>
 <ul>
 <li>文件载体创建伴生锁文件 <code>&lt;path&gt;.lock</code>（跨进程互斥）；</li>
-<li>设备载体用 <code>flock</code> 互斥；容量/扇区经 <code>BLKGETSIZE64</code>/<code>BLKSSZGET</code> ioctl 探测；</li>
-<li>Windows 物理盘不在支持范围（权限/锁卷三重障碍）——Windows 用文件载体。</li>
+<li>设备载体（Linux）用 <code>flock</code> 互斥；容量/扇区经 <code>BLKGETSIZE64</code>/<code>BLKSSZGET</code> ioctl 探测；</li>
+<li>设备载体（Windows，2026-08-26 补齐）：<code>virtual:///dev/C:</code>（卷）/ <code>virtual:///dev/PhysicalDriveN</code>（物理盘）——
+<code>CreateFile</code> share=0 独占 + 卷锁定（FSCTL_LOCK_VOLUME，物理盘无卷锁语义）；NO_BUFFERING 直 IO +
+WRITE_THROUGH 写穿档（IS-03 同机制）；扇区经 <code>GetDiskFreeSpace</code> 探测（物理盘失败默认 512）。
+须管理员权限；卷被挂载占用时先手动卸载（不自动卸卷——危险）。快照挂载（只读）共享读开口不锁卷。</li>
 </ul>
 <h3 id="22-格式化">2.2 格式化</h3>
-<pre><code class="lang-csharp">public static RawFileSystem New(RawCarrier carrier, RawFormatOptions? options = null, ILogger? logger = null)   // Format 已终态改名 New（零过渡）
+<pre><code class="lang-csharp">public static TierVolumeFs New(TierVolumeCarrier carrier, TierVolumeFormatOptions? options = null, ILogger? logger = null)   // Format 已终态改名 New（零过渡）
 </code></pre>
 <table>
 <thead>
@@ -177,6 +182,16 @@ RawCarrier.Device(&quot;/dev/nvme0n1p3&quot;)     // 设备载体：固定几何
 <td>日志物理预留（0 = 不预留——此后该卷永不开日志）</td>
 </tr>
 <tr>
+<td><code>Preallocation</code></td>
+<td><code>Metadata</code></td>
+<td>载体预分配方式轴（IS-02/IS-04 统一词汇）：<code>Metadata</code> = 现行稀疏（SetLength 只改元数据，簇随写分配）；<code>Full</code> = 载体物理占位（不标记稀疏 + 创建时物化全部空间——一次性成本部署方承担，换运行时零分配抖动；无特权 Windows / Linux 无 fallocate 时转零写物化，全失败 fail-fast）</td>
+</tr>
+<tr>
+<td><code>CarrierWriteThrough</code></td>
+<td>false</td>
+<td>载体句柄写穿档（IS-03）：载体以 FILE_FLAG_WRITE_THROUGH/O_SYNC 打开——每写完成即达稳定存储；journal 提交免独立 fsync（写穿完成即单屏障），Flush 对已写穿数据短路。与句柄级 <code>FileOpenHints.WriteThrough</code>（逐写 journal 提交）正交</td>
+</tr>
+<tr>
 <td><code>Label</code></td>
 <td>&quot;&quot;</td>
 <td>卷标签（≤32B UTF-8）</td>
@@ -195,8 +210,8 @@ RawCarrier.Device(&quot;/dev/nvme0n1p3&quot;)     // 设备载体：固定几何
 <li>格式化完成即 clean、日志就绪（<code>JournalReserveBytes &gt; 0</code> 时）。</li>
 </ul>
 <h3 id="23-打开">2.3 打开</h3>
-<pre><code class="lang-csharp">public static RawFileSystem Open(RawCarrier carrier, RawOpenOptions? options = null, ILogger? logger = null)
-public static RawFileSystem Open(RawCarrier?[] carriers, RawOpenOptions? options = null, ILogger? logger = null)
+<pre><code class="lang-csharp">public static TierVolumeFs Open(TierVolumeCarrier carrier, TierVolumeOpenOptions? options = null, ILogger? logger = null)
+public static TierVolumeFs Open(TierVolumeCarrier?[] carriers, TierVolumeOpenOptions? options = null, ILogger? logger = null)
 </code></pre>
 <table>
 <thead>
@@ -222,6 +237,16 @@ public static RawFileSystem Open(RawCarrier?[] carriers, RawOpenOptions? options
 <td>false</td>
 <td>多载体卷允许成员缺失（null 占位）——只读降级形态</td>
 </tr>
+<tr>
+<td><code>Preallocation</code></td>
+<td><code>Metadata</code></td>
+<td>载体预分配方式轴——须与格式化档一致：<code>Full</code> 档跳过载体稀疏标记（避免把 full 载体静默降回稀疏语义）</td>
+</tr>
+<tr>
+<td><code>CarrierWriteThrough</code></td>
+<td>false</td>
+<td>载体句柄写穿档——须与格式化档一致</td>
+</tr>
 </tbody>
 </table>
 <p>打开路径自动完成：唯一性检查 → superblock 采纳（CRC/版本）→ 日志重放（dirty 卷）→ 可达性对账 → 恢复可写。<strong>断电后直接 <code>Open</code> 即可，无需修复工具。</strong></p>
@@ -239,7 +264,7 @@ public static RawFileSystem Open(RawCarrier?[] carriers, RawOpenOptions? options
 </ul>
 <hr>
 <h2 id="3-日常使用ifilesystem-平面">3. 日常使用（IFileSystem 平面）</h2>
-<p>Raw 实现完整 <code>IFileSystem</code>——与内存/本地/网络文件系统同构，全部 API 见 <code>src/TC.Tier.Core/IO/IFileSystem.cs</code> 与 <code>IFileHandle.cs</code>。要点：</p>
+<p>TierVolume 实现完整 <code>IFileSystem</code>——与内存/本地/网络文件系统同构，全部 API 见 <code>src/TC.Tier.Core/IO/IFileSystem.cs</code> 与 <code>IFileHandle.cs</code>。要点：</p>
 <h3 id="31-命名空间">3.1 命名空间</h3>
 <pre><code class="lang-csharp">fs.CreateDirectory(&quot;docs&quot;);                     // mkdir -p（幂等 + 耐久）
 fs.DeleteDirectory(&quot;docs&quot;);                     // 仅限空（非空抛 DirectoryNotEmpty）
@@ -326,7 +351,7 @@ fs.VolumeUuid;        // 卷 UUID（诊断）
 <p>两档<strong>语义同构</strong>（与本地文件系统的两档对称）——直达档对齐由实现吸收（弹跳窗/合并读），未对齐缓冲也可用；一致性规范内建（直达写失效对应缓存页 / 直达读前排干重叠脏页）。</p>
 <h3 id="42-自管页缓存参数">4.2 自管页缓存参数</h3>
 <ul>
-<li>预算：<code>RawOpenOptions.PageCacheBytes</code>（默认 64 MiB）；</li>
+<li>预算：<code>TierVolumeOpenOptions.PageCacheBytes</code>（默认 64 MiB）；</li>
 <li>预算内行为：LRU 逐出、写回脏页（flusher 阈值 <code>max(1MB, 预算/8)</code> 唤醒）、整块 run 写绕（write-around，不污染缓存）；</li>
 <li><strong>0 预算 = 纯直达形态</strong>：扫描型负载不想吃内存时用。</li>
 </ul>
@@ -346,25 +371,25 @@ fs.FlushRoot();  // 目录级收口（净卷 = 纯屏障，纳秒级）
 <hr>
 <h2 id="5-多载体卷扩容缩容降级">5. 多载体卷（扩容/缩容/降级）</h2>
 <pre><code class="lang-csharp">// 在线扩容（加载体——纯加法，不改格式）
-fs.AddCarrier(RawCarrier.File(&quot;/data/vol2.raw&quot;), capacityBytes: 20L &lt;&lt; 30);
+fs.AddCarrier(TierVolumeCarrier.File(&quot;/data/vol2.tier&quot;), capacityBytes: 20L &lt;&lt; 30);
 // 设备成员容量自几何，省略 capacityBytes
 
 // 缩容（减载体）——非空成员自动迁移（btrfs device remove 同构）后摘除
 fs.RemoveCarrier(1);    // 主载体（成员 0）不可移除
 
 // 多载体打开（全量清单——路径不入盘上格式，LVM 同构）
-using var fs2 = RawFileSystem.Open(new RawCarrier?[]
+using var fs2 = TierVolumeFs.Open(new TierVolumeCarrier?[]
 {
-    RawCarrier.File(&quot;/data/vol.raw&quot;),      // 成员 0 = 主载体
-    RawCarrier.File(&quot;/data/vol2.raw&quot;),
+    TierVolumeCarrier.File(&quot;/data/vol.tier&quot;),      // 成员 0 = 主载体
+    TierVolumeCarrier.File(&quot;/data/vol2.tier&quot;),
 });
 
 // 降级打开（成员缺失——只读形态；缺失成员上的数据读诚实拒绝）
-using var fs3 = RawFileSystem.Open(new RawCarrier?[]
+using var fs3 = TierVolumeFs.Open(new TierVolumeCarrier?[]
 {
-    RawCarrier.File(&quot;/data/vol.raw&quot;),
+    TierVolumeCarrier.File(&quot;/data/vol.tier&quot;),
     null,                                   // 占位缺失成员
-}, new RawOpenOptions { AllowDegraded = true });
+}, new TierVolumeOpenOptions { AllowDegraded = true });
 </code></pre>
 <ul>
 <li>成员容量 64 块对齐；误并入已格式化载体显式拒绝；</li>
@@ -374,7 +399,7 @@ using var fs3 = RawFileSystem.Open(new RawCarrier?[]
 </ul>
 <hr>
 <h2 id="6-采集还原迁移管线--dd-快道">6. 采集/还原/迁移（管线 + dd 快道）</h2>
-<p>全部经 <code>RootSpaceImage</code>（<code>TC.Tier.Core.IO.Image</code>）——只认 <code>IFileSystem</code> 接口平面，四态（Mem/Disk/Remote/Raw）互转一套代码：</p>
+<p>全部经 <code>RootSpaceImage</code>（<code>TC.Tier.Core.IO.Image</code>）——只认 <code>IFileSystem</code> 接口平面，四态（Mem/Disk/Remote/TierVolume）互转一套代码：</p>
 <pre><code class="lang-csharp">// 采集 → TCA1 流（结构化存档：清单 + 数据帧 + CRC）
 using (var out_ = File.Create(&quot;backup.tca&quot;))
     RootSpaceImage.Capture(fs, out_, new ImageOptions
@@ -389,14 +414,14 @@ using (var in_ = File.OpenRead(&quot;backup.tca&quot;))
     RootSpaceImage.Restore(in_, targetFs, new ImageOptions { VerifyChecksums = true });
 
 // 文件系统间转移——能力位自动路由：
-// 源与目标都置位 ContiguousCapture（即 Raw↔Raw）→ dd 字节直拷快道；
+// 源与目标都置位 ContiguousCapture（即 TierVolume↔TierVolume）→ dd 字节直拷快道；
 // 其余组合 → 结构化管线（TCA1 流中转）
 RootSpaceImage.Transfer(sourceFs, targetFs);
 </code></pre>
 <ul>
 <li>TCA1 保真：稀疏（洞不搬零）、unwritten 区间（预分配语义重建）、FileExtra；时间戳仅审计记录不承诺还原；</li>
 <li>快道前置：容量预检（目标不足抛 <code>DiskFull</code> 且零字节受损）、双侧维护租约、镜像后目标重载内存态；</li>
-<li><strong><code>.raw</code> 文件本身即存档</strong>——<code>cp</code>/<code>dd</code>/网络推流都是合法迁移（单工件自描述）。</li>
+<li><strong><code>.tier</code> 文件本身即存档</strong>——<code>cp</code>/<code>dd</code>/网络推流都是合法迁移（单工件自描述）。</li>
 </ul>
 <hr>
 <h2 id="7-维护门闩静默快照前置">7. 维护门闩（静默快照前置）</h2>
@@ -413,7 +438,7 @@ RootSpaceImage.Transfer(sourceFs, targetFs);
 </ul>
 <hr>
 <h2 id="8-能力位capabilities">8. 能力位（Capabilities）</h2>
-<p>Raw 置位（对照 Disk 全对齐 + 6 增强）：</p>
+<p>TierVolume 置位（对照 Disk 全对齐 + 6 增强）：</p>
 <p><code>Sparse</code>（内部恒真）· <code>RandomWrite</code> · <code>EmptyDirectories</code> · <code>DurableRename</code> · <code>AtomicDirectoryMove</code>（<strong>增强</strong>：实例内元数据事务，不依赖 OS）· <code>ExclusiveLock</code>（<strong>增强</strong>：内建）· <code>RangeLock</code>（<strong>增强</strong>：进程内逻辑锁）· <code>RangeShift</code>（<strong>增强</strong>：全平台）· <code>ContiguousCapture</code> · <code>MaintenanceGate</code> · <code>CopyRange</code> · <code>VectorIO</code> · <code>DirectIO</code> · <code>Advise</code> · <code>WriteThrough</code> · <code>FlushDataOnly</code> · <code>Mmap</code>（文件载体；设备诚实不置位）· <code>Volume</code> 几何精确（<strong>增强</strong>）。</p>
 <p>消费方<strong>按能力位决策</strong>，不要按文件系统硬编码——这是四类文件系统平权的机械保证。</p>
 <hr>
@@ -474,7 +499,7 @@ RootSpaceImage.Transfer(sourceFs, targetFs);
 <ol>
 <li><strong>一卷一实例，无侧门</strong>：一切载体字节访问（含备份导出）必须经实例——直接 <code>dd</code> 一个<strong>活卷</strong>属于违规（锁是 advisory 拦不住外部写者；设备载体 O_DIRECT 下有一致性风险）；</li>
 <li><strong>句柄必须 Dispose</strong>：<code>IFileHandle</code> 持有共享登记；泄漏句柄会挡住 Delete/维护收敛；</li>
-<li><strong>不要绕过 <code>RawFileSystem</code> 类型表面</strong>：盘上格式细节全部内嵌私有——partial 拆分是内部组织，不是扩展点；</li>
+<li><strong>不要绕过 <code>TierVolumeFs</code> 类型表面</strong>：盘上格式细节全部内嵌私有——partial 拆分是内部组织，不是扩展点；</li>
 <li><strong>写放大自知</strong>：碎片文件 <code>Map</code> 会物化（全文件重写）；<code>CollapseRange/InsertRange</code> 是 memmove 语义；</li>
 <li><strong>容量声明定死</strong>：单载体不改格式不扩容——跨上限一律 <code>AddCarrier</code>（纯加法）。</li>
 </ol>
@@ -499,16 +524,16 @@ h.Advise(FileAdvise.Sequential);                 // 纯流式：无页机制、�
 <p><strong>配方 C：备份到 S3 再恢复</strong></p>
 <pre><code class="lang-csharp">var remote = new RemoteFileSystem(/* s3 options */);
 RootSpaceImage.Transfer(rawFs, remote);          // 结构化管线（TCA1 + Zstd 压缩）
-// 灾备：Transfer(remote, RawFileSystem.New(RawCarrier.File(&quot;/restore.raw&quot;), ...))
+// 灾备：Transfer(remote, TierVolumeFs.New(TierVolumeCarrier.File(&quot;/restore.tier&quot;), ...))
 </code></pre>
 <p><strong>配方 D：在线扩容不打断服务</strong></p>
-<pre><code class="lang-csharp">fs.AddCarrier(RawCarrier.Device(&quot;/dev/sdb1&quot;));   // 新块立即可用；成员表事务原子持久
+<pre><code class="lang-csharp">fs.AddCarrier(TierVolumeCarrier.Device(&quot;/dev/sdb1&quot;));   // 新块立即可用；成员表事务原子持久
 </code></pre>
 <hr>
 <h2 id="12-测试与验证">12. 测试与验证</h2>
 <ul>
-<li>契约测试族 <code>tests/TC.Tier.Core.Tests/IO/Raw/</code>（1:1 跟源文件走）；</li>
-<li>性能基准 <code>benchmarks/TC.Tier.Core.Benchmarks/IO/RawIoBenchmarks.cs</code>（<code>dotnet run -c Release -- --filter *RawIo*</code>）；</li>
+<li>契约测试族 <code>tests/TC.Tier.Core.Tests/IO/TierVolume/</code>（1:1 跟源文件走）；</li>
+<li>性能基准 <code>benchmarks/TC.Tier.Core.Benchmarks/IO/TierVolumeIoBenchmarks.cs</code>（<code>dotnet run -c Release -- --filter *TierVolumeIo*</code>）；</li>
 <li>探针 <code>prototypes/DiskVsRawProbe/</code>（快速肉眼对照）；</li>
 <li>数字与验收线见 <a href="perf/io-performance.html">perf/io-performance.md</a>。</li>
 </ul>

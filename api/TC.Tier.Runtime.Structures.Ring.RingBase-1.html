@@ -146,9 +146,6 @@
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;RingRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Recovery">LifecycleBase&lt;RingRecoveryHints&gt;.Recovery</a>
-    </div>
-    <div>
       <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;RingRecoveryHints&gt;.Id</a>
     </div>
     <div>
@@ -215,7 +212,9 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1__ctor_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.#ctor*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1__ctor_TC_Tier_Runtime_Structures_Ring_Contracts_IRingCodec_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Ring_RingSettings_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Ring_RingRecoveryHints__TC_Tier_Runtime_Structures_Ring_Contracts_RingCursorFactory_TC_Tier_Runtime_Structures_Ring_Contracts_IRingScanCursor__TC_Tier_Runtime_Structures_Ring_Contracts_IRingSnapshot_TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.#ctor(TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec,TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Ring.RingSettings,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Ring.RingRecoveryHints},TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory{TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor},TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot,TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader,TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Core.Logging.ILogger)">RingBase(IRingCodec, IFileSystem, RingSettings, IRecovery&lt;RingRecoveryHints&gt;?, RingCursorFactory&lt;IRingScanCursor&gt;?, IRingSnapshot?, MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;?, IMetaTransport?, LightEpoch?, ILogger?)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>构造 Ring 基类——装配主引擎/溢出引擎/meta 引擎（构造期纯 Create 零 IO，启动在 OnInitializeBegin）、
+页几何、8 地址指针初值、环满背压 lag 与冷页缓存容量（页池初始化推迟到 Initialize）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -234,52 +233,62 @@
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec.html">IRingCodec</a></td>
         <td><span class="parametername">codec</span></td>
-        <td></td>
+        <td><p>注入的 record 三段式 codec。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></td>
         <td><span class="parametername">fs</span></td>
-        <td></td>
+        <td><p>文件系统（组合根注入）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingSettings.html">RingSettings</a></td>
         <td><span class="parametername">settings</span></td>
-        <td></td>
+        <td><p>RingSettings（页几何/水位配置，构造时全量校验 fail-fast）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</td>
         <td><span class="parametername">recovery</span></td>
-        <td></td>
+        <td><p>恢复策略（null = 默认 DefaultRingRecovery）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory-1.html">RingCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a>&gt;</td>
         <td><span class="parametername">cursorFactory</span></td>
-        <td></td>
+        <td><p>扫描游标工厂。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot.html">IRingSnapshot</a></td>
         <td><span class="parametername">ringSnapshot</span></td>
-        <td></td>
+        <td><p>快照实现（null = 默认 RingSnapshot）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</td>
         <td><span class="parametername">metaPolicyFactory</span></td>
-        <td></td>
+        <td><p>meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></td>
         <td><span class="parametername">metaTransport</span></td>
-        <td></td>
+        <td><p>Transport 模式的外部 meta 传输。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></td>
         <td><span class="parametername">epoch</span></td>
-        <td></td>
+        <td><p>epoch 保护（null = 自建 LightEpoch）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></td>
         <td><span class="parametername">logger</span></td>
-        <td></td>
+        <td><p>日志记录器（可选）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -289,7 +298,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AverageRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AverageRecordSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AverageRecordSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AverageRecordSize">AverageRecordSize</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>平均记录大小（溢出阈值/容量估算的锚点值）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -340,7 +350,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ClosedUntilAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ClosedUntilAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ClosedUntilAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ClosedUntilAddress">ClosedUntilAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>关页边界——此地址前的页已关闭（新写入不得落在其前）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -365,7 +376,8 @@
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FixedRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FixedRecordSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_FixedRecordSize" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.FixedRecordSize">FixedRecordSize</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>固定记录大小（record 字节几何插槽）；0 = 变长（record 大小由 header 自述 PayloadLength/PaddingLength）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -420,7 +432,8 @@ Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_HeadAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.HeadAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_HeadAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.HeadAddress">HeadAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>驱逐边界——此地址前的旧页已被回收（head 随 flush/驱逐推进）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -601,7 +614,8 @@ Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOnlyAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOnlyAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ReadOnlyAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ReadOnlyAddress">ReadOnlyAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>只读水位——此地址前页面为 readonly（冻结，等待 flush 后驱逐）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -626,7 +640,8 @@ Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeHeadAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeHeadAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeHeadAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeHeadAddress">SafeHeadAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>安全驱逐边界（epoch 保护下的驱逐推进目标）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -651,7 +666,8 @@ Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeReadOnlyAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeReadOnlyAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_SafeReadOnlyAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.SafeReadOnlyAddress">SafeReadOnlyAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>安全只读水位——readonly 区推进目标（epoch 保护下驱逐推进，读者可安全读至此处）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -676,7 +692,8 @@ Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TailAddress_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TailAddress*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TailAddress" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TailAddress">TailAddress</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>写游标——下一条 record 的分配地址（TryAllocate 单调推进）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -741,7 +758,11 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AbortAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AbortAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_AbortAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.AbortAsync(System.Int64,System.Threading.CancellationToken)">AbortAsync(long, CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>★ AbortAsync（2PC 回滚的异步版，D2 决策落地）：TruncateSuffix 回退到上一已确认提交边界，
+丢弃本轮悬干数据，随后异步 WriteMeta 持久化回退后状态。</p>
+<p>对等 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_Abort_System_Int64_">Abort(long)</a> 的守卫矩阵与窗口契约（回退点 = _txRollbackTail，
+上一提交点之后的全部写入必须属于被回滚事务）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -760,12 +781,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">seq</span></td>
-        <td></td>
+        <td><p>要回滚的 Prepare 序号。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌——异步 meta 落盘途中响应取消。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -780,7 +803,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
+        <td><p>回滚完成的 ValueTask。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -906,7 +930,9 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverride*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverride(System.Boolean)">DisposeOverride(bool)</h4>
-  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>同步额外清理钩子（LifecycleBase 模板）：先落盘 mutable 区 [FlushedUntilAddress, TailAddress)
+→ 写 meta 落盘 → 释放 meta 策略 → 释放页 native 内存/页池（引擎内存归引擎，引擎以外资源在此收）。
+各步异常吞掉互不阻断（存储底线：尽力落盘）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -926,8 +952,7 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
-本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+        <td><p>true = 用户调 Dispose（可触托管资源）。</p>
 </td>
       </tr>
     </tbody>
@@ -938,7 +963,9 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverrideAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverrideAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.DisposeOverrideAsync(System.Boolean)">DisposeOverrideAsync(bool)</h4>
-  <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+  <div class="markdown level1 summary"><p>异步额外清理钩子（LifecycleBase 模板）：对等 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverride_System_Boolean_">DisposeOverride(bool)</a> 的异步轨——
+异步落盘 mutable 区 → 异步写 meta → 异步释放 meta 策略 → 释放页 native 内存/页池。
+各步异常吞掉互不阻断（存储底线：尽力落盘）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -958,7 +985,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
         <td><span class="parametername">disposing</span></td>
-        <td></td>
+        <td><p>true = 用户调 DisposeAsync（可触托管资源）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -973,7 +1001,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
+        <td><p>释放完成的 ValueTask。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1021,7 +1050,7 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ExitEpoch_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ExitEpoch*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ExitEpoch" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ExitEpoch">ExitEpoch()</h4>
-  <div class="markdown level1 summary"><p>退出 epoch 读保护（与 <a class="xref" href="TC.Tier.Contracts.Transactions.IEpochProtected.html#TC_Tier_Contracts_Transactions_IEpochProtected_EnterEpoch">EnterEpoch()</a> 同线程配对）。</p>
+  <div class="markdown level1 summary"><p>退出 epoch 读保护（IEpochProtected 契约——与 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterEpoch">EnterEpoch()</a> 同线程配对）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -1233,7 +1262,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKeyAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKeyAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetKeyAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetKeyAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">GetKeyAsync(LogicalAddress, CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>异步读单条 key：热区同步快路径直读；冷区异步整页回源后读。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -1252,12 +1282,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">addr</span></td>
-        <td></td>
+        <td><p>record 的起始逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌——冷区异步回源途中响应取消。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1272,7 +1304,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RecordKey-1.html">RecordKey</a>&lt;TKey&gt;&gt;</td>
-        <td></td>
+        <td><p>record 的 key 封装（Key/ValueLength/Flags/Address）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1280,7 +1313,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecordSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRecordSize_System_Int64_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRecordSize(System.Int64)">GetRecordSize(long)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>读物理地址处 record 的实际几何：filled = header + payload + padding 实际字节数，allocated = 对齐后的槽长。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -1299,7 +1333,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">phys</span></td>
-        <td></td>
+        <td><p>record 的物理地址。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1314,7 +1349,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32-.filled">filled</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int32,system.int32-.allocated">allocated</a>)</td>
-        <td></td>
+        <td><p>(实际字节数, 对齐后占用槽长)。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1373,7 +1409,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRequiredRecordSize_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRequiredRecordSize*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetRequiredRecordSize_System_Int64_System_Int32_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetRequiredRecordSize(System.Int64,System.Int32)">GetRequiredRecordSize(long, int)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>给定可用字节数下覆盖该 record 所需的最小槽长（估算插槽，实现类按自身 record 形态给出）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -1392,12 +1429,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
         <td><span class="parametername">phys</span></td>
-        <td></td>
+        <td><p>record 的物理地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
         <td><span class="parametername">availableBytes</span></td>
-        <td></td>
+        <td><p>可用字节数。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1412,7 +1451,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
+        <td><p>所需的最小槽长（字节数）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1468,7 +1508,9 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValue_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValue*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValue_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValue(TC.Tier.Contracts.Storage.LogicalAddress,System.Span{System.Byte})">GetValue(LogicalAddress, Span&lt;byte&gt;)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>读 addr 处 record 的 value（拷贝交付到 <code class="paramref">destination</code>）。
+热区直读 native 页拷贝；冷区自动回源后拷贝；溢出 record（FLAG_VALUE_OVERFLOW）从溢出引擎读入。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -1487,12 +1529,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">addr</span></td>
-        <td></td>
+        <td><p>record 的起始逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">destination</span></td>
-        <td></td>
+        <td><p>value 字节的拷贝目的地。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1507,7 +1551,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></td>
-        <td></td>
+        <td><p>写入 destination 的 value 字节数。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1515,7 +1560,9 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.GetValueAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Memory{System.Byte},System.Threading.CancellationToken)">GetValueAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>异步读 value（拷贝交付到 <code class="paramref">destination</code>）：热区同步快路径
+（溢出值走异步溢出引擎读）；冷区异步整页回源后同步拷贝。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -1534,17 +1581,20 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">addr</span></td>
-        <td></td>
+        <td><p>record 的起始逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">destination</span></td>
-        <td></td>
+        <td><p>value 字节的拷贝目的地。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌——溢出值/冷区异步读途中响应取消。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1559,7 +1609,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</td>
-        <td></td>
+        <td><p>写入 destination 的 value 字节数。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -1616,7 +1667,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_InitializePolicies_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.InitializePolicies*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_InitializePolicies" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.InitializePolicies">InitializePolicies()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>派生类初始化钩子：装配冷页缓存（ClockCache 容量 = ClockCacheCapacity 或 ColdReadRatio 派生）并恢复溢出尾水位。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -1688,13 +1740,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitializeBegin_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitializeBegin*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_OnInitializeBegin" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.OnInitializeBegin">OnInitializeBegin()</h4>
-  <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子——this 构造完后、后台恢复启动前。</p>
-<pre><code>        &lt;p&gt;子类在此：① &lt;code&gt;_engine.Initialize(...)&lt;/code&gt;（Runtime 层引擎 init）
-          ② &lt;code&gt;Resources.Add(_engine)&lt;/code&gt;（注册主引擎到资源组）
-          ③ 创建 MetaPolicy（按 MetaPolicyKind）
-          ④ 后期资源 &lt;code&gt;Resources.Add(metaEngine/overflowEngine, ...)&lt;/code&gt;&lt;/p&gt;
-        &lt;p&gt;此时 this 已完全构造，虚方法安全；&lt;xref href=&quot;TC.Tier.Core.Shared.LifecycleBase%601.CreateRecovery&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 紧随其后被基类调用。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>启动期钩子：主引擎/溢出引擎/meta 引擎（Managed）并行 Initialize（均非阻塞），
+引擎就绪等待在恢复核心（RecoverAsync 开头 await WaitForReadyAsync）完成。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -1969,7 +2016,7 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync(System.Threading.CancellationToken)">ScanAsync(CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>全量扫描（重载）——从 BeginAddress 扫到当前尾。</p>
+  <div class="markdown level1 summary"><p>全量扫描（IKeyResolver 重载契约）——从 BeginAddress 扫到当前尾（TailAddress）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -1989,7 +2036,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌——冷区异步回源途中响应取消。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2004,7 +2052,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</td>
-        <td></td>
+        <td><p>(Key, Address) 异步流。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2012,7 +2061,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.ScanAsync(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">ScanAsync(LogicalAddress, LogicalAddress, CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>范围扫描——吐 (Key, Address) 对（光有 key 建不了条目）；异步迭代器流式回源。</p>
+  <div class="markdown level1 summary"><p>范围扫描（IKeyResolver 契约）——从 begin 扫到 end（开区间），异步迭代器流式回源（冷区真异步 IO，不阻塞调用线程）。
+仅吐用户数据 record（过滤 FLAG_ENTRY_IS_META 的 meta record）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -2032,17 +2082,20 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">begin</span></td>
-        <td></td>
+        <td><p>扫描起点（小于 BeginAddress 时游标自动夹取）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">end</span></td>
-        <td></td>
+        <td><p>扫描终点（开区间，不含；为 default 时取当前尾）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌——冷区异步回源途中响应取消（EnumeratorCancellation）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2057,7 +2110,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</td>
-        <td></td>
+        <td><p>(Key, Address) 异步流。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2187,7 +2241,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKey*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_TC_Tier_Contracts_Storage_LogicalAddress__0__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKey(TC.Tier.Contracts.Storage.LogicalAddress,`0@)">TryGetKey(LogicalAddress, out TKey)</h4>
-  <div class="markdown level1 summary"><p>按地址读单条 key。false = 读不到（无效地址/record 无效）。</p>
+  <div class="markdown level1 summary"><p>按地址读单条 key（IKeyResolver 契约）——热冷透明：热区直读 native 页，冷区自动整页回源后读。
+key 位置 = record 起始 + header 字节数（定长 sizeof(TKey) 字节）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -2207,12 +2262,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">addr</span></td>
-        <td></td>
+        <td><p>record 的起始逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><span class="xref">TKey</span></td>
         <td><span class="parametername">key</span></td>
-        <td></td>
+        <td><p>输出的 key 值。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2227,7 +2284,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>读取成功返回 true（本实现读路径恒成功）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2235,7 +2293,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKeyAsync_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKeyAsync*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKeyAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.TryGetKeyAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">TryGetKeyAsync(LogicalAddress, CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>异步读单条 key（<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetKey_TC_Tier_Contracts_Storage_LogicalAddress__0__">TryGetKey(LogicalAddress, out TKey)</a> 的异步版）：热区同步快路径，冷区异步整页回源后读。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -2254,12 +2313,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">addr</span></td>
-        <td></td>
+        <td><p>record 的起始逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌——冷区异步回源途中响应取消。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2274,7 +2335,8 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,system.boolean-.key">Key</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,system.boolean-.success">Success</a>)&gt;</td>
-        <td></td>
+        <td><p>(Key=读到的 key 值, Success=是否成功)。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -2282,7 +2344,11 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
 
   <a id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValue*"></a>
   <h4 id="TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Runtime.Structures.Ring.RingBase`1.UpdateValue(TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlySpan{System.Byte})">UpdateValue(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>★ 原位更新既有 record 的 value（同步）——按「旧/新是否溢出」四分支翻转：
+overflow→overflow 更新溢出帧指针、inline→overflow 补 OVERFLOW 位并写溢出帧、
+overflow→inline 回退（清 OVERFLOW 位 + 容量校验 + 拷值）、inline→inline 重写 payload 长度 + 拷值，
+每分支后重写 header 与 CRC。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -2301,12 +2367,14 @@ CommittedTailAddress——跨崩溃的恢复裁决同一路）。⚠️ 窗口�
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></td>
         <td><span class="parametername">addr</span></td>
-        <td></td>
+        <td><p>目标 record 的逻辑地址。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</td>
         <td><span class="parametername">newValue</span></td>
-        <td></td>
+        <td><p>新 value 字节。</p>
+</td>
       </tr>
     </tbody>
   </table>

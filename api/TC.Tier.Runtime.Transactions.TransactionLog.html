@@ -127,7 +127,8 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog__ctor_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.#ctor*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog__ctor_TC_Tier_Contracts_Storage_IStorageEngine_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.#ctor(TC.Tier.Contracts.Storage.IStorageEngine)">TransactionLog(IStorageEngine)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>构造事务日志（对齐缓冲 + 固定块 commit record；打开即读盘恢复 lastCommittedSeq）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -222,7 +223,9 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_Commit_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Commit*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Commit" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Commit">Commit()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>真正两阶段提交（同步）：Phase 1 foreach Prepare（任一失败 → Abort 已 Prepare 的并抛）→
+全部成功 → persist commit record（Write+Flush = 原子点）→ Phase 2 foreach ConfirmCommitted。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -239,7 +242,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
+        <td><p>新提交的 seq。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -247,10 +251,8 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_CommitAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.CommitAsync*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_CommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.CommitAsync(System.Threading.CancellationToken)">CommitAsync(CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>★ 真正两阶段提交（本次改造）：Phase 1 foreach Prepare → 任一失败 → foreach Abort；
-全部成功 → persist commit record（原子点）→ Phase 2 foreach ConfirmCommitted。</p>
-<p>落盘分层：参与者 Prepare 各自 flush 数据+meta；协调者只持久化 commit record（原子点）。</p>
-<p>返回新 seq。Phase 1 失败抛异常（已 Prepare 的全部 Abort）。</p>
+  <div class="markdown level1 summary"><p>真正两阶段提交（异步）：Phase 1 foreach PrepareAsync（任一失败 → Abort 已 Prepare 的并抛）→
+全部成功 → persist commit record（WriteAsync+Flush = 原子点）→ Phase 2 foreach ConfirmCommitted。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -270,7 +272,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -285,7 +288,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td></td>
+        <td><p>新提交的 seq。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -293,7 +297,8 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_Dispose_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Dispose*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Dispose" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Dispose">Dispose()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>释放对齐缓冲（幂等——CAS 守卫，重复调 no-op）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -303,7 +308,8 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_DisposeAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.DisposeAsync*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_DisposeAsync" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.DisposeAsync">DisposeAsync()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>异步释放对齐缓冲（幂等——CAS 守卫；实质同步，无异步资源）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -320,7 +326,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></td>
-        <td></td>
+        <td><p>表示释放完成的 ValueTask。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -328,7 +335,8 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_Load_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Load*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Load" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Load">Load()</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>从磁盘加载 commit record（固定块读 → Magic/Crc 校验）——返回 lastCommittedSeq（空/损坏 = 0）。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -345,7 +353,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></td>
-        <td></td>
+        <td><p>lastCommittedSeq（无 record = 0）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -353,11 +362,12 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcile_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcile*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcile" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcile">LoadAndReconcile()</h4>
-  <div class="markdown level1 summary"><p>★ 恢复协调（本次改造为双向分支）：Load commit record + 对每个参与者裁决。</p>
-<p>- committedSeq == 0（空盘/损坏）：所有有悬干数据的参与者 Abort</p>
+  <div class="markdown level1 summary"><p>★ 恢复协调：Load commit record + 推进所有已注册参与者到已提交 seq。</p>
+<p>调用方须在调用前 Register 所有参与者（与 Commit 时相同的集合）。</p>
+<p>恢复判定：</p>
+<p>- committedSeq == 0（空盘/损坏）→ 所有有悬干的参与者 Abort</p>
 <p>- LastCommittedSeq &lt; committedSeq → ConfirmCommitted(committedSeq)（正向：未同步推进）</p>
 <p>- LastPreparedSeq &gt; committedSeq → Abort(LastPreparedSeq)（反向：超前悬干丢弃）</p>
-<p>调用方须在调用本方法前 Register 所有参与者（按依赖顺序：底层先，上层后）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -383,7 +393,8 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcileAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcileAsync*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcileAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAndReconcileAsync(System.Threading.CancellationToken)">LoadAndReconcileAsync(CancellationToken)</h4>
-  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 summary"><p>异步恢复协调（对等同步版 <a class="xref" href="TC.Tier.Runtime.Transactions.TransactionLog.html#TC_Tier_Runtime_Transactions_TransactionLog_LoadAndReconcile">LoadAndReconcile()</a>）——LoadAsync + 按双向判定推进/回退参与者。</p>
+</div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
   <div class="codewrapper">
@@ -402,7 +413,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -417,7 +429,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td></td>
+        <td><p>加载的 committedSeq（空盘/损坏 = 0）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -425,7 +438,7 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAsync_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAsync*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_LoadAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.LoadAsync(System.Threading.CancellationToken)">LoadAsync(CancellationToken)</h4>
-  <div class="markdown level1 summary"><p>启动时从磁盘加载 commit record（读 lastCommittedSeq）。返回 lastCommittedSeq（无 record = 0）。</p>
+  <div class="markdown level1 summary"><p>异步从磁盘加载 commit record（对等同步版 <a class="xref" href="TC.Tier.Runtime.Transactions.TransactionLog.html#TC_Tier_Runtime_Transactions_TransactionLog_Load">Load()</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -445,7 +458,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></td>
         <td><span class="parametername">ct</span></td>
-        <td></td>
+        <td><p>取消令牌。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -460,7 +474,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</td>
-        <td></td>
+        <td><p>lastCommittedSeq（无 record = 0）。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -468,7 +483,7 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_Register_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Register*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Register_System_String_TC_Tier_Contracts_Transactions_ITransactionParticipant_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Register(System.String,TC.Tier.Contracts.Transactions.ITransactionParticipant)">Register(string, ITransactionParticipant)</h4>
-  <div class="markdown level1 summary"><p>★ 注册参与者（带名称标识，用于诊断/按名称查找）。</p>
+  <div class="markdown level1 summary"><p>注册参与者（带名称标识——诊断/按名称查找；同名注册覆盖保留末次插入顺序）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -488,12 +503,14 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">name</span></td>
-        <td></td>
+        <td><p>参与者名称（非空）。</p>
+</td>
       </tr>
       <tr>
         <td><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></td>
         <td><span class="parametername">participant</span></td>
-        <td></td>
+        <td><p>参与者实例。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -501,7 +518,7 @@
 
   <a id="TC_Tier_Runtime_Transactions_TransactionLog_Unregister_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Unregister*"></a>
   <h4 id="TC_Tier_Runtime_Transactions_TransactionLog_Unregister_System_String_" data-uid="TC.Tier.Runtime.Transactions.TransactionLog.Unregister(System.String)">Unregister(string)</h4>
-  <div class="markdown level1 summary"><p>按名称取消注册（可选，子系统销毁时调）。返回是否找到并移除。</p>
+  <div class="markdown level1 summary"><p>按名称取消注册（可选，子系统销毁时调）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
   <h5 class="declaration">Declaration</h5>
@@ -521,7 +538,8 @@
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></td>
         <td><span class="parametername">name</span></td>
-        <td></td>
+        <td><p>参与者名称。</p>
+</td>
       </tr>
     </tbody>
   </table>
@@ -536,7 +554,8 @@
     <tbody>
       <tr>
         <td><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></td>
-        <td></td>
+        <td><p>是否找到并移除。</p>
+</td>
       </tr>
     </tbody>
   </table>
