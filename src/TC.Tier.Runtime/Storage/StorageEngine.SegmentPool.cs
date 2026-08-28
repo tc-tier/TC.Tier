@@ -21,7 +21,7 @@ internal sealed partial class StorageEngine
     /// <summary>
     /// 构建声明（single-flight）：segId → 完成信号（true=已入池可取用 / false=弃建或失败）。
     /// <para>★ 池补建（<see cref="PreCreateSegmentPhysical"/>）与正式建段
-    ///   （<see cref="EnsureSegmentPhysicalAsync"/>）经此互斥——N≥2 双消费者并发建同一物理段
+    ///   （<see cref="EnsureSegmentPhysical"/>）经此互斥——N≥2 双消费者并发建同一物理段
     ///   的窗口（容量双重计数 / 句柄缓存覆盖泄漏 / 重复等值 meta 写）由此关死（引擎 N≥2 审计）。</para>
     /// </summary>
     private readonly Dictionary<int, TaskCompletionSource<bool>> _poolBuildGates = new();

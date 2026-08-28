@@ -90,6 +90,10 @@ public class EpochProtectedVersionScheme
         _epoch.Suspend();
     }
 
+    /// <summary>
+    /// 尝试推进当前 EPVS 的状态机。若当前线程未受保护，则不会推进状态机。
+    /// </summary>
+    /// <param name="expectedMachine">期望的状态机实例，用于避免无限递归推进。</param>
     internal void TryStepStateMachine(VersionSchemeStateMachine? expectedMachine = null)
     {
         var machineLocal = _currentMachine;

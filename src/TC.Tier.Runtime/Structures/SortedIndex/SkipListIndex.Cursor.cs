@@ -4,6 +4,9 @@ namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>有序遍历游标（层 0 链扫描——range scan 比较族独有能力）。</summary>
+    /// <param name="direction">遍历方向（扫描沿层 0 链前向产出条目——direction 由游标 Direction 原样暴露）。</param>
+    /// <returns>层 0 链扫描游标。</returns>
     public override IIndexScanCursor<TKey> CreateScanCursor(ReadDirection direction)
         => new SkipListScanCursor(this, direction);
 

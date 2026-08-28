@@ -29,6 +29,7 @@ public readonly ref struct SessionReadScope
     /// <summary>会话覆盖层（RYW——组合层自管内容的挂点）。</summary>
     public object? State => _session.State;
 
+    /// <summary>退出保护区——对全部 epoch 读保护持有者逐一 ExitEpoch（与构造期 EnterEpoch 对称）。</summary>
     public void Dispose()
     {
         foreach (var h in _holders) h.ExitEpoch();

@@ -19,8 +19,11 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
     // === 子类钩子实现（格式布局）===
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>体长（32B 几何——头 BodyLength 字段，写头时先知）。</summary>
+    /// <returns>几何体字节长。</returns>
     protected override long ComputeBodyLength() => PersistGeometrySize;
 
+    /// <summary>写体（32B 几何——脏节点批量写回引擎 + currentLevel/entryCount/headAddr 塔顶锚点；分片经 WriteBodyChunk）。</summary>
     protected override unsafe void WriteBody()
     {
         // ★ 脏节点批量写回（链/值变更延迟到 dump——插入路径零额外引擎写；物化前引擎副本完整含链；
@@ -45,6 +48,13 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
     // === 帧物化（基类帧走链定位后调——读几何 → head arena 落位 → 计数）===
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// 物化锚点帧（读几何 → head arena 落位 + 塔顶锚点 + 计数；recountNeeded 时沿层 0 链实收重数）。
+    /// </summary>
+    /// <param name="head">帧锚点地址（MinAddress 锚点槽）。</param>
+    /// <param name="recountNeeded">重放窗口非空（W&lt;End）——dump 后插入混入层 0 链才需实收重数；false 时几何计数直接可信。</param>
+    /// <param name="entryCount">输出：物化后条目数。</param>
+    /// <returns>true = 物化成功；false = 帧内容不符（头校验/几何越界/head 空——走 fail-safe 全量重放）。</returns>
     protected override unsafe bool TryMaterializeFrame(LogicalAddress head, bool recountNeeded, out long entryCount)
     {
         entryCount = 0;
@@ -89,7 +99,10 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
         return true;
     }
 
+    /// <summary>物化后回调（基类 TryApplyMainStorage 物化成功后调）——设置写者条目计数。</summary>
+    /// <param name="entryCount">物化实收条目数。</param>
     protected override void OnMaterialized(long entryCount) => _entryCount = entryCount;
 
+    /// <summary>当前条目数（后台 dump 策略触发用——Volatile 读）。</summary>
     protected override long CurrentEntryCount => Volatile.Read(ref _entryCount);
 }

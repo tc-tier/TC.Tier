@@ -14,7 +14,9 @@ namespace TC.Tier.Core.Primitives;
 /// </summary>
 public sealed unsafe class NodeArena : IDisposable
 {
+    /// <summary>块大小对数位（22 → 每块 4MB）。</summary>
     public const int ChunkShift = 22;
+    /// <summary>单块字节数（4MB——大块摊薄建块开销，块内 CAS bump 无锁分配）。</summary>
     public const int ChunkSize = 1 << ChunkShift;
 
     private byte*[] _chunks = [ (byte*)System.Runtime.InteropServices.NativeMemory.Alloc(ChunkSize) ];
@@ -93,6 +95,7 @@ public sealed unsafe class NodeArena : IDisposable
     /// <summary>已分配字节（当前块 top + 此前整块）——仪器/测试口径。</summary>
     internal long UsedBytes => (long)(ChunkCount - 1) * ChunkSize + Volatile.Read(ref _top);
 
+    /// <summary>释放竞技场——一次性释放全部块（含 oversized 块）的原生内存（幂等，线程安全）。</summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
@@ -103,5 +106,6 @@ public sealed unsafe class NodeArena : IDisposable
         global::System.GC.SuppressFinalize(this);
     }
 
+    /// <summary>终结器兜底释放（正常 Dispose 后经 SuppressFinalize 不再触发）。</summary>
     ~NodeArena() => Dispose();
 }

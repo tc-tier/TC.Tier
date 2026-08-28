@@ -37,6 +37,7 @@ public interface IFileSystem : IDisposable
     /// <summary>★ 句柄入口——按显式打开语义打开/创建文件（PreallocateSize&gt;0 时 open 即幂等预分配）。</summary>
     /// <param name="path">根下相对路径（层级命名空间，经 PathValidator.ValidateRelative 校验）。</param>
     /// <param name="options">打开语义四要素 + 预分配。</param>
+    /// <returns>文件句柄</returns>
     IFileHandle Open(string path, FileOpenOptions options);
 
     /// <summary>根目录 mkdir -p（幂等）——引擎 Initialize 必经。</summary>
@@ -55,15 +56,19 @@ public interface IFileSystem : IDisposable
 
     /// <summary>删除目录（POSIX rmdir：仅限空——非空抛 <see cref="IOError.DirectoryNotEmpty"/>）+ 父目录 fsync。
     /// <para>★ 不提供递归删除（危险操作不藏糖：EnumerateFiles+Delete+DeleteDirectory 显式组合）。</para></summary>
+    /// <param name="path">相对目录路径。</param>
     void DeleteDirectory(string path);
 
     /// <summary>目录存在性（Remote：前缀下有对象或子前缀——能力位 EmptyDirectories 未置位时创建后未必可见）。</summary>
+    /// <param name="path">相对目录路径。</param>
     bool DirectoryExists(string path);
 
     /// <summary>
     /// 目录整树移动。dest 已存在抛 <see cref="IOError.AlreadyExists"/>（不提供 overwrite——平台语义分歧大）。
     /// <para>★ 原子性由能力位 <see cref="FileSystemCapabilities.AtomicDirectoryMove"/> 表达：
     ///   Disk/Mem 原子；Remote 回退 = 逐对象 Copy+Delete（非原子，部分失败有残留）。</para></summary>
+    /// <param name="source">相对源目录路径。</param>
+    /// <param name="dest">相对目标目录路径。</param>
     void MoveDirectory(string source, string dest);
 
     // ═══════════════════════════════════════════════════════════════
@@ -81,19 +86,26 @@ public interface IFileSystem : IDisposable
     void CreateFile(string path, long preallocateSize = 0, ReadOnlyMemory<byte> extra = default);
 
     /// <summary>文件存在性（目录存在性见 <see cref="DirectoryExists"/>）。</summary>
+    /// <param name="path">相对路径。</param>
     bool Exists(string path);
 
     /// <summary>耐久删除文件（=FileNative.DeleteFileDurably 语义）。</summary>
+    /// <param name="path">相对路径。</param>
     void Delete(string path);
 
     /// <summary>
     /// 文件移动/换名（=MoveFileDurably 语义，内建父目录刷盘——能力位 DurableRename）。
     /// <para>★ overwrite 必须显式：true=POSIX rename 原子覆盖；false=目标已存在抛 <see cref="IOError.AlreadyExists"/>。</para>
     /// </summary>
+    /// <param name="source">相对源路径。</param>
+    /// <param name="dest">相对目标路径。</param>
+    /// <param name="overwrite">是否覆盖已存在的目标文件。</param>
     void Move(string source, string dest, bool overwrite = false);
 
     /// <summary>单条目完整信息（基本字段 + 元数据；Name 回显输入路径；文件或目录自动判别）。</summary>
     /// <exception cref="FileIOException">IOError.NotFound——条目不存在。</exception>
+    /// <param name="path">相对路径。</param>
+    /// <returns>条目信息</returns>
     FsEntryInfo Stat(string path);
 
     // ═══════════════════════════════════════════════════════════════
@@ -102,24 +114,46 @@ public interface IFileSystem : IDisposable
 
     /// <summary>枚举根层文件（pattern 缺省 "*" 全匹配；recursive=true 全部后代）。</summary>
     /// <exception cref="FileIOException">IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</exception>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="recursive">是否递归枚举全部后代目录。</param>
+    /// <returns>枚举条目集合</returns>
     IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false);
 
     /// <summary>枚举子目录层文件。Name = 相对所枚举目录的路径（recursive 时多组件）。</summary>
+    /// <exception cref="FileIOException">IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</exception>
+    /// <param name="path">相对目录路径。</param>
+    /// <param name="pattern">通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="recursive">是否递归枚举全部后代目录。</param>
+    /// <returns>枚举条目集合</returns>
     IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false);
 
     /// <summary>枚举根层子目录。</summary>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="recursive">是否递归枚举全部后代目录。</param>
+    /// <returns>枚举条目集合</returns>
     IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false);
 
     /// <summary>枚举子目录的一层子目录（recursive=true = 全部后代目录）。</summary>
+    /// <param name="path">相对目录路径。</param>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="recursive">是否递归枚举全部后代目录。</param>
+    /// <returns>枚举条目集合</returns>
     IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false);
 
     /// <summary>
     /// 混合枚举（文件+目录一次产出——引擎扫盘形态；Remote 单次列举同时出 Objects+CommonPrefixes）。
     /// 契约：同参下结果 = EnumerateFiles ∪ EnumerateDirectories。
     /// </summary>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="recursive">是否递归枚举全部后代目录。</param>
+    /// <returns>枚举条目集合</returns>
     IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false);
 
     /// <summary>混合枚举（子目录范围）。</summary>
+    /// <param name="path">相对目录路径。</param>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="recursive">是否递归枚举全部后代目录。</param>
+    /// <returns>枚举条目集合</returns>
     IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false);
 
     // ═══════════════════════════════════════════════════════════════
@@ -130,6 +164,8 @@ public interface IFileSystem : IDisposable
     ///   非重入（同持有者二次 Acquire 抛异常）；持锁中 fs.Dispose 视为违约释放并告警。</para>
     /// <para>★ 返回 IDisposable lease——RAII + 异常安全（Dispose 即释放）。</para>
     /// </summary>
+    /// <param name="timeout">获取锁的超时（默认无限等待）。</param>
+    /// <returns>排他锁租约</returns>
     IDisposable AcquireExclusive(TimeSpan timeout);
 
     /// <summary>
@@ -147,5 +183,6 @@ public interface IFileSystem : IDisposable
     /// <param name="reason">维护理由（诊断/可观测）。</param>
     /// <param name="scope">拒绝范围。</param>
     /// <param name="ct">在途收敛等待的取消令牌。</param>
+    /// <returns>维护租约</returns>
     IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default);
 }

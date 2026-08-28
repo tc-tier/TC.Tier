@@ -72,5 +72,6 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     /// <summary>条目数（写者维护的 O(1) 计数——旧形全表扫描）。</summary>
     public override long EntryCount => _entryCount;
 
+    /// <summary>索引内存占用估算（字节）——当前代表桶区 + 溢出池（128B/桶 × 桶数）。</summary>
     public override long IndexSize => _table.Size * 128L + _table.OverflowPool.Length * 128L;
 }

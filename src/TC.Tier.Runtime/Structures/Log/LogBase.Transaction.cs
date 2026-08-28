@@ -35,6 +35,14 @@ public abstract partial class LogBase
         AppendMeta(TailAddress);  // opaque 由 SetOpaqueMetaPayload 预设值自动带入
     }
 
+    /// <summary>
+    /// ★ Prepare 异步对等版（同步 <see cref="Prepare(long)"/>）：FlushUntilAsync 数据落盘 +
+    /// AppendMetaAsync 写 meta（TailAddress 作 committedOffset；opaque 由 SetOpaqueMeta stage 自动带入）。
+    /// <para>★ Abort 支撑：meta 同块持久化当前提交边界（<see cref="_txRollbackTail"/> →
+    /// PreparedTailAddress 字段）——本轮 Prepare 窗口的回退点跨崩溃可用。</para>
+    /// </summary>
+    /// <param name="seq">准备提交的序号。</param>
+    /// <param name="ct">取消令牌。</param>
     public async ValueTask PrepareAsync(long seq, CancellationToken ct)
     {
         Volatile.Write(ref _lastPreparedSeq, seq);
@@ -91,6 +99,14 @@ public abstract partial class LogBase
         AppendMeta(rollbackTail);                             // meta 重写：持久化回退后状态（窗口关、seq 复位）
     }
 
+    /// <summary>
+    /// ★ Abort 异步对等版（同步 <see cref="Abort(long)"/>）：TruncateSuffix 回退到上一已确认提交边界
+    /// （<see cref="_txRollbackTail"/>），丢弃本轮悬干数据，随后 AppendMetaAsync 持久化回退后状态。
+    /// <para>守卫矩阵同同步版：seq 已提交 → no-op；陈旧 Abort → 仅复位记账；无既有提交边界 /
+    /// 边界已被头截断回收 / 无悬干数据 → 仅复位记账。</para>
+    /// </summary>
+    /// <param name="seq">回滚的 Prepare 序号。</param>
+    /// <param name="ct">取消令牌。</param>
     public async ValueTask AbortAsync(long seq, CancellationToken ct)
     {
         EnsureNotDisposed();

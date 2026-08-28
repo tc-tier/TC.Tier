@@ -2,8 +2,8 @@ namespace TC.Tier.Runtime.Storage;
 
 /// <summary>
 /// IO 实现 partial——Append/Write/Read/Allocate/Flush/Reclaim 全在基类，
-/// 通过 <see cref="IO.IFileHandle"/> 调用（介质无关）。
-/// <para>★ 实现类只决定注入哪个 <see cref="IO.FileHandleDelegate"/>（造 DiskFileHandle/MemFileHandle）
+/// 通过 <see cref="IFileHandle"/> 调用（介质无关）。
+/// <para>★ 实现类只决定注入哪个文件句柄工厂委托（造 DiskFileHandle/MemFileHandle）
 ///   和哪个 <see cref="Compact.ICompact"/>——其余差异为零。</para>
 /// </summary>
 internal sealed partial class StorageEngine

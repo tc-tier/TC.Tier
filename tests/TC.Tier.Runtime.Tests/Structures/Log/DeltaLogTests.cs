@@ -195,22 +195,13 @@ public class DeltaLogTests
                 await log.MetaPolicy.CommitAsync(default);
             }
 
-            // 实例 2：同卷同引擎名重开（扫盘恢复），cursor 应扫到 IsMeta entry
+            // 实例 2：同卷同引擎名重开——恢复期 MetaHost 扫描（引擎尾 = 物理尾含最后 meta entry）
+            // Load 读回嵌入式 meta（恢复后引擎尾收缩到提交边界——再次 Load 非正常流程，不测）
             var settings2 = TestLogSettingsFactory.DeltaOn(vol, "delta-meta", logPageSizeBits: 14, deleteOnClose: true);
             using var log2 = TestLogSettingsFactory.NewDeltaLog(vol, settings2);
-            using var cursor = log2.OpenCursor(LogicalAddress.Empty);
-            Assert.NotNull(cursor);
-            bool foundMeta = false;
-            while (cursor!.MoveNext())
-            {
-                if (cursor.CurrentIsMeta)
-                {
-                    foundMeta = true;
-                    Assert.True(cursor.CurrentPayload.Length >= 0);
-                    break;
-                }
-            }
-            Assert.True(foundMeta, "应扫到 IsMeta entry（嵌入式 meta 落盘）");
+            var payload = log2.MetaPolicy.ReadMetaPayload();
+            Assert.NotNull(payload);
+            Assert.Equal(log2.BeginAddress, payload.Value.BeginAddress);
         }
         finally { vol.Dispose(); }
     }

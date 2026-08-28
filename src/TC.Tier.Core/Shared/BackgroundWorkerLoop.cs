@@ -50,7 +50,7 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
     /// <summary>
     /// 构造。
     /// </summary>
-    /// <param name="scheduler">执行器调度器：null=<see cref="Task.Run"/>（公共池——低频 worker，如 CpuSampler/meta flusher）；
+    /// <param name="scheduler">执行器调度器：null=<c>Task.Run</c>（公共池——低频 worker，如 CpuSampler/meta flusher）；
     ///   非 null=注入（如 <see cref="IsolatedTaskScheduler.Shared"/>——高频/关键 worker，隔离公共池）。
     ///   ★ 线程数 M 由调度器决定，与 <paramref name="consumerCount"/> 彻底解耦；本类不 own 调度器（注入方管生命周期）。</param>
     /// <param name="consumerCount">消费者（循环 Task）数——<b>协作</b>跑在调度器线程上，<b>不是线程数</b>。默认 1。
@@ -93,9 +93,12 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
     /// <para>★ 抛异常不杀 worker——异常走 <see cref="OnCycleError"/> 钩子，循环继续下一周期。</para>
     /// <para>★ 收到 <see cref="OperationCanceledException"/>（Stop 触发的 cts.Cancel）视为正常退出，不进 OnCycleError。</para>
     /// </summary>
+    /// <param name="ct">循环取消 token（Stop/Dispose 时触发）。</param>
+    /// <returns>是否继续循环（true=继续，false=退出）。</returns>
     protected abstract ValueTask<bool> RunOneCycleAsync(CancellationToken ct);
 
     /// <summary>循环启动前钩子（可选，初始化资源/状态）。★ 多消费者下仅 <see cref="Start"/> 调用一次。</summary>
+    /// <remarks>子类可 override 做初始化操作。</remarks>
     protected virtual void OnLoopStart() { }
 
     /// <summary>
@@ -104,6 +107,8 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
     /// <para>★ 多消费者下仅末位退出的消费者执行一次（Interlocked 守护）。</para>
     /// <para>★ ct 传 <see cref="CancellationToken.None"/>——退出清理不应被再次取消。</para>
     /// </summary>
+    /// <param name="ct">循环退出清理的取消 token（Stop/Dispose 时触发）。</param>
+    /// <returns>异步任务。</returns>
     protected virtual ValueTask OnLoopExitAsync(CancellationToken ct) => ValueTask.CompletedTask;
 
     /// <summary>
@@ -111,12 +116,15 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
     /// <para>★ 对齐 Compactor 现状：单 lease 失败 NotifyFailed 不杀 worker。</para>
     /// <para>★ <see cref="OperationCanceledException"/> 不进此钩子（视为正常退出）。</para>
     /// </summary>
+    /// <param name="ex">异常。</param>
+    /// <remarks>子类可 override 做重试/告警/计数。</remarks>
     protected virtual void OnCycleError(Exception ex)
         => _logger?.LogWarning(ex, "{WorkerName} 单周期异常（worker 继续运行）", _name);
 
     /// <summary>单周期完成耗时钩子（默认 >10ms 时 LogDebug；子类可 override 上报到 ObservabilityHub Histogram）。
     /// <para>★ 慢循环是后台 worker 最常见的性能问题——override 本方法接 <c>ObservabilityHub.Metrics.Histogram</c> 即默认可观测。</para></summary>
     /// <param name="elapsedMicros">本周期耗时（微秒，含 await 等待时间）。</param>
+    /// <remarks>子类可 override 上报到 ObservabilityHub Histogram。</remarks>
     protected virtual void OnCycleCompleted(long elapsedMicros)
     {
         if (elapsedMicros > 10_000)   // >10ms 才记，避免日志洪水
@@ -343,6 +351,8 @@ public abstract class BackgroundWorkerLoop<T> : BackgroundWorkerLoop
     /// <para>★ 内建 <see cref="BucketPriorityQueue{WorkerPriority, T}"/> 无锁入队 + 异步唤醒等待的消费者。</para>
     /// <para>★ 默认优先级 <see cref="WorkerPriority.Normal"/>（多数场景不关心优先级 = FIFO）。</para>
     /// </summary>
+    /// <param name="item">入队元素。</param>
+    /// <param name="priority">优先级（默认 Normal）。</param>
     public void Enqueue(T item, WorkerPriority priority = WorkerPriority.Normal)
         => _queue.Enqueue(item, priority);
 
@@ -350,6 +360,7 @@ public abstract class BackgroundWorkerLoop<T> : BackgroundWorkerLoop
     public int QueueCount => _queue.Count;
 
     /// <summary>内建队列（子类 override RunOneCycleAsync 时可直接访问）。</summary>
+    /// <remarks>子类 override <see cref="RunOneCycleAsync(CancellationToken)"/> 自定义循环逻辑时可直接访问内建队列。</remarks>
     protected BucketPriorityQueue<WorkerPriority, T> Queue => _queue;
 
     // ════════════════════════════════════════════════════════════
@@ -359,8 +370,11 @@ public abstract class BackgroundWorkerLoop<T> : BackgroundWorkerLoop
     /// <summary>
     /// ★ 处理一个出队元素（子类核心实现——标准后台任务模式只需实现此方法）。
     /// <para>★ 基类默认 <see cref="RunOneCycleAsync(CancellationToken)"/> 从内建队列出队后调此方法。</para>
-    /// <para>★ 抛异常不杀 worker——异常走 <see cref="OnCycleError"/> 钩子。</para>
+    /// <para>★ 抛异常不杀 worker——异常走 <see cref="BackgroundWorkerLoop.OnCycleError"/> 钩子。</para>
     /// </summary>
+    /// <param name="item">出队元素。</param>
+    /// <param name="ct">循环取消 token（Stop/Dispose 时触发）。</param>
+    ///  <returns>异步任务。</returns>
     protected abstract ValueTask ProcessItemAsync(T item, CancellationToken ct);
 
     /// <summary>
@@ -371,6 +385,8 @@ public abstract class BackgroundWorkerLoop<T> : BackgroundWorkerLoop
     ///   并发内核 + in-flight 限流）。内建队列仍在，仍可用 <see cref="Enqueue"/>。</para>
     /// <para>★ 返回 false 则停止循环（如 EOF / 显式终止条件）。</para>
     /// </summary>
+    /// <param name="ct">循环取消 token（Stop/Dispose 时触发）。</param>
+    /// <returns>是否继续循环（true=继续，false=退出）。</returns>
     protected override async ValueTask<bool> RunOneCycleAsync(CancellationToken ct)
     {
         // ★ 默认实现：从内建队列异步出队 → 分发给 ProcessItemAsync

@@ -15,5 +15,7 @@ public interface ILogger
     void Log(LogLevel logLevel, string message, Exception? exception = null);
 
     /// <summary>指定级别是否启用（热路径短路用）。</summary>
+    /// <param name="logLevel">日志级别。</param>
+    /// <returns>是否启用指定级别的日志。</returns>
     bool IsEnabled(LogLevel logLevel);
 }

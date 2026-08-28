@@ -6,8 +6,8 @@ namespace TC.Tier.Runtime.Structures.Log.Contracts;
 /// 参见 EntryLog.md §3.5。</para>
 /// <para>内置策略：</para>
 /// <para>- <see cref="GroupCommitPolicy"/>：三维度阈值兜底（数据量/时间/记录数任一满足）</para>
-/// <para>- <see cref="SynchronousCommitPolicy"/>：恒 true（每次 Append 立即提交，单条强制）</para>
-/// <para>- <see cref="ExternalCommitPolicy"/>：恒 false（不自动提交，靠手动 CommitAsync 或 2PC）</para>
+/// <para>- Synchronous：恒 true（每次 Append 立即提交，单条强制）</para>
+/// <para>- External：恒 false（不自动提交，靠手动 CommitAsync 或 2PC）</para>
 /// </summary>
 public interface ICommitPolicy
 {

@@ -23,7 +23,9 @@ public sealed partial class StreamSnapshot
             _session = session;
         }
 
+        /// <summary>当前帧已写 data 总字节数（Complete/ResetFrame 后清零）。</summary>
         public long TotalDataLength => _totalDataLength;
+        /// <summary>当前帧已写 entry 条数（Complete/ResetFrame 后清零）。</summary>
         public long EntryCount => _entryCount;
 
         /// <summary>异步写一个 entry（自动 EntryCount+1；CRC 边写边累积）。</summary>

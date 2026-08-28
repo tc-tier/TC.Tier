@@ -9,6 +9,8 @@ internal interface IPoolAttachable
     HandlePoolAttachment? PoolAttachment { get; }
 
     /// <summary>挂载池（Acquire 流程调用；幂等）。返回附件。</summary>
+    /// <param name="pool">池</param>
+    /// <returns>对应的 <see cref="HandlePoolAttachment"/> 实例</returns>
     HandlePoolAttachment AttachPool(FileHandlePool pool);
 
     /// <summary>池专用真关闭（绕过归还分支——仅池内三出口调用）。</summary>

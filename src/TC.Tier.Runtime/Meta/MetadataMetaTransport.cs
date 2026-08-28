@@ -8,7 +8,7 @@ namespace TC.Tier.Runtime.Meta;
 /// <para> - 每次写块 = 版本链追加新版本（写到一半崩 = 旧版本完好，CRC/magic 断链天然容错）；</para>
 /// <para> - 持久化点即 <see cref="WriteBlock"/>（Write + Persist + flush）——对齐
 ///   TransportMetaPolicy.Commit 的 meta fsync 语义（调用链保证 data 先落盘）；</para>
-/// <para> - N=2 轮转自动回收（每次写后 <see cref="VersionedMetadata.ReclaimOldVersions"/>），空间有界；</para>
+/// <para> - N=2 轮转自动回收（每次写后 <see cref="MetadataBase.ReclaimOldVersions"/>），空间有界；</para>
 /// <para> - 读 = 内存工作副本零 IO；需要跨结构原子提交时底层已实现 ITransactionParticipant（
 ///   经 <see cref="Storage"/> 注册进 TransactionLog）。</para>
 /// <para>配置约束：<see cref="VersionedMetadataSettings.PayloadSize"/> 必须 ≥ meta 块上界
@@ -42,6 +42,8 @@ public sealed class MetadataMetaTransport : IMetaTransport, IDisposable
     /// <summary>底层 VersionedMetadata——高级场景（注册 ITransactionParticipant 进 TransactionLog / 手动 ReclaimOldVersions）。</summary>
     public VersionedMetadata Storage => _metadata;
 
+    /// <summary>读最后一个 meta 块——等待就绪后读当前版本，按自述布局裁剪为精确块；无数据（空链）返回空 Span。</summary>
+    /// <returns>精确块视图（有效至本传输下一次调用）；空 Span = 从未写入。</returns>
     public ReadOnlySpan<byte> ReadLastBlock()
     {
         _metadata.WaitForReady();
@@ -49,6 +51,9 @@ public sealed class MetadataMetaTransport : IMetaTransport, IDisposable
         return _lastBlock is null ? ReadOnlySpan<byte>.Empty : _lastBlock;
     }
 
+    /// <summary>异步读最后一个 meta 块（对等同步版 <see cref="ReadLastBlock()"/>）。</summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>精确块视图（有效至本传输下一次调用）；空 Memory = 从未写入。</returns>
     public async ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct)
     {
         await _metadata.WaitForReadyAsync(ct).ConfigureAwait(false);
@@ -69,6 +74,10 @@ public sealed class MetadataMetaTransport : IMetaTransport, IDisposable
         _metadata.ReclaimOldVersions();   // N=2 轮转——版本链空间有界
     }
 
+    /// <summary>异步写完整块（实质同步——flush 原生同步，立即返回完成；对等同步版 <see cref="WriteBlock"/>）。</summary>
+    /// <param name="block">完整 meta 块（长度不得超过 PayloadSize，超限抛 <see cref="ArgumentException"/>）。</param>
+    /// <param name="ct">取消令牌（当前实现不使用——同步落地）。</param>
+    /// <returns>表示写完成的 ValueTask。</returns>
     public async ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct)
     {
         WriteBlock(block.Span);   // flush 原生仅同步（引擎写/截断同步语义）
@@ -93,5 +102,6 @@ public sealed class MetadataMetaTransport : IMetaTransport, IDisposable
         return buf;   // 自述越界 = 垃圾——原样交策略 magic 校验拒绝
     }
 
+    /// <summary>释放底层 VersionedMetadata（版本链存储托管资产）。</summary>
     public void Dispose() => _metadata.Dispose();
 }

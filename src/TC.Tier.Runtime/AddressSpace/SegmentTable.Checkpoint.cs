@@ -4,7 +4,7 @@ namespace TC.Tier.Runtime.AddressSpace;
 /// <see cref="SegmentTable"/> partial——持久化（LoadAddressTable/SaveAddressTable）。
 /// <para>★ 三段式恢复：头部（ReadHeader）→ 段载荷（ReadSegment 循环 AppendUnsafe）→ 尾部（ReadFooter 直接 LoadTail）。</para>
 /// <para>★ 无 InitializeTail/ValidateWatermark——footer 是水位权威，读出什么就 Load 什么。
-///   水位的最终修正（2PC/快照）由 <see cref="SegmentTable.ApplyHints"/> 独立完成。</para>
+///   水位的最终修正（2PC/快照）由 ApplyHints 独立完成。</para>
 /// </summary>
 public sealed partial class SegmentTable
 {
@@ -105,7 +105,7 @@ public sealed partial class SegmentTable
     ///   并发 Append 的尾推进被挡（TryUpdateAllocated 前检失败自旋重试）、并发 ReclaimTail 回退被拒——
     ///   快照 = 段列表 + 双尾的一致性视图（原实现遍历段表与读 footer 之间水位可被推进 → 恢复时
     ///   footer 水位超前于段列表 = 已提交数据被当洞覆盖）。推进者的段在推进前已 EnsureSegmentsForLength
-    ///   在表——hold 后遍历见完整几何。hold 失败（回退者持有时）有界自旋（回退是短操作——截断毫秒级）。
+    ///   在表——hold 后遍历见完整几何。hold 失败（回退者持有时）有界自旋（回退是短操作——截断毫秒级）。</para>
     /// </summary>
     public void SaveAddressTable(IAddressTableWriter writer)
     {

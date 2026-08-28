@@ -78,11 +78,22 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
     /// <remarks>★ LogicalAddress 是 16B struct，Volatile/Interlocked 不直接支持；
     ///   Ring 水位推进在单写者上下文（epoch drain / _tailLock），普通读 + 推进方负责可见性。</remarks>
     public LogicalAddress FlushedUntilAddress => _flushedUntilAddress;
+    /// <summary>安全只读水位——readonly 区推进目标（epoch 保护下驱逐推进，读者可安全读至此处）。</summary>
     public LogicalAddress SafeReadOnlyAddress => _safeReadOnlyAddress;
+
+    /// <summary>只读水位——此地址前页面为 readonly（冻结，等待 flush 后驱逐）。</summary>
     public LogicalAddress ReadOnlyAddress { get => _readOnlyAddress; private protected set => _readOnlyAddress = value; }
+
+    /// <summary>写游标——下一条 record 的分配地址（TryAllocate 单调推进）。</summary>
     public LogicalAddress TailAddress => _tailAddress;
+
+    /// <summary>驱逐边界——此地址前的旧页已被回收（head 随 flush/驱逐推进）。</summary>
     public LogicalAddress HeadAddress => _headAddress;
+
+    /// <summary>安全驱逐边界（epoch 保护下的驱逐推进目标）。</summary>
     public LogicalAddress SafeHeadAddress => _safeHeadAddress;
+
+    /// <summary>关页边界——此地址前的页已关闭（新写入不得落在其前）。</summary>
     public LogicalAddress ClosedUntilAddress => _closedUntilAddress;
 
     // === codec（注入的 record 三段式 codec）===
@@ -128,6 +139,20 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
     // ★ 原始 settings 引用（Validate 追加约束 + InitializePolicies 读 ClockCacheCapacity/ColdReadRatio 用）
     private readonly RingSettings _settings;
 
+    /// <summary>
+    /// 构造 Ring 基类——装配主引擎/溢出引擎/meta 引擎（构造期纯 Create 零 IO，启动在 OnInitializeBegin）、
+    /// 页几何、8 地址指针初值、环满背压 lag 与冷页缓存容量（页池初始化推迟到 Initialize）。
+    /// </summary>
+    /// <param name="codec">注入的 record 三段式 codec。</param>
+    /// <param name="fs">文件系统（组合根注入）。</param>
+    /// <param name="settings">RingSettings（页几何/水位配置，构造时全量校验 fail-fast）。</param>
+    /// <param name="recovery">恢复策略（null = 默认 DefaultRingRecovery）。</param>
+    /// <param name="cursorFactory">扫描游标工厂。</param>
+    /// <param name="ringSnapshot">快照实现（null = 默认 RingSnapshot）。</param>
+    /// <param name="metaPolicyFactory">meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。</param>
+    /// <param name="metaTransport">Transport 模式的外部 meta 传输。</param>
+    /// <param name="epoch">epoch 保护（null = 自建 LightEpoch）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
     protected RingBase(IRingCodec codec,
         IFileSystem fs,
         RingSettings settings,
@@ -294,6 +319,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
                 $"ColdRecordBufferLimit {s.ColdRecordBufferLimit} 须 >= 28 (HeaderSize)");
     }
 
+    /// <summary>派生类初始化钩子：装配冷页缓存（ClockCache 容量 = ClockCacheCapacity 或 ColdReadRatio 派生）并恢复溢出尾水位。</summary>
     protected void InitializePolicies()
     {
         ThrowIfDisposed();
@@ -314,6 +340,8 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
         RecoverOverflowTail(null);
     }
 
+    /// <summary>启动期钩子：主引擎/溢出引擎/meta 引擎（Managed）并行 Initialize（均非阻塞），
+    /// 引擎就绪等待在恢复核心（RecoverAsync 开头 await WaitForReadyAsync）完成。</summary>
     protected override void OnInitializeBegin()
     {
         // ★ 双引擎并行启动（均非阻塞）：主引擎 + 溢出引擎 + meta 引擎（Managed，自恢复）。
@@ -393,7 +421,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
 
     /// <summary>
     /// ★ 写 meta record 到 ring 流末尾（Transport 策略 MetaHost 传输写入）。
-    /// <para>★ 独立于 <see cref="BlittableRing.WriteRecordCore"/>——不复用用户 record 写入路径。
+    /// <para>★ 独立于 <see cref="WriteRecordCore"/>——不复用用户 record 写入路径。
     ///   meta record 作为带 <see cref="RecordFlags.FLAG_ENTRY_IS_META"/> 的特殊 record 追加到 TailAddress 之后，
     ///   payload = 内层 [RingMetaHeader][RingMetaPayload][Crc32Footer] meta block。</para>
     /// <para>★ 对齐 <c>LogBase.WriteMetaPayload</c>（LogBase.LogMeta.cs:47）——独立 private protected 写流原语。</para>
@@ -461,7 +489,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
     private protected static void VolatileWriteAddr(ref LogicalAddress location, LogicalAddress value)
         => location = value;
 
-    /// <summary>★ CAS 单调推进 LogicalAddress 水位（仅 newValue &gt; 当前值才推进，不回退，同 <see cref="Utility.MonotonicUpdate"/> 语义；LogicalAddress 版因 16 字节复合结构不能直接复用 long 版）。</summary>
+    /// <summary>★ CAS 单调推进 LogicalAddress 水位（仅 newValue &gt; 当前值才推进，不回退，同 <see cref="Utility.MonotonicUpdate(ref long, long, out long)"/> 语义；LogicalAddress 版因 16 字节复合结构不能直接复用 long 版）。</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private protected static bool MonotonicUpdateAddr(ref LogicalAddress variable, LogicalAddress newValue, out LogicalAddress oldValue)
     {

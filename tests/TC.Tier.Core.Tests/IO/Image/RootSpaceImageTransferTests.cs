@@ -12,7 +12,7 @@ public sealed class RootSpaceImageTransferTests
 {
     /// <summary>
     /// 连续卷测试替身：命名空间平面透传 MemoryFileSystem（结构化回退用），
-    /// 载体 = 自持 MemoryStream（OpenRawBacking 直达载体——模拟真介质在维护租约内的载体逃生口，
+    /// 载体 = 自持 MemoryStream（OpenVolumeBacking 直达载体——模拟真介质在维护租约内的载体逃生口，
     /// 不经句柄平面，§2.4/§6.2）。人工置位 ContiguousCapture。
     /// </summary>
     private sealed class FakeContiguousVolume : IFileSystem, IContiguousVolume
@@ -37,7 +37,7 @@ public sealed class RootSpaceImageTransferTests
             return b;
         }
 
-        public Stream OpenRawBacking(bool writable)
+        public Stream OpenVolumeBacking(bool writable)
             => new CarrierStream(_carrier, writable);
 
         public void OnMirrorCompleted()

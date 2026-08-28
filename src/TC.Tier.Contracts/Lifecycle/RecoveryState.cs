@@ -5,6 +5,7 @@ namespace TC.Tier.Contracts.Lifecycle;
 /// </summary>
 public readonly record struct RecoveryState
 {
+    /// <summary>当前恢复阶段（见 <see cref="RecoveryPhase"/>——严格顺序推进，不可回退）。</summary>
     public required RecoveryPhase Phase { get; init; }
     /// <summary>0-100。Completed=100，Failed=0。</summary>
     public int Percent { get; init; }

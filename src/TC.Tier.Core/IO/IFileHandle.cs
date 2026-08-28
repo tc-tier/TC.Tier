@@ -37,15 +37,25 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>同步写入——从指定偏移覆写（磁盘=pwrite，内存=MemoryCopy）；越过 EOF 零洞扩展（pwrite 平权）。</summary>
+    /// <param name="offset">写入起点</param>
+    /// <param name="source">源缓冲</param>
     void Write(long offset, ReadOnlySpan<byte> source);
 
     /// <summary>异步写入——语义同 <see cref="Write"/>。</summary>
+    /// <param name="offset">写入起点</param>
+    /// <param name="source">源缓冲</param>
+    /// <param name="ct">取消令牌</param>
     ValueTask WriteAsync(long offset, ReadOnlyMemory<byte> source, CancellationToken ct);
 
     /// <summary>同步读取——返回实际读取字节数（EOF 处可能小于 destination.Length；磁盘 pread 到 EOF 语义）。</summary>
+    /// <param name="offset">读取起点</param>
+    /// <param name="destination">目标缓冲</param>
     int Read(long offset, Span<byte> destination);
 
     /// <summary>异步读取——语义同 <see cref="Read"/>。</summary>
+    /// <param name="offset">读取起点</param>
+    /// <param name="destination">目标缓冲</param>
+    /// <param name="ct">取消令牌</param>
     ValueTask<int> ReadAsync(long offset, Memory<byte> destination, CancellationToken ct);
 
     // ═══════════════════════════════════════════════════════════════
@@ -61,12 +71,19 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     /// <para>★ 失败语义：预留不回滚（回退=吞噬他人预留），失败区间成为读零稀疏洞；
     ///   异常携带 ReservedOffset（预留落点），句柄不因失败废止。</para>
     /// </summary>
+    /// <param name="source">源缓冲</param>
+    /// <returns>实际写入偏移（预留落点）</returns>
     long Append(ReadOnlySpan<byte> source);
 
     /// <summary>异步追加——语义同 <see cref="Append"/>。</summary>
+    /// <param name="source">源缓冲</param>
+    /// <param name="ct">取消令牌</param>
+    /// <returns>实际写入偏移（预留落点）</returns>
     ValueTask<long> AppendAsync(ReadOnlyMemory<byte> source, CancellationToken ct);
 
     /// <summary>移动游标。与 Append 并发是调用方错误（互斥操作，文档纪律声明，不设内部锁）。</summary>
+    /// <param name="offset">偏移量</param>
+    /// <param name="origin">偏移基准</param>
     long Seek(long offset, SeekOrigin origin);
 
     // ═══════════════════════════════════════════════════════════════
@@ -92,9 +109,12 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     /// 物理打洞回收区间——文件大小不变，区间归零。
     /// <para>★ 对齐契约：offset 与 length 必须按 <c>Volume.AllocationUnit</c> 对齐，未对齐抛 <see cref="IOError.AlignmentError"/>（两介质同校验）。</para>
     /// </summary>
+    /// <param name="offset">打洞起点</param>
+    /// <param name="length">打洞长度</param>
     void PunchHole(long offset, long length);
 
     /// <summary>枚举已分配区间——块粒度报告，对齐到 AllocationUnit（mem=PageSize / 磁盘=fs 簇）。</summary>
+    /// <returns>已分配区间列表（闭区间 [Start, End)）</returns>
     IReadOnlyCollection<(long Start, long End)> EnumerateAllocatedRanges();
 
     /// <summary>
@@ -103,6 +123,7 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     ///   <c>Unwritten</c>（预分配未写区间——物理已留、读零、写转换）。不支持区分的介质
     ///   （Disk/Mem/Remote）默认实现恒 <c>false</c>（全部按 written 报告——诚实默认）。</para>
     /// </summary>
+    /// <returns>已分配区间列表（闭区间 [Start, End) + Unwritten 状态）</returns>
     IReadOnlyCollection<(long Start, long End, bool Unwritten)> EnumerateAllocatedRangesDetailed()
     {
         var result = new List<(long, long, bool)>();
@@ -112,9 +133,13 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     }
 
     /// <summary>区间塌缩——[offset, offset+length) 移除且后续数据前移，文件缩短（对齐 AllocationUnit；不支持平台抛 Unsupported）。</summary>
+    /// <param name="offset">塌缩起点</param>
+    /// <param name="length">塌缩长度</param>
     void CollapseRange(long offset, long length);
 
     /// <summary>区间插入——在 offset 处插入零洞且后续数据后移，文件增长（对齐 AllocationUnit；不支持平台抛 Unsupported）。</summary>
+    /// <param name="offset">插入起点</param>
+    /// <param name="length">插入长度</param>
     void InsertRange(long offset, long length);
 
     // ═══════════════════════════════════════════════════════════════
@@ -129,10 +154,13 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     /// <param name="sourceOffset">源区间起点。</param>
     /// <param name="destinationOffset">目标写入起点。</param>
     /// <param name="length">拷贝长度。</param>
+    /// <returns>实际拷贝字节数（失败不回滚目标，已完成长度经 <see cref="FileIOException.CompletedLength"/> 携带）。</returns>
     long CopyRange(IFileHandle destination, long sourceOffset, long destinationOffset, long length);
 
     /// <summary>整文件引用克隆（FICLONE/写时复制）——不支持平台回退 CopyRange 全量。语义同 <see cref="CopyRange"/> 的部分失败契约。</summary>
     /// <param name="destination">目标句柄（须同一介质）。</param>
+    /// <returns>实际克隆字节数（失败不回滚目标，已完成长度经 <see cref="FileIOException.CompletedLength"/> 携带）。</returns>
+    /// <exception cref="FileIOException">不支持克隆的介质或平台（Disk/Mem/Remote）</exception>
     long CloneRange(IFileHandle destination);
 
     // ═══════════════════════════════════════════════════════════════
@@ -140,15 +168,26 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>向量写入——多片缓冲按序写入连续区间（readv/writev 或逐片回退）。语义等价逐片 Write。</summary>
+    /// <param name="offset">写入起点</param>
+    /// <param name="sources">源缓冲片段</param>
+    /// <exception cref="ArgumentException">sources 为空</exception>
     void WriteVector(long offset, ReadOnlySpan<ReadOnlyMemory<byte>> sources);
 
     /// <summary>异步向量写入——语义同 <see cref="WriteVector"/>。</summary>
+    /// <param name="offset">写入起点</param>
+    /// <param name="sources">源缓冲片段</param>
+    /// <param name="ct">取消令牌</param>
     ValueTask WriteVectorAsync(long offset, ReadOnlyMemory<ReadOnlyMemory<byte>> sources, CancellationToken ct);
 
     /// <summary>向量读取——多片缓冲按序填充，返回总读取字节数（EOF 截断）。语义等价逐片 Read。</summary>
+    /// <param name="offset">读取起点</param>
+    /// <param name="destinations">目标缓冲片段</param>
     int ReadVector(long offset, ReadOnlySpan<Memory<byte>> destinations);
 
     /// <summary>异步向量读取——语义同 <see cref="ReadVector"/>。</summary>
+    /// <param name="offset">读取起点</param>
+    /// <param name="destinations">目标缓冲片段</param>
+    /// <param name="ct">取消令牌</param>
     ValueTask<int> ReadVectorAsync(long offset, Memory<Memory<byte>> destinations, CancellationToken ct);
 
     // ═══════════════════════════════════════════════════════════════
@@ -172,12 +211,20 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     /// 阻塞获取字节范围锁。同句柄重叠再锁存在平台分歧（Linux OFD 幂等转换；Windows LockFileEx 冲突）——
     /// 可移植契约不依赖同句柄重锁行为。
     /// </summary>
+    /// <param name="offset">锁起点</param>
+    /// <param name="length">锁长度</param>
+    /// <param name="mode">锁模式</param>
     void Lock(long offset, long length, FileLockMode mode);
 
     /// <summary>非阻塞尝试获取——失败立即返回 false（不抛）。</summary>
+    /// <param name="offset">锁起点</param>
+    /// <param name="length">锁长度</param>
+    /// <param name="mode">锁模式</param>
     bool TryLock(long offset, long length, FileLockMode mode);
 
     /// <summary>释放字节范围锁（须与 Lock/TryLock 的区间精确配对）。</summary>
+    /// <param name="offset">锁起点</param>
+    /// <param name="length">锁长度</param>
     void Unlock(long offset, long length);
 
     // ═══════════════════════════════════════════════════════════════
@@ -207,12 +254,18 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
     ReadOnlyMemory<byte> FileExtra { get; }
 
     /// <summary>偏移读（pread 契约）：返回实际读数；尾段不足返实际量；offset ≥ 长度 → 0（EOF 不抛）。</summary>
+    /// <param name="offset">读取起点</param>
+    /// <param name="destination">目标缓冲区</param>
+    /// <returns>实际读取字节数</returns>
     int ReadFileExtra(long offset, Span<byte> destination);
 
     /// <summary>精准字节写（pwrite 契约）：原位覆写；越尾零扩展；扩展后总长超 <see cref="IFileSystem.MaxFileExtraBytes"/>
     /// 抛 <see cref="ArgumentException"/>（预算闭环——仅有的两个长度增长点之一）。并发：同区并发写由调用方协调。</summary>
+    /// <param name="offset">写入起点</param>
+    /// <param name="data">源缓冲区</param>
     void WriteFileExtra(long offset, ReadOnlySpan<byte> data);
 
     /// <summary>完全覆盖（长度可增可减；空 = 清除）；超限同抛（预算闭环另一增长点）。</summary>
+    /// <param name="extra">源缓冲区</param>
     void SetFileExtra(ReadOnlyMemory<byte> extra);
 }

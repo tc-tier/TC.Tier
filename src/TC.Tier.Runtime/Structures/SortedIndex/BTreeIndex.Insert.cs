@@ -10,6 +10,14 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     /// <summary>子节点分裂后待父节点吸收的提升项（分离键 + 右半地址）。</summary>
     private readonly record struct PendingSplit(TKey SeparatorKey, LogicalAddress RightAddress);
 
+    /// <summary>
+    /// 插入条目（key → valueAddress）——根叶直插/满叶分裂建新根/递归下降 + 满节点分裂提升分离键；
+    /// 同 key 原位覆写 value 不增计数（epoch 读保护内完成）。
+    /// </summary>
+    /// <param name="key">条目键。</param>
+    /// <param name="valueAddress">条目 value 逻辑地址。</param>
+    /// <param name="beginAddress">结构起始地址（重放路径约定参数——B+树插入不消费）。</param>
+    /// <returns>插入后地址。</returns>
     public override LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)
     {
         _epoch.Resume();

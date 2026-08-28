@@ -6,7 +6,7 @@ namespace TC.Tier.Runtime.Benchmarks.Storage;
 /// 基准介质卷——压测统一组合根（与测试 <c>TestVolume</c> 同一条路径）：
 /// 介质 = 一根连接字符串（<see cref="TierFs"/> spec），引擎/业务代码零介质分支。
 /// <para>★ 介质切换 = 环境变量 <c>TC_BENCH_FS_SPEC</c>（零重编译）：
-///   <c>local:///abs/root</c>（真磁盘）/ <c>virtual:///abs/file.raw</c>（Raw）/
+///   <c>local:///abs/root</c>（真磁盘）/ <c>virtual:///abs/file.tier</c>（TierVolume）/
 ///   <c>network:///s3/h/b/p?...</c>（S3）——同一套基准零改动平权压测。</para>
 /// <para>★ 默认 <c>memory:</c>（快、免清理）；local 介质每卷自动配唯一子目录
 ///   （并行基准隔离），Dispose 健壮清理。</para>
@@ -28,25 +28,30 @@ internal sealed class BenchVolume : IDisposable
     {
     }
 
-    /// <summary>按 spec 构造（生产组合根同一条路径）。</summary>
-    public BenchVolume(string spec)
+    /// <summary>按 spec 构造（生产组合根同一条路径）。<paramref name="options"/> 非空时经
+    /// TierFs 合流挂载（IS-03 载体档验证用——如 TierVolumeFormatOptions{CarrierWriteThrough=true}）。</summary>
+    public BenchVolume(string spec, FileSystemOptions? options = null)
     {
         if (spec.StartsWith("local", StringComparison.Ordinal))
         {
             // local：每卷唯一子目录（并行卷隔离）——引擎 Dispose 后递归清理
             _diskDir = Path.Combine(Path.GetTempPath(), $"tc-bench-{Guid.NewGuid():N}");
             Directory.CreateDirectory(_diskDir);
-            Fs = TierFs.New($"local:///{_diskDir.Replace('\\', '/')}");
+            Fs = options is null
+                ? TierFs.New($"local:///{_diskDir.Replace('\\', '/')}")
+                : TierFs.New($"local:///{_diskDir.Replace('\\', '/')}", options);
         }
         else if (spec.StartsWith("virtual", StringComparison.Ordinal))
         {
-            // virtual：每卷唯一 .raw 文件——TierFs.New 格式化显式非幂等，固定路径跨迭代撞"载体已格式化"
-            _diskDir = Path.Combine(Path.GetTempPath(), $"tc-bench-{Guid.NewGuid():N}.raw");
-            Fs = TierFs.New($"virtual:///{_diskDir.Replace('\\', '/')}");
+            // virtual：每卷唯一 .tier 文件——TierFs.New 格式化显式非幂等，固定路径跨迭代撞"载体已格式化"
+            _diskDir = Path.Combine(Path.GetTempPath(), $"tc-bench-{Guid.NewGuid():N}.tier");
+            Fs = options is null
+                ? TierFs.New($"virtual:///{_diskDir.Replace('\\', '/')}")
+                : TierFs.New($"virtual:///{_diskDir.Replace('\\', '/')}", options);
         }
         else
         {
-            Fs = TierFs.New(spec);
+            Fs = options is null ? TierFs.New(spec) : TierFs.New(spec, options);
         }
     }
 

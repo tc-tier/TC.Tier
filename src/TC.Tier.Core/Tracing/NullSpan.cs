@@ -6,12 +6,19 @@ namespace TC.Tier.Core.Tracing;
 /// </summary>
 public sealed class NullSpan : ISpan
 {
+    /// <summary>全局共享单例（无状态，安全并发使用）。</summary>
     public static readonly NullSpan Instance = new();
     private NullSpan() { }
+    /// <inheritdoc/>
     public void SetTag(string key, string? value) { }
+    /// <inheritdoc/>
     public void SetTag(string key, long value) { }
+    /// <inheritdoc/>
     public void RecordException(Exception ex) { }
+    /// <inheritdoc/>
     public void SetStatus(SpanStatus status, string? description = null) { }
+    /// <inheritdoc/>
     public void AddEvent(string name) { }
+    /// <inheritdoc/>
     public void Dispose() { }
 }

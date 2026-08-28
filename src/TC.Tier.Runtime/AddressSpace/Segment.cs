@@ -63,7 +63,7 @@ public sealed partial class Segment
     /// <summary>
     /// 生长上限——Compact 原位更新可变（L12 修复 ：换段从"新建对象换槽"改为
     /// "同对象换内脏"，引用恒稳——自旋写者/reader/句柄池持锁天然互斥）。
-    /// 变更仅经 <see cref="ApplyCompactReplacement"/>（持 extent lock + SegmentLock 排他）。
+    /// 变更仅经 <see cref="ApplyCompactReplacement(long, long, IReadOnlyList{ExtentRecord})"/>（持 extent lock + SegmentLock 排他）。
     /// <para>★ L28 收口（）：读改 Volatile——GrowthLimit 是 Compact 可变的跨线程字段，
     ///   无屏障裸读（地址算术/IsFull/Remaining 的消费点）可与换段写交错读到旧值（ARM 弱序）。</para>
     /// </summary>
@@ -92,7 +92,7 @@ public sealed partial class Segment
     public StableState StableState => (StableState)Volatile.Read(ref _stateCode);
 
     /// <summary>
-    /// ★ 物理状态就绪（物理门开）——<see cref="WaitSegmentReady"/> 的判定谓词（设计决策：
+    /// ★ 物理状态就绪（物理门开）——<see cref="SegmentTable.WaitSegmentReady"/> 的判定谓词（设计决策：
     /// 物理门正向判定物理就绪，不用逻辑相位反向判定）。
     /// <para>Ready/Full/Compacting 均为物理就绪（Compacting 物理存在、整理排他由区间锁管，不在本门职责）；
     /// Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文件不存在）非就绪。</para>

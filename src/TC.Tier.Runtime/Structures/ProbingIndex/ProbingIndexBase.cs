@@ -33,6 +33,8 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
     private protected int SectorSize { get; }
 
     private protected LogicalAddress _beginAddress;
+
+    /// <summary>探测起始地址（引擎 MinAddress——探测索引只在内存，不锚定固定槽，只锚定地址空间起点）。</summary>
     public LogicalAddress BeginAddress => _beginAddress;
 
     /// <summary>
@@ -67,12 +69,15 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         _beginAddress = _engine.MinAddress;
     }
 
+    /// <summary>启动主引擎（非阻塞——就绪由族恢复核心开头 await 保证；水位线归结构层，引擎自恢复不下传 hint）。</summary>
     protected override void OnInitializeBegin()
     {
         // ★ 引擎启动（非阻塞——就绪由族恢复核心开头 await 保证）。水位线归结构层：引擎自恢复不下传 hint。
         _engine.Initialize();
     }
 
+    /// <summary>创建默认恢复实现（RecoveryBase 模板派生——只填恢复算法：hints → 主存储帧 → 全量重放三级回退）。</summary>
+    /// <returns>默认探测族恢复实例。</returns>
     protected override IRecovery<ProbingIndexRecoveryHints>? CreateRecovery() => new DefaultProbingIndexBaseRecovery(this);
 
     // ══ 族器官：hash 路由 + 桶并发 ══
@@ -102,18 +107,44 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
 
     // ══ 抽象面 ══
 
+    /// <summary>
+    /// ★ 不含 epoch 进出的查找——epoch 由调用方经 <see cref="EnterScope"/> / <see cref="FindBatch"/> 在外层持有。
+    /// 子类实现 tag 命中 + KeyResolver 判等闭环。
+    /// </summary>
+    /// <param name="key">查找键。</param>
+    /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     protected abstract LogicalAddress FindNoEpoch(TKey key);
 
+    /// <summary>点查 key → value 逻辑地址（epoch 读保护内完成）。</summary>
+    /// <param name="key">查找键。</param>
+    /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     public abstract LogicalAddress Find(TKey key);
+
+    /// <summary>插入条目（key → valueAddress；同 key 覆写 value 不增计数），返回插入后地址（epoch 读保护内完成）。</summary>
+    /// <param name="key">条目键。</param>
+    /// <param name="valueAddress">条目 value 逻辑地址。</param>
+    /// <param name="beginAddress">探测下限地址（重放路径约定参数）——槽内旧条目地址小于它视为陈旧，可覆写落位。</param>
+    /// <returns>插入后地址。</returns>
     public abstract LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress);
+
+    /// <summary>删除条目（epoch 读保护内完成）。</summary>
+    /// <param name="key">条目键。</param>
+    /// <returns>true = 真删到；false = 不存在。</returns>
     public abstract bool Delete(TKey key);
+
+    /// <summary>条目数（写者维护计数——O(1)）。</summary>
     public abstract long EntryCount { get; }
+
+    /// <summary>索引内存占用估算（字节——子类按结构形态估算）。</summary>
     public abstract long IndexSize { get; }
 
+    /// <summary>扩容（探测族独有能力——子类实现表代函数式重建，装载超阈值由 Insert 触发）。</summary>
     public abstract void GrowIndex();
 
     // ══ 共享模板（各族自持——设计稿：不设公共基类）══
 
+    /// <summary>进入读保护 scope（ref struct <see cref="IndexScope"/>——创建即 Resume epoch，Dispose 即 Suspend；scope 内 Find 省逐次 epoch 进出）。</summary>
+    /// <returns>读保护 scope。</returns>
     public IndexScope EnterScope() => new(this);
 
     /// <summary>★ epoch 读保护协议实现（IEpochProtected——Session 读 scope 聚合入口；IndexScope 转发此真源）。</summary>
@@ -123,8 +154,12 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         ResumeEpoch();
     }
 
+    /// <summary>退出 epoch 读保护（与 <see cref="EnterEpoch"/> 成对——Session 读 scope 聚合入口转发）。</summary>
     public void ExitEpoch() => SuspendEpoch();
 
+    /// <summary>批量点查（keys → results，同一轮 epoch 内完成——零逐查 Resume/Suspend 开销）。</summary>
+    /// <param name="keys">输入键集合。</param>
+    /// <param name="results">输出地址数组（长度须 ≥ keys 长度，不足抛 ArgumentException）。</param>
     public void FindBatch(ReadOnlySpan<TKey> keys, Span<LogicalAddress> results)
     {
         if (keys.Length > results.Length)
@@ -142,6 +177,7 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         }
     }
 
+    /// <summary>读保护 scope（ref struct——EnterScope 创建即 Resume epoch，Dispose 即 Suspend；Find 走 FindNoEpoch 零进出开销）。</summary>
     public readonly ref struct IndexScope
     {
         private readonly ProbingIndexBase<TKey> _owner;
@@ -154,6 +190,7 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         /// <summary>scope 内单查（FindNoEpoch 转发）——epoch 已由 scope 持有，省逐次 Resume/Suspend（~10ns/op）。</summary>
         public LogicalAddress Find(TKey key) => _owner.FindNoEpoch(key);
 
+        /// <summary>退出 scope（Suspend epoch——与 EnterScope 的 Resume 成对）。</summary>
         public void Dispose()
         {
             _owner?.ExitEpoch();

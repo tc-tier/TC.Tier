@@ -28,7 +28,7 @@ public sealed partial class StreamSnapshot : SnapshotBase
         IRecovery<SnapshotRecoveryHints>? recovery = null,
         MetaPolicyFactory<SnapshotMetaHeader, SnapshotMetaPayload>? metaPolicyFactory = null,
         IMetaTransport? metaTransport = null)
-        : base(new Codec(), fileSystem, settings, recovery, metaPolicyFactory, metaTransport)
+        : base(new StreamFrameCodec(), fileSystem, settings, recovery, metaPolicyFactory, metaTransport)
     {
         _settings = settings;
     }

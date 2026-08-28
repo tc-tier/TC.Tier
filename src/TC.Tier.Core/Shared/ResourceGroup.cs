@@ -118,6 +118,9 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     }
 
     /// <summary>解析注册名（已持锁）：显式优先，缺省用 Type.Name，仍重名则追加序号。</summary>
+    /// <param name="resource">资源对象。</param>
+    /// <param name="name">显式注册名（可空）。</param>
+    /// <returns>最终注册名（不为空，唯一）。</returns>
     private string ResolveNameLocked(object resource, string? name)
     {
         if (!string.IsNullOrWhiteSpace(name)) return name!;
@@ -134,6 +137,9 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     // === 按名查询（线程安全）===
 
     /// <summary>按名取资源并转型；不存在或类型不匹配返回 null。线程安全。</summary>
+    /// <typeparam name="T">资源类型（class 约束，编译期类型安全）。</typeparam>
+    /// <param name="name">注册名。</param>
+    /// <returns>资源实例或 null。</returns>
     public T? Get<T>(string name) where T : class
     {
         lock (_lock)
@@ -143,6 +149,8 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     }
 
     /// <summary>是否包含指定名。线程安全。</summary>
+    /// <param name="name">注册名。</param>
+    /// <returns>是否包含。</returns>
     public bool Contains(string name)
     {
         lock (_lock) { return _byName.ContainsKey(name); }
@@ -151,11 +159,12 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     /// <summary>已注册的所有资源名快照（诊断/枚举用）。线程安全——返回快照副本，避免外部枚举期间被修改。</summary>
     public IReadOnlyList<string> Names
     {
-        get { lock (_lock) { return _byName.Keys.ToArray(); } }
+        get { lock (_lock) { return [.. _byName.Keys]; } }
     }
 
     /// <summary>诊断：当前组内所有资源快照（对齐 lease GetActiveLeases——泄漏时定位"谁加了什么资源"）。
     /// 线程安全——锁内快照副本。含所有权模式（Owned/Referenced）。</summary>
+    /// <returns>资源快照列表（按添加顺序）。</returns>
     public IReadOnlyList<ResourceInfo> GetResources()
     {
         lock (_lock)
@@ -178,6 +187,8 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     }
 
     /// <summary>反查资源名（已持锁）——诊断 GetResources 用。</summary>
+    /// <param name="entry">资源条目。</param>
+    /// <returns><![CDATA[资源名或 "<unknown>"（理论上不可能）。]]></returns>
     private string FindNameLocked(ResourceEntry entry)
     {
         foreach (var (name, e) in _byName)
@@ -187,6 +198,9 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
 
     // === Dispose 状态 ===
 
+    /// <summary>
+    /// 是否已释放（CAS 防双释放）。线程安全——Volatile.Read。
+    /// </summary>
     private bool IsDisposed
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -247,6 +261,8 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     /// <para>★ 同步路径优先 <see cref="IDisposable"/>——仅对只实现 <see cref="IAsyncDisposable"/> 的资源才阻塞等异步
     ///   （避免两接口都实现的资源在有 SynchronizationContext 的线程上 <c>GetAwaiter().GetResult()</c> 死锁）。</para>
     /// <para>★ 展平 <see cref="AggregateException"/>——避免 GetResult 抛的 AggregateException 与外层聚合嵌套。</para></summary>
+    /// <param name="snapshot">快照列表（逆序，后加的在前）。</param>
+    /// <returns>异常列表（展平 AggregateException），无异常返回 null。</returns
     private static List<Exception>? DisposeCoreSync(List<object> snapshot)
     {
         List<Exception>? exs = null;
@@ -269,6 +285,8 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     }
 
     /// <summary>异步释放核心（已快照）：IAsyncDisposable 优先（await）、收集异常。锁外执行。</summary>
+    /// <param name="snapshot">快照列表（逆序，后加的在前）。</param>
+    /// <returns>异常列表（展平 AggregateException），无异常返回 null。</returns>
     private static async Task<List<Exception>?> DisposeCoreAsync(List<object> snapshot)
     {
         List<Exception>? exs = null;
@@ -292,6 +310,8 @@ public sealed class ResourceGroup : IDisposable, IAsyncDisposable
     }
 
     /// <summary>展平异常收集——AggregateException 拆出 InnerExceptions，避免聚合嵌套（同步 Dispose 的 GetResult 会包一层）。</summary>
+    /// <param name="exs">异常列表（可能 null，首次异常时创建）。</param>
+    /// <param name="ex">新捕获的异常。</param>
     private static void AddFlattened(List<Exception> exs, Exception ex)
     {
         if (ex is AggregateException ae && ae.InnerExceptions.Count > 0)

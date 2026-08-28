@@ -85,10 +85,10 @@ public sealed class TierSpecTests
     [Fact]
     public void Virtual_FileCarrier_DefaultSubKindNull()
     {
-        var s = TierSpec.Parse("virtual:///data/vol.raw?label=wal");
+        var s = TierSpec.Parse("virtual:///data/vol.tier?label=wal");
         Assert.Equal(StorageNature.Virtual, s.Nature);
         Assert.Null(s.SubKind);
-        Assert.Equal("/data/vol.raw", s.AbsolutePath);
+        Assert.Equal("/data/vol.tier", s.AbsolutePath);
         Assert.Equal("wal", s.Label);
     }
 
@@ -103,16 +103,16 @@ public sealed class TierSpecTests
     [Fact]
     public void Virtual_WindowsFileCarrier()
     {
-        var s = TierSpec.Parse("virtual:///D:/vols/archive.raw");
+        var s = TierSpec.Parse("virtual:///D:/vols/archive.tier");
         Assert.Null(s.SubKind);
-        Assert.Equal("D:/vols/archive.raw", s.AbsolutePath);
+        Assert.Equal("D:/vols/archive.tier", s.AbsolutePath);
     }
 
     [Fact]
     public void Virtual_MultiCarrier_MemberList()
     {
-        var s = TierSpec.Parse("virtual:///data/vol.raw?member=/data/v2.raw&member=/data/v3.raw");
-        Assert.Equal(["/data/v2.raw", "/data/v3.raw"], s.Members);
+        var s = TierSpec.Parse("virtual:///data/vol.tier?member=/data/v2.tier&member=/data/v3.tier");
+        Assert.Equal(["/data/v2.tier", "/data/v3.tier"], s.Members);
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public sealed class TierSpecTests
         Assert.Equal("local:data/tier", TierSpec.Parse("local:data\\tier").ToString());
         Assert.Equal("local:", TierSpec.Parse("local").ToString());
         Assert.Equal("memory:", TierSpec.Parse("memory").ToString());
-        Assert.Equal("virtual:///data/vol.raw", TierSpec.Parse("virtual:///data/vol.raw").ToString());
+        Assert.Equal("virtual:///data/vol.tier", TierSpec.Parse("virtual:///data/vol.tier").ToString());
         Assert.Equal("virtual:///dev/nvme0n1", TierSpec.Parse("virtual:///dev/nvme0n1").ToString());
         Assert.Equal("network:///s3/h/b/p", TierSpec.Parse("network:///s3/h/b/p").ToString());
     }
@@ -229,10 +229,10 @@ public sealed class TierSpecTests
         "local:?label=x",
         "memory:",
         "memory?quota=1G&label=test-a",
-        "virtual:///data/vol.raw?label=wal",
+        "virtual:///data/vol.tier?label=wal",
         "virtual:///dev/nvme0n1?label=wal",
-        "virtual:///D:/vols/archive.raw",
-        "virtual:///data/vol.raw?member=/data/v2.raw&member=/data/v3.raw",
+        "virtual:///D:/vols/archive.tier",
+        "virtual:///data/vol.tier?member=/data/v2.tier&member=/data/v3.tier",
         "network:///s3/cos.example.com/tc-bucket/engine-a",
         "network:///s3/minio:9000/tier-logs/engine-a",
         "network:///s3/host/bucket",

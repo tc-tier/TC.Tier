@@ -178,8 +178,17 @@ public abstract partial class RingBase<TKey>
     }
 
     // === record 字节几何插槽（abstract，实现类 override；sealed → JIT 去虚化）===
+    /// <summary>固定记录大小（record 字节几何插槽）；0 = 变长（record 大小由 header 自述 PayloadLength/PaddingLength）。</summary>
     protected internal abstract int FixedRecordSize { get; }
+    /// <summary>平均记录大小（溢出阈值/容量估算的锚点值）。</summary>
     protected internal abstract int AverageRecordSize { get; }
+    /// <summary>读物理地址处 record 的实际几何：filled = header + payload + padding 实际字节数，allocated = 对齐后的槽长。</summary>
+    /// <param name="phys">record 的物理地址。</param>
+    /// <returns>(实际字节数, 对齐后占用槽长)。</returns>
     protected internal abstract (int filled, int allocated) GetRecordSize(long phys);
+    /// <summary>给定可用字节数下覆盖该 record 所需的最小槽长（估算插槽，实现类按自身 record 形态给出）。</summary>
+    /// <param name="phys">record 的物理地址。</param>
+    /// <param name="availableBytes">可用字节数。</param>
+    /// <returns>所需的最小槽长（字节数）。</returns>
     protected internal abstract int GetRequiredRecordSize(long phys, int availableBytes);
 }

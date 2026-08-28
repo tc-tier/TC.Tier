@@ -293,6 +293,20 @@ internal sealed class DiskFileHandle : IFileHandle, IPoolAttachable
         catch (Exception ex) when (ex is not OperationCanceledException)
         { throw ex.Wrap(nameof(Preallocate), _path); }
 
+        // IS-04：Full 档 = 物理占位强制（失败显式报错，不静默降级）；Metadata = 现行 best-effort 稀疏降级
+        if (_fs.PreallocationMode == PreallocationMode.Full)
+        {
+            try
+            {
+                if (!FileNative.EnsurePhysicalAllocation(_handle, _preallocateSize, _logger))
+                    throw new FileIOException(IOError.IOFailure,
+                        $"预分配失败（Preallocation=Full）：{_path}——full 档不允许静默降级为稀疏",
+                        _path, nameof(Preallocate));
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            { throw ex.Wrap(nameof(Preallocate), _path); }
+            return;
+        }
         try { FileNative.PreallocateFile(_handle, _preallocateSize, _logger); }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

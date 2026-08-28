@@ -10,6 +10,10 @@ public sealed class RollbackException : Exception
     /// <summary>本回合占用的域 seq（已随回滚作废——批合并下同批回合共享同一作废 seq）。</summary>
     public long Seq { get; }
 
+    /// <summary>构造回滚异常。</summary>
+    /// <param name="seq">本回合占用的域 seq（已随回滚作废）。</param>
+    /// <param name="message">回滚原因消息。</param>
+    /// <param name="inner">内层异常（如复制决策调用异常）。</param>
     public RollbackException(long seq, string message, Exception? inner = null)
         : base(message, inner)
     {

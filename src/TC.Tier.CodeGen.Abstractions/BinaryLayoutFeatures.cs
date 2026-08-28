@@ -8,6 +8,7 @@ namespace TC.Tier.CodeGen;
 [System.Flags]
 public enum BinaryLayoutFeatures
 {
+    /// <summary>默认：仅生成 Write/Read/Validate。</summary>
     None            = 0,
 
     /// <summary>生成 StructSize 常量（= [StructLayout].Size 值）。</summary>

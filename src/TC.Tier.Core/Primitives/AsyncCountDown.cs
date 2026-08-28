@@ -2,7 +2,7 @@ namespace TC.Tier.Core.Primitives;
 
 /// <summary>
 /// 异步倒计时器：当计数器从非零降到零时，唤醒所有等待者。
-/// <para>底层基于 <see cref="AsyncManualResetEvent"/>（<see cref="ManualResetValueTaskSourceCore{TResult}"/>），
+/// <para>底层基于 <see cref="AsyncManualResetEvent"/>（<see cref="System.Threading.Tasks.Sources.ManualResetValueTaskSourceCore{TResult}"/>），
 /// 常规等待路径零堆分配（传统 <see cref="TaskCompletionSource{TResult}"/> 方案每次等待有一次堆分配，
 /// 且 <c>nextTcs</c> 赋值非原子存在竞态；本实现消除分配并修复竞态）。</para>
 /// <para>语义：初始/计数归零时事件 set（等待立即返回）；<see cref="Add"/> 使计数 &gt; 0，

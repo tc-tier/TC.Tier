@@ -93,7 +93,7 @@ public partial class HashIndex<TKey> : ProbingIndexBase<TKey> where TKey : unman
     private readonly object _overflowLock = new();
 
     /// <summary>
-    /// ctor 收 <see cref="protected internal"/>——开放泛型不落消费面闸门（同 BlittableRing）：
+    /// ctor 收 <c>protected internal</c>——开放泛型不落消费面闸门（同 BlittableRing）：
     /// 外部直接 new 即 CS0122，用 [RingKey] 生成封闭类型（HashOfT 经 protected 肢）；内核测试经 IVT。
     /// </summary>
     protected internal HashIndex(IFileSystem fileSystem, HashIndexSettings settings,
@@ -121,6 +121,7 @@ public partial class HashIndex<TKey> : ProbingIndexBase<TKey> where TKey : unman
             OverflowPool = new HashBucket[overflowCapacity],
         };
 
+    /// <summary>恢复钩子：索引初始化——记录引擎 MinAddress 为探测起始地址（探测索引只在内存，只锚定地址空间起点）。</summary>
     protected override void InitializeIndex()
     {
         _beginAddress = _engine.MinAddress;

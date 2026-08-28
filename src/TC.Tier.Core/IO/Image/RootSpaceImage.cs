@@ -1,9 +1,11 @@
+using TC.Tier.Core.IO.TierVolume;
+
 namespace TC.Tier.Core.IO.Image;
 
 /// <summary>
 /// 根空间采集/还原管线（raw-medium-and-conversion-design §5）——四态互转的唯一机构。
 /// <para>★ 只依赖 <see cref="IFileSystem"/>/IFileHandle 接口平面：对根空间内部住着谁一无所知，
-///   任意介质 ↔ 任意介质（含 Raw 载体——virtual 介质的 .raw 文件/块设备载体层，已落地点亮）。</para>
+///   任意介质 ↔ 任意介质（含 TierVolume 载体——virtual 介质的 .tier 文件/块设备载体层，已落地点亮）。</para>
 /// <para>★ 采集契约：枚举（<see cref="IFileSystem.EnumerateEntries(string?, string, bool)"/> 递归）→
 ///   Stat/FileExtra/区间表 → 清单先行 → 逐区间帧化（稀疏保真：洞不占帧）。静默前置（§5.5）：
 ///   <see cref="ImageOptions.QuietSource"/> 且源置位 MaintenanceGate 时经维护门闩包夹（WriteOperations 档）。</para>
@@ -16,6 +18,10 @@ public static class RootSpaceImage
     /// <summary>
     /// 采集根空间 → TCA1 流。源须已静默（或 <see cref="ImageOptions.QuietSource"/> 自动门闩）。
     /// </summary>
+    /// <param name="source">源根空间（任意 <see cref="IFileSystem"/> 介质）。</param>
+    /// <param name="output">输出流（任意可写流）。</param>
+    /// <param name="options">采集选项（可空 = 默认）。</param>
+    /// <returns>采集摘要（清单条目数 + 数据帧数 + 原始字节数）。</returns>
     public static ImageSummary Capture(IFileSystem source, Stream output, ImageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -115,6 +121,10 @@ public static class RootSpaceImage
     /// <summary>
     /// 从 TCA1 流还原到目标根空间（必须为空）。逐帧 CRC + 流尾对账（<see cref="ImageOptions.VerifyChecksums"/> 可关）。
     /// </summary>
+    /// <param name="input">输入流（任意可读流）。</param>
+    /// <param name="destination">目标根空间（任意 <see cref="IFileSystem"/> 介质）。</param>
+    /// <param name="options">还原选项（可空 = 默认）。</param>
+    /// <returns>还原摘要（清单条目数 + 数据帧数 + 原始字节数）。</returns>
     public static ImageSummary Restore(Stream input, IFileSystem destination, ImageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -145,7 +155,7 @@ public static class RootSpaceImage
                 var e = entries[i];
                 if (e.Type != FsEntryType.File) continue;
                 // D4（§5.2）：unwritten 保真——预分配语义重建（物理预留 + 读零 + 写转换）。
-                // 各介质 CreateFile(preallocateSize) 语义对齐（Disk=fallocate / Mem=Reserved / Raw=unwritten 区间；
+                // 各介质 CreateFile(preallocateSize) 语义对齐（Disk=fallocate / Mem=Reserved / TierVolume=unwritten 区间；
                 // Remote 服务端 no-op——预留退化为洞，读零语义保持，诚实降级）。
                 var prealloc = 0L;
                 foreach (var (_, end, flags) in e.Ranges)
@@ -239,6 +249,10 @@ public static class RootSpaceImage
     ///   拷贝后长度对账（短读即 <see cref="IOError.IOFailure"/>）。压缩选项对快道不生效
     ///   （字节镜像语义——压缩属结构化产物，§6.3）。</para>
     /// </summary>
+    /// <param name="source">源根空间（任意 <see cref="IFileSystem"/> 介质）。</param>
+    /// <param name="target">目标根空间（任意 <see cref="IFileSystem"/> 介质）。</param>
+    /// <param name="options">采集选项（可空 = 默认）。</param>
+    /// <returns>转移摘要（清单条目数 + 数据帧数 + 原始字节数）。</returns>
     public static ImageSummary Transfer(IFileSystem source, IFileSystem target, ImageOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -269,8 +283,8 @@ public static class RootSpaceImage
         using var dstLease = target.EnterMaintenance("transfer-fastpath-dst", MaintenanceScope.AllOperations,
             CancellationToken.None);
 
-        using var srcStream = srcVolume.OpenRawBacking(writable: false);
-        using var dstStream = dstVolume.OpenRawBacking(writable: true);
+        using var srcStream = srcVolume.OpenVolumeBacking(writable: false);
+        using var dstStream = dstVolume.OpenVolumeBacking(writable: true);
 
         // ★ 容量预检（D6——设计 §10：整卷覆盖是破坏性操作，先验后写，盲写禁止）：
         // 目标卷容量 < 源卷字节数 → 写前拒绝，目标零字节受损。
@@ -287,5 +301,47 @@ public static class RootSpaceImage
         dstStream.Flush();
         dstVolume.OnMirrorCompleted();   // 目标实例内存态从盘重建（镜像覆盖了盘上状态）
         return new ImageSummary(0, 0, copied);
+    }
+
+    /// <summary>
+    /// 增量导出（V2 §1.2——journal delta 帧）：源须为日志化卷（<see cref="IJournaledVolume"/>——
+    /// 现役 = TierVolume）。基点 = 快照/检查点 LSN；delta = (baseLsn, 已提交头] 操作级记录流
+    /// （无数据面扫描——导出体积 ∝ 变更量；qcow2 dirty bitmap 是块级，我们 op 级）。
+    /// </summary>
+    /// <param name="source">源根空间（须日志化卷）。</param>
+    /// <param name="output">输出流（任意可写流）。</param>
+    /// <param name="baseLsn">基点 LSN（快照/检查点）。</param>
+    /// <returns>增量导出摘要（清单条目数 + 数据帧数 + 原始字节数）。</returns>
+    public static SnapshotDeltaSummary ExportDelta(IFileSystem source, Stream output, ulong baseLsn)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(output);
+        if (source is not IJournaledVolume journaled)
+            throw new FileIOException(IOError.Unsupported,
+                $"介质不支持增量导出（须日志化卷）：{source.GetType().Name}", null, "ExportDelta");
+        // ★ 静默前置（与 Capture 同纪律）：导出读取载体数据块——与并发数据段写互斥
+        // （Parallel 档数据段锁外写载体；不静默 = 撕裂块嵌入流——正确性必需，非可选）
+        using IDisposable? lease = source.Capabilities.HasFlag(FileSystemCapabilities.MaintenanceGate)
+            ? source.EnterMaintenance("image-delta-export", MaintenanceScope.WriteOperations, CancellationToken.None)
+            : null;
+        return journaled.ExportDeltaTo(output, baseLsn);
+    }
+
+    /// <summary>
+    /// 增量还原（V2 §1.2）：目标须为同基线日志化卷（基线 = 卷 UUID + 头对齐 + 可选镜像 CRC）。
+    /// 三级备份形态：全量（Capture/快照挂载采集）· 增量（本路径）· dd 快道（Transfer 载体直拷——
+    /// dd 副本保卷身份，恰是增量链路的全量基座：副本打开重放至拷贝时刻头 = 基点）。
+    /// </summary>
+    /// <param name="input">输入流（任意可读流）。</param>
+    /// <param name="destination">目标根空间（须日志化卷）。</param>
+    /// <returns>增量还原摘要（清单条目数 + 数据帧数 + 原始字节数）。</returns>
+    public static SnapshotDeltaSummary ApplyDelta(Stream input, IFileSystem destination)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        ArgumentNullException.ThrowIfNull(destination);
+        if (destination is not IJournaledVolume journaled)
+            throw new FileIOException(IOError.Unsupported,
+                $"介质不支持增量还原（须日志化卷）：{destination.GetType().Name}", null, "ApplyDelta");
+        return journaled.ApplyDeltaFrom(input);
     }
 }

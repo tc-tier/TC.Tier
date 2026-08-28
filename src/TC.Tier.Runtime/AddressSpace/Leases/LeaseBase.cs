@@ -78,6 +78,7 @@ public abstract partial class LeaseBase : IDisposable, ITrackedLease
     /// 结束逻辑地址（不包含）。
     /// </summary>
     public LogicalAddress End { get; private set; }
+    /// <summary>lease 状态（Active / Committed / RolledBack / Finalized——原子读）。</summary>
     public LeaseState State => (LeaseState)Volatile.Read(ref _state);
     internal int ChunkCount => ChunkCountInternal;
 

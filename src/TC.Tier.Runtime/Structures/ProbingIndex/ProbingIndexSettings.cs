@@ -33,6 +33,8 @@ public sealed record ProbingIndexPersistencePolicy
 /// </summary>
 public abstract class ProbingIndexSettings : Settings
 {
+    /// <summary>名称直构（对齐 RingSettings/LogSettings 双 ctor 形态——segment 增长上限固定 1G）。</summary>
+    /// <param name="name">配置名（默认 "tc.probingindex"）。</param>
     protected ProbingIndexSettings(string name = "tc.probingindex")
         : base(name, segmentGrowthLimit: AlignmentConst.Alignment1G) { }
 

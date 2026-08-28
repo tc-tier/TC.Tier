@@ -201,7 +201,7 @@ public sealed partial class Segment
     }
 
     /// <summary>
-    /// 找 start 处的区间 index——不加锁，调用方须持 <see cref="Segment.ExtentLock"/>。
+    /// 找 start 处的区间 index——不加锁，调用方须持 <see cref="AcquireExtentLock"/>。
     /// <para>★ 同 Start 多条时优先返回在途态（Leased）——lease Commit/Rollback 转终态的目标就是 lease 占住时插的那条。</para>
     /// <para>★ 找不到在途态时退回任意一条 Start==start 的（兼容 AllocateRaw 直接 MarkWasted 还没 Leased 的情况）。</para>
     /// <para>★ 修复同 Start 歧义 bug：之前 FindContainingIndex 可能找错目标（改了 Committed 而非 Leased）。</para>

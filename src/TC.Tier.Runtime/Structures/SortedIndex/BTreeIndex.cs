@@ -169,6 +169,7 @@ public partial class BTreeIndex<TKey> : SortedIndexBase<TKey> where TKey : unman
         _rootAddress = LogicalAddress.Empty;
     }
 
+    /// <summary>建空 B+树结构（锚定起始地址 + 空根叶节点——恢复核心第一步，主存储不可用时；空树无帧）。</summary>
     protected override void InitializeIndex()
     {
         _beginAddress = _engine.MinAddress;

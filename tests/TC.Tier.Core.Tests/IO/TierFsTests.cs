@@ -3,7 +3,7 @@ using TC.Tier.Core.IO.Disk;
 using TC.Tier.Core.IO.Mem;
 using TC.Tier.Core.IO.Remote;
 using TC.Tier.Core.IO.Testing;
-using TC.Tier.Core.IO.Raw;
+using TC.Tier.Core.IO.TierVolume;
 
 namespace TC.Tier.Core.Tests.IO;
 
@@ -158,10 +158,10 @@ public sealed class TierFsTests
     [Fact]
     public void Virtual_NewWithQuota_Write_Close_ThenOpenReadOnly()
     {
-        var vol = Path.Combine(TempDir(), "v.raw");
+        var vol = Path.Combine(TempDir(), "v.tier");
         var spec = vol.Replace('\\', '/');
 
-        using (var fs = (RawFileSystem)TierFs.New($"virtual:///{spec}?quota=4M&label=wal-a"))
+        using (var fs = (TierVolumeFs)TierFs.New($"virtual:///{spec}?quota=4M&label=wal-a"))
         {
             fs.EnsureRoot();
             fs.CreateDirectory("seg");
@@ -170,7 +170,7 @@ public sealed class TierFsTests
             h.Write(0, new byte[100]);
         }   // Dispose = 关卷提交
 
-        using (var ro = (RawFileSystem)TierFs.Open($"virtual:///{spec}?access=ro"))
+        using (var ro = (TierVolumeFs)TierFs.Open($"virtual:///{spec}?access=ro"))
         {
             Assert.True(ro.Exists("seg/data.0"));
             // 只读：写路径拒绝
@@ -181,9 +181,9 @@ public sealed class TierFsTests
     [Fact]
     public void Virtual_NewWithoutQuota_AutoExpandVolume()
     {
-        var vol = Path.Combine(TempDir(), "grow.raw");
+        var vol = Path.Combine(TempDir(), "grow.tier");
         var spec = vol.Replace('\\', '/');
-        using (var fs = (RawFileSystem)TierFs.New($"virtual:///{spec}"))
+        using (var fs = (TierVolumeFs)TierFs.New($"virtual:///{spec}"))
         {
             Assert.Equal(64L << 20, fs.Volume.TotalSpace);   // 初始小界（-1 自动扩容已落地）
             Assert.Equal(-1, fs.Volume.QuotaBytes);
@@ -193,19 +193,19 @@ public sealed class TierFsTests
         }
         // 多载体 New（member=）仍须显式 quota——自动扩容仅限单文件载体
         var ex = Assert.Throws<NotSupportedException>(
-            () => TierFs.New($"virtual:///{vol.Replace('\\', '/')}?member=/x/v2.raw"));
+            () => TierFs.New($"virtual:///{vol.Replace('\\', '/')}?member=/x/v2.tier"));
         Assert.Contains("quota", ex.Message);
     }
 
     [Fact]
     public void Virtual_OpenQuotaTightens_And_LabelChecks()
     {
-        var vol = Path.Combine(TempDir(), "v2.raw");
+        var vol = Path.Combine(TempDir(), "v2.tier");
         var spec = vol.Replace('\\', '/');
         using (TierFs.New($"virtual:///{spec}?quota=32M&label=vol-a")) { }
 
         // Open 收紧（min 规则）：quota=10M 挂载（含 8M 日志预留计入空间根上限）——小文件通，大文件 DiskFull
-        using (var fs = (RawFileSystem)TierFs.Open($"virtual:///{spec}?quota=10M"))
+        using (var fs = (TierVolumeFs)TierFs.Open($"virtual:///{spec}?quota=10M"))
         {
             fs.EnsureRoot();
             fs.CreateFile("small", preallocateSize: 512 << 10);
@@ -221,9 +221,9 @@ public sealed class TierFsTests
     [Fact]
     public void Virtual_NewWithAccessRo_SealedOnCreation()
     {
-        var vol = Path.Combine(TempDir(), "sealed.raw");
+        var vol = Path.Combine(TempDir(), "sealed.tier");
         var spec = vol.Replace('\\', '/');
-        using var fs = (RawFileSystem)TierFs.New($"virtual:///{spec}?quota=4M&access=ro");
+        using var fs = (TierVolumeFs)TierFs.New($"virtual:///{spec}?quota=4M&access=ro");
         Assert.ThrowsAny<Exception>(() => fs.CreateFile("x"));   // 建完即封存
     }
 
@@ -242,12 +242,12 @@ public sealed class TierFsTests
         }
 
         // virtual：未格式化 → 建（自动扩容卷）；已格式化 → 开
-        var vol = Path.Combine(TempDir(), "oc.raw").Replace(System.IO.Path.DirectorySeparatorChar, '/');
-        using (var vFresh = (RawFileSystem)TierFs.OpenOrCreate($"virtual:///{vol}"))
+        var vol = Path.Combine(TempDir(), "oc.tier").Replace(System.IO.Path.DirectorySeparatorChar, '/');
+        using (var vFresh = (TierVolumeFs)TierFs.OpenOrCreate($"virtual:///{vol}"))
         {
             Assert.Equal(64L << 20, vFresh.Volume.TotalSpace);   // 懒初始化建卷（New 路径）
         }
-        using (var vAgain = (RawFileSystem)TierFs.OpenOrCreate($"virtual:///{vol}"))
+        using (var vAgain = (TierVolumeFs)TierFs.OpenOrCreate($"virtual:///{vol}"))
         {
             Assert.True(vAgain.Volume.TotalSpace >= 64L << 20, "已格式化 → Open（数据面在档）");
         }
@@ -459,7 +459,7 @@ public sealed class TierFsTests
         Assert.Equal(64 << 10, mv.QuotaBytes);
         Assert.True(mv.UsedBytes >= 0);
 
-        var vol = Path.Combine(TempDir(), "g4.raw");
+        var vol = Path.Combine(TempDir(), "g4.tier");
         using var raw = TierFs.New($"virtual:///{RootSpec(vol)}?quota=8M&label=v1");
         var rv = raw.Volume;
         Assert.Equal(StorageNature.Virtual, rv.Nature);

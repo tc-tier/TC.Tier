@@ -12,9 +12,12 @@ public sealed partial class StreamSnapshot
     [StructLayout(LayoutKind.Explicit, Size = HeaderSize)]
     public struct StreamFrameHeader
     {
+        /// <summary>Magic 常量（快照帧魔数 "SNHD"，帧头身份校验）。</summary>
         public const uint Magic = RecordMagic.SnapshotFrame; // "SNHD"
+        /// <summary>当前版本号（major=1, minor=0）。</summary>
         public const ushort CurrentVersion = (ushort)((1 << 8) | 0);
 
+        /// <summary>默认 Flags（CRC64 | PAYLOAD_4B | CRC_IN_FOOTER | FOOTER_MAGIC）。</summary>
         public const ushort DefaultFlags = RecordFlags.FLAG_CRC64
                                          | RecordFlags.FLAG_PAYLOAD_4B
                                          | RecordFlags.FLAG_CRC_IN_FOOTER
@@ -22,8 +25,10 @@ public sealed partial class StreamSnapshot
 
         private const int HeaderSize = 14;
 
+        /// <summary>Magic 标识（ValidEquals 校验必须等于 <see cref="Magic"/>）。</summary>
         [FieldOffset(0), ValidEquals(Magic)] public uint MagicValue;
 
+        /// <summary>版本号（ValidEquals 校验必须等于 <see cref="CurrentVersion"/>）。</summary>
         [FieldOffset(4), ValidEquals(CurrentVersion)]
         public ushort Version;
 
@@ -31,7 +36,9 @@ public sealed partial class StreamSnapshot
         [FieldOffset(6), ValidHasFlags(DefaultFlags)]
         public ushort Flags;
 
+        /// <summary>data 字节长度（不含 header/padding/footer）。</summary>
         [FieldOffset(8)] public uint PayloadLength;
+        /// <summary>padding 字节长度（扇区对齐补零）。</summary>
         [FieldOffset(12)] public ushort PaddingLength;
     }
 
@@ -44,16 +51,21 @@ public sealed partial class StreamSnapshot
     [StructLayout(LayoutKind.Explicit, Size = FooterSize)]
     public struct StreamFrameFooter
     {
+        /// <summary>Footer 字节大小（28B = Magic 4B + TotalLength 8B + EntryCount 8B + Crc 8B）。</summary>
         public const int FooterSize = 28;
 
         /// <summary>"SNFT" — Footer magic（反向扫描定位帧尾）。</summary>
         public const uint FooterMagic = RecordMagic.SnapshotFrameFooter;
 
+        /// <summary>Footer magic 标识（ValidEquals 校验必须等于 <see cref="FooterMagic"/>）。</summary>
         [FieldOffset(0), ValidEquals(FooterMagic)]
         public uint Magic;
 
+        /// <summary>data 总长度（冗余，恢复校验用）。</summary>
         [FieldOffset(4)] public ulong TotalLength; // data 总长度（冗余，恢复校验用）
+        /// <summary>entry 条数。</summary>
         [FieldOffset(12)] public ulong EntryCount; // entry 条数
+        /// <summary>Crc64（覆盖 Header + Data + Footer 前 20B）。</summary>
         [FieldOffset(20)] public ulong Crc; // Crc64
     }
 }

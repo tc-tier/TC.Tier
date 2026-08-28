@@ -125,6 +125,9 @@ public sealed class AsyncPriorityQueue<T> : IDisposable
     /// <para>★ 返回的 preds[L] 保证在该层未标记（pred 只在 curr 未标记时推进）；
     ///   succs[L] 为 Node 或 null，绝不返回 Marker。</para>
     /// </summary>
+    /// <param name="key">要查找的 key。</param>
+    /// <param name="preds">返回各层前驱链。</param>
+    /// <param name="succs">返回各层后继链。</param>
     private void Find(long key, Node[] preds, Node?[] succs)
     {
         var pred = _head;
@@ -158,6 +161,10 @@ public sealed class AsyncPriorityQueue<T> : IDisposable
     }
 
     /// <summary>level-L 链接 CAS：pred.Forward[L] 从 succ 改为 node。succ 为 null 时即尾插。</summary>
+    /// <param name="pred">前驱节点。</param>
+    /// <param name="level">层级。</param>
+    /// <param name="succ">预期后继节点（null = 尾插）。</param>
+    /// <param name="node">要链接的节点。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool TryLink(Node pred, int level, Node? succ, Node node)
         => Interlocked.CompareExchange(ref pred.Forward[level], node, succ) == succ;
@@ -382,6 +389,7 @@ public sealed class AsyncPriorityQueue<T> : IDisposable
     //  DISPOSE
     // ════════════════════════════════════════════════════════════
 
+    /// <summary>释放队列——置 disposed 标志（后续操作抛 <see cref="ObjectDisposedException"/>）并唤醒全部挂起的异步出队等待者（幂等）。</summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;

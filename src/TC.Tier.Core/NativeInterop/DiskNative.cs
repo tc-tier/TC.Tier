@@ -13,9 +13,9 @@ internal static class DiskNative
     /// <summary>
     /// ★ 获取磁盘扇区大小（跨平台真实查询，非固定值）。
     /// <para>Windows: <see cref="Kernel32.GetDiskFreeSpace"/>（查卷的物理扇区大小）。</para>
-    /// <para>Linux: <see cref="Statvfs"/> 的 <c>f_frsize</c>（文件系统基本块大小，
+    /// <para>Linux: <c>statvfs</c> 的 <c>f_frsize</c>（文件系统基本块大小，
     ///   无 fd 时作为扇区大小的合理近似；精确值需 ioctl(fd, BLKSSZGET)，但构造时无 fd）。</para>
-    /// <para>macOS: <see cref="Statvfs"/> 的 <c>f_frsize</c>（同 Linux，POSIX 标准）。</para>
+    /// <para>macOS: <c>statvfs</c> 的 <c>f_frsize</c>（同 Linux，POSIX 标准）。</para>
     /// <para>★ P/Invoke 失败时退回 512（保守下限，DIO 对齐安全值）。</para>
     /// <para>★ 不用 statvfs.f_bsize（文件系统首选块大小，可能偏大如 4096，非 DIO 硬性要求）；
     ///   f_frsize 是基本块大小，更接近物理扇区。</para>

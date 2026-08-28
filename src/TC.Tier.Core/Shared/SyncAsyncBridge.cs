@@ -1,31 +1,6 @@
 namespace TC.Tier.Core.Shared;
 
 /// <summary>
-/// <see cref="SyncAsyncBridge"/> 的调用选项（docs/sync-async-bridge.md §6.1）。
-/// </summary>
-public sealed record SyncBridgeOptions
-{
-    /// <summary>诊断名（操作句柄名 / 超时现场 / 日志标识）。默认 "sync-bridge"。</summary>
-    public string Name { get; init; } = "sync-bridge";
-
-    /// <summary>
-    /// 执行 work 的调度器。null（默认）= <see cref="SyncAsyncBridge.DefaultScheduler"/>（桥专用独立池）；
-    /// 可注入 own <see cref="IsolatedTaskScheduler"/> 实例分池（嵌套桥 / 独占分区场景）。
-    /// </summary>
-    public TaskScheduler? Scheduler { get; init; }
-
-    /// <summary>
-    /// 同步等待（<c>Run</c> 系）的超时上限（ms）。默认 <see cref="SyncAsyncBridge.DefaultTimeoutMs"/>（15s）。
-    /// <para>★ 有界纪律：超时抛 <see cref="TimeoutException"/>（带现场）——同步 API 不允许无限期阻塞。
-    ///   大对象/慢介质调用点按需调大（如 multipart 传整段预算）。</para>
-    /// </summary>
-    public int TimeoutMs { get; init; } = SyncAsyncBridge.DefaultTimeoutMs;
-
-    /// <summary>日志（超时 WARN / 未观察告警；透传 <see cref="AsyncOperation"/> 泄漏绊线）。默认 null 静默。</summary>
-    public ILogger? Logger { get; init; }
-}
-
-/// <summary>
 /// 同步-异步桥（docs/sync-async-bridge.md §6）——"写路径必须同步转异步"的统一出口。
 /// <para>★ <see cref="Start"/>：在独立池上发起异步工作，<b>立即</b>返回 <see cref="AsyncOperation"/> 状态句柄
 ///   （返回时状态已同步置 Running——可见性原则）。调用方继续本地逻辑，最后时刻才 <c>Wait</c>（"Start 早、Wait 晚"）。</para>
@@ -46,7 +21,7 @@ public static class SyncAsyncBridge
     public const int DefaultTimeoutMs = 15_000;
 
     // === 桥默认独立池（进程级 well-known，惰性创建，不 Dispose——进程意图资源，对齐 IsolatedTaskScheduler.Shared）===
-    private static readonly Lazy<IsolatedTaskScheduler> s_defaultScheduler = new(
+    private static readonly Lazy<IsolatedTaskScheduler> SDefaultScheduler = new(
         static () => new IsolatedTaskScheduler(
             new IsolatedSchedulerOptions
             {
@@ -58,20 +33,21 @@ public static class SyncAsyncBridge
         LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>桥默认独立池（M = Clamp(ProcessorCount,2,4) 私有线程，watchdog 开）。</summary>
-    public static IsolatedTaskScheduler DefaultScheduler => s_defaultScheduler.Value;
+    public static IsolatedTaskScheduler DefaultScheduler => SDefaultScheduler.Value;
 
     // === 再入防护：桥 work 执行期间携带"当前池"，嵌套 Start 同池 → 快速失败 ===
-    private static readonly AsyncLocal<TaskScheduler?> s_currentBridgeScheduler = new();
+    private static readonly AsyncLocal<TaskScheduler?> SCurrentBridgeScheduler = new();
 
     /// <summary>
     /// 在独立池上发起异步工作，立即返回状态句柄。
-    /// <para>★ 可见性原则：返回时 <see cref="AsyncOperation.Status"/> 必为 Running——"已受理"不依赖被调度。</para>
+    /// <para>★ 可见性原则：返回时 <see cref="AsyncOperationBase.Status"/> 必为 Running——"已受理"不依赖被调度。</para>
     /// <para>★ 高级形态（"Start 早、Wait 晚"）：发起后继续本地逻辑，最后时刻才 Wait。常规同步桥接直接用 <see cref="Run"/>。</para>
     /// <para>⚠️ 有界队列满时 <c>StartNew</c> 阻塞入队线程（生产者背压，防御性有界——docs/sync-async-bridge.md §6.2）。</para>
     /// </summary>
     /// <param name="work">异步工作体（协作式契约：await 让出、不阻塞、不再入同池同步等待）。</param>
     /// <param name="options">桥选项（null = 全默认）。</param>
     /// <param name="cancellationToken">传给 work 的取消令牌（取消由 work 协作响应）。</param>
+    /// <returns>状态句柄（可 Wait / Cancel / Describe / LeakDetect）。</returns>
     public static AsyncOperation Start(Func<CancellationToken, ValueTask> work,
         SyncBridgeOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -81,7 +57,7 @@ public static class SyncAsyncBridge
 
         // ★ 再入防护：当前线程正在本池跑桥 work（AsyncLocal 随 await 流动）又同步等本池新操作 = 池自锁。
         //   分池（注入不同 Scheduler）豁免；跨池嵌套须 DAG 无环（契约，见类注释）。
-        if (s_currentBridgeScheduler.Value is { } ambient && ReferenceEquals(ambient, scheduler))
+        if (SCurrentBridgeScheduler.Value is { } ambient && ReferenceEquals(ambient, scheduler))
             throw new InvalidOperationException(
                 $"桥工作体内禁止再经同一桥池同步等待（'{name}' 再入 {ambient.GetType().Name}）——注入独立 Scheduler 分池，或改为纯异步等待");
 
@@ -93,7 +69,7 @@ public static class SyncAsyncBridge
         // ★ await 的 continuation 回流桥池私有线程（TaskScheduler.Current 捕获）——不经公共池。
         _ = Task.Factory.StartNew(async () =>
         {
-            s_currentBridgeScheduler.Value = scheduler;   // 随 work 的 await 流动（再入检测的判据）
+            SCurrentBridgeScheduler.Value = scheduler;   // 随 work 的 await 流动（再入检测的判据）
             try
             {
                 await work(cancellationToken).ConfigureAwait(false);
@@ -114,9 +90,13 @@ public static class SyncAsyncBridge
 
     /// <summary>
     /// 一次性同步桥接：发起 + 有界等待 + 失败重抛。
-    /// <para>★ 超时抛 <see cref="TimeoutException"/>（含 <see cref="AsyncOperation.Describe"/> 现场 + WARN 日志）——
+    /// <para>★ 超时抛 <see cref="TimeoutException"/>（含 <see cref="AsyncOperationBase.Describe"/> 现场 + WARN 日志）——
     ///   同步 API 有界纪律的机器强制。</para>
     /// </summary>
+    /// <param name="work">异步工作体（协作式契约：await 让出、不阻塞、不再入同池同步等待）。</param>
+    /// <param name="options">桥选项（null = 全默认）。</param>
+    /// <param name="cancellationToken">传给 work 的取消令牌（取消由 work 协作响应）。</param>
+    /// <remarks>★ 便捷入口：替代裸 <c>GetAwaiter().GetResult()</c>，对齐 docs/sync-async-bridge.md §6.1。</remarks>
     public static void Run(Func<CancellationToken, ValueTask> work,
         SyncBridgeOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -126,6 +106,11 @@ public static class SyncAsyncBridge
 
     /// <summary>带返回值的一次性同步桥接（结果经闭包槽传递：ReportSucceeded 前写入，
     /// Wait 返回 true 后读取——CAS/事件全屏障保证可见性）。</summary>
+    /// <typeparam name="T">返回值类型。</typeparam>
+    /// <param name="work">异步工作体（协作式契约 ：await 让出、不阻塞、不再入同池同步等待）。</param>
+    /// <param name="options">桥选项（null = 全默认）。</param>
+    /// <param name="cancellationToken">传给 work 的取消令牌（取消由 work 协作响应）。</param>
+    /// <returns>work 的返回值（同步可见）。</returns>
     public static T Run<T>(Func<CancellationToken, ValueTask<T>> work,
         SyncBridgeOptions? options = null, CancellationToken cancellationToken = default)
     {
@@ -139,6 +124,10 @@ public static class SyncAsyncBridge
     }
 
     /// <summary>有界等待 + 超时现场（超时 = 诊断入口：WARN + TimeoutException）。</summary>
+    /// <param name="op">状态句柄。</param>
+    /// <param name="options">桥选项（null = 全默认）。</param>
+    /// <param name="cancellationToken">传给 Wait 的取消令牌（取消 由调用方协作响应）。</param>
+    /// <remarks>★ Wait 失败 = 超时（WARN + TimeoutException）——同步 API 不允许无限期阻塞。</remarks>
     private static void WaitBounded(AsyncOperation op, SyncBridgeOptions? options, CancellationToken cancellationToken)
     {
         var timeoutMs = options?.TimeoutMs ?? DefaultTimeoutMs;

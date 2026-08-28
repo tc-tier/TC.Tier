@@ -27,7 +27,7 @@ internal struct AsyncPriorityQueueV3Slot
 /// <summary>
 /// ★ 实验版本（Route C 依赖追踪式回收版）——**不可用于生产**：仅保留作设计档案与对照实验；
 ///   生产一律用 <see cref="AsyncPriorityQueue{T}"/>（Route A 基线）。测试默认 Skip，不入基准。
-/// AsyncPriorityQueue <b>Route C 依赖追踪式回收版——非移动内存 + 槽位寻址 + generation +
+/// AsyncPriorityQueue <b>Route C 依赖追踪式回收版——非移动内存 + 槽位寻址 + generation +</b>
 /// 16B 边对（gen-in-flags）+ <b>入边计数回收判据</b> + epoch 静默 + 零分配。
 /// <para>★ B'（V2）的残余竞态（"一代陈旧引用"）在此由两个机制级封口消除：</para>
 /// <list type="bullet">

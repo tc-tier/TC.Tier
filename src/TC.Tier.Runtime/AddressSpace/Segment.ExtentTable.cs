@@ -848,8 +848,11 @@ public sealed partial class Segment
         /// <summary>区间总数。</summary>
         public readonly int Count => _list.Count;
 
+        /// <summary>前进到下一个区间记录。</summary>
+        /// <returns>true = 已推进（<see cref="Current"/> 可用）；false = 遍历结束。</returns>
         public bool MoveNext() => ++_index < _list.Count;
 
+        /// <summary>释放遍历器——退出区间锁（遍历期间写者阻塞）。</summary>
         public void Dispose() => _lock.Dispose(); // 释放 Monitor
     }
 }

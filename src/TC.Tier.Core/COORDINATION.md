@@ -17,7 +17,7 @@
 > - [`docs/cache-and-compute.md`](docs/cache-and-compute.md) —— 缓存/弱引用字典/CRC/计时/位运算/异常（`ClockCache`/`ShardLockWeakReference`/`UnifiedCrc`/`MicroTimer`/`Utility`/`ThrowHelper`）
 > - [`docs/native-interop.md`](docs/native-interop.md) —— 原生 syscall facade（`DiskNative`/`FileNative`/`MemoryNative`，IO/预分配/打洞/刷盘/内存锁；★ Core.IO 的内部实现底座，**不对外**——能力已由 Core.IO 全部封口）
 > - [`docs/io.md`](docs/io.md) —— 文件 IO 原语层（`IFileSystem`/`IFileHandle`/`FileHandlePool`/`MemoryFileSystem`/`FaultInjectingFileSystem`，两平面×四介质×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）
-> - [`docs/virtual-file-system.md`](docs/virtual-file-system.md) —— **第四介质 Raw**（`RawFileSystem`：`.raw` 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 [docs/perf/io-performance.md](docs/perf/io-performance.md) §8）
+> - [`docs/virtual-file-system.md`](docs/virtual-file-system.md) —— **第四介质 TierVolume**（`TierVolumeFs`：`.tier` 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 [docs/perf/io-performance.md](docs/perf/io-performance.md) §8）
 > - [`../TC.Tier.Core.IO.S3/COORDINATION.md`](../TC.Tier.Core.IO.S3/COORDINATION.md) —— S3 兼容对象存储客户端层（`S3ObjectStore`：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；使用指南 [`../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md`](../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md)）
 > - [`docs/observability.md`](docs/observability.md) —— 可观测（`ObservabilityHub`/`IMetricsSink`/`ITracer`：视图全景/采样/零开销契约/测试场景）
 > - [`docs/logging.md`](docs/logging.md) —— 日志（`ILogger`/`LoggerExtensions`：重载矩阵/热路径规则/与 Hub 的边界）

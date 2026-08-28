@@ -24,6 +24,9 @@ public abstract partial class SnapshotBase : LifecycleBase<SnapshotRecoveryHints
     /// <summary>Managed 模式的 meta 引擎（构造期 Create；启动在 OnInitializeBegin，就绪等待在恢复核心）。</summary>
     private readonly StorageEngine? _metaEngine;
 
+    /// <summary>meta 引擎访问器（Managed 模式——派生结构恢复核心 join 用）。</summary>
+    private protected StorageEngine? MetaEngine => _metaEngine;
+
     /// <summary>流式帧 codec（Header + Payload + Footer）。</summary>
     private protected readonly ISnapshotCodec _codec;
 
@@ -50,8 +53,8 @@ public abstract partial class SnapshotBase : LifecycleBase<SnapshotRecoveryHints
 
     // === 2PC ===
     private protected long _lastCommittedSeq = -1;
-    private long _lastPreparedSeq = -1;
-    private long _lastAbortedSeq = -1;
+    private protected long _lastPreparedSeq = -1;
+    private protected long _lastAbortedSeq = -1;
     private readonly SortedList<long, List<Action>> _txCallbacks = new();
     private readonly object _txCallbackLock = new();
 

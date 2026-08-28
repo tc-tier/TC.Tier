@@ -18,8 +18,13 @@ public sealed class CompactLease : IDisposable
     private int _chunkCount;   // ★ _chunks 实际有效长度（ArrayPool 租的数组可能 > chunkCount）
     private int _state = (int)LeaseState.Active;
 
+    /// <summary>Compact 区间起始逻辑地址（包含）。</summary>
     public LogicalAddress Start { get; private set; }
+
+    /// <summary>Compact 区间结束逻辑地址（不包含）。</summary>
     public LogicalAddress End { get; private set; }
+
+    /// <summary>lease 状态（Active / Committed / RolledBack——原子读）。</summary>
     public LeaseState State => (LeaseState)Volatile.Read(ref _state);
 
     /// <summary>
@@ -102,6 +107,11 @@ public sealed class CompactLease : IDisposable
         }
     }
 
+    /// <summary>
+    /// 整体原子提交（不支持 chunk 分阶段提交）——先校验全部 chunk 已填终态（半填拒绝提交），
+    /// CAS 进 Committed 后先 CompactCommit（原位换内脏，锁内清场）再释放区间所有权。
+    /// </summary>
+    /// <exception cref="InvalidOperationException">任一 chunk 仍 Pending（漏填 SetReplacement/MarkInvalid）。</exception>
     public void Commit()
     {
         // ★ 完整性绊线（设计文档 §5.2）：任何 chunk 仍 Pending（漏填 SetReplacement/MarkInvalid）→
@@ -145,6 +155,7 @@ public sealed class CompactLease : IDisposable
         ReleaseChunks();
     }
 
+    /// <summary>整体回滚——CAS 进 RolledBack 后逐一回滚 extent、通知源 CompactRollback、释放数组。</summary>
     public void Rollback()
     {
         if (Interlocked.CompareExchange(ref _state, (int)LeaseState.RolledBack, (int)LeaseState.Active) !=
@@ -182,6 +193,7 @@ public sealed class CompactLease : IDisposable
         _chunkCount = 0;   // ★ 重置有效长度
     }
 
+    /// <summary>释放——仍 Active 的 lease 自动走 Rollback（未提交的占住区间回滚）。</summary>
     public void Dispose()
     {
         if (Volatile.Read(ref _state) != (int)LeaseState.Active) return;

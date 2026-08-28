@@ -19,24 +19,31 @@ public sealed partial class ObservabilityHub
     // === 视图 ===
 
     /// <summary>三原语公共视图（Counter/Histogram/Gauge + IsEnabled 短路）。</summary>
+    /// <remarks>★ MetricsView 仅封装三原语，所有维度视图都依赖它（避免重复短路）。</remarks>
     public MetricsView Metrics { get; }
 
     /// <summary>Storage Engine IO 维度视图（Read/Write/Flush/Compact/Reclaim/Throttle）。</summary>
+    /// <remarks>★ StorageView 仅封装 Storage Engine IO 相关指标，避免与 Log/Index/SegmentAllocator 指标混杂。</remarks>
     public StorageView Storage { get; }
 
     /// <summary>Log 结构维度视图（Append/Commit/Truncate/Recover）。</summary>
+    /// <remarks>★ LogView 仅封装 Log 相关指标，避免与 Storage/Index/SegmentAllocator 指标混杂。</remarks>
     public LogView Log { get; }
 
     /// <summary>Index 结构维度视图（Find/Insert/Upsert/Delete/Scan）。</summary>
+    /// <remarks>★ IndexView 仅封装 Index 相关指标，避免与 Storage/Log/SegmentAllocator 指标混杂。</remarks>
     public IndexView Index { get; }
 
     /// <summary>Segment 分配器维度视图（段表的 Segment 分配/释放/FreeList——段表专用，非通用 Allocator）。</summary>
+    /// <remarks>★ SegmentAllocatorView 仅封装段表的 Segment 分配器相关指标，避免与 Storage/Log/Index 指标混杂。</remarks>
     public SegmentAllocatorView SegmentAllocator { get; }
 
     /// <summary>指标总开关（Options.Metrics.Enabled &amp;&amp; sink.IsEnabled）。</summary>
+    /// <remarks>★ MetricsEnabled 仅封装总开关，避免各维度视图重复短路。</remarks>
     public bool MetricsEnabled { get; }
 
     /// <summary>链路追踪总开关（Options.Tracing.Enabled &amp;&amp; tracer.IsEnabled）。</summary>
+    /// <remarks>★ TracingEnabled 仅封装总开关，避免各 Span 重复短路。</remarks>
     public bool TracingEnabled => _options.Tracing.Enabled && _tracer.IsEnabled;
 
     private ObservabilityHub(IMetricsSink metrics, ITracer tracer, ObservabilityOptions options)

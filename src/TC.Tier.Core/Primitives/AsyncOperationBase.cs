@@ -39,6 +39,7 @@ public abstract class AsyncOperationBase : IAsyncOperation
     // === 状态（int 压缩：AsyncOperationStatus；0=Running 初始，无需 Interlocked 初始化）===
     private int _state;
     private Exception? _exception;      // 终态异常——置态前写（volatile 序保证观察者见终态即可见异常）
+    /// <summary>成功载荷（泛型变体结果）——锁内置终态前写，与终态原子发布（仅供子类 <see cref="ReportSucceededWithPayload"/> 注入）。</summary>
     protected object? _succeededPayload;  // 成功载荷（泛型变体结果）——锁内置态前写（与终态原子发布）
     private int _observed;              // 消费侧观察标志（Wait/WaitAsync/ThrowIfFailed/Exception/Result 读）
     private readonly AsyncManualResetEvent _completed = new();   // 完成信号（默认线程池异步调度——Set 调用点不持锁）

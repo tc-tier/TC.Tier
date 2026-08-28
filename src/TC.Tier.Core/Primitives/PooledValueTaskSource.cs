@@ -33,6 +33,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     /// （正常/异常路径都调）。静态委托 + 租用者已有对象做 state，零分配。
     /// </summary>
     public object? CleanupState;
+    /// <summary>清理回调（与 <see cref="CleanupState"/> 配对：GetResult 完成态时以 <c>(CleanupState, this)</c> 调用一次后清空）。</summary>
     public Action<object?, PooledValueTaskSource>? OnCleanup;
 
     // ★ 单次完成守卫（竞态修复）：0=武装（租出待完成）；1=已完成；2=已归还池。

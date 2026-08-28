@@ -3,51 +3,6 @@ using System.IO.Hashing;
 
 namespace TC.Tier.Core.IO.Image;
 
-/// <summary>采集流的逐帧压缩编码（流头 flags 低 2 位——brotli/zstd 预留，设计 §5.1/§10）。</summary>
-public enum ImageCompression : byte
-{
-    /// <summary>不压缩（配合文件→文件零拷贝场景——CopyRange/reflink 快道，设计 §6.3）。</summary>
-    None = 0,
-
-    /// <summary>BCL ZLib（逐帧独立——坏一帧不毁全卷）。</summary>
-    ZLib = 1,
-
-    /// <summary>zstd 原生（RM-13——NativeInterop/ZstdCodec；逐帧独立）。运行库缺失环境
-    /// <see cref="ImageOptions.Validate"/> 显式拒绝（诚实降级——不静默回退）。</summary>
-    Zstd = 2,
-}
-
-/// <summary>采集/还原选项。</summary>
-public sealed record ImageOptions
-{
-    /// <summary>逐帧压缩编码（默认 ZLib）。</summary>
-    public ImageCompression Compression { get; init; } = ImageCompression.ZLib;
-
-    /// <summary>数据帧上限（字节，默认 1 MiB——帧间独立校验/续传粒度）。</summary>
-    public int FrameBytes { get; init; } = 1 << 20;
-
-    /// <summary>
-    /// 采集前静默源根空间（默认 true）：源置位 <see cref="FileSystemCapabilities.MaintenanceGate"/> 时
-    /// 经 <see cref="IFileSystem.EnterMaintenance"/> 包夹采集全程（WriteOperations 档——读继续放行）。
-    /// 业务在途收敛仍是消费者契约（设计 §5.5/§8.2）。
-    /// </summary>
-    public bool QuietSource { get; init; } = true;
-
-    /// <summary>还原端逐条目 CRC 校验（默认 true；关闭换吞吐——慎用）。</summary>
-    public bool VerifyChecksums { get; init; } = true;
-
-    internal void Validate()
-    {
-        if (FrameBytes is < 512 or > (1 << 26))
-            throw new ArgumentException($"FrameBytes 必须在 [512, 64MiB]：{FrameBytes}");
-        if (Compression == ImageCompression.Zstd && !NativeInterop.ZstdCodec.IsAvailable)
-            throw new ArgumentException("本机 zstd 运行库不可用（libzstd）——Zstd 编码显式拒绝（诚实降级）",
-                nameof(Compression));
-    }
-}
-
-/// <summary>采集/还原结果摘要（进度/审计）。</summary>
-public sealed record ImageSummary(long EntryCount, long FrameCount, long RawBytes);
 
 /// <summary>
 /// TCA1 流式传送格式（raw-medium-and-conversion-design §5.1）——采集器与还原器共用的二进制编解码。
@@ -65,12 +20,15 @@ public sealed record ImageSummary(long EntryCount, long FrameCount, long RawByte
 /// </summary>
 internal static class ImageFormat
 {
-    internal static ReadOnlySpan<byte> Magic => "TCA1"u8;
+    private static ReadOnlySpan<byte> Magic => "TCA1"u8;
+    /// <summary>
+    /// 流尾魔数（尾 CRC 聚合的对账基准——帧序列 CRC 聚合，设计 §5.1/§5.3）。
+    /// </summary>
     internal static ReadOnlySpan<byte> FooterMagic => "TCE1"u8;
-    internal const ushort Version = 1;
+    private const ushort Version = 1;
 
     // 区间 flags
-    internal const byte RangeUnwritten = 0x01;   // §5.2 unwritten 保真（Raw 载体启用——virtual 介质 unwritten extent 保真；local/memory 恒 0）
+    internal const byte RangeUnwritten = 0x01;   // §5.2 unwritten 保真（TierVolume 载体启用——virtual 介质 unwritten extent 保真；local/memory 恒 0）
 
     /// <summary>写流头 + 清单（采集第一阶段——枚举 + Stat + FileExtra + 区间表）。</summary>
     internal static void WriteManifest(BinaryWriter w, ImageOptions options,
@@ -102,6 +60,9 @@ internal static class ImageFormat
     }
 
     /// <summary>读流头 + 清单（还原第一阶段；magic/版本/CRC 违约即拒——未知保留值拒开同族，§3.9）。</summary>
+    /// <exception cref="FileIOException">流头/清单格式违约（magic/版本/flags/长度/CRC）</exception>
+    /// <param name="r">流头 + 清单的二进制读取器</param>
+    /// <returns>流头压缩编码 + 清单条目列表</returns>
     internal static (ImageCompression Compression, List<ManifestEntry> Entries) ReadManifest(BinaryReader r)
     {
         if (!r.ReadBytes(4).AsSpan().SequenceEqual(Magic))
@@ -143,6 +104,12 @@ internal static class ImageFormat
     }
 
     /// <summary>写单个数据帧（压缩 + CRC；返回本帧原始字节数与帧 CRC 供聚合）。</summary>
+    /// <param name="w">二进制写入器</param>
+    /// <param name="entryIdx">清单条目索引（帧所属条目）</param>
+    /// <param name="offset">帧在条目中的偏移量</param>
+    /// <param name="raw">原始数据</param>
+    /// <param name="codec">压缩编码</param>
+    /// <returns>(Offset, RawLen, FrameCrc)</returns>
     internal static (long Offset, int RawLen, uint FrameCrc) WriteFrame(BinaryWriter w, uint entryIdx,
         long offset, ReadOnlySpan<byte> raw, ImageCompression codec)
     {
@@ -186,6 +153,9 @@ internal static class ImageFormat
     }
 
     /// <summary>读单个数据帧（解压 + 校验）；返回 (entryIdx, offset, rawPayload)。</summary>
+    /// <param name="r">二进制读取器</param>
+    /// <param name="verify">是否校验 CRC（还原端可选关闭 吞吐）</param>
+    /// <returns>(EntryIdx, Offset, RawPayload)</returns>
     internal static (uint EntryIdx, long Offset, byte[] Raw) ReadFrame(BinaryReader r, bool verify)
     {
         var entryIdx = r.ReadUInt32();
@@ -197,6 +167,9 @@ internal static class ImageFormat
     /// 帧体读取（entryIdx 已由调用方读走——纯流式探测路径复用，D5：
     /// 非可寻址流先探 4 字节判帧/尾，尾 magic 不匹配时按帧体续读）。
     /// </summary>
+    /// <param name="r">二进制读取器</param>
+    /// <param name="verify">是否校验 CRC（还原端可选关闭 吞吐）</param>
+    /// <returns>(Offset, RawPayload)</returns>
     internal static (long Offset, byte[] Raw) ReadFrameCore(BinaryReader r, bool verify)
     {
         var offset = r.ReadInt64();
@@ -236,6 +209,10 @@ internal static class ImageFormat
     }
 
     /// <summary>写流尾（帧数/原始字节/帧 CRC 聚合）。</summary>
+    /// <param name="w">二进制写入器</param>
+    /// <param name="frameCount">帧数</param>
+    /// <param name="rawBytes">原始字节数</param>
+    /// <param name="framesCrc">帧 CRC 聚合</param>
     internal static void WriteFooter(BinaryWriter w, long frameCount, long rawBytes, uint framesCrc)
     {
         w.Write(FooterMagic);
@@ -245,6 +222,10 @@ internal static class ImageFormat
     }
 
     /// <summary>读流尾并全量对账（帧数/字节数/聚合 CRC——不符即拒）。</summary>
+    /// <param name="r">二进制读取器</param>
+    /// <param name="frameCount">帧数</param>
+    /// <param name="rawBytes">原始字节数</param>
+    /// <param name="framesCrc">帧 CRC 聚合</param>
     internal static void ReadFooterAndVerify(BinaryReader r, long frameCount, long rawBytes, uint framesCrc)
     {
         if (!r.ReadBytes(4).AsSpan().SequenceEqual(FooterMagic))
@@ -253,6 +234,10 @@ internal static class ImageFormat
     }
 
     /// <summary>流尾字段对账（magic 已由调用方读走——纯流式探测路径复用，D5）。</summary>
+    /// <param name="r">二进制读取器</param>
+    /// <param name="frameCount">帧数</param>
+    /// <param name="rawBytes">原始字节数</param>
+    /// <param name="framesCrc">帧 CRC 聚合</param>
     internal static void ReadFooterFieldsAndVerify(BinaryReader r, long frameCount, long rawBytes, uint framesCrc)
     {
         var fc = r.ReadInt64();
@@ -264,6 +249,8 @@ internal static class ImageFormat
     }
 
     /// <summary>帧 CRC 聚合（帧 CRC 序列的滚动 CRC-32——尾对账基准；增量实现，与库的一次散列独立）。</summary>
+    /// <param name="current">当前聚合 CRC（初始 0）</param>
+    /// <param name="frameCrc">单帧 CRC</param>
     internal static uint AggregateCrc(uint current, uint frameCrc)
     {
         Span<byte> b = stackalloc byte[4];
@@ -271,14 +258,20 @@ internal static class ImageFormat
         return Crc32Incremental(current, b);
     }
 
-    private static readonly uint[] s_crcTable = BuildCrcTable();
+    /// <summary>
+    /// CRC-32 查表（标准反射多项式 0xEDB88320——System.IO.Hashing 8.x 无静态 Update，自持增量）。
+    /// </summary>
+    private static readonly uint[] SCrcTable = BuildCrcTable();
 
     /// <summary>增量 CRC-32（标准反射多项式 0xEDB88320——System.IO.Hashing 8.x 无静态 Update，自持增量）。</summary>
+    /// <param name="crc">当前 CRC（初始 0）</param>
+    /// <param name="data">增量数据</param>
+    /// <returns>增量后的 CRC</returns>
     private static uint Crc32Incremental(uint crc, ReadOnlySpan<byte> data)
     {
         crc = ~crc;
         foreach (var b in data)
-            crc = s_crcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
+            crc = SCrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
         return ~crc;
     }
 
@@ -295,10 +288,22 @@ internal static class ImageFormat
         return table;
     }
 
+    /// <summary>
+    /// 格式错误异常（流头/清单/帧/尾违约——magic/版本/flags/长度/CRC）。
+    /// </summary>
+    /// <param name="path">文件路径</param>
+    /// <param name="message">错误信息</param>
+    /// <returns>文件 I/O 异常</returns>
     internal static FileIOException NewFormatError(string? path, string message)
         => new(IOError.IOFailure, $"TCA1 格式错误：{message}", path, "Image");
 
     /// <summary>清单条目（采集端从接口平面物化；还原端按此重建）。</summary>
+    /// <param name="Path">条目路径（相对根目录，UTF-8）</param>
+    /// <param name="Type">条目类型（文件/目录/符号链接/特殊文件）</param>
+    /// <param name="LogicalLength">条目逻辑长度（文件/符号链接/特殊文件）</param>
+    /// <param name="Extra">条目额外信息（文件/符号链接/特殊文件）</param>
+    /// <param name="ModifiedTicks">条目修改时间（审计，文件/符号链接/特殊文件）</param>
+    /// <param name="Ranges">条目稀疏区间（文件）</param>
     internal sealed record ManifestEntry(
         string Path,
         FsEntryType Type,

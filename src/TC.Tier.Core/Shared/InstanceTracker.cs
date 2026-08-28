@@ -29,6 +29,7 @@ internal static class InstanceTracker
     /// <summary>注册实例（构造器调）。返回跟踪 Id。</summary>
     /// <param name="instance">要跟踪的实例。</param>
     /// <param name="typeName">类型名（诊断用）。</param>
+    /// <returns>跟踪 Id（可用于诊断日志/告警）。</returns>
     internal static Guid Register(object instance, string typeName)
     {
         ArgumentNullException.ThrowIfNull(instance);
@@ -38,6 +39,8 @@ internal static class InstanceTracker
     }
 
     /// <summary>注销实例（Dispose 调）——标记正常释放。返回是否注销成功（未注册返回 false）。</summary>
+    /// <param name="instance">要注销的实例。</param>
+    /// <returns>是否注销成功（未注册返回 false）。</returns>
     internal static bool Unregister(object instance)
     {
         ArgumentNullException.ThrowIfNull(instance);
@@ -49,6 +52,7 @@ internal static class InstanceTracker
 
     /// <summary>获取当前所有存活（未 GC）的跟踪实例快照（对齐 GetActiveLeases）。</summary>
     /// <param name="typeFilter">可选类型名过滤（子串匹配，null = 全部）。</param>
+    /// <returns>当前所有存活的跟踪实例快照。</returns>
     /// <remarks>★ ConditionalWeakTable 不支持直接枚举（无原子快照），用 ForEach 兜底——
     ///   枚举期间实例可能被 GC（条目消失），返回的是尽力而为快照（诊断场景可接受）。
     ///   State 字段不填（实时状态走实例自身属性，跟踪器不持有捕获实例的委托——防强引用泄漏）。</remarks>

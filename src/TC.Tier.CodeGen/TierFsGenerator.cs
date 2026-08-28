@@ -91,6 +91,12 @@ public sealed class TierFsGenerator : IIncrementalGenerator
             ["Members"] = ("Member(string path)", "_spec = _spec with { Members = _spec.Members.Append(path).ToArray() };"),
         }.ToImmutableDictionary(System.StringComparer.Ordinal);
 
+    /// <summary>
+    /// 注册生成管道：<c>[MediumOptions]</c> 标注 → 类型化重载族（TierFsTypedOverloads.g.cs）；
+    /// 带 <c>[assembly: TierProtocolExported]</c> 的引用程序集 → 外部协议注册桥
+    /// （消费方程序集加载即注册，零反射）；本性/动词未知报 TCSG010/TCSG011。
+    /// </summary>
+    /// <param name="context">增量生成器初始化上下文。</param>
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
         // ★ 外部协议注册桥（设计决策——源生成器解决，零反射）：
@@ -262,6 +268,8 @@ public sealed class TierFsGenerator : IIncrementalGenerator
                 sb.AppendLine($"    internal {className}(TierSpec spec) => _spec = spec;");
                 foreach (var (sig, body) in methods)
                 {
+                    var methodName = sig.Split('(')[0].Trim();
+                    sb.AppendLine($"    /// <summary>{methodName}——spec 属性链式设置（[SpecParam] 派生；返回本构造器）。</summary>");
                     sb.AppendLine($"    public {className} {sig}");
                     sb.AppendLine($"    {{");
                     sb.AppendLine($"        {body}");

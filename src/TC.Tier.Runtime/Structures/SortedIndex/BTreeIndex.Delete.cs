@@ -2,6 +2,9 @@ namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>删除条目——叶根直接移除；internal 树沿 Find 同路径下降到含 key 叶子移除（epoch 读保护内；本轮不重平衡）。</summary>
+    /// <param name="key">条目键。</param>
+    /// <returns>true = 真删到；false = 不存在。</returns>
     public override bool Delete(TKey key)
     {
         _epoch.Resume();

@@ -19,11 +19,17 @@ public struct RingMetaPayload
 {
     /// <summary>6 LogicalAddress(16B each) + LastCommittedSeq(8B) + LastPreparedSeq(8B) + OverflowTailAddress(16B) + KeySize(4B) = 132B。</summary>
     private const int PayloadSize = 132;
+    /// <summary>数据区起点（FieldOffset 0）——恢复锚点（GetDistance 原点，内存水位从它重建）。</summary>
     [FieldOffset(0)]   public LogicalAddress BeginAddress;
+    /// <summary>落盘边界水位（FieldOffset 16）——此地址前的数据已写引擎，恢复可信数据上限。</summary>
     [FieldOffset(16)]  public LogicalAddress FlushedUntilAddress;
+    /// <summary>安全只读水位（FieldOffset 32）——epoch 保护下的 readonly 区推进目标。</summary>
     [FieldOffset(32)]  public LogicalAddress SafeReadOnlyAddress;
+    /// <summary>只读水位（FieldOffset 48）——此地址前页面冻结，等待 flush 后驱逐。</summary>
     [FieldOffset(48)]  public LogicalAddress ReadOnlyAddress;
+    /// <summary>写游标（FieldOffset 64）——下一条 record 的分配地址。</summary>
     [FieldOffset(64)]  public LogicalAddress TailAddress;
+    /// <summary>最近一次已确认提交（ConfirmCommitted）的 seq（FieldOffset 80）。-1 = 未参与事务。</summary>
     [FieldOffset(80)]  public long LastCommittedSeq;
     /// <summary>最近一次 Prepare 的 seq。恢复时判定悬空事务用。-1 = 从未 Prepare。</summary>
     [FieldOffset(88)]  public long LastPreparedSeq;

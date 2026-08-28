@@ -32,7 +32,6 @@ public abstract partial class RingBase<TKey>
     /// <summary>
     /// ★ 同步更新 meta 缓存（水位 + payload）并 Commit 落盘。
     /// </summary>
-    /// <param name="payload">opaque payload（可选，≤策略 PayloadCapacity）。默认空。</param>
     /// <param name="flushedUntilOverride">覆盖 FlushedUntilAddress 水位（&lt;0 表示不覆盖，用当前值）。
     ///   ★ Transport 策略回落 MetaHost（宿主流嵌入）时的 1-fsync Prepare 优化用：先记 dataTail 再随数据同页 flush，
     ///   避免 Managed 那种"先 flush 再记水位"的 2 次 fsync。</param>
@@ -68,9 +67,8 @@ public abstract partial class RingBase<TKey>
     /// <summary>
     /// ★ 异步更新 meta 缓冲（水位 + payload）并 CommitAsync 落盘。
     /// </summary>
-    /// <param name="payload">opaque payload（可选，≤策略 PayloadCapacity）。默认空。</param>
-    /// <param name="ct">取消令牌。</param>
     /// <param name="flushedUntilOverride">覆盖 FlushedUntilAddress 水位（&lt;0 表示不覆盖）。见 <see cref="WriteMeta"/>。</param>
+    /// <param name="ct">取消令牌。</param>
     private async ValueTask WriteMetaAsync(LogicalAddress flushedUntilOverride = default, CancellationToken ct = default)
     {
         MetaPolicy.WriteHeader(BuildMetaHeader());
@@ -105,28 +103,60 @@ public abstract partial class RingBase<TKey>
     };
 
 
+    /// <summary>
+    /// Ring meta 块布局实现（<see cref="IMetaLayout{RingMetaHeader,RingMetaPayload}"/> 规范实现）——
+    /// Header 12B 规范字段 + Payload（结构化水位 + opaque 插槽）大小自述，codec 委托
+    /// RingMetaHeaderCodec/RingMetaPayloadCodec；读旧块短 payload 时零扩展降级。
+    /// </summary>
     protected sealed class MetaLayout: IMetaLayout<RingMetaHeader,RingMetaPayload>
     {
+        /// <summary>构造布局——按 settings.MetaOpaqueBytes 定 PayloadOpaqueSize（随水位原子携带的外部 opaque 容量）。</summary>
+        /// <param name="payloadOpaqueSize">opaque 插槽字节数（settings.MetaOpaqueBytes）。</param>
         public MetaLayout(int payloadOpaqueSize)
         {
             PayloadOpaqueSize = payloadOpaqueSize;
         }
+
+        /// <summary>规范 header 字节大小（RingMetaHeaderCodec 定长 12B）。</summary>
         public int HeaderSize => RingMetaHeaderCodec.StructSize;
+
+        /// <summary>结构化 payload 字节大小（RingMetaPayloadCodec 定长 + opaque 插槽）。</summary>
         public int PayloadSize => RingMetaPayloadCodec.StructSize + PayloadOpaqueSize;
+
+        /// <summary>opaque 插槽字节大小（构造注入，≤ 策略 PayloadCapacity 的扩展区）。</summary>
         public int PayloadOpaqueSize { get; }
+
+        /// <summary>Magic 常量（块身份校验）。</summary>
         public uint Magic => RingMetaHeader.Magic;
+
+        /// <summary>当前版本号。</summary>
         public ushort CurrentVersion => RingMetaHeader.CurrentVersion;
+
+        /// <summary>默认 Flags（含 CRC 模式等）。</summary>
         public ushort DefaultFlags => RingMetaHeader.DefaultFlags;
 
+        /// <summary>序列化 header 到 Span（validate=true 时校验 Magic/Version）。</summary>
+        /// <param name="dst">目标缓冲。</param>
+        /// <param name="header">header 值。</param>
+        /// <param name="validate">是否校验 Magic/Version。</param>
         public void WriteHeader(Span<byte> dst, in RingMetaHeader header, bool validate)
             => RingMetaHeaderCodec.Write(dst, in header, validate);
 
+        /// <summary>从 Span 反序列化 header。</summary>
+        /// <param name="src">源缓冲。</param>
+        /// <returns>解析出的 RingMetaHeader。</returns>
         public RingMetaHeader ReadHeader(ReadOnlySpan<byte> src)
             => RingMetaHeaderCodec.Read(src);
 
+        /// <summary>序列化 payload 到 Span。</summary>
+        /// <param name="dst">目标缓冲。</param>
+        /// <param name="payload">payload 值。</param>
         public void WritePayload(Span<byte> dst, in RingMetaPayload payload)
             => RingMetaPayloadCodec.Write(dst, in payload);
 
+        /// <summary>从 Span 反序列化 payload（旧块短于当前布局时零扩展解读——新字段读默认值，优雅降级不抛）。</summary>
+        /// <param name="src">源缓冲。</param>
+        /// <returns>解析出的 RingMetaPayload。</returns>
         public RingMetaPayload ReadPayload(ReadOnlySpan<byte> src)
         {
             // ★ 旧块容错：盘上 payload 短于当前布局（字段追加前写入的块）→ 零扩展后解读，
@@ -138,15 +168,34 @@ public abstract partial class RingBase<TKey>
         }
 
         // === Header 规范字段访问（泛型策略通过 layout 读写 header 字段）===
+        /// <summary>读 header 的 MagicValue（用于校验）。</summary>
+        /// <param name="header">header 值。</param>
+        /// <returns>MagicValue。</returns>
         public uint GetMagicValue(in RingMetaHeader header) => header.MagicValue;
+
+        /// <summary>读 header 的 Version（用于校验）。</summary>
+        /// <param name="header">header 值。</param>
+        /// <returns>Version。</returns>
         public ushort GetVersion(in RingMetaHeader header) => header.Version;
+
+        /// <summary>读 header 的 PayloadLength（用于计算 opaque 长度）。</summary>
+        /// <param name="header">header 值。</param>
+        /// <returns>PayloadLength。</returns>
         public ushort GetPayloadLength(in RingMetaHeader header) => header.PayloadLength;
+
+        /// <summary>设置 header 的 PayloadLength（WritePayload 后更新）。</summary>
+        /// <param name="header">header 值。</param>
+        /// <param name="payloadLength">新的 payload 长度。</param>
+        /// <returns>更新后的 header 副本。</returns>
         public RingMetaHeader WithPayloadLength(in RingMetaHeader header, ushort payloadLength)
         {
             var h = header;
             h.PayloadLength = payloadLength;
             return h;
         }
+
+        /// <summary>创建填好规范字段（Magic/Version/Flags）的默认 header。</summary>
+        /// <returns>默认 RingMetaHeader。</returns>
         public RingMetaHeader CreateDefaultHeader() => new()
         {
             MagicValue = RingMetaHeader.Magic,
@@ -154,27 +203,43 @@ public abstract partial class RingBase<TKey>
             Flags = RingMetaHeader.DefaultFlags,
         };
     }
+    /// <summary>
+    /// Transport 策略回落的 meta 传输适配器——meta block 嵌入 ring 流：
+    /// 写 = 追加一条 IS_META record 到 ring 流末尾；读 = 倒序扫 ring 流找最后一条有效 IS_META record 的 payload。
+    /// </summary>
+    /// <param name="owner">宿主 Ring——写经 WriteMetaRecord 追加、读倒扫 ring 流页帧。</param>
     protected sealed class MetaHost(RingBase<TKey> owner) : IMetaTransport
     {
 
         /// <summary>最近一次扫描结果（字段持有——ReadLastBlock 返回的视图有效至本传输下一次调用）。</summary>
         private byte[]? _lastBlock;
 
+        /// <summary>读回最后一条 meta block——倒序扫 ring 流取最后一条有效 IS_META record 的 payload。</summary>
+        /// <returns>payload 视图（有效至本传输下一次调用）；null 转空 Span = 从未写入。</returns>
         public ReadOnlySpan<byte> ReadLastBlock()
         {
             _lastBlock = ScanLastBlockCore();
             return _lastBlock;
         }
 
+        /// <summary>异步读回最后一条 meta block（对等同步版 <see cref="ReadLastBlock"/>）。</summary>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>payload 视图（有效至本传输下一次调用）；空 Memory = 从未写入。</returns>
         public async ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct)
         {
             _lastBlock = await ScanLastBlockCoreAsync(ct).ConfigureAwait(false);
             return _lastBlock is null ? default : _lastBlock;
         }
 
+        /// <summary>写完整 meta block——作为 IS_META record 追加到 ring 流末尾（last-write-wins）。</summary>
+        /// <param name="block">完整 meta block（[RingMetaHeader][RingMetaPayload][Crc32Footer]）。</param>
         public void WriteBlock(ReadOnlySpan<byte> block)
             => owner.WriteMetaRecord(block);
 
+        /// <summary>异步写完整 meta block（对等同步版 <see cref="WriteBlock"/>）。</summary>
+        /// <param name="block">完整 meta block。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>表示写完成的 ValueTask。</returns>
         public async ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct)
             => await owner.WriteMetaRecordAsync(block, ct).ConfigureAwait(false);
 

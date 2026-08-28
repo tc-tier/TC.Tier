@@ -43,6 +43,7 @@ internal sealed partial class StorageEngine
     /// </summary>
     /// <param name="owner">存储引擎实例</param>
     /// <param name="logger">日志记录器</param>
+    /// <param name="consumerCount">消费者数——N 个消费者共 drain 同一段生命周期事件队列（counting-semaphore 逐项公平唤醒）。</param>
     private sealed class DefaultEngineWorkerLoop(
         StorageEngine owner,
         ILogger? logger,

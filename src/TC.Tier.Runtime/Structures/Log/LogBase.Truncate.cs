@@ -49,6 +49,13 @@ public abstract partial class LogBase
             _logicalTail = address;
         }
 
+        // ★ 截断完成钩子——EntryLog override 夹 CommittedOffset（截断后 commit 边界不得越过物理尾，
+        //   否则重放越界跳段报 Segment not found——2PC Abort 路径 OnAborted 同款语义）。
+        OnTailTruncated(address);
+
         return true;
     }
+
+    /// <summary>尾截断完成回调（默认空——EntryLog 夹 CommittedOffset 用）。</summary>
+    protected virtual void OnTailTruncated(LogicalAddress rollbackTail) { }
 }

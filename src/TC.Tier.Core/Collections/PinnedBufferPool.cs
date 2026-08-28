@@ -130,6 +130,8 @@ public sealed class PinnedBufferPool : IDisposable
     /// 将 size 向上取整到最近的 2 的幂，并返回其 log2（即桶数组索引）。
     /// 例：1→0, 2→1, 3..4→2, 4096→12, 4097..8192→13。
     /// </summary>
+    /// <param name="size">要取整的大小</param>
+    /// <returns>向上取整到最近的 2 的幂的 log2（桶数组索引）</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int SizeToIndex(int size)
     {
@@ -385,6 +387,7 @@ public sealed class PinnedBufferPool : IDisposable
     }
 
     // ── 批量搬运 Return：本地满时向全局批量溢出 TransferBatch 个 ──
+    /// <summary>归还入桶（onOverflow=null 便捷重载——桶满静默拒绝）。</summary>
     /// <returns><c>true</c> 表示已入桶；<c>false</c> 表示桶已满，调用方需自行处理（如 Dispose）。</returns>
     private bool ReturnToBucket<T>(Bucket<T> bucket, T item) where T : class
         => ReturnToBucket(bucket, item, onOverflow: null);
@@ -499,6 +502,9 @@ public sealed class PinnedBufferPool : IDisposable
             if (b is not null) TrimBucket(b, limit, disposeItem: true);
     }
 
+    /// <summary>
+    /// 释放池：清空全部桶（全局栈 + 所有线程本地栈）释放非托管内存，并释放桶的 ThreadLocal（幂等，线程安全）。
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;

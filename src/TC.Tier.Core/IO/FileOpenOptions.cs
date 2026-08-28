@@ -25,6 +25,7 @@ public sealed record FileOpenOptions
     public long PreallocateSize { get; init; }
 
     /// <summary>组合合法性校验——非法抛 <see cref="ArgumentException"/>（Append 须写权限；写模式须写权限；Append 与 Truncate/CreateNew 互斥由枚举单值天然保证）。</summary>
+    /// <param name="paramName">参数名（默认 "options"）</param>
     public void Validate(string paramName = "options")
     {
         var needsWrite = Mode is FileOpenMode.OpenOrCreate or FileOpenMode.CreateNew

@@ -40,6 +40,7 @@ public abstract partial class LeaseBase
             _index = -1;
         }
 
+        /// <summary>当前 chunk（几何 + 分段 Commit/Rollback 的 <see cref="ChunkScope"/>）。</summary>
         public readonly ChunkScope Current
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -50,6 +51,8 @@ public abstract partial class LeaseBase
             }
         }
 
+        /// <summary>前进到下一个 chunk（过类型化物理门后可用 <see cref="Current"/> 产出）。</summary>
+        /// <returns>true = 已推进到下一个 chunk；false = 遍历结束。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool MoveNext()
         {
@@ -61,9 +64,11 @@ public abstract partial class LeaseBase
             return true;
         }
 
+        /// <summary>提交当前 chunk（doneMask 仲裁——与其他路径 exactly-once）。</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void CommitCurrent() => _lease.OnChunkCommit(_index);
 
+        /// <summary>回滚当前 chunk（doneMask 仲裁——与其他路径 exactly-once）。</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void RollbackCurrent() => _lease.OnChunkRollback(_index);
     }

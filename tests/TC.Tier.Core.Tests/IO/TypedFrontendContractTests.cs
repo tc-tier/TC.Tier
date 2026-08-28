@@ -58,8 +58,8 @@ public sealed class TypedFrontendContractTests : IDisposable
     [Fact]
     public void Dsl_Virtual_DeviceAndMembers()
     {
-        var spec = Specs.Virtual("/data/v.raw").Label("vol").Member("/v2.raw").Member("/v3.raw").ToSpec();
-        spec.Members.Should().Equal("/v2.raw", "/v3.raw");   // 可重复参数（Repeatable）
+        var spec = Specs.Virtual("/data/v.tier").Label("vol").Member("/v2.tier").Member("/v3.tier").ToSpec();
+        spec.Members.Should().Equal("/v2.tier", "/v3.tier");   // 可重复参数（Repeatable）
         spec.SubKind.Should().BeNull("文件载体缺省二级");
         var dev = Specs.Virtual("/dev/nvme0n1").ToSpec();
         dev.SubKind.Should().Be("dev", "首段制设备形态（path 首段定语义）");

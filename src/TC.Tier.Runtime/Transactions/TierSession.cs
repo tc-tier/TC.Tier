@@ -114,6 +114,7 @@ public sealed class TierSession : IDisposable
     /// （FIFO 全序不变）。空 staged 合法（纯 seq 推进回合）。ct 取消=排队撤销（出队丢弃）。</para>
     /// </summary>
     /// <param name="context">调用方关联上下文（随回执域诊断面可读——协议不解释内容）。</param>
+    /// <param name="ct">取消令牌（取消 = 排队撤销：出队丢弃；在途回合不可打断，等终态防登记泄漏）。</param>
     /// <returns>域 seq（本回合所在批的共享 seq）。</returns>
     public async ValueTask<long> CommitAsync(object? context = null, CancellationToken ct = default)
     {
@@ -264,7 +265,12 @@ public sealed class TierSession : IDisposable
 /// <summary>会话状态机：Active（可写可提交）→ Faulted（回合失败回执，重开）→ Disposed（终态）。</summary>
 public enum SessionState
 {
+    /// <summary>初态——Stage/Commit/读 scope 合法。</summary>
     Active = 0,
+
+    /// <summary>回合失败回执——Stage/Commit 抛（fault 原因内联），重开 = OpenSession。</summary>
     Faulted = 1,
+
+    /// <summary>终态——Dispose 后不可再用。</summary>
     Disposed = 2,
 }

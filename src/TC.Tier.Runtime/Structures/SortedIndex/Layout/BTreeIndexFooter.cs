@@ -13,9 +13,11 @@ public struct BTreeIndexFooter
 
     private const int FooterSize = 32;
 
+    /// <summary>帧尾 magic 字段（偏移 0——ValidEquals(FooterMagic) 校验）。</summary>
     [FieldOffset(0), ValidEquals(FooterMagic)]
     public uint Magic;
 
+    /// <summary>保留字段（偏移 4——对齐填充）。</summary>
     [FieldOffset(4)] public uint Reserved;
 
     /// <summary>水位 W：帧内容 = record 流 [?, W) 的折叠；重放只需 (W, End)。</summary>

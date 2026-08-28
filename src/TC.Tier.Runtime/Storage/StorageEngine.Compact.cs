@@ -51,7 +51,7 @@ internal sealed partial class StorageEngine
     /// 统一启动后台任务——注册到 <see cref="_backgroundTasks"/>，完成（成功/失败/取消）后自动清理。
     /// <para>★ 调用方持返回的 Task 引用（或经 <see cref="IAsyncOperation"/> 句柄对外），
     ///   绝不 <c>_ = Task.Run(...)</c> 丢弃引用。</para>
-    /// <para>★ taskBody 内部应响应 <paramref name="ct"/>（= BackgroundCts.Token，Dispose 时 cancel）。</para>
+    /// <para>★ taskBody 内部应响应 <c>ct</c>（= BackgroundCts.Token，Dispose 时 cancel）。</para>
     /// <para>★ 无论 taskBody 成功/抛异常/取消，finally 都会从 BackgroundTasks 移除。</para>
     /// <para>★ 不带排他——Reclaim 等可并发；Compact 入口调用前须自己 <see cref="TryEnterCompactingOrFail"/>。</para>
     /// </summary>
@@ -154,7 +154,7 @@ internal sealed partial class StorageEngine
     private void ExitCompactRange() => Volatile.Write(ref _compactRange, CompactRangeInfo.Inactive);
 
     /// <summary>
-    /// 判断 segId 是否在当前 Compact 范围内——<see cref="OnSegmentFullAsyncCore"/> 据此跳过。
+    /// 判断 segId 是否在当前 Compact 范围内——<c>OnSegmentFullAsync</c>（Full 任务处理）据此跳过。
     /// <para>★ 单次 Volatile.Read 读取整个 CompactRangeInfo 引用，避免三元组撕裂。</para>
     /// </summary>
     private bool IsSegmentUnderCompact(int segId)

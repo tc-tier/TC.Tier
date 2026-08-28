@@ -69,7 +69,7 @@ public enum FileSystemCapabilities
     AtomicDirectoryMove = 1 << 15,
 
     /// <summary>
-    /// 根空间数据面 = 单一连续后端（Raw 介质两形态——.raw 文件与块设备；单一后端是 Raw 的定义性质）——
+    /// 根空间数据面 = 单一连续后端（TierVolume 介质两形态——.tier 文件与块设备；单一后端是 TierVolume 的定义性质）——
     /// 整体采集可走单句柄 [0, Length) 顺序读，零命名空间参与；多载体卷语义为"每载体连续"（逐载体段拷贝）。
     /// 结构化根空间（Disk 目录树 / Mem——Reserved 为每文件连续而非整卷连续 / Remote 对象空间）不置位。
     /// <para>★ 消费者（采集/还原管线）据此自动路由 dd 快道，不按介质硬编码（raw-medium-and-conversion-design §6）。</para>

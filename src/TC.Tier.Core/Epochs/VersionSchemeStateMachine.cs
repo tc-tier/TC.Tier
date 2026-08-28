@@ -21,7 +21,9 @@ public abstract class VersionSchemeStateMachine
         ActualToVersion = toVersion;
     }
 
-    /// <summary></summary>
+    /// <summary>
+    /// 获取要过渡到的目标版本。
+    /// </summary>
     /// <returns>要过渡到的目标版本；-1 表示无条件过渡到未指定的下一版本。</returns>
     public long ToVersion() => _toVersion;
 

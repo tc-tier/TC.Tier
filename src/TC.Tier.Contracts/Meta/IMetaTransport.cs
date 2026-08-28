@@ -20,14 +20,20 @@ namespace TC.Tier.Contracts.Meta;
 public interface IMetaTransport
 {
     /// <summary>写完整 meta block（同步，Span 零分配）。</summary>
+    /// <param name="block">完整 meta block（[Header][Payload][Footer Crc32C]）</param>
     void WriteBlock(ReadOnlySpan<byte> block);
 
     /// <summary>写完整 meta block（异步对等版）。</summary>
+    /// <param name="block">完整 meta block（[Header][Payload][Footer Crc32C]）</param>
+    /// <param name="ct">取消令牌（可选）。</param>
     ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct);
 
     /// <summary>读回最后一条 meta block（<see cref="ReadOnlySpan{T}.IsEmpty"/> = 无）。</summary>
+    /// <returns>完整 meta block（[Header][Payload][Footer Crc32C]）</returns>
     ReadOnlySpan<byte> ReadLastBlock();
 
     /// <summary>读回最后一条 meta block（异步对等版；空 Memory = 无）。</summary>
+    /// <param name="ct">取消令牌（可选）。</param>
+    /// <returns>完整 meta block（[Header][Payload][Footer Crc32C]）</returns>
     ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct);
 }

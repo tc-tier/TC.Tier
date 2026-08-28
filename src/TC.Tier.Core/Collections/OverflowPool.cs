@@ -34,6 +34,7 @@ public sealed class OverflowPool<T> : IDisposable
     /// <summary>TryAdd 被拒次数（池满或已释放，对象被 disposer 回收）。</summary>
     public long Overflows => Interlocked.Read(ref _overflows);
 
+    /// <summary>构造溢出池（有界并发队列——池空 miss、池满 overflow，都无阻塞）。</summary>
     /// <param name="size">池容量上限（软约束）。</param>
     /// <param name="disposer">被拒/释放时的对象回收回调（null = no-op）。</param>
     public OverflowPool(int size, Action<T>? disposer = null)
@@ -45,6 +46,9 @@ public sealed class OverflowPool<T> : IDisposable
     }
 
     /// <summary>尝试从池中取出对象。成功（命中）返回 true；池空（未命中）返回 false。</summary>
+    /// <param name="item">输出对象（池空时为 default(T)）。</param>
+    /// <returns>是否成功命中池对象。</returns>
+    /// <remarks>★ 高并发下 TryGet/TryAdd 可能瞬时超出 size 几个（软上限），但对调用方无正确性影响。</remarks>
     public bool TryGet(out T? item)
     {
         if (_itemQueue.TryDequeue(out item))
@@ -57,6 +61,9 @@ public sealed class OverflowPool<T> : IDisposable
     }
 
     /// <summary>尝试归还对象到池。池未满且未释放返回 true（入池）；否则调 disposer 回收，返回 false（overflow）。</summary>
+    /// <param name="item">要归还的对象。</param>
+    /// <returns>是否成功入池。</returns>
+    /// <remarks>★ 高并发下 TryGet/TryAdd 可能瞬时超出 size 几个（软上限），但对调用方无正确性影响。</remarks>
     public bool TryAdd(T item)
     {
         // 软上限：Count 快照与 Enqueue 非原子，高并发下可能瞬时超出 size 几个（无正确性影响，见类注释）
@@ -71,6 +78,7 @@ public sealed class OverflowPool<T> : IDisposable
     }
 
     /// <summary>聚合指标快照。</summary>
+    /// <remarks>★ 高并发下 Count 快照为近似值（ConcurrentQueue 非原子）。</remarks>
     public (long hits, long misses, int count, int size, long overflows) GetStats()
         => (Hits, Misses, Count, _size, Overflows);
 

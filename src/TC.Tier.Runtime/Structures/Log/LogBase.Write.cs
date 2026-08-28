@@ -492,6 +492,9 @@ public abstract partial class LogBase
     }
 
     // === partial: Dispose 时刷末页 ===
+    /// <summary>★ Dispose 钩子——刷末页后释放写引擎资源：等在途 FlushPage 任务（同步阻塞）、
+    /// 有未落盘 entry 则 FlushPage、释放双页缓冲与 frame 池，最后走基类编排。</summary>
+    /// <param name="disposing">true = 显式 Dispose（false = 终结器路径，本实现忽略）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         if (_pageA is null) return;
@@ -507,6 +510,9 @@ public abstract partial class LogBase
 
 
 
+    /// <summary>★ 异步 Dispose 钩子（对等 DisposeOverride）——等在途 FlushPage 任务、
+    /// 异步刷末页、释放双页缓冲与 frame 池，最后走基类异步编排。</summary>
+    /// <param name="disposing">true = 显式 Dispose（false = 终结器路径，本实现忽略）。</param>
     protected override async ValueTask DisposeOverrideAsync(bool disposing)
     {
         if (_pageA is null) return;

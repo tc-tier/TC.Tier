@@ -5,6 +5,8 @@ namespace TC.Tier.CodeGen;
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
 public sealed class ValidRangeAttribute(object min, object max) : Attribute
 {
+    /// <summary>区间下界（含）。</summary>
     public object Min { get; } = min;
+    /// <summary>区间上界（含）。</summary>
     public object Max { get; } = max;
 }

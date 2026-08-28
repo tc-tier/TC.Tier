@@ -59,6 +59,7 @@ public abstract partial class LogBase
             {
                 owner._logicalTail = hintTail;
                 RaiseProgress(90, $"hints tail={hintTail}");
+                ReconcileEngineTail();
                 OnLogRecovered();
                 return;
             }
@@ -68,6 +69,7 @@ public abstract partial class LogBase
             {
                 owner._logicalTail = new LogicalAddress(0, fileSize);
                 RaiseProgress(90, $"file size={fileSize}");
+                ReconcileEngineTail();
                 OnLogRecovered();
                 return;
             }
@@ -82,6 +84,7 @@ public abstract partial class LogBase
                 Volatile.Write(ref owner._lastPreparedSeq, payload.LastPreparedSeq);
                 owner._txRollbackTail = payload.PreparedTailAddress;   // 回退点（旧块缺省 Empty = 无窗口）
                 RaiseProgress(90, $"meta tail={payload.TailAddress}");
+                ReconcileEngineTail();
                 OnLogRecovered();
                 return;
             }
@@ -91,7 +94,72 @@ public abstract partial class LogBase
             var scannedTail = await ScanTailAsync(ct).ConfigureAwait(false);
             owner._logicalTail = scannedTail;
             RaiseProgress(90, $"scanned tail={scannedTail}");
+            ReconcileEngineTail();
             OnLogRecovered();
+        }
+
+        /// <summary>★ 恢复后引擎尾对齐：退到 Log 真实尾（引擎 AllocatedTail 可能超前——窗口预留
+        ///   空洞），否则恢复后续写从引擎尾起（与 Log 尾之间间隙空洞——重放撞零停）。
+        ///   水位在恢复裁决后、OnLogRecovered 前统一执行。</summary>
+        /// <remarks>★ 帧边界对齐：meta/hints 记录的尾 = 末帧<b>数据尾</b>（header+data+CRC 终点），
+        ///   但帧在扇区对齐后还有尾部 padding——恢复后续写的首个 frame 必须落在 padding 之后的
+        ///   帧边界（padded end），否则 cursor 读完末帧 CRC 跳过 padding 后找不到新帧 header，
+        ///   重启后追加的 entry 全部不可读（Restart_AppendContinues 100/101 实锤）。
+        ///   截断点尾（TruncateSuffix 的 entry 起点）不是帧数据尾——残基不同，不误对齐。</remarks>
+        private void ReconcileEngineTail()
+        {
+            LogicalAddress logicalTail = default;
+            try
+            {
+                logicalTail = owner._logicalTail;
+                if (!logicalTail.IsValid) return;
+                var target = AlignToPaddedFrameEnd(logicalTail);
+                // ★ 引擎尾已 ≤ target（物理尾即目标）时无需退（ReclaimTail 只收缩——等于会抛）；
+                //   引擎尾超前 target（窗口预留/预分配/元组水位）→ 收缩到 target（退掉预留空洞，
+                //   帧边界之后续写，cursor 顺序读跨帧无洞）。
+                if (owner._engine.AllocatedTail > target)
+                    owner._engine.ReclaimTail(target);
+            }
+            catch (Exception ex)
+            {
+                // 对齐失败不阻断恢复（水位裁决已完成）——后续 Allocate 可能留间隙（重放见空洞停）
+                owner.Logger?.LogWarning(ex, "ReconcileEngineTail: engine tail reconciliation failed (recovered tail {Tail})",
+                    logicalTail);
+            }
+        }
+
+        /// <summary>
+        /// ★ 尾地址 → 帧边界（padded end）对齐：仅当尾恰是末帧数据尾（≡ frameHeader+CRC 开销 mod 扇区）
+        ///   且该帧 header 经探测验证（magic + dataLen 自洽）时，把尾推进到 padding 之后的帧边界。
+        /// <para>不满足（截断点/未知地址/无 padding 的扇区形态）→ 原样返回，不猜测。</para>
+        /// </summary>
+        private LogicalAddress AlignToPaddedFrameEnd(LogicalAddress tail)
+        {
+            int sector = (int)owner.SectorSize;
+            int dataEndOverhead = LogPageFrameHeaderCodec.StructSize + Crc32FooterCodec.StructSize;   // 8+4
+            // 扇区 ≤ 开销 → ComputeFramePadding 恒 0（无 padding 形态）——无需对齐
+            if (sector <= dataEndOverhead) return tail;
+            // 帧数据尾 = 帧首 + 8 + dataLen + 4，dataLen 恒扇区倍数 ⇒ 数据尾 ≡ overhead (mod sector)
+            if (tail.Offset % sector != dataEndOverhead % sector) return tail;
+
+            // ★ 探测验证：真帧数据尾前必有该帧 header（magic + dataLen == tail−frameStart−overhead）。
+            //   排除恰好落在同残基上的截断点（entry 起点 4 对齐——理论上可撞 12 mod 512）。
+            Span<byte> hdr = stackalloc byte[LogPageFrameHeaderCodec.StructSize];
+            for (long back = 0; ; back += sector)
+            {
+                long candidate = tail.Offset - dataEndOverhead - back;
+                if (candidate < 0) break;
+                var addr = new LogicalAddress(tail.SegId, candidate);
+                if (owner._engine.Read(addr, hdr) < LogPageFrameHeaderCodec.StructSize) continue;
+                var h = LogPageFrameHeaderCodec.Read(hdr);
+                if (h.MagicValue != RecordMagic.LogPageFrame) continue;
+                if (h.DataLength != tail.Offset - candidate - dataEndOverhead) continue;   // dataLen 自洽
+                if (h.DataLength <= 0 || h.DataLength > owner.PageSize) continue;
+                int padding = owner.ComputeFramePadding((int)h.DataLength);
+                if (padding <= 0) return tail;
+                return owner._engine.CalculationAddress(tail, padding);
+            }
+            return tail;
         }
 
         /// <summary>★ 恢复后钩子——<see cref="OnRecoveryCoreAsync"/> 末尾、MarkReady 前调用。

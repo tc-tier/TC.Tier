@@ -338,7 +338,6 @@ public sealed unsafe class LightEpoch : IDisposable
     /// 递增当前 epoch，并把触发 action 关联到前一个 epoch。
     /// </summary>
     /// <param name="onDrain">触发 action（前一个 epoch 安全回收时执行）。</param>
-    /// <returns></returns>
     public void BumpCurrentEpoch(Action onDrain)
     {
         // ★ 嵌套检测（按实例）：同实例嵌套（外层 bump 回调内二次 bump 同一表）有自死锁/重入风险；
@@ -447,7 +446,6 @@ public sealed unsafe class LightEpoch : IDisposable
     /// </summary>
     /// <param name="markerIdx">活动 ID。</param>
     /// <param name="version">版本。</param>
-    /// <returns></returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Mark(int markerIdx, long version)
     {
@@ -673,8 +671,8 @@ public sealed unsafe class LightEpoch : IDisposable
     /// <summary>
     /// 32 位 murmur3 实现。
     /// </summary>
-    /// <param name="h"></param>
-    /// <returns></returns>
+    /// <param name="h">输入整数。</param>
+    /// <returns>哈希值。</returns>
     private static int Murmur3(int h)
     {
         var a = (uint)h;

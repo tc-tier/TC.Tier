@@ -32,9 +32,13 @@ public sealed partial class StreamSnapshot
             _dataAvailable = logicalLength - StreamFrameHeaderCodec.StructSize - StreamFrameFooterCodec.StructSize;
         }
 
+        /// <summary>footer 是否已解析且 CRC64 校验通过（读至 data 末尾自动解析，解析前恒 false）。</summary>
         public bool IsFooterValid => _footerValid;
+        /// <summary>帧内 entry 条数（footer 解析前为 0）。</summary>
         public long EntryCount => _entryCount;
+        /// <summary>帧内 data 总长度（footer 解析前为 0）。</summary>
         public long TotalLength => _totalLength;
+        /// <summary>footer 存储的 CRC64 校验和（footer 解析前为 0）。</summary>
         public ulong StoredChecksum => _storedChecksum;
 
         /// <summary>读 data（EOF 后返回 0；自动解析并校验 footer CRC64）。</summary>
@@ -132,6 +136,7 @@ public sealed partial class StreamSnapshot
             _footerParsed = true;
         }
 
+        /// <summary>释放读取器（幂等）——释放底层读会话。</summary>
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;

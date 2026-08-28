@@ -10,7 +10,7 @@ namespace TC.Tier.Core.Primitives;
 /// 后续 <see cref="WaitAsync"/> 立即返回，直到显式 <see cref="Reset"/>。</para>
 /// </summary>
 /// <remarks>
-/// <b>实现要点</b>：<see cref="ManualResetValueTaskSourceCore{TResult}"/> 是单消费者模型，
+/// <b>实现要点</b>：<see cref="System.Threading.Tasks.Sources.ManualResetValueTaskSourceCore{TResult}"/> 是单消费者模型，
 /// 不能被多个 waiter 共享（多 waiter 同 version 挂起时，先完成的 waiter 调 GetResult 会使后续
 /// waiter 的 OnCompleted 抛 InvalidOperationException）。故本实现为<b>每个等待者分配独立的
 /// <see cref="PooledValueTaskSource"/></b>（双层池化）。

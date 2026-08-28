@@ -1,7 +1,7 @@
 namespace TC.Tier.Contracts.Lifecycle;
 
 /// <summary>
-/// ★ 恢复阶段（持有者中立——所有 <see cref="Shared.LifecycleBase{T}"/> 派生类共享同一套通用恢复状态语义）。
+/// ★ 恢复阶段（持有者中立——所有 <c>LifecycleBase&lt;THints&gt;</c> 派生类共享同一套通用恢复状态语义）。
 /// <para>严格顺序推进，不可回退：<see cref="NotStarted"/> → <see cref="Recovering"/> →
 ///   <see cref="Completed"/>（成功）/ <see cref="Failed"/>（失败）。</para>
 /// <para>★ 恢复进行中的细分步骤（读 meta/配置、扫数据源定位边界、应用恢复结果等）<b>不</b>另设阶段枚举——

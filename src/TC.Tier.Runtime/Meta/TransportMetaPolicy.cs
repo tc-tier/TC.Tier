@@ -31,32 +31,44 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
     /// <summary>当前 opaque 实际长度（字段记账——从 header 倒推会读到旧值，opaque 永远记不上）。</summary>
     private int _opaqueLen;
 
+    /// <summary>Payload 区总容量（结构化水位 + opaque 扩展，来自 metaLayout）。</summary>
     public int PayloadSize => metaLayout.PayloadSize;
 
     private int OpaqueOffset => _headerSize + _structPayloadSize;
     private int OpaqueCapacity => metaLayout.PayloadOpaqueSize;
     // === Header 读写（纯规范字段）===
 
+    /// <summary>写规范 header 到就地缓冲（validate=true 由 layout 防御性补全 Magic/Version/Flags 规范字段）。</summary>
+    /// <param name="header">调用方提供的规范 header。</param>
     public void WriteHeader(THeader header)
         // 用调用方入参写（validate 由 layout 防御性补全规范字段）
         => metaLayout.WriteHeader(_buffer.GetSpan(0, _headerSize), in header, validate: true);
 
+    /// <summary>读就地缓冲中的规范 header（未 Load 返回 null）。</summary>
+    /// <returns>规范 header；未 Load 时为 null。</returns>
     public THeader? ReadHeader()
         => !_loaded ? null : metaLayout.ReadHeader(_buffer.GetSpan(0, _headerSize));
 
     // === 结构化水位 Payload 读写 ===
 
+    /// <summary>写结构化水位 payload 到就地缓冲，并同步更新 Header.PayloadLength。</summary>
+    /// <param name="payload">结构化水位 payload。</param>
     public void WritePayload(in TPayload payload)
     {
         metaLayout.WritePayload(_buffer.GetSpan(_headerSize, _structPayloadSize), in payload);
         UpdatePayloadLength();
     }
 
+    /// <summary>读就地缓冲中的结构化水位 payload（未 Load 返回 null）。</summary>
+    /// <returns>结构化水位 payload；未 Load 时为 null。</returns>
     public TPayload? ReadMetaPayload()
         => !_loaded ? null : metaLayout.ReadPayload(_buffer.GetSpan(_headerSize, _structPayloadSize));
 
     // === Opaque 扩展读写 ===
 
+    /// <summary>写 opaque 扩展字节（写在结构化水位之后，长度记账并同步 Header.PayloadLength）。</summary>
+    /// <param name="opaque">原始扩展字节。</param>
+    /// <exception cref="ArgumentException">opaque 长度超过 opaque 区容量（metaLayout.PayloadOpaqueSize）。</exception>
     public void WritePayload(ReadOnlySpan<byte> opaque)
     {
         if (opaque.Length > OpaqueCapacity)
@@ -68,6 +80,8 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
         UpdatePayloadLength();
     }
 
+    /// <summary>读就地缓冲中的 opaque 扩展字节（未 Load 或无 opaque 返回 Empty）。</summary>
+    /// <returns>实际 opaque 长度视图（Span 指向就地缓冲）；未 Load 或无 opaque 时为空。</returns>
     public ReadOnlySpan<byte> ReadPayload()
     {
         if (!_loaded || _opaqueLen <= 0 || _opaqueLen > OpaqueCapacity) return ReadOnlySpan<byte>.Empty;
@@ -84,6 +98,7 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
 
     // === 提交：变长块 [Header][实际 Payload][Footer CRC] → 传输 ===
 
+    /// <summary>同步提交——拼出变长块 [Header][实际 PayloadLength][Footer CRC] 后经传输写块，成功后视为已 Load。</summary>
     public void Commit()
     {
         ThrowIfDisposed();
@@ -91,6 +106,9 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
         _loaded = true;
     }
 
+    /// <summary>异步提交（对等同步版）——拼块后经传输异步写块，成功后视为已 Load。</summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>写块完成的任务。</returns>
     public async ValueTask CommitAsync(CancellationToken ct)
     {
         ThrowIfDisposed();
@@ -116,6 +134,8 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
 
     // === 加载：传输读最后一条 → 校验 → 全量重置缓存 ===
 
+    /// <summary>同步加载——经传输读最后一条块，校验（magic/version/长度界/CRC）通过则全量重置并采纳缓存。</summary>
+    /// <returns>true = 读到且校验通过；false = 空/无数据/校验失败（不区分原因）。</returns>
     public bool Load()
     {
         ThrowIfDisposed();
@@ -123,6 +143,9 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
         return !block.IsEmpty && TryLoadFrom(block);
     }
 
+    /// <summary>异步加载（对等同步版）——经传输异步读最后一条块后走同一校验/采纳路径。</summary>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>true = 读到且校验通过；false = 空/无数据/校验失败（不区分原因）。</returns>
     public async ValueTask<bool> LoadAsync(CancellationToken ct)
     {
         ThrowIfDisposed();
@@ -164,6 +187,7 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
 
     private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
+    /// <summary>释放就地缓冲（幂等——重复调用不抛）。</summary>
     public void Dispose()
     {
         if (_disposed) return;
@@ -171,6 +195,8 @@ public sealed class TransportMetaPolicy<THeader, TPayload>(
         _buffer.Dispose();
     }
 
+    /// <summary>异步释放就地缓冲（幂等；对齐缓冲本身无异步资源，直接同步释放后回已完成任务）。</summary>
+    /// <returns>释放完成的任务。</returns>
     public async ValueTask DisposeAsync()
     {
         if (_disposed) return;

@@ -9,7 +9,9 @@ namespace TC.Tier.Core.IO.Remote;
 /// <summary>
 /// 远程文件系统——<see cref="IFileSystem"/> 第三介质桥（B3.3/B3.4）：注入的 <see cref="IObjectStore"/>
 /// 升格为文件语义（staging 写回层 / 延迟加载 / multipart 编排 / fencing 卷锁）。
-/// <para>★ 构造：<see cref="Create(IObjectStore, RemoteFileSystemOptions?, ILogger?)"/>——store 注入
+/// <para>★ 构造：<see cref="New(IObjectStore, RemoteFileSystemOptions, ILogger)"/> /
+///   <see cref="Open(IObjectStore, RemoteFileSystemOptions, ILogger)"/> /
+///   <see cref="OpenOrCreate(IObjectStore, RemoteFileSystemOptions, ILogger)"/>——store 注入
 ///   （S3ObjectStore / MemoryObjectStore / 任意实现），桥对厂商零知识。</para>
 /// <para>★ 键模型：对象键 = <c>{KeyPrefix}{path}</c>（多引擎共桶隔离）；path 经 <see cref="PathValidator"/>
 ///   （三介质同一实现——越出前缀即 <see cref="ArgumentException"/>，不可能访问同桶其他前缀对象）。</para>
@@ -71,6 +73,11 @@ public sealed class RemoteFileSystem : IFileSystem
         ArgumentNullException.ThrowIfNull(store);
         options ??= new RemoteFileSystemOptions();
         options.Validate();
+        // IS-04：network 无预分配概念（对象存储无块布局——厂商配额）——显式请求 Full 不静默
+        if (options.Preallocation == PreallocationMode.Full)
+            throw new FileIOException(IOError.Unsupported,
+                "network 无预分配概念（对象存储无块布局——厂商配额，FreeSpace=-1）：Preallocation=Full 显式请求不支持（能力位诚实不置）。",
+                null, "mount");
         var fs = new RemoteFileSystem(store, options, logger);
         if (options.OrphanUploadCleanup is { } threshold)
             fs.CleanupOrphanUploads(threshold);
@@ -770,16 +777,17 @@ public sealed class RemoteFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <remarks>★ 尽力型 fencing（§4.6）：lock 对象 + 条件 PUT 抢建 / 心跳超时接管（IfMatch CAS）/
-    /// 条件删除防误删。<b>仅防意外双开</b>——无即死释放（崩溃后保护真空 = 心跳超时窗口）、
-    /// 时钟漂移可提前接管；正确性由段表 lease 单写者协议承担（锁只是运营护栏）。</remarks>
-    /// <inheritdoc/>
     public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         return _maintenance.Enter(reason, scope, ct);
     }
 
+    /// <summary>尽力型 fencing 独占锁（lock 对象 + 条件 PUT 抢建 / 心跳超时接管 / 条件删除防误删）。</summary>
+    /// <param name="timeout">抢锁等待上限（超时抛 <see cref="FileIOException"/>（SharingViolation））。</param>
+    /// <returns>租约（RAII——Dispose 即释放停跳）。</returns>
+    /// <remarks>★ <b>仅防意外双开</b>——无即死释放（崩溃后保护真空 = 心跳超时窗口）、
+    /// 时钟漂移可提前接管；正确性由段表 lease 单写者协议承担（锁只是运营护栏）。</remarks>
     public IDisposable AcquireExclusive(TimeSpan timeout)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);

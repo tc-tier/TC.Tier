@@ -23,19 +23,25 @@ public sealed partial class DeltaLog
         internal const int MaxEntrySize = 1 << 22;
 
         // — 规范字段 (14B) —
+        /// <summary>Magic 标识（DeltaLog entry 魔数；ValidEquals 校验必须等于 <see cref="Magic"/>）。</summary>
         [FieldOffset(0), ValidEquals(DeltaLogHeader.Magic)]
         public uint MagicValue;
 
+        /// <summary>版本号（ValidEquals 校验必须等于 <see cref="CurrentVersion"/>）。</summary>
         [FieldOffset(4), ValidEquals(DeltaLogHeader.CurrentVersion)]
         public ushort Version;
 
+        /// <summary>Flags（ValidHasFlags 校验必须含 <see cref="DefaultFlags"/> 各位）。</summary>
         [FieldOffset(6), ValidHasFlags(DeltaLogHeader.DefaultFlags)]
         public ushort Flags;
 
+        /// <summary>payload 字节长度（不含 header/padding）。</summary>
         [FieldOffset(8)] public uint PayloadLength;
+        /// <summary>padding 字节长度（对齐到 codec.Alignment 的补零）。</summary>
         [FieldOffset(12)] public ushort PaddingLength;
 
         // — CRC in Header (4B) —
+        /// <summary>CRC32C（覆盖 Header 除 Crc 自身 + Payload + Padding）。</summary>
         [FieldOffset(14)] public uint Crc;
     }
 }

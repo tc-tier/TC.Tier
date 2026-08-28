@@ -23,9 +23,11 @@ public abstract partial class RingBase<TKey>
     /// <summary>
     /// 扫描游标基类（嵌套泛型抽象，持 Owner）。
     /// </summary>
+    /// <typeparam name="TRingBase">所属 Ring 的具体类型（约束为 <see cref="RingBase{TKey}"/> 派生）。</typeparam>
     protected internal abstract class RingScanCursor<TRingBase> : StructureScanCursorBase, IRingScanCursor
         where TRingBase : RingBase<TKey>
     {
+        /// <summary>所属 Ring 实例（泛型具化——寻址/水位/页加载的真源）。</summary>
         protected readonly TRingBase Owner;
         private readonly AlignedMemoryManager _frame;
         private readonly int _pageSize;
@@ -39,6 +41,10 @@ public abstract partial class RingBase<TKey>
         private bool _frameLoaded;
         private int _currentRecordSize;
 
+        /// <summary>创建扫描游标：起点夹取到 <paramref name="owner"/>.BeginAddress，终点未给默认取当前尾；申请页大小、扇区对齐的读帧。</summary>
+        /// <param name="owner">所属 Ring 实例。</param>
+        /// <param name="beginAddress">扫描起点；小于 owner.BeginAddress 时夹取为 BeginAddress。</param>
+        /// <param name="endAddress">扫描终点（开区间，不含）；为 default 时取 owner.TailAddress（扫到当前尾）。</param>
         protected RingScanCursor(TRingBase owner, LogicalAddress beginAddress, LogicalAddress endAddress)
             : base(ReadDirection.Forward)
         {
@@ -54,12 +60,19 @@ public abstract partial class RingBase<TKey>
             _frame = new AlignedMemoryManager(_pageSize, (int)owner.SectorSize);
         }
 
+        /// <summary>当前 record 的起始地址（MoveNext 推进成功后即刚交出的那条）。</summary>
         public LogicalAddress CurrentAddress => _currentAddress;
+        /// <summary>下一待解析地址（解析循环工作游标——跳过 meta/无效 header/跨页时推进）。</summary>
         public LogicalAddress NextAddress => _nextAddress;
+        /// <summary>扫描起点（已夹取到 owner.BeginAddress）。</summary>
         public LogicalAddress BeginAddress { get; }
+        /// <summary>扫描终点（开区间，不含）。</summary>
         public LogicalAddress EndAddress { get; }
+        /// <summary>当前 record 对齐后的占用字节数（header + payload + padding 向上取整到 codec 对齐粒度）。</summary>
         public int CurrentRecordSize => _currentRecordSize;
 
+        /// <summary>读当前 record 的 header 字段：热区直读 native 页，冷区从读帧读。</summary>
+        /// <returns>当前 record 的 header 字段（Flags/PayloadLength/PaddingLength/PreviousAddress）。</returns>
         public RingRecordFields GetFields()
         {
             int headerSize = Owner.RingCodec.HeaderSize;
@@ -72,6 +85,10 @@ public abstract partial class RingBase<TKey>
             }
         }
 
+        /// <summary>
+        /// 推进到下一 record：epoch 读保护内解析 header（跳过 meta/无效 record），跨页时自动推进到下一页边界。
+        /// </summary>
+        /// <returns>推进成功返回 true；到达 EndAddress 返回 false。</returns>
         public override bool MoveNext()
         {
             Owner._epoch.Resume();
@@ -160,6 +177,12 @@ public abstract partial class RingBase<TKey>
             return true;
         }
 
+        /// <summary>
+        /// 异步推进：下一地址在热区（尚未落盘部分）时委托同步 <see cref="MoveNext()"/> 快路径；
+        /// 冷区走异步慢路径（异步整页装载读帧，不阻塞调用线程）。
+        /// </summary>
+        /// <param name="cancellationToken">取消令牌——冷区异步装载途中响应取消。</param>
+        /// <returns>推进成功返回 true；到达 EndAddress 返回 false。</returns>
         public override ValueTask<bool> MoveNextAsync(CancellationToken cancellationToken = default)
         {
             if (_nextAddress >= Owner.FlushedUntilAddress)
@@ -203,7 +226,10 @@ public abstract partial class RingBase<TKey>
             return true;
         }
 
+        /// <summary>释放读帧 native 内存（扫描游标持有的页对齐读帧）。</summary>
         public override void Dispose() => _frame.Dispose();
+        /// <summary>异步释放——同步等价（释放读帧 native 内存后返回已完成 ValueTask）。</summary>
+        /// <returns>已完成的 ValueTask。</returns>
         public override ValueTask DisposeAsync() { _frame.Dispose(); return default; }
     }
 

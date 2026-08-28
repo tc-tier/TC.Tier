@@ -27,6 +27,7 @@ public interface IObjectStore : IDisposable
     /// <param name="data">对象内容。</param>
     /// <param name="metadata">用户元数据（null = 无；超限抛 <see cref="ArgumentException"/>，不静默截断）。</param>
     /// <param name="condition">条件前置（null = 无条件）。</param>
+    /// <param name="ct">取消令牌。</param>
     ValueTask PutAsync(string key, ReadOnlyMemory<byte> data, ObjectMetadata? metadata = null,
                        PutCondition? condition = null, CancellationToken ct = default);
 

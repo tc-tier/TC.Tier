@@ -53,9 +53,12 @@ public sealed class TierFsSpecAnalyzer : DiagnosticAnalyzer
             ("member", "virtual"),
         }.ToImmutableDictionary(p => p.Item1, p => p.Item2, StringComparer.Ordinal);
 
+    /// <summary>本分析器支持的全部诊断规则（TCSG120 scheme 非法 / TCSG121 参数未知 / TCSG122 参数 × 介质违规）。</summary>
     public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics
         => ImmutableArray.Create(BadSchemeRule, BadParamRule, ParamMediaRule);
 
+    /// <summary>注册 InvocationExpression 语法节点回调（AnalyzeInvocation）——生成代码不分析、启用并发执行。</summary>
+    /// <param name="context">分析上下文。</param>
     public override void Initialize(AnalysisContext context)
     {
         context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);

@@ -75,5 +75,6 @@ public readonly struct ExtentLease : IDisposable
         }
     }
 
+    /// <summary>释放——等价于 Rollback（占住区间未提交则回滚）。</summary>
     public void Dispose() => Rollback();
 }

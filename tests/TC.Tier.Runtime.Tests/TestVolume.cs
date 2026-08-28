@@ -7,7 +7,7 @@ namespace TC.Tier.Runtime.Tests;
 /// <para>★ 默认 "memory:"（mem 模拟磁盘：几何基准 512 + DIO 对齐强制 + ExclusiveLock 真锁）——
 ///   全量 417 项 ~17s（磁盘真 IO 同套 ~12min）。</para>
 /// <para>★ 介质切换 = 环境变量 <c>TC_TEST_FS_SPEC</c>（零重编译）：
-///   <c>local:///abs/root</c>（真磁盘）/ <c>virtual:///abs/file.raw</c>（Raw）/
+///   <c>local:///abs/root</c>（真磁盘）/ <c>virtual:///abs/file.tier</c>（TierVolume）/
 ///   <c>network:///s3/h/b/p?...</c>（S3）——同一套测试零改动平权回归。</para>
 /// <para>★ 隔离与清理：mem 每次 spec 新卷天然隔离（Dispose=拔盘）；
 ///   local 介质每卷自动配唯一子目录（并行/多卷隔离），Dispose 递归清理。</para>

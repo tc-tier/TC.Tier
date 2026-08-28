@@ -53,6 +53,7 @@ public sealed class SpinRWLock
     // ★ 常设 Debug 仪器（Release 零开销）：最近 24 次锁字原子操作环形记录，绊线异常自动携带。
     //   教训（）：LockWord AcquireShared OR置位 bug 靠临时造的值示波器破案（CAS-R before==after
     //   铁证）——原语级 Debug 全套跟踪必须是常设设施，否则每次锁异常都要现场考古一下午。
+    /// <summary>创建锁（仅 DEBUG：初始化操作环形示波器；Release 无构造器，结构体字段零初始化）。</summary>
     public SpinRWLock()
     {
         _storage.Ops = new (string, int, long, long)[24];
@@ -324,6 +325,7 @@ public sealed class SpinRWLock
             _disposed = false;
         }
 
+        /// <summary>释放写锁（幂等——重复 Dispose 不重复释放）。</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
         {
@@ -347,6 +349,7 @@ public sealed class SpinRWLock
             _disposed = false;
         }
 
+        /// <summary>释放读锁（幂等——重复 Dispose 不重复释放）。</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Dispose()
         {

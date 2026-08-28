@@ -124,7 +124,7 @@ public abstract class RecoveryBase<THints> : IRecovery<THints>
     /// <summary>
     /// ★ 恢复核心——子类<b>唯一必须 override</b> 的钩子：真正的恢复算法（扫盘 / 读 meta / 回放 / 重建索引 / 装配策略）。
     /// <para>在 <see cref="OnRecoveryStart"/> 之后、<see cref="OnRecoveryComplete"/> 之前执行。进度上报用
-    ///   <see cref="RaiseProgress"/>（推进 phase/percent/detail）；取消检查用 <paramref name="ct"/>（在 IO checkpoint 处
+    ///   <see cref="RaiseProgress(int, string?)"/>（推进 phase/percent/detail）；取消检查用 <paramref name="ct"/>（在 IO checkpoint 处
     ///   <c>ct.ThrowIfCancellationRequested()</c>）。</para>
     /// <para>★ 四级回退（hints → meta → 引擎水位 → 扫盘）等恢复策略差异，全部封装在此 override 内——
     ///   模板不关心具体算法，只保证 Start/Core/Complete 的串行编排。</para>

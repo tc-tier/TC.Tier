@@ -20,9 +20,14 @@ public struct LogMetaHeader
                                          | RecordFlags.FLAG_CRC_IN_FOOTER | RecordFlags.FLAG_META_STANDALONE;
 
     // === 规范字段 (12B，与 RingMetaHeader 完全同构) ===
+    /// <summary>Magic 标识（LogMeta 魔数；ValidEquals 校验必须等于 <see cref="Magic"/>）。</summary>
     [FieldOffset(0), ValidEquals(Magic)]            public uint   MagicValue;
+    /// <summary>版本号（ValidEquals 校验必须等于 <see cref="CurrentVersion"/>）。</summary>
     [FieldOffset(4), ValidEquals(CurrentVersion)]   public ushort Version;
+    /// <summary>Flags（ValidEquals 校验必须等于 <see cref="DefaultFlags"/>）。</summary>
     [FieldOffset(6), ValidEquals(DefaultFlags)]     public ushort Flags;
+    /// <summary>payload 字节长度（水位 + opaque 扩展区，由策略 WritePayload 时按实际数据长度填）。</summary>
     [FieldOffset(8)]  public ushort PayloadLength;
+    /// <summary>padding 字节长度（补齐策略布局对齐）。</summary>
     [FieldOffset(10)] public ushort PaddingLength;
 }

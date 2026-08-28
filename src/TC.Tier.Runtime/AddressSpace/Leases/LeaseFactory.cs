@@ -112,6 +112,7 @@ public abstract class LeaseFactory
     /// <summary>
     /// 池化工厂——对象池复用（高频 Append/Write 零分配）。
     /// </summary>
+    /// <param name="enableDiagnostics">是否启用诊断跟踪（false=生产零诊断开销；true=lease 注册到诊断表，泄漏检测可用）。</param>
     /// <param name="maxPoolSize">池容量上限（防内存膨胀）</param>
     private sealed class PooledFactory(bool enableDiagnostics, int maxPoolSize = 64) : LeaseFactory
     {
