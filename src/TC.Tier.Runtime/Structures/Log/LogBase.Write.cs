@@ -306,6 +306,8 @@ public abstract partial class LogBase
         int used = ActivePageUsed;
         int alignedLen = used.AlignUp((int)SectorSize);
         if (alignedLen > PageSize) alignedLen = PageSize;
+        if (alignedLen > used)
+            ActivePage.GetSpan(used, alignedLen - used).Clear();
 
         int frameSize = PaddedFrameSize(alignedLen);
         int paddingSize = frameSize - (LogPageFrameHeaderCodec.StructSize + alignedLen + PageFrameFooterSize);
@@ -365,6 +367,8 @@ public abstract partial class LogBase
         int used = ActivePageUsed;
         int alignedLen = used.AlignUp((int)SectorSize);
         if (alignedLen > PageSize) alignedLen = PageSize;
+        if (alignedLen > used)
+            ActivePage.GetSpan(used, alignedLen - used).Clear();
 
         int frameSize = PaddedFrameSize(alignedLen);
         int paddingSize = frameSize - (LogPageFrameHeaderCodec.StructSize + alignedLen + PageFrameFooterSize);

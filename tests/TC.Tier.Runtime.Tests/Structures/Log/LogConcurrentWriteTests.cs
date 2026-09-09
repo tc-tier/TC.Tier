@@ -1,3 +1,5 @@
+using System.Reflection;
+using TC.Tier.Core.Primitives;
 using TC.Tier.Runtime.Structures.Log;
 
 namespace TC.Tier.Runtime.Tests.Structures.Log;
@@ -176,5 +178,39 @@ public class LogConcurrentWriteTests
             seen[w]++;
         }
         seen.Should().AllBeEquivalentTo(perWriter, "每个写者的全部 entry 跨实例恢复可读");
+    }
+
+    [Fact]
+    public void Prepare_Reopen_IgnoresUnusedAlignedPageSlack()
+    {
+        using var vol = new TestVolume();
+        using (var log = TestLogSettingsFactory.NewEntryLog(vol, Settings(vol, "cw-slack")))
+        {
+            log.Append(new byte[32]);
+            PoisonUnusedAlignedSlackWithDuplicateEntry(log);
+            log.Prepare(seq: 1);
+        }
+
+        using var log2 = TestLogSettingsFactory.NewEntryLog(vol, Settings(vol, "cw-slack"));
+        int count = 0;
+        using var cursor = log2.OpenCursor(log2.BeginAddress, log2.TailAddress);
+        while (cursor.MoveNext())
+        {
+            cursor.CurrentIsMeta.Should().BeFalse();
+            count++;
+        }
+
+        count.Should().Be(1, "flush must zero the sector-aligned slack so recovery never sees ghost entries");
+    }
+
+    private static void PoisonUnusedAlignedSlackWithDuplicateEntry(EntryLog log)
+    {
+        const BindingFlags Flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var page = (AlignedMemoryManager)typeof(LogBase).GetField("_pageA", Flags)!.GetValue(log)!;
+        int used = (int)typeof(LogBase).GetField("_pageUsedA", Flags)!.GetValue(log)!;
+        int alignedLen = Math.Min(log.PageSize, ((used + page.Alignment - 1) / page.Alignment) * page.Alignment);
+        int slack = alignedLen - used;
+        slack.Should().BeGreaterThanOrEqualTo(used, "the test payload must fit inside the sector-aligned slack we are poisoning");
+        page.GetSpan(0, used).CopyTo(page.GetSpan(used, slack).Slice(0, used));
     }
 }
