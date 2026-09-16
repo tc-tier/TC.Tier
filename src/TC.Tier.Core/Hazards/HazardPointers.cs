@@ -275,6 +275,7 @@ public sealed unsafe class HazardDomain : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>当前线程在本域注册上下文。幂等：同线程同域重复调用返回同一实例。</summary>
+    /// <returns>当前线程在本域的注册句柄（Dispose = 注销，须在注册线程调用）。</returns>
     /// <exception cref="ObjectDisposedException">域已释放。</exception>
     public HazardRegistration Register()
     {
@@ -387,6 +388,8 @@ public sealed unsafe class HazardDomain : IDisposable
     /// <param name="hazardSlot">hazard 槽位（线程内轮换，如链表遍历 curr/next 两槽）。</param>
     /// <param name="source">共享来源位置（如结构边）。</param>
     /// <param name="slotRef">输出的被保护句柄（0 = 来源为空）。</param>
+    /// <returns>true 表示保护建立且 <paramref name="slotRef"/> 已验证新鲜（此后才允许解引用）；
+    /// false 表示来源为空（slotRef = 0，槽位已清）。</returns>
     public bool TryProtect(HazardRegistration reg, int hazardSlot, ref long source, out long slotRef)
     {
         var e = EntryOf(reg, hazardSlot);
@@ -404,6 +407,9 @@ public sealed unsafe class HazardDomain : IDisposable
 
     /// <summary>裸发布：仅限指针新鲜性已有结构性证明的场景（如对同一已验证引用换槽重发布）。
     /// 常规获取一律走 <see cref="TryProtect"/>。slotRef = 0 即清空（等价 <see cref="Unprotect"/>）。</summary>
+    /// <param name="reg">本域注册。</param>
+    /// <param name="hazardSlot">hazard 槽位（0..槽位/线程数-1）。</param>
+    /// <param name="slotRef">要发布的受保护句柄（0 = 清空该槽）。</param>
     public void Publish(HazardRegistration reg, int hazardSlot, long slotRef)
     {
         var e = EntryOf(reg, hazardSlot);
@@ -411,6 +417,8 @@ public sealed unsafe class HazardDomain : IDisposable
     }
 
     /// <summary>解除保护（等价 Publish(reg, hazardSlot, 0)）。</summary>
+    /// <param name="reg">本域注册。</param>
+    /// <param name="hazardSlot">要解除的 hazard 槽位。</param>
     public void Unprotect(HazardRegistration reg, int hazardSlot)
     {
         var e = EntryOf(reg, hazardSlot);
@@ -424,6 +432,8 @@ public sealed unsafe class HazardDomain : IDisposable
     /// <summary>登记退休（1 CAS push 即返）。达到水位顺带触发 Scan（策略非保证，见活性契约）。
     /// <para>★ reclaim 恰好执行一次由 Scan 结构性保证；delegate 由调用方缓存（零分配纪律）；
     /// 必须纯内存、无异常、不阻塞。记录池耗尽时自动强制 Scan 推进（活性兜底）。</para></summary>
+    /// <param name="slotRef">要退休的受保护句柄（此前须已解除保护，否则回收永久滞留）。</param>
+    /// <param name="reclaim">回收回调（参数为 slotRef）——纯内存、无异常、不阻塞，由调用方缓存复用。</param>
     public void Retire(long slotRef, Action<long> reclaim)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);

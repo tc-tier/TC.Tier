@@ -8,6 +8,7 @@ using TC.Tier.Core.IO.Shared;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
+/// <summary>TierVolumeFs partial——释放（clean 关闭协议与资源回收）。</summary>
 public sealed partial class TierVolumeFs
 {
     // ═══════════════ 释放（clean 关闭协议）═══════════════

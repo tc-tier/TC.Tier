@@ -179,4 +179,68 @@ public class AsyncCountDownTests
             cd.IsEmpty.Should().BeTrue();
         }
     }
+
+    [Fact]
+    public async Task AddRemove_RacingAtZero_NeverLeavesEventReset()
+    {
+        for (int iteration = 0; iteration < 2_000; iteration++)
+        {
+            var cd = new AsyncCountDown();
+            using var start = new ManualResetEventSlim();
+
+            var add = Task.Run(() =>
+            {
+                start.Wait();
+                cd.Add();
+            });
+            var remove = Task.Run(() =>
+            {
+                start.Wait();
+                while (cd.IsEmpty)
+                    Thread.SpinWait(1);
+                cd.Remove();
+            });
+
+            start.Set();
+            await Task.WhenAll(add, remove);
+
+            cd.IsEmpty.Should().BeTrue();
+            cd.WaitUntilEmptyAsync().AsTask().IsCompletedSuccessfully.Should().BeTrue(
+                $"iteration {iteration}: counter=0 时事件必须保持 set");
+        }
+    }
+
+    [Fact]
+    public void Remove_WhenAlreadyEmpty_Throws()
+    {
+        var cd = new AsyncCountDown();
+
+        var remove = () => cd.Remove();
+
+        remove.Should().Throw<InvalidOperationException>();
+        cd.IsEmpty.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task InlineContinuation_ReentersAdd_OutsideTransitionGate()
+    {
+        var cd = new AsyncCountDown(runContinuationsAsynchronously: false);
+        cd.Add();
+
+        var resumed = WaitThenAddAsync();
+        cd.Remove();
+        await resumed;
+
+        cd.IsEmpty.Should().BeFalse("inline continuation added a new outstanding operation");
+        var wait = cd.WaitUntilEmptyAsync().AsTask();
+        wait.IsCompleted.Should().BeFalse();
+        cd.Remove();
+        await wait;
+
+        async Task WaitThenAddAsync()
+        {
+            await cd.WaitUntilEmptyAsync();
+            cd.Add();
+        }
+    }
 }

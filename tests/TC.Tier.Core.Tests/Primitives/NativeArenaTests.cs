@@ -36,6 +36,59 @@ public class NativeArenaTests
     }
 
     [Fact]
+    public void Allocate_OverflowCount_ThrowsNotCorrupts()
+    {
+        using var arena = new NativeArena(4096);
+        // count*sizeof 溢出为负——无 checked 时绕过边界检查产生过小 Span（buffer overrun）
+        Action act = () => { var _ = arena.Allocate<int>(1 << 30); _.Clear(); };
+        act.Should().Throw<OverflowException>();
+        arena.Remaining.Should().Be(4096, "溢出请求必须原样拒绝，不消耗空间");
+    }
+
+    [Fact]
+    public void Allocate_NegativeCount_Throws()
+    {
+        using var arena = new NativeArena(4096);
+        Action act = () => { var _ = arena.Allocate<byte>(-1); _.Clear(); };
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public void AllocateBytes_NegativeCount_Throws()
+    {
+        using var arena = new NativeArena(4096);
+
+        Action allocate = () => arena.AllocateBytes(-1);
+
+        allocate.Should().Throw<ArgumentOutOfRangeException>();
+        arena.Remaining.Should().Be(4096);
+    }
+
+    [Fact]
+    public unsafe void Allocate_ConcurrentReservations_DoNotOverlap()
+    {
+        const int allocationCount = 10_000;
+        using var arena = new NativeArena(allocationCount * sizeof(int));
+
+        Parallel.For(0, allocationCount, value =>
+        {
+            var slot = arena.Allocate<int>(1);
+            slot[0] = value + 1;
+        });
+
+        arena.Used.Should().Be(allocationCount * sizeof(int));
+        var values = new Span<int>(arena.Pointer.ToPointer(), allocationCount);
+        var seen = new bool[allocationCount];
+        foreach (int value in values)
+        {
+            value.Should().BeInRange(1, allocationCount);
+            seen[value - 1].Should().BeFalse($"allocation value {value} must occupy one unique slot");
+            seen[value - 1] = true;
+        }
+        seen.Should().OnlyContain(static value => value);
+    }
+
+    [Fact]
     public void Reset_AllowsReuse()
     {
         using var arena = new NativeArena(64);

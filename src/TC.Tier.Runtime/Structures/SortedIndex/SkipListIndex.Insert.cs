@@ -3,6 +3,9 @@ using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// SkipListIndex 插入 partial——塔链下降 + 逐层 CAS 入塔（含 arena 节点分配与层高生成）。
+/// </summary>
 public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>
@@ -15,6 +18,7 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
     /// <returns>插入后地址。</returns>
     public override unsafe LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)
     {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥——CAS 逐层入链的整链一致性）
         _epoch.Resume();
         try
         {
@@ -103,7 +107,7 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
                 MarkDirty(_headAddress);   // ★ 塔顶变更延迟写回（同上）
 
             Interlocked.Increment(ref _entryCount);
-            _cachedNodes.Upsert(nodeAddr, (nint)newNode);
+            _cachedNodes.Upsert(nodeAddr, (nint)newNode);   // ★ 先入链后 admit——闸前读者可追链到引擎未写入地址（已由操作闸封死，2026-08-27 审计注记）
             return valueAddress;
         }
         finally

@@ -17,9 +17,11 @@ public interface IMetaLayout<THeader, TPayload>
     where TPayload : struct
 {
     /// <summary>规范 header 字节大小（12B 规范字段布局）。</summary>
+    /// <returns>规范 header 字节大小（12B 规范字段布局）。</returns>
     int HeaderSize { get; }
 
     /// <summary>结构化 payload 字节大小（Log=64, Ring=112, Blob=56）。</summary>
+    /// <returns>结构化 payload 字节大小（Log=64, Ring=112, Blob=56）。</returns>
     int PayloadSize { get; }
 
     /// <summary>

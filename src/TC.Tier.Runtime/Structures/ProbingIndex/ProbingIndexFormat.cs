@@ -1,5 +1,5 @@
-using System.IO.Hashing;
 using System.Runtime.InteropServices;
+using TC.Tier.CodeGen;
 using TC.Tier.Contracts.Layout;
 using TC.Tier.Contracts.Structures;
 
@@ -95,4 +95,25 @@ public static class ProbingIndexFormat
         /// <summary>CRC64（覆盖 Header + Body + Footer 前 24B）。</summary>
         [FieldOffset(24)] public ulong Crc;
     }
+}
+
+/// <summary>
+/// Hash dump 帧几何块（32B，跟在帧头之后）：表尺寸（2 的幂）+ 溢出池容量 + 条目数 +
+/// 溢出池 bump 指针（审计 #411——恢复取 max(帧值, 扫池重算)）。[BinaryLayout] 声明式生成。
+/// </summary>
+[BinaryLayout(Features = BinaryLayoutFeatures.All)]
+[StructLayout(LayoutKind.Explicit, Size = ProbingIndexFormat.GeometrySize)]
+internal struct HashIndexGeometry
+{
+    /// <summary>表尺寸（2 的幂）。</summary>
+    [FieldOffset(0)] internal long TableSize;
+
+    /// <summary>溢出池容量（桶数）。</summary>
+    [FieldOffset(8)] internal long OverflowCapacity;
+
+    /// <summary>条目数（dump 瞬时）。</summary>
+    [FieldOffset(16)] internal long EntryCount;
+
+    /// <summary>溢出池 bump 指针（dump 瞬时读）。</summary>
+    [FieldOffset(24)] internal long OverflowCount;
 }

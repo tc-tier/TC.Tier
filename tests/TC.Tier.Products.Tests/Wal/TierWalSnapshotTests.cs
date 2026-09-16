@@ -23,6 +23,7 @@ public class TierWalSnapshotTests
             await wal.ExportSnapshotAsync(default);
             transfer.CommittedImage.Should().NotBeNull();
             wal.SnapshotIndex.Should().Be(50);
+            wal.SnapshotHeadIndex.Should().Be(1, "快照镜像起点 = 当时日志头（50 条无截断——head=1）");
         }
 
         // ★ 冷节点：导入（经注入传输面——同卷新实例）→ SnapshotIndex 恢复 → 快照条目 = 镜像帧流
@@ -33,6 +34,7 @@ public class TierWalSnapshotTests
         await wal2.ImportSnapshotAsync(default);
 
         wal2.SnapshotIndex.Should().Be(50);
+        wal2.SnapshotHeadIndex.Should().Be(1, "导入帧流 50 帧 → head = N₀ - count + 1 = 1（快照区 index 对齐）");
         var entries = CountSnapshotFrames(await ReadSnapshotAll(wal2));
         entries.Should().Be(50, "镜像帧流 = 快照 [Head..N₀] 全部条目");
         (await TierWalTests.ReadAll(wal2, 51, default)).Should().BeEmpty("冷节点主数据无增量（leader 后续推送）");

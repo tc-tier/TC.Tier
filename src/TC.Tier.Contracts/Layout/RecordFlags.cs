@@ -139,6 +139,8 @@ public static class RecordFlags
     // ══ 辅助方法 ══
 
     /// <summary>由 flags 提取 CRC 字段长度（0/4/8）。</summary>
+    /// <param name="flags">记录标志位（取 FLAG_CRC_MASK 位域判定 CRC 类型）。</param>
+    /// <returns>CRC 字段长度：0=无 CRC，4=CRC32/CRC32C，8=CRC64，未知位组合=0。</returns>
     public static int GetCrcLen(ushort flags) => (flags & FLAG_CRC_MASK) switch
     {
         FLAG_CRC_NONE => 0,

@@ -2,6 +2,9 @@ using System.Runtime.InteropServices;
 
 namespace TC.Tier.Runtime.Structures.Log;
 
+/// <summary>
+/// EntryLog 头部布局 partial——嵌套 <see cref="EntryLogHeader"/>（unified-binary-layout.md §5.2）。
+/// </summary>
 public sealed partial class EntryLog
 {
     /// <summary>

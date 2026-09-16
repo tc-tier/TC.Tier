@@ -108,19 +108,26 @@ Measured on .NET 8 across Windows (i5-12400) and Linux (AMD 6900HX) — **for re
 ## Architecture
 
 ```
-Official products (planned): TierKV / TierWAL / TierBlob / TierQueue / TierTimeSeries
+Official products: TierKV / TierWAL / TierQueue (time series in progress)
 ────────────────────────────────────────────────
 Storage Runtime (composable kernel)
-  Index (Hash/BTree/SkipList) · Ring · Log · Blob (metadata/mirror/snapshot)
+  Index (Hash/BTree/SkipList) · Ring · Log + add-ons (mirror/metadata/snapshot)
 ────────────────────────────────────────────────
 Storage Engine (Options → Builder → Start/StartAsync, 16B logical address space)
 ────────────────────────────────────────────────
 File system layer (local:// / memory: / virtual:// / network:///s3)
+────────────────────────────────────────────────
+Core.Net (distributed protocol layer)
+  raft consensus × three node-communication forms × HyParView/Swarm — unified wire framing,
+  pluggable transport (TCP/UDP/QUIC)
+Official node: TierRaftNode (turnkey raft × TierWAL node, TC.Tier.Products.Net)
 ```
 
-Dependencies are one-way and acyclic: `TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products`. The source generator (`TC.Tier.CodeGen`) cuts across — BinaryLayout / registration bridges are generated at compile time, zero runtime reflection.
+Dependencies are one-way and acyclic: `TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products` (storage pillar); networking pillar `TC.Tier.Core` → `TC.Tier.Core.Net` → `TC.Tier.Products.Net`. The source generator (`TC.Tier.CodeGen`) cuts across — BinaryLayout / registration bridges are generated at compile time, zero runtime reflection.
 
+- Development guide (architecture & design philosophy, code organization): [DEVELOPMENT.md](DEVELOPMENT.md) (Chinese)
 - Engine guide: [storage-engine.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)
+- Networking & consensus guide: [net.md](https://docs.mytzz.top/docs/src/TC.Tier.Core.Net/docs/net.html)
 - Structures overview: [structures.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html)
 - Lifecycle model: [lifecycle.md](https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html)
 
@@ -133,7 +140,7 @@ Dependencies are one-way and acyclic: `TC.Tier.CodeGen.Abstractions` → `TC.Tie
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) — build, test conventions, code standards (enforced at compile time: no reflection TCSG030 / no sync-over-async TCSG031).
+See [CONTRIBUTING.md](CONTRIBUTING.md) — build, test conventions, code standards (enforced at compile time: no reflection TCSG136 / no sync-over-async TCSG137 / no fire-and-forget TCSG138).
 
 ## License
 

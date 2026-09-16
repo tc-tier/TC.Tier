@@ -3,6 +3,8 @@ using TC.Tier.Core.Primitives;
 using TC.Tier.Core.Primitives;
 using TC.Tier.Runtime.Storage.Compact;
 
+using TC.Tier.Core.Tests;
+using Skip = Xunit.Skip;
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
@@ -290,9 +292,10 @@ public sealed class NewDeviceConcurrentTests : IDisposable
         r2.MigrationMap.Should().NotBeEmpty();
     }
 
-    [Fact]
+    [SkippableFact]
     public void RangeCompact_WaitsForPriorEpochReader()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         const int blockSize = 64 * 1024;
         var vol = NewVol();
         var options = new StorageEngineOptions("test", segmentGrowthLimit: blockSize * 4L).WithPreallocateFile(false).WithHints(FileOpenHints.WriteThrough);

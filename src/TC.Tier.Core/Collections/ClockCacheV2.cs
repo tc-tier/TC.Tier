@@ -94,6 +94,7 @@ public sealed class ClockCacheV2<TKey, TValue> : IDisposable
     /// <para>★ 组相联对哈希质量敏感（桶偏斜 → 组内溢出提前淘汰），HashKey 做 murmur3 fmix32 终混消除低位偏斜。</para>
     /// <param name="key">要查找的键。</param>
     /// <param name="value">如果找到键，则返回对应的值；否则返回默认值。</param>
+    /// <returns>true 表示命中（已置访问位并输出对应值）；false 表示未命中（<paramref name="value"/> 为 <c>default</c>）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryGet(TKey key, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out TValue value)
     {

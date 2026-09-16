@@ -37,7 +37,10 @@ public static class AlignmentConst
     /// 512字节对齐
     /// </summary>
     public const int Alignment512B = 512;
-
+    /// <summary>
+    /// 1K字节对齐
+    /// </summary>
+    public const int Alignment1K = 1 * BYTES_PER_KB;
     /// <summary>
     /// 4K字节对齐
     /// </summary>

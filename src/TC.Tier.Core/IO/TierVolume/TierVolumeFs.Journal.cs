@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
+using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
@@ -49,7 +49,6 @@ public sealed partial class TierVolumeFs
     private readonly object _journalGate = new();   // 日志区写 + 屏障串行化（W2——与检查点互斥）
     private int _inFlightSnapshots;              // 在途两段式快照（0/1 闸——W2；检查点不等待：CkptLsn 取 _lsn 覆盖）
 
-    private const int JournalHeaderSize = 32;    // magic(4) type(1) pad(1) rsvd(2) lsn(8) gen(8) bodyLen(4) bodyCrc(4)
 
     /// <summary>格式化/打开后初始化日志运行态（superblock 为权威）。</summary>
     private void JournalInitFromSuperblock()
@@ -100,8 +99,14 @@ public sealed partial class TierVolumeFs
         public override long Length => _len;
         public override long Position { get => _len; set => throw new NotSupportedException(); }
 
+        /// <summary>把缓冲区片段追加到池化缓冲。</summary>
+        /// <param name="b">源数据缓冲。</param>
+        /// <param name="offset">b 内读取起始索引。</param>
+        /// <param name="count">写入字节数。</param>
         public override void Write(byte[] b, int offset, int count) => Write(b.AsSpan(offset, count));
 
+        /// <summary>把字节片段追加到池化缓冲（空间不足时倍增扩容）。</summary>
+        /// <param name="b">要追加的字节片段。</param>
         public override void Write(ReadOnlySpan<byte> b)
         {
             if (_len + b.Length > _buf.Length)
@@ -114,9 +119,20 @@ public sealed partial class TierVolumeFs
             _len += b.Length;
         }
 
+        /// <summary>no-op（纯内存追加缓冲，无需刷新）。</summary>
         public override void Flush() { }
+        /// <summary>不支持读取——恒抛 <see cref="NotSupportedException"/>。</summary>
+        /// <param name="buffer">接收缓冲（未使用）。</param>
+        /// <param name="offset">buffer 内起始索引（未使用）。</param>
+        /// <param name="count">请求字节数（未使用）。</param>
+        /// <returns>不返回——恒抛异常。</returns>
         public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        /// <summary>不支持定位——恒抛 <see cref="NotSupportedException"/>。</summary>
+        /// <param name="offset">偏移（未使用）。</param>
+        /// <param name="origin">基准（未使用）。</param>
+        /// <returns>不返回——恒抛异常。</returns>
         public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        /// <summary>不支持改长——恒抛 <see cref="NotSupportedException"/>。</summary>
         public override void SetLength(long value) => throw new NotSupportedException();
     }
 
@@ -339,19 +355,46 @@ public sealed partial class TierVolumeFs
             }
             catch
             {
-                _inFlightSnapshots = 0;
+                // ★ IO-04：回滚预留缺口——原实现只复位 inFlight/放回记录，不还原 _journalHead，
+                //   [snapHead, reserve) 永不被写；崩溃重放 ScanJournalFrames 在缺口断链 = 缺口后
+                //   全部已提交记录不可达。先还原再放行：inFlight=1 期间无其他 head 写者（软路径被
+                //   L299 挡、硬模式持 MetadataLock 自旋 L383 未到 head 读写点），裸写安全；若先放行
+                //   （inFlight=0）再回退，硬模式可能已从预推 head 写入，回退会覆盖其落点。
+                _journalHead = snapHead;
+                Volatile.Write(ref _inFlightSnapshots, 0);
                 lock (MetadataLock)
                     foreach (var t in snapshot) _pendingRecords.Add(t);   // 放回（锁内——发射器并发）
                 throw;
             }
             // ── 元数据锁外：gate 串行化写区+屏障（检查点互斥）═══
+            Exception? gateFailure = null;
             lock (_journalGate)
             {
-                var endHead = WriteSnapshotToArea(snapshot, snapHead, snapGen);
-                JournalBarrier();   // 单屏障——数据页 + 日志记录同一覆盖（写穿档 = 写穿完成即屏障）
-                if (snapGen == _journalGen)
-                    _journalHead = endHead;   // 真实终点同步（含环绕 Pad——防漂移；检查点翻转后 head 由检查点权威）
+                try
+                {
+                    var endHead = WriteSnapshotToArea(snapshot, snapHead, snapGen);
+                    JournalBarrier();   // 单屏障——数据页 + 日志记录同一覆盖（写穿档 = 写穿完成即屏障）
+                    if (snapGen == _journalGen)
+                        _journalHead = endHead;   // 真实终点同步（含环绕 Pad——防漂移；检查点翻转后 head 由检查点权威）
+                }
+                catch (Exception ex)
+                {
+                    // ★ IO-05：gate 段异常必须复位在途计数——原实现无 catch，inFlight 永卡 1 =
+                    //   CommitCore（L383 自旋）与软路径（L299 转 hard）永久活锁。head 回滚到批次起点
+                    //   （部分写入的帧由重试整批重写覆盖——同代数页对齐幂等；崩溃窗口内该批本就未提交）。
+                    //   inFlight=1 期间无并发 head 写者（同 IO-04 论证），gate 内裸写安全。
+                    _journalHead = snapHead;
+                    gateFailure = ex;
+                }
                 Volatile.Write(ref _inFlightSnapshots, 0);
+            }
+            if (gateFailure is not null)
+            {
+                // 记录放回在 gate 外补记账（锁序 MetadataLock→gate 单向——gate 内取 MetadataLock 会与
+                // CommitCore 的持锁等 gate 形成反转）
+                lock (MetadataLock)
+                    foreach (var t in snapshot) _pendingRecords.Add(t);
+                throw gateFailure;
             }
             lock (MetadataLock)
             {
@@ -434,7 +477,7 @@ public sealed partial class TierVolumeFs
                 stretch.Clear();
                 var padLen = _journalAreaLen - head;
                 Array.Clear(buffer);
-                EncodeRecordHeader(buffer, JournalRecordType.Pad, lsn, (int)(padLen - JournalHeaderSize), gen);
+                EncodeRecordHeader(buffer, JournalRecordType.Pad, lsn, (int)(padLen - JournalFrameHeaderCodec.StructSize), gen);
                 WriteCarrier(_journalAreaStart + head, buffer.AsSpan(0, (int)padLen));
                 head = 0;
                 stretchStart = 0;
@@ -456,26 +499,40 @@ public sealed partial class TierVolumeFs
     }
 
     private int FramedSize(int bodyLen)
-        => (JournalHeaderSize + bodyLen + _pageSize - 1) / _pageSize * _pageSize;
+        => (JournalFrameHeaderCodec.StructSize + bodyLen + _pageSize - 1) / _pageSize * _pageSize;
 
     private void EncodeRecord(List<byte> into, JournalRecordType type, byte[] body, int bodyLen, ulong lsn, ulong gen)
     {
-        var header = new byte[JournalHeaderSize];
-        EncodeRecordHeader(header, type, lsn, bodyLen, gen);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(28), Crc32.HashToUInt32(body.AsSpan(0, bodyLen)));
+        var header = new byte[JournalFrameHeaderCodec.StructSize];
+        var hdr = new JournalFrameHeader
+        {
+            Magic = JournalFrameHeader.MagicValue,
+            Type = (byte)type,
+            Lsn = lsn,
+            Generation = gen,
+            BodyLength = (uint)bodyLen,
+            BodyCrc = UnifiedCrc.ComputeCrc32C(body.AsSpan(0, bodyLen)),
+        };
+        JournalFrameHeaderCodec.Write(header, in hdr);
         into.AddRange(header);
         into.AddRange(body.AsSpan(0, bodyLen));
-        var pad = FramedSize(bodyLen) - JournalHeaderSize - bodyLen;
+        var pad = FramedSize(bodyLen) - JournalFrameHeaderCodec.StructSize - bodyLen;
         if (pad > 0) into.AddRange(stackalloc byte[pad]);
     }
 
+    /// <summary>帧头字段填充 + codec 落盘（偏移/字节序单一真源——[BinaryLayout] 布局生成）。
+    /// BodyCrc 恒 0：Pad 帧由调用方零化缓冲承载（盘上 crc 区恒零——旧语义逐字节保持）。</summary>
     private void EncodeRecordHeader(Span<byte> header, JournalRecordType type, ulong lsn, int bodyLen, ulong? gen = null)
     {
-        "RJRN"u8.CopyTo(header);
-        header[4] = (byte)type;
-        BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(8), lsn);
-        BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(16), gen ?? _journalGen);
-        BinaryPrimitives.WriteUInt32LittleEndian(header.Slice(24), (uint)bodyLen);
+        var hdr = new JournalFrameHeader
+        {
+            Magic = JournalFrameHeader.MagicValue,
+            Type = (byte)type,
+            Lsn = lsn,
+            Generation = gen ?? _journalGen,
+            BodyLength = (uint)bodyLen,
+        };
+        JournalFrameHeaderCodec.Write(header, in hdr);
     }
 
     // ═══════════════ 重放（dirty 打开——raw-journal §6）═══════════════
@@ -492,24 +549,25 @@ public sealed partial class TierVolumeFs
         var areaLen = _journalAreaLen;
         var offset = 0L;
         var wrapped = false;
-        var headerBuf = new byte[JournalHeaderSize];   // 循环外单次分配（CA2014——stackalloc 移出循环）
+        var headerBuf = new byte[JournalFrameHeaderCodec.StructSize];   // 循环外单次分配（CA2014——stackalloc 移出循环）
         while (offset < areaLen)
         {
             var remaining = areaLen - offset;
-            if (remaining < JournalHeaderSize) break;
+            if (remaining < JournalFrameHeaderCodec.StructSize) break;
             ReadJournalSpan(offset, headerBuf);
-            if (!headerBuf.AsSpan(0, 4).SequenceEqual("RJRN"u8)) break;                 // 有效前缀终止
-            var type = (JournalRecordType)headerBuf[4];
-            var lsn = BinaryPrimitives.ReadUInt64LittleEndian(headerBuf.AsSpan(8));
-            var gen = BinaryPrimitives.ReadUInt64LittleEndian(headerBuf.AsSpan(16));
-            var bodyLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(headerBuf.AsSpan(24));
-            var bodyCrc = BinaryPrimitives.ReadUInt32LittleEndian(headerBuf.AsSpan(28));
+            var hdr = JournalFrameHeaderCodec.Read(headerBuf);
+            if (hdr.Magic != JournalFrameHeader.MagicValue) break;                       // 有效前缀终止
+            var type = (JournalRecordType)hdr.Type;
+            var lsn = hdr.Lsn;
+            var gen = hdr.Generation;
+            var bodyLen = (int)hdr.BodyLength;
+            var bodyCrc = hdr.BodyCrc;
             var framed = FramedSize(bodyLen);
             if (bodyLen < 0 || framed > remaining) break;                                 // 撕裂尾
             if (gen != _journalGen) break;                                                // 陈旧代数（复位前旧块）
             var body = new byte[bodyLen];
-            ReadJournalSpan(offset + JournalHeaderSize, body);
-            if (Crc32.HashToUInt32(body) != bodyCrc) break;               // 撕裂/损毁
+            ReadJournalSpan(offset + JournalFrameHeaderCodec.StructSize, body);
+            if (UnifiedCrc.ComputeCrc32C(body) != bodyCrc) break;               // 撕裂/损毁
             frames.Add(new JournalFrame(lsn, type, offset, framed, bodyLen));
             offset += framed;
             if (offset >= areaLen && !wrapped) { wrapped = true; offset = 0; }    // 环绕续扫（Pad 之后）
@@ -531,7 +589,7 @@ public sealed partial class TierVolumeFs
             if (frame.Lsn <= _sb.JournalCkptLsn || frame.Type == JournalRecordType.Pad)
                 continue;
             var body = new byte[frame.BodyLen];
-            ReadJournalSpan(frame.AreaOffset + JournalHeaderSize, body);
+            ReadJournalSpan(frame.AreaOffset + JournalFrameHeaderCodec.StructSize, body);
             apply.Add((frame.Lsn, frame.Type, body));
             maxLsn = Math.Max(maxLsn, frame.Lsn);
         }
@@ -549,6 +607,26 @@ public sealed partial class TierVolumeFs
         _lsn = Math.Max(maxLsn, _sb.JournalHeadLsn);
         _committedLsn = _lsn;
         _journalHead = endOffset >= _journalAreaLen ? 0 : endOffset;   // 追加起点 = 有效前缀末尾
+        AssertExtentOrder();   // ★ 回归防线（SameFile 并发追加根因）：重放后表须有序互不相交——二分读依赖
+    }
+
+    /// <summary>逐文件断言 extent 表按 LogicalStart 严格递增（读路径 FindExtent/NextExtentStart 二分依赖
+    /// 有序不变量；乱序曾致并发追加崩溃重放后整块读零——2026-09-01 销案）。重放/增量应用结束时调用。</summary>
+    private void AssertExtentOrder()
+    {
+        foreach (var entry in _entries.Values)
+        {
+            long prevEnd = 0;
+            var first = true;
+            foreach (var x in entry.Extents)
+            {
+                if (!first && x.LogicalStart < prevEnd)
+                    throw NewReplayError(
+                        $"重放后区间表乱序/重叠：{entry.Path} start={x.LogicalStart} < prevEnd={prevEnd}——二分读不变量破坏");
+                prevEnd = Math.Max(prevEnd, x.LogicalEnd);
+                first = false;
+            }
+        }
     }
 
     /// <summary>日志区内读（D11——分块路径：记录不跨区尾，区内任意段经载体读通道即可）。</summary>
@@ -656,13 +734,24 @@ public sealed partial class TierVolumeFs
                 var newTailEnd = r.ReadInt64();
                 var newLen = r.ReadInt64();
                 var e = _entries[path];
-                var tail = e.Extents[^1];
+                // ★ SameFile flaky 重放尾扩乱序（2026-09-01 排查）：原取 Extents[^1]，并行提交序 ≠ 预留序
+                //   下列表序可偏离发射时尾序。正确定位 = LogicalEnd ≤ newTailEnd 的最大者：
+                //   - 顺序正常（TailExtend 先于后续 Append）：该者即被扩尾；
+                //   - 并发 Append（起点恰 = newTailEnd）先重放：该者 = Append 前驱，仍为被扩对象；
+                //   - 已生效/重放幂等：其 LogicalEnd == newTailEnd → 零扩跳过。
                 var bs = (long)_pageSize;
+                var tail = e.Extents[0];
+                foreach (var cand in e.Extents)
+                    if (cand.LogicalEnd <= newTailEnd && cand.LogicalEnd > tail.LogicalEnd) tail = cand;
                 var extBlocks = (uint)((RoundUp(newTailEnd, bs) - tail.LogicalEnd) / bs);
-                MarkBlocks(tail.PhysicalBlock + (ulong)(tail.Length / bs), extBlocks, used: true);
-                var grown = new List<Extent>(e.Extents);   // CoW（RM-12 一致性——重放也走不可变交换）
-                grown[^1] = tail with { Length = tail.Length + (long)extBlocks * bs };
-                e.Extents = grown;
+                if (extBlocks > 0)
+                {
+                    MarkBlocks(tail.PhysicalBlock + (ulong)(tail.Length / bs), extBlocks, used: true);
+                    var grown = new List<Extent>(e.Extents);   // CoW（RM-12 一致性——重放也走不可变交换）
+                    var tailIdx = grown.FindIndex(x => x.LogicalStart == tail.LogicalStart);
+                    grown[tailIdx] = tail with { Length = tail.Length + (long)extBlocks * bs };
+                    e.Extents = grown;
+                }
                 e.LogicalLength = Math.Max(e.LogicalLength, newLen);
                 MetadataDirty = true;
                 break;
@@ -677,7 +766,15 @@ public sealed partial class TierVolumeFs
                 var newLen = r.ReadInt64();
                 var e = _entries[path];
                 MarkBlocks(phys, (uint)((len + _pageSize - 1) / _pageSize), used: true);
-                e.Extents = new List<Extent>(e.Extents) { new Extent(start, len, phys, state) };   // CoW（RM-12）
+                // ★ SameFile 并发追加 flaky 根因（2026-09-01 排查实锤）：原无条件尾插——
+                //   并行档提交序 ≠ 预留序（A 预留 X、B 预留 X+64K，B 先提交）→ 重放按记录序重建
+                //   出乱序表 → 读路径 FindExtent（二分，假设有序）漏判该区 → 按洞读零。
+                //   在线端窗口合并（PublishPlanMergeLocked）保序，重放必须同守"按 LogicalStart 有序"不变量。
+                var append = new Extent(start, len, phys, state);
+                var list = new List<Extent>(e.Extents);
+                var insertAt = list.FindIndex(x => x.LogicalStart > start);
+                if (insertAt < 0) list.Add(append); else list.Insert(insertAt, append);
+                e.Extents = list;   // CoW（RM-12）
                 e.LogicalLength = Math.Max(e.LogicalLength, newLen);
                 MetadataDirty = true;
                 break;

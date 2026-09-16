@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
 using TC.Tier.Core.Primitives;
-using TC.Tier.Core.Shared;
+using TC.Tier.Core.Execution;
+using TC.Tier.Core.Lifecycle;
 
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
 
@@ -39,6 +39,7 @@ public abstract partial class ProbingIndexBase<TKey>
     // ════════════════════════════════════════════════════════════
 
     /// <summary>体长（头 BodyLength 字段——写头时先知：几何 + 结构内容）。</summary>
+    /// <returns>体字节数（几何 + 桶区/溢出池等内容——写头时先知，帧长可推导）。</returns>
     protected abstract long ComputeBodyLength();
 
     /// <summary>写体内容（几何 + 结构内容全在体内——fuzzy 逐槽拷贝归子类，分片经 <see cref="WriteBodyChunk"/>）。</summary>
@@ -48,6 +49,9 @@ public abstract partial class ProbingIndexBase<TKey>
     /// 物化最新完整帧（读几何 → 重建结构 → 重数实收）。返回 true 且 <paramref name="entryCount"/>
     /// 给出物化后条目数（fuzzy 帧实收为准）。
     /// </summary>
+    /// <param name="head">帧头地址（基类帧走链定位的最新完整帧）。</param>
+    /// <param name="entryCount">物化后条目数（仅成功返回时有意义）。</param>
+    /// <returns>true = 物化成功；false = 帧无效/校验失败（恢复核心走全量重放 fail-safe）。</returns>
     protected abstract bool TryMaterializeFrame(LogicalAddress head, out long entryCount);
 
     /// <summary>当前条目数（后台策略触发用）。</summary>
@@ -59,9 +63,10 @@ public abstract partial class ProbingIndexBase<TKey>
 
     private LogicalAddress _frameHead;
     private LogicalAddress _frameWriteEnd;
-    private Crc64? _frameCrc;
+    private UnifiedCrc64? _frameCrc;
 
     /// <summary>写体分片（子类 WriteBody 内调用——CRC 边写边累积，帧长任意边界）。</summary>
+    /// <param name="chunk">体内容分片（任意长度边界；空分片忽略）。</param>
     protected void WriteBodyChunk(ReadOnlySpan<byte> chunk)
     {
         if (_frameCrc is null)
@@ -78,6 +83,9 @@ public abstract partial class ProbingIndexBase<TKey>
 
     private sealed class ProbingIndexDumpWorker(ProbingIndexBase<TKey> owner) : BackgroundWorkerLoop(null, 1, "ProbingIndexDumpWorker")
     {
+        /// <summary>后台 dump 单周期：休眠 1s → 按策略（时间间隔/条目增量任一命中）触发帧落盘。</summary>
+        /// <param name="ct">循环取消 token（Stop/Dispose 时触发——休眠被取消按正常退出处理）。</param>
+        /// <returns>是否继续循环（恒 true——轮询型常驻，直到 Stop/Dispose）。</returns>
         protected override async ValueTask<bool> RunOneCycleAsync(CancellationToken ct)
         {
             await Task.Delay(1000, ct).ConfigureAwait(false);   // 1s 轮询粒度（后台低频）
@@ -109,6 +117,14 @@ public abstract partial class ProbingIndexBase<TKey>
     // ════════════════════════════════════════════════════════════
     // === dump 编排（帧三拍——头/体/尾 + 版本链 + 轮替，机制归基类）===
     // ════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 显式帧落盘（公开检查点触发口——TierKv 检查点编排/运维手动触发；语义同 <c>TryDump</c>）。
+    /// <para>★ W = KeyResolver 已落盘水位（组合层契约保证 ≤ W 记录必已入索引）——
+    /// 调用前须先落盘真相源（如 Ring FlushUntil(Tail)）。</para>
+    /// </summary>
+    /// <returns>true = 帧已完整落盘（写 + Flush 成功）；false = 未就绪或持久化关闭（PersistenceKind≠Builtin）未写帧。</returns>
+    public bool CheckpointFrame() => TryDump();
 
     /// <summary>
     /// 快照当前结构为一代主存储帧（后台循环触发；测试可直调）。
@@ -196,6 +212,7 @@ public abstract partial class ProbingIndexBase<TKey>
     }
 
     /// <summary>物化后回调（子类设置条目计数——fuzzy 帧实收为准）。</summary>
+    /// <param name="entryCount">物化实收条目数（帧内实数——以此写回写者维护的条目计数）。</param>
     protected virtual void OnMaterialized(long entryCount) { }
 
     /// <summary>
@@ -239,7 +256,7 @@ public abstract partial class ProbingIndexBase<TKey>
         return newestHead.IsValid;
     }
 
-    private bool AppendFrameBodyCrc(Crc64 crc, LogicalAddress at, long bodyLen)
+    private bool AppendFrameBodyCrc(UnifiedCrc64 crc, LogicalAddress at, long bodyLen)
     {
         Span<byte> buf = stackalloc byte[PersistBodyChunk];
         var off = at;
@@ -257,6 +274,10 @@ public abstract partial class ProbingIndexBase<TKey>
     }
 
     /// <summary>读体分片（子类物化用——整读/分段读 helper）。</summary>
+    /// <param name="at">读起始逻辑地址。</param>
+    /// <param name="dst">接收缓冲区（请求字节数 = 长度）。</param>
+    /// <param name="got">实读字节数（可小于请求值；0 = 起始处无数据）。</param>
+    /// <returns>true = 至少读到 1 字节；false = 起始处即无数据（0 字节）。</returns>
     protected bool ReadBodyChunk(LogicalAddress at, Span<byte> dst, out int got)
     {
         got = _engine.Read(at, dst);

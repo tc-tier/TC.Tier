@@ -105,11 +105,7 @@ public sealed partial class Segment
             return false;
         }
 
-        var idx = _extentList.FindContainingIndex(start);
-        // ★ 回退到最早的同 Start extent
-        while (idx > 0 && _extentList[idx - 1].Start == _extentList[idx].Start)
-            idx--;
-        idx = Math.Max(0, idx);
+        var idx = _extentList.FindEarliestNotAfterIndex(start);   // ★ #344 统一原语
         // ★ L1 销案（）：Reclaim 族（中间/头/尾）可重占 Aborted——重试治愈毒化区。
         //   幂等论证：Aborted = punch/commit 非原子窗口的"数据完好或已归零"二态未知；Reclaim 契约
         //   = 销毁数据成洞（不读数据）——再 punch 两分支收敛同终态（完好→归零；已零→no-op），
@@ -148,10 +144,7 @@ public sealed partial class Segment
             return false;
         }
 
-        var idx = _extentList.FindContainingIndex(start);
-        while (idx > 0 && _extentList[idx - 1].Start == _extentList[idx].Start)
-            idx--;
-        idx = Math.Max(0, idx);
+        var idx = _extentList.FindEarliestNotAfterIndex(start);   // ★ #344 统一原语
         for (var i = idx; i < _extentList.Count; i++)
         {
             var r = _extentList[i];
@@ -170,6 +163,9 @@ public sealed partial class Segment
     /// <para>★ Compact Phase 0 用：等所有权全部归还（在途 IO 完成）。</para>
     /// <para>★ 与 <see cref="CanAcquire"/> 区别：允许 Aborted（永久洞），只拒绝 Leased/Punching（在途）。</para>
     /// </summary>
+    /// <param name="start">起始偏移（字节）。</param>
+    /// <param name="end">结束偏移（字节，不含）。</param>
+    /// <returns>true = [start, end) 内无在途区间，所有权已全部归还；false = 存在 Leased/Punching 在途区间，需继续等待。</returns>
     public bool IsRangeFullyDrained(long start, long end)
     {
         using var lk = AcquireExtentLock();
@@ -199,11 +195,7 @@ public sealed partial class Segment
                 return (o.Start, o.State);
         }
 
-        var idx = _extentList.FindContainingIndex(offset);
-        // ★ 同 Start 有多个区间时回退到最早的那个
-        while (idx > 0 && _extentList[idx - 1].Start == _extentList[idx].Start)
-            idx--;
-        var startIdx = idx >= 0 ? idx : 0;
+        var startIdx = _extentList.FindEarliestNotAfterIndex(offset);   // ★ #344 统一原语
         var readableEnd = offset;
 
         for (var i = startIdx; i < _extentList.Count && readableEnd < bound; i++)
@@ -314,8 +306,7 @@ public sealed partial class Segment
         var reclaimMaySplitAborted =
             ExtentStateCode.SourceOf(requestState) == ExtentStateCode.SrcReclaim;
         // 从 start 之前的第一个可能重叠区间开始扫描（FindContainingIndex 找 Start ≤ start 的最大 idx）
-        var startIdx = _extentList.FindContainingIndex(start);
-        if (startIdx < 0) startIdx = 0;
+        var startIdx = _extentList.FindEarliestNotAfterIndex(start);   // ★ #344 统一原语（同 Start 早期重叠区间不再漏扫）
         for (var i = startIdx; i < _extentList.Count; i++)
         {
             var old = _extentList[i];
@@ -376,6 +367,9 @@ public sealed partial class Segment
     /// <para>★ 大 list（> _compactThreshold）：O(1) 标记路径——只改状态 + 增量投影，合并推迟到 CompactIntervals。</para>
     /// <para>★ 碎片率超阈值时通过 _compactCallback 入队异步压缩。</para>
     /// </summary>
+    /// <param name="start">区间起始偏移（字节）。</param>
+    /// <param name="end">区间结束偏移（字节，不含）。</param>
+    /// <param name="sparse">是否为稀疏区间（写入 Committed 记录时携带）。</param>
     public void CompleteAndMerge(long start, long end, bool sparse)
     {
         using var lk = AcquireExtentLock();
@@ -747,6 +741,9 @@ public sealed partial class Segment
     /// <summary>
     /// 检查 [start, end) 区间是否全部可读（Read 用）。
     /// </summary>
+    /// <param name="start">起始偏移（字节）。</param>
+    /// <param name="end">结束偏移（字节，不含）。</param>
+    /// <returns>true = 区间全部可读（无越界、无在途记录）；false = 存在不可读部分，应走慢路径 <see cref="ClampReadable"/>。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool IsRangeFullyReadable(long start, long end)
     {
@@ -782,6 +779,9 @@ public sealed partial class Segment
     ///   （Committed 蕴含记录存在），end 越过 VisibleOffset ⟺ 该区已被截断抹除——快速失败
     ///   与"读已删段抛 PartitionInvalidException"同语义。</para>
     /// </summary>
+    /// <param name="start">起始偏移（字节）。</param>
+    /// <param name="end">结束偏移（字节，不含）。</param>
+    /// <returns>true = 含 Aborted/Wasted 终态区间或已越出可见投影（永不可读），等待方必须快速失败；false = 不含，可继续等待变为可读。</returns>
     public bool ContainsPermanentlyUnreadable(long start, long end)
     {
         // 截断死区：区间尾越过可见投影（记录已被 RetreatOffset 删除）——永不可读
@@ -800,6 +800,7 @@ public sealed partial class Segment
     /// 拍快照——拷贝当前 ExtentRecord 列表（Compact 搬迁用，仅冷路径）。
     /// <para>★ 热路径/诊断用 <see cref="EnumerateExtents"/>——零拷贝持锁遍历，不分配 List。</para>
     /// </summary>
+    /// <returns>当前区间记录列表的快照副本（离锁可安全访问，调用方可长期持有）。</returns>
     public IReadOnlyList<ExtentRecord> SnapshotExtents()
     {
         using var lk = AcquireExtentLock();
@@ -813,6 +814,7 @@ public sealed partial class Segment
     /// <para>★ 大量区间时不浪费内存（全量拷贝 = N × 32B List 分配）。</para>
     /// <para>★ 须快速处理——持 SpinLock 期间阻塞写者，不能做 IO/慢操作。</para>
     /// </summary>
+    /// <returns>持锁零拷贝遍历器（using 释放时自动归还区间锁）。</returns>
     public ExtentReader EnumerateExtents() => new(this);
 
     /// <summary>★ ref struct 持锁遍历器——using 自动释放 SpinLock，零分配零拷贝。

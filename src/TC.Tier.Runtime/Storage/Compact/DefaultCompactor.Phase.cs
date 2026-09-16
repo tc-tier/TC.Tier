@@ -33,6 +33,15 @@ internal sealed partial class DefaultCompactor
                 var snapshots = TakePhysicalSnapshots(lease, ct);
                 long leaseTotalLen = snapshots.Values.SelectMany(s => s).Sum(r => r.End - r.Start);
 
+                // ★ 活跃尾段判定：数据窗尾（= 提交水位线）落在段中间——该段不 rename
+                //   （原地搬移 + 源区打洞，写者句柄恒有效——并行整理语义）
+                var dataEnd = lease.DataEnd;
+                var tailChunk = lease.Chunks.FirstOrDefault(c => c.SegId == lease.End.SegId);
+                var tailSegId = tailChunk is not null && dataEnd.SegId == lease.End.SegId
+                    && dataEnd.Offset < tailChunk.OldGrowthLimit
+                    ? lease.End.SegId
+                    : -1;
+
                 // 无数据 lease → 空操作（仍记 plan 用于 Phase 2 Commit/Dispose）
                 if (leaseTotalLen <= 0)
                 {
@@ -44,6 +53,8 @@ internal sealed partial class DefaultCompactor
                         FirstNewSegId = lease.Start.SegId,
                         NewSegCount = 0,
                         SegLimit = 1,
+                        TailSegId = tailSegId,
+                        DataEndOffset = dataEnd.Offset,
                     });
                     continue;
                 }
@@ -53,27 +64,50 @@ internal sealed partial class DefaultCompactor
                 int newSegCount = (int)((leaseTotalLen + segLimit - 1) / segLimit);
                 if (newSegCount < 1) newSegCount = 1;
 
-                // 创建临时段
-                var tempHandles = CreateTempSegments(firstNewSegId, newSegCount, segLimit, ct);
-                allTempHandles.AddRange(tempHandles);
+                // 创建临时段（活跃尾段不建——原地写）
+                var tempHandles = CreateTempSegments(firstNewSegId, newSegCount, segLimit, tailSegId, ct);
+                allTempHandles.AddRange(tempHandles.Where(static h => h is not null)!);
 
-                // 拷贝本 lease 数据
+                // 拷贝本 lease 数据（活跃尾段目标 = 原地写 + 反向拷贝）
+                using var tailInPlace = tailSegId >= 0
+                    ? _fileSystem.Open(GetSegmentPath(tailSegId), new FileOpenOptions
+                    {
+                        Access = AccessMode.ReadWrite,
+                        Mode = FileOpenMode.OpenExisting,
+                        Sharing = FileSharing.ReadWrite | FileSharing.Delete,
+                    })
+                    : null;
                 CopyData(snapshots, firstNewSegId, newSegCount, segLimit, leaseTotalLen,
-                    tempHandles, op, ct, migrationMap);
+                    tempHandles, tailSegId, tailInPlace, op, ct, migrationMap);
 
-                // flush 本 lease 临时段
-                foreach (var h in tempHandles) h.Flush();
+                // ★ 活跃尾段：搬移完成后源区打洞（尾段内打包尾到数据窗尾之间的窗口内数据已全部搬走）
+                if (tailSegId >= 0 && tailInPlace is not null)
+                {
+                    long beforeTail = (long)(tailSegId - firstNewSegId) * segLimit;
+                    long tailPackedEnd = Math.Clamp(leaseTotalLen - beforeTail, 0, dataEnd.Offset);
+                    if (tailPackedEnd < dataEnd.Offset)
+                        tailInPlace.PunchHole(tailPackedEnd, dataEnd.Offset - tailPackedEnd);
+                }
+
+                // flush 本 lease 临时段（活跃尾段 = 原地 flush）
+                foreach (var h in tempHandles) h?.Flush();
+                tailInPlace?.Flush();
 
                 // ★ 新段自写元数据（设计决策：元数据随新段走，fs 替换同步就位）——
                 //   段元组写临时段 FileExtra（xattr 随 inode / sidecar 随 TryMoveSidecar），
                 //   promote（rename）时随文件就位——不再经引擎 tupleWriter 委托事后补写。
+                //   活跃尾段原地搬移——元组写原段 FileExtra（文件不替换，元组就地更新）。
                 for (int i = 0; i < tempHandles.Count; i++)
                 {
+                    var temp = tempHandles[i];   // 局部捕获——索引二次访问丢非空流态（CS8604）
+                    if (temp is null) continue;
                     long realSize = (i == tempHandles.Count - 1)
                         ? leaseTotalLen - segLimit * (tempHandles.Count - 1)
                         : segLimit;
-                    WriteTempSegmentMeta(tempHandles[i], realSize, segLimit, realSize);
+                    WriteTempSegmentMeta(temp, realSize, segLimit, realSize);
                 }
+                if (tailInPlace is not null)
+                    WriteTempSegmentMeta(tailInPlace, GetSegmentLength(tailSegId), segLimit, GetSegmentLength(tailSegId));
 
                 perLeasePlans.Add(new LeasePlan
                 {
@@ -84,6 +118,8 @@ internal sealed partial class DefaultCompactor
                     NewSegCount = newSegCount,
                     SegLimit = segLimit,
                     TempHandles = tempHandles,
+                    TailSegId = tailSegId,
+                    DataEndOffset = dataEnd.Offset,
                 });
             }
 
@@ -104,12 +140,16 @@ internal sealed partial class DefaultCompactor
             {
                 if (plan.NewSegCount == 0)
                 {
-                    // ★ L19 配套（）：lease 尾段扩到 GrowthLimit 后"零数据 lease"也有 chunk
-                    //   （旧钳制下空区间零 chunk、Commit 无绊线可触）——显式填充：零数据整理 = 空段槽
+                    // ★ 零数据 lease（空设备/全打洞）：显式填充——零数据整理 = 空段槽
                     //   （SetReplacement(旧上限, 0)：MaxOffset 归零、区间表清空，读零语义不变）。
-                    //   空设备/全打洞 lease 的正常形态。
+                    //   ★ 活跃尾段带 preserveFrom = 数据窗尾——水位线后活跃区原样保留（并行写者）。
                     foreach (var chunk in plan.Lease.Chunks)
-                        chunk.SetReplacement(chunk.OldGrowthLimit, 0);
+                    {
+                        if (chunk.SegId == plan.TailSegId)
+                            chunk.SetReplacement(chunk.OldGrowthLimit, 0, StableState.Ready, 0, plan.DataEndOffset);
+                        else
+                            chunk.SetReplacement(chunk.OldGrowthLimit, 0);
+                    }
                     continue;
                 }
                 FillLeaseChunks(plan);
@@ -162,7 +202,7 @@ internal sealed partial class DefaultCompactor
                 ProcessOldSegDispositions(AnalyzeSegDispositions(plan));
             }
 
-            // 末段尾 PunchHole 释放预分配块（每个 lease 的末段）
+            // 末段尾 PunchHole 释放预分配块（每个 lease 的末段；活跃尾段只打到数据窗尾——水位线后保留）
             foreach (var plan in perLeasePlans)
             {
                 if (plan.NewSegCount == 0) continue;
@@ -170,12 +210,14 @@ internal sealed partial class DefaultCompactor
                 if (lastNewOff < plan.SegLimit)
                 {
                     int lastNewSegId = plan.FirstNewSegId + plan.NewSegCount - 1;
-                    PunchHoleSegment(lastNewSegId, lastNewOff, plan.SegLimit - lastNewOff);
+                    long punchEnd = lastNewSegId == plan.TailSegId ? plan.DataEndOffset : plan.SegLimit;
+                    if (lastNewOff < punchEnd)
+                        PunchHoleSegment(lastNewSegId, lastNewOff, punchEnd - lastNewOff);
                 }
             }
 
             // 删 commit marker
-            DeleteCommitMarkerRequired();
+            DeleteLastWrittenCommitMarker();
 
             // ★ 新段元数据已随临时段就位（Phase 1 拷贝后自写 FileExtra，rename 同步迁移）——此处无需补写。
 
@@ -276,10 +318,17 @@ internal sealed partial class DefaultCompactor
         internal int FirstNewSegId;
         internal int NewSegCount;
         internal long SegLimit;
-        internal List<IFileHandle> TempHandles = new();
+        internal List<IFileHandle?> TempHandles = new();   // CS8619：元素可空（CreateTempSegments 缺段位 null）——类型对齐事实
+        /// <summary>★ 活跃尾段段号（数据窗尾 = 提交水位线落在段中间——该段不 rename：原地搬移 + 源区打洞，
+        /// 写者句柄恒有效并行不丢）；-1 = 水位线在段界（无活跃尾段）。</summary>
+        internal int TailSegId = -1;
+        /// <summary>★ 数据窗尾偏移（= lease.DataEnd.Offset——尾段 punch/保留边界）。</summary>
+        internal long DataEndOffset;
     }
 
-    /// <summary>填 lease.Chunks——新段 SetReplacement、超出范围的旧段 MarkInvalid。</summary>
+    /// <summary>填 lease.Chunks——新段 SetReplacement、超出范围的旧段 MarkInvalid。
+    /// 活跃尾段（TailSegId）不 MarkInvalid：SetReplacement 原位更新（preserveFrom = 数据窗尾——
+    /// 水位线之后的活跃区原样保留，写者并行不丢）。</summary>
     private void FillLeaseChunks(LeasePlan plan)
     {
         int newSegEndExclusive = plan.FirstNewSegId + plan.NewSegCount;
@@ -291,15 +340,25 @@ internal sealed partial class DefaultCompactor
             int segId = plan.FirstNewSegId + i;
             long segOff = (i == plan.NewSegCount - 1) ? lastNewOff : plan.SegLimit;
             var chunk = chunks.FirstOrDefault(c => c.SegId == segId);
-            // ★ 全量 Compact 不设 preserveFrom（重打包模型：数据物理搬移到新偏移，原位保留会指向
-            //   未拷贝的洞 = 假 committed）。写者数据进快照的保障 = lease 获取前的提交必在
-            //   CommittedTail 之内（AppendFinalize 即时推尾），窗口外无已提交残留。
-            chunk?.SetReplacement(plan.SegLimit, segOff);
+            // ★ 全量 Compact 非尾段不设 preserveFrom（重打包模型：数据物理搬移到新偏移，原位保留会指向
+            //   未拷贝的洞 = 假 committed）。活跃尾段设 preserveFrom = 数据窗尾——水位线后的活跃区
+            //   区间原样拼接保留（写者并行在写；写者数据进快照的保障 = lease 获取前的提交必在
+            //   CommittedTail 之内，窗口外无已提交残留——rename 段无此需要）。
+            if (segId == plan.TailSegId)
+                chunk?.SetReplacement(plan.SegLimit, segOff, StableState.Ready, 0, plan.DataEndOffset);
+            else
+                chunk?.SetReplacement(plan.SegLimit, segOff);
         }
+
+        // ★ 活跃尾段打包不溢出（数据全搬走、段号在重打包范围外）也要 SetReplacement 原位保留，
+        //   不得 MarkInvalid（段文件保留 + 写者句柄恒有效）。
+        var tailChunk = plan.TailSegId >= 0 ? chunks.FirstOrDefault(c => c.SegId == plan.TailSegId) : null;
+        if (tailChunk is not null && tailChunk.State == CompactChunkState.Pending)
+            tailChunk.SetReplacement(plan.SegLimit, 0, StableState.Ready, 0, plan.DataEndOffset);
 
         foreach (var chunk in chunks)
         {
-            if (chunk.SegId >= newSegEndExclusive)
+            if (chunk.SegId >= newSegEndExclusive && chunk.SegId != plan.TailSegId)
                 chunk.MarkInvalid();
         }
     }
@@ -378,26 +437,29 @@ internal sealed partial class DefaultCompactor
     //  Phase 1: 拷贝
     // ═══════════════════════════════════════════════════════════════
 
-    /// <summary>创建 newSegCount 个临时段 IFileHandle。</summary>
-    private List<IFileHandle> CreateTempSegments(int firstNewSegId, int newSegCount, long segLimit,
-        CancellationToken ct)
+    /// <summary>创建 newSegCount 个临时段 IFileHandle（活跃尾段不建——null 占位，原地写）。</summary>
+    private List<IFileHandle?> CreateTempSegments(int firstNewSegId, int newSegCount, long segLimit,
+        int tailSegId, CancellationToken ct)
     {
-        var handles = new List<IFileHandle>(newSegCount);
+        var handles = new List<IFileHandle?>(newSegCount);
         for (int i = 0; i < newSegCount; i++)
         {
             ct.ThrowIfCancellationRequested();
             int segId = firstNewSegId + i;
-            handles.Add(CreateTempHandle(segId, segLimit));
+            // ★ 活跃尾段：不建 temp、不 rename——数据搬移经原地句柄（写者句柄恒有效）
+            handles.Add(segId == tailSegId ? null : CreateTempHandle(segId, segLimit));
         }
 
         return handles;
     }
 
-    /// <summary>拷贝循环——基于物理快照把源段 allocated 区间搬到新段（累积到全局 migrationMap）。</summary>
+    /// <summary>拷贝循环——基于物理快照把源段 allocated 区间搬到新段（累积到全局 migrationMap）。
+    /// 活跃尾段目标（dstSegId == tailSegId）= 原地写（同段前移 → 反向拷贝）。</summary>
     private void CopyData(
         Dictionary<int, List<(long Start, long End)>> snapshots,
         int firstNewSegId, int newSegCount, long segLimit, long totalLen,
-        List<IFileHandle> tempHandles, AsyncOperation<CompactResult> op, CancellationToken ct,
+        List<IFileHandle?> tempHandles, int tailSegId, IFileHandle? tailInPlace,
+        AsyncOperation<CompactResult> op, CancellationToken ct,
         Dictionary<LogicalAddress, LogicalAddress?> migrationMap)
     {
         using var chunkBuf = new AlignedMemoryManager(CopyChunkSize, AlignmentConst.Alignment4K);
@@ -433,9 +495,15 @@ internal sealed partial class DefaultCompactor
                         long spaceInSeg = segLimit - dstOff;
                         int toWrite = (int)Math.Min(n - written, spaceInSeg);
 
-                        tempHandles[dstSegIdx].Write(dstOff, bufMem.Span.Slice(written, toWrite));
-
                         int dstSegId = firstNewSegId + dstSegIdx;
+                        // ★ 活跃尾段目标 = 原地写（temp 位置为 null）。数据已读入 chunkBuf——
+                        //   同段前移写目标 [dstOff, dstOff+toWrite) 只覆盖已读源区
+                        //   （dstOff + toWrite ≤ off + toWrite，未来源读取 [off+n, end) 不受扰），正向安全。
+                        if (dstSegId == tailSegId && tailInPlace is not null)
+                            tailInPlace.Write(dstOff, bufMem.Span.Slice(written, toWrite));
+                        else
+                            tempHandles[dstSegIdx]!.Write(dstOff, bufMem.Span.Slice(written, toWrite));
+
                         migrationMap[new LogicalAddress(segId, off + written)] =
                             new LogicalAddress(dstSegId, dstOff);
 

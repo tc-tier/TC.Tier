@@ -5,6 +5,8 @@ namespace TC.Tier.Core.Primitives;
 /// <summary>
 /// <see cref="NativeArena"/> 是一个简单的非托管内存分配器，提供类似竞技场（arena）的内存管理方式。
 /// 它在初始化时分配一块固定大小的非托管内存，并允许在该内存块中进行快速的线性分配。适用于需要高性能、低开销的内存分配场景，例如临时缓冲区、批量数据处理等。
+/// <para><see cref="Allocate{T}"/> 与 <see cref="AllocateBytes"/> 可并发调用；<see cref="Reset"/> 和
+/// <see cref="Dispose"/> 是生命周期操作，调用前必须由使用方排空所有分配者及已返回 Span 的使用者。</para>
 /// </summary>
 public sealed unsafe class NativeArena : IDisposable
 {
@@ -43,12 +45,12 @@ public sealed unsafe class NativeArena : IDisposable
     /// <summary>
     /// 获取已使用的字节数。
     /// </summary>
-    public int Used => _offset;
+    public int Used => Volatile.Read(ref _offset);
 
     /// <summary>
     /// 获取剩余可用字节数。
     /// </summary>
-    public int Remaining => _size - _offset;
+    public int Remaining => _size - Volatile.Read(ref _offset);
 
     /// <summary>
     /// 获取竞技场是否已被释放。
@@ -75,12 +77,11 @@ public sealed unsafe class NativeArena : IDisposable
     /// <exception cref="InvalidOperationException">剩余空间不足时抛出。</exception>
     public Span<T> Allocate<T>(int count) where T : struct
     {
-        int bytes = count * Unsafe.SizeOf<T>();
-        if (_offset + bytes > _size)
-            throw new InvalidOperationException($"NativeArena exhausted: requested {bytes}, remaining {Remaining}");
-        var span = new Span<T>((_ptr + _offset).ToPointer(), count);
-        _offset += bytes;
-        return span;
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        // checked：count*sizeof 溢出为负可绕过下界检查→过小 Span→buffer overrun
+        int bytes = checked(count * Unsafe.SizeOf<T>());
+        int offset = Reserve(bytes);
+        return new Span<T>((_ptr + offset).ToPointer(), count);
     }
 
     /// <summary>
@@ -91,11 +92,24 @@ public sealed unsafe class NativeArena : IDisposable
     /// <exception cref="InvalidOperationException">剩余空间不足时抛出。</exception>
     public Span<byte> AllocateBytes(int count)
     {
-        if (_offset + count > _size)
-            throw new InvalidOperationException($"NativeArena exhausted: requested {count}, remaining {Remaining}");
-        var span = new Span<byte>((_ptr + _offset).ToPointer(), count);
-        _offset += count;
-        return span;
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        int offset = Reserve(count);
+        return new Span<byte>((_ptr + offset).ToPointer(), count);
+    }
+
+    private int Reserve(int bytes)
+    {
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        while (true)
+        {
+            int current = Volatile.Read(ref _offset);
+            int next = checked(current + bytes);
+            if (next > _size)
+                throw new InvalidOperationException(
+                    $"NativeArena exhausted: requested {bytes}, remaining {_size - current}");
+            if (Interlocked.CompareExchange(ref _offset, next, current) == current)
+                return current;
+        }
     }
 
     /// <summary>
@@ -103,7 +117,8 @@ public sealed unsafe class NativeArena : IDisposable
     /// </summary>
     public void Reset()
     {
-        _offset = 0;
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
+        Volatile.Write(ref _offset, 0);
     }
 
     /// <summary>

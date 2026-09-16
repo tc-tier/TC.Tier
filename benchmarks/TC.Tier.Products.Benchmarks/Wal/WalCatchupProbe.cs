@@ -64,6 +64,11 @@ public static class WalCatchupProbe
         imp.Stop();
         Console.WriteLine($"冷节点导入：耗时 {imp.Elapsed.TotalSeconds:F3}s，SnapshotIndex={wal2.SnapshotIndex:N0}");
 
+        // ★ 增量段补给冷节点（模拟网络到货——本探针无传输层，直写同批 delta 条目；
+        //   补写不在收敛计时内——收敛只计 导出+导入+重放 三腿）
+        await AppendRangeAsync(wal2, (int)n0 + 1, delta, entrySize).ConfigureAwait(false);
+        await wal2.CommitAsync(default).ConfigureAwait(false);
+
         long replayed = 0;
         var rep = Stopwatch.StartNew();
         await foreach (var e in wal2.ReadFromAsync(n0 + 1, default).ConfigureAwait(false))
@@ -74,13 +79,15 @@ public static class WalCatchupProbe
         }
         rep.Stop();
 
+        if (replayed != delta)
+            Console.WriteLine($"  [警告] 增量重放 {replayed:N0} 条 != 预期 {delta:N0}（探针口径自检）");
         var converge = exportSeconds + imp.Elapsed.TotalSeconds + rep.Elapsed.TotalSeconds;
         Console.WriteLine();
         Console.WriteLine($"增量重放：{replayed:N0} 条，耗时 {rep.Elapsed.TotalSeconds:F2}s（{replayed / rep.Elapsed.TotalSeconds:N0} 条/s）");
         Console.WriteLine($"收敛时间（存储侧）：导出 {exportSeconds:F2}s + 导入 {imp.Elapsed.TotalSeconds:F3}s + 重放 {rep.Elapsed.TotalSeconds:F2}s = {converge:F2}s");
     }
 
-    private static async Task AppendRangeAsync(ITierWal wal, int firstIndex, int n, int entrySize)
+    private static async Task AppendRangeAsync(TierWal wal, int firstIndex, int n, int entrySize)   // CA1859：具体形（接口虚调用消）
     {
         const int batchSize = 1000;
         for (var done = 0; done < n; done += batchSize)

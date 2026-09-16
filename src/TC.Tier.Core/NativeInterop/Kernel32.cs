@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Microsoft.Win32.SafeHandles;
 
@@ -229,7 +230,7 @@ internal static unsafe partial class Kernel32
 
     /// <summary>GetActiveProcessorCount — 获取指定组的活跃处理器数。</summary>
     [LibraryImport(NativeLibraries.Kernel32, EntryPoint = "GetActiveProcessorCount", SetLastError = true)]
-    private static partial uint GetActiveProcessorCount(uint groupNumber);
+    private static partial uint GetActiveProcessorCount(ushort groupNumber);
 
     /// <summary>GetActiveProcessorGroupCount — 获取活跃处理器组数（NUMA 插槽数）。</summary>
     [LibraryImport(NativeLibraries.Kernel32, EntryPoint = "GetActiveProcessorGroupCount", SetLastError = true)]
@@ -361,58 +362,146 @@ internal static unsafe partial class Kernel32
     // ════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// 线程轮询绑核（[socket, core] 顺序）。NUMA 机上索引 0..N-1 映射到 socket0 的 core0..coreN-1。
+    /// 线程轮询绑核（[processor group, processor] 顺序），按各组真实活动处理器数连续映射。
     /// </summary>
     /// <param name="threadIndex">线程索引（从 0 起）。</param>
     public static void AffinitizeThreadRoundRobin(uint threadIndex)
     {
-        var processorCount = GetActiveProcessorCount(NativeConstants.AllProcessorGroups);
-        var processorGroupCount = GetActiveProcessorGroupCount();
-        var procsPerGroup = processorCount / processorGroupCount;
-
-        GroupAffinity affinity = default;
-        GroupAffinity oldAffinity = default;
-
-        var thread = GetCurrentThread();
-        GetThreadGroupAffinity(thread, ref affinity);
-
-        threadIndex %= processorCount;
-        affinity.Mask = (ulong)1L << ((int)(threadIndex % procsPerGroup));
-        affinity.Group = threadIndex / procsPerGroup;
-
-        if (SetThreadGroupAffinity(thread, ref affinity, ref oldAffinity) == 0)
-            throw new InvalidOperationException("无法绑定线程亲和性");
+        var groupProcessorCounts = GetActiveProcessorCountsByGroup();
+        SetCurrentThreadAffinity(MapProcessorRoundRobin(threadIndex, groupProcessorCounts));
     }
 
-    /// <summary>获取处理器组数（NUMA 插槽数）与每组处理器数。</summary>
+    /// <summary>获取 Windows 处理器组数与各组公共可用的最小处理器数。</summary>
     public static (uint groupCount, uint procsPerGroup) GetNumGroupsProcsPerGroup()
     {
-        var processorCount = GetActiveProcessorCount(NativeConstants.AllProcessorGroups);
-        var processorGroupCount = GetActiveProcessorGroupCount();
-        return (processorGroupCount, processorCount / processorGroupCount);
+        var groupProcessorCounts = GetActiveProcessorCountsByGroup();
+        uint minProcessorCount = groupProcessorCounts[0];
+        for (int group = 1; group < groupProcessorCounts.Length; group++)
+            minProcessorCount = Math.Min(minProcessorCount, groupProcessorCounts[group]);
+        return ((uint)groupProcessorCounts.Length, minProcessorCount);
     }
 
     /// <summary>
-    /// 线程分片绑核（[core, socket] 顺序）。NUMA 机上索引 0..N-1 映射到各 socket 的 core0。
+    /// 线程分片绑核（[processor, processor group] 顺序），异构组中跳过不存在的处理器序号。
     /// </summary>
     /// <param name="threadIndex">线程索引（从 0 起）。</param>
-    /// <param name="processorGroupCount">NUMA 插槽数。</param>
+    /// <param name="processorGroupCount">Windows 处理器组数。</param>
     public static void AffinitizeThreadShardedNuma(uint threadIndex, ushort processorGroupCount)
     {
-        var processorCount = GetActiveProcessorCount(NativeConstants.AllProcessorGroups);
-        var procsPerGroup = processorCount / processorGroupCount;
-        threadIndex = procsPerGroup * (threadIndex % processorGroupCount) + (threadIndex / processorGroupCount);
-        AffinitizeThreadRoundRobin(threadIndex);
+        if (processorGroupCount == 0)
+            throw new ArgumentOutOfRangeException(nameof(processorGroupCount), "处理器组数必须大于 0。");
+
+        var groupProcessorCounts = GetActiveProcessorCountsByGroup();
+        if (processorGroupCount != groupProcessorCounts.Length)
+            throw new ArgumentOutOfRangeException(nameof(processorGroupCount), processorGroupCount,
+                $"处理器组数与系统当前拓扑不一致（actual={groupProcessorCounts.Length}）。");
+
+        SetCurrentThreadAffinity(MapProcessorSharded(threadIndex, groupProcessorCounts));
     }
 
-    /// <summary>进程权限是否已成功启用（缓存，避免重复调内核）。</summary>
-    private static bool? _processPrivilegeEnabled;
+    private static uint[] GetActiveProcessorCountsByGroup()
+    {
+        ushort groupCount = GetActiveProcessorGroupCount();
+        if (groupCount == 0)
+            throw new Win32Exception(Marshal.GetLastPInvokeError(), "无法获取活动处理器组。");
 
-    /// <summary>启用进程级 SeManageVolumePrivilege 权限（卷管理用）。非 Windows 返回 false。</summary>
+        var groupProcessorCounts = new uint[groupCount];
+        for (ushort group = 0; group < groupCount; group++)
+        {
+            uint processorCount = GetActiveProcessorCount(group);
+            if (processorCount == 0)
+                throw new Win32Exception(Marshal.GetLastPInvokeError(),
+                    $"处理器组 {group} 返回无效的活动处理器数 {processorCount}。");
+            if (processorCount > 64)
+                throw new InvalidOperationException(
+                    $"处理器组 {group} 返回 {processorCount} 个活动处理器，超出 GROUP_AFFINITY 掩码容量。");
+            groupProcessorCounts[group] = processorCount;
+        }
+        return groupProcessorCounts;
+    }
+
+    internal static (ushort Group, uint Processor) MapProcessorRoundRobin(
+        uint threadIndex, ReadOnlySpan<uint> groupProcessorCounts)
+    {
+        uint processorIndex = threadIndex % ValidateProcessorGroupCounts(groupProcessorCounts);
+        for (ushort group = 0; group < groupProcessorCounts.Length; group++)
+        {
+            uint processorCount = groupProcessorCounts[group];
+            if (processorIndex < processorCount)
+                return (group, processorIndex);
+            processorIndex -= processorCount;
+        }
+
+        throw new InvalidOperationException("处理器轮询映射未收敛。");
+    }
+
+    internal static (ushort Group, uint Processor) MapProcessorSharded(
+        uint threadIndex, ReadOnlySpan<uint> groupProcessorCounts)
+    {
+        uint remaining = threadIndex % ValidateProcessorGroupCounts(groupProcessorCounts);
+        uint maxProcessorCount = 0;
+        foreach (uint processorCount in groupProcessorCounts)
+            maxProcessorCount = Math.Max(maxProcessorCount, processorCount);
+
+        for (uint processor = 0; processor < maxProcessorCount; processor++)
+        {
+            for (ushort group = 0; group < groupProcessorCounts.Length; group++)
+            {
+                if (processor >= groupProcessorCounts[group])
+                    continue;
+                if (remaining == 0)
+                    return (group, processor);
+                remaining--;
+            }
+        }
+
+        throw new InvalidOperationException("处理器分片映射未收敛。");
+    }
+
+    private static uint ValidateProcessorGroupCounts(ReadOnlySpan<uint> groupProcessorCounts)
+    {
+        if (groupProcessorCounts.IsEmpty || groupProcessorCounts.Length > ushort.MaxValue)
+            throw new ArgumentException("处理器组列表必须非空且可由 ushort 组号表示。", nameof(groupProcessorCounts));
+
+        uint totalProcessorCount = 0;
+        foreach (uint processorCount in groupProcessorCounts)
+        {
+            if (processorCount is 0 or > 64)
+                throw new ArgumentOutOfRangeException(nameof(groupProcessorCounts), processorCount,
+                    "每个 Windows 处理器组必须包含 1..64 个活动处理器。");
+            totalProcessorCount = checked(totalProcessorCount + processorCount);
+        }
+        return totalProcessorCount;
+    }
+
+    private static void SetCurrentThreadAffinity((ushort Group, uint Processor) target)
+    {
+        GroupAffinity affinity = default;
+        GroupAffinity oldAffinity = default;
+        var thread = GetCurrentThread();
+        if (GetThreadGroupAffinity(thread, ref affinity) == 0)
+            throw new Win32Exception(Marshal.GetLastPInvokeError(), "无法读取当前线程亲和性。");
+
+        affinity.Mask = 1UL << checked((int)target.Processor);
+        affinity.Group = target.Group;
+
+        if (SetThreadGroupAffinity(thread, ref affinity, ref oldAffinity) == 0)
+            throw new Win32Exception(Marshal.GetLastPInvokeError(), "无法绑定线程亲和性。");
+    }
+
+    // ★ 权限探测状态（0=未探测 1=失败 2=成功——volatile int 编码；裸 static bool? 懒初始化有发布竞态）
+    private static volatile int _processPrivilegeState;
+
+    /// <summary>最近一次权限启用失败的 Win32 错误码（诊断用——失败分支即时捕获，0 = 无失败记录）。</summary>
+    public static int LastPrivilegeError { get; private set; }
+
+    /// <summary>启用进程级 SeManageVolumePrivilege 权限（卷管理用）。非 Windows 返回 false。
+    /// <para>★ 结果缓存（volatile 状态编码，并发首探最坏重复探测一次——内核侧幂等）；失败原因见 <see cref="LastPrivilegeError"/>。</para></summary>
     public static bool EnableProcessPrivileges()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
-        if (_processPrivilegeEnabled.HasValue) return _processPrivilegeEnabled.Value;
+        var state = _processPrivilegeState;
+        if (state != 0) return state == 2;
 
         TokenPrivileges privileges = default;
         privileges.PrivilegeCount = 1;
@@ -421,7 +510,8 @@ internal static unsafe partial class Kernel32
         Luid luid = default;
         if (!AdvApi32.LookupPrivilegeValue(null, "SeManageVolumePrivilege", ref luid))
         {
-            _processPrivilegeEnabled = false;
+            LastPrivilegeError = Marshal.GetLastWin32Error();
+            _processPrivilegeState = 1;
             return false;
         }
 
@@ -429,20 +519,22 @@ internal static unsafe partial class Kernel32
 
         if (!AdvApi32.OpenProcessToken(GetCurrentProcess(), NativeConstants.TokenAdjustPrivileges, out var token))
         {
-            _processPrivilegeEnabled = false;
+            LastPrivilegeError = Marshal.GetLastWin32Error();
+            _processPrivilegeState = 1;
             return false;
         }
 
         if (!AdvApi32.AdjustTokenPrivileges(token, 0, ref privileges, 0, IntPtr.Zero, IntPtr.Zero) ||
             Marshal.GetLastWin32Error() != 0)
         {
+            LastPrivilegeError = Marshal.GetLastWin32Error();
             CloseHandle(token);
-            _processPrivilegeEnabled = false;
+            _processPrivilegeState = 1;
             return false;
         }
 
         CloseHandle(token);
-        _processPrivilegeEnabled = true;
+        _processPrivilegeState = 2;
         return true;
     }
 
@@ -466,7 +558,7 @@ internal static unsafe partial class Kernel32
     internal static bool EnableVolumePrivileges(string fileName, SafeFileHandle handle)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return false;
-        if (_processPrivilegeEnabled == false) return false;
+        if (!EnableProcessPrivileges()) return false;   // ★ 未探测/未启用一律先确保权限——旧"未探测(null)直落 DeviceIoControl"必失败
 
         var volumePath = string.Concat(@"\\.\", fileName.AsSpan(0, 2));
         const uint creationDisposition = unchecked((uint)FileMode.Open);

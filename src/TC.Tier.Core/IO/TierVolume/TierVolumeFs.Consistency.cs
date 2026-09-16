@@ -1,4 +1,4 @@
-using System.IO.Hashing;
+using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
@@ -45,7 +45,7 @@ public sealed partial class TierVolumeFs
 
         var image = SerializeMetadata();
         var imageSpan = image.Buffer.AsSpan(0, image.LengthBytes);
-        var imageCrc = Crc32.HashToUInt32(imageSpan);
+        var imageCrc = UnifiedCrc.ComputeCrc32C(imageSpan);
         var blocks = (uint)((imageSpan.Length + _pageSize - 1) / _pageSize);
         var oldRuns = _sb.ImageRuns;
 
@@ -184,7 +184,7 @@ public sealed partial class TierVolumeFs
             ReadCarrierExactly((long)(start * (ulong)_pageSize), image.AsSpan((int)pos, take));
             pos += take;
         }
-        if (Crc32.HashToUInt32(image) != winner.ImageCrc)
+        if (UnifiedCrc.ComputeCrc32C(image) != winner.ImageCrc)
             throw new FileIOException(IOError.IOFailure,
                 $"元数据镜像 CRC 校验失败（{winnerSide} 侧，gen={winner.Generation}）", _carrier.Path, "Open");
         LoadMetadata(image);

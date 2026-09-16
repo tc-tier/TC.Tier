@@ -54,7 +54,7 @@ public sealed partial class Segment
     /// 等待 = 先查状态（volatile）→ 等闩 → 醒后复查——双检零竞态。
     /// <para>★ 恢复期构造的非 Empty 段（出生即 Ready/Full）构造时即 Set（已物理就绪）。</para>
     /// </summary>
-    private readonly Core.Primitives.AsyncManualResetEvent _physicalReady = new();
+    private readonly AsyncManualResetEvent _physicalReady = new();
 
     // ═══ 只读属性 ═══
     /// <summary>段身份（事件快照、日志、Compact 关联用）。</summary>

@@ -82,6 +82,8 @@ public sealed class TierFsSpecAnalyzer : DiagnosticAnalyzer
 
     /// <summary>真值表单源化：被分析编译内可解析 TierSpec 时从其 [SpecParam] 符号派生（单一事实源）；
     /// 不可解析（如无 Core 引用的冒烟编译）→ 静态回退表。</summary>
+    /// <param name="ctx">语法节点分析上下文（取 Compilation 解析 TierSpec 符号）。</param>
+    /// <returns>query→media 真值表（按编译缓存，避免重复符号解析）。</returns>
     private static ImmutableDictionary<string, string> ResolveTable(SyntaxNodeAnalysisContext ctx)
     {
         var cached = TableCache.GetValue(ctx.Compilation, comp =>
@@ -112,6 +114,8 @@ public sealed class TierFsSpecAnalyzer : DiagnosticAnalyzer
         return cached;
     }
 
+    /// <summary>检测 TierFs.New/Open/OpenOrCreate 的 spec 字符串合规性（L1 纵深防御——运行时另有校验）。</summary>
+    /// <param name="ctx">语法节点分析上下文。</param>
     private static void AnalyzeInvocation(SyntaxNodeAnalysisContext ctx)
     {
         var invocation = (InvocationExpressionSyntax)ctx.Node;

@@ -10,6 +10,7 @@ internal sealed partial class StorageEngine
     public int Read(LogicalAddress source, Span<byte> destination)
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("Read");
         EnsureReady();
         if (destination.IsEmpty) return 0;
 
@@ -99,6 +100,7 @@ internal sealed partial class StorageEngine
         CancellationToken ct)
     {
         ThrowIfDisposed();
+        if (_faults is { } faults) await faults.OnOpEnterAsync("ReadAsync", ct).ConfigureAwait(false);
         EnsureReady();
         if (destination.IsEmpty) return 0;
 

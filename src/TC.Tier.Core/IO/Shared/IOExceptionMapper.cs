@@ -10,6 +10,8 @@ namespace TC.Tier.Core.IO.Shared;
 internal static class IOExceptionMapper
 {
     /// <summary>把原生异常映射为 <see cref="IOError"/>（不包装，仅分类）。</summary>
+    /// <param name="ex">原生异常（OCE/ArgumentException/UnauthorizedAccessException/IOException 等）。</param>
+    /// <returns>语义错误码（无法识别为 <see cref="IOError.Unknown"/>）。</returns>
     public static IOError Classify(Exception ex) => ex switch
     {
         OperationCanceledException => IOError.Cancelled,
@@ -21,6 +23,8 @@ internal static class IOExceptionMapper
     };
 
     /// <summary>HResult → IOError（Win32 码与 POSIX errno 的交集映射）。</summary>
+    /// <param name="hr">异常 HResult（低 16 位为 Win32 错误码 / POSIX errno）。</param>
+    /// <returns>语义错误码（无交集映射为 <see cref="IOError.Unknown"/>）。</returns>
     public static IOError ClassifyHResult(int hr)
     {
         // Win32 HResult 高 16 位 = facility，低 16 位 = code
@@ -53,6 +57,10 @@ internal static class IOExceptionMapper
     /// <summary>
     /// 包装为 <see cref="FileIOException"/>（附错误分类、操作名与路径）——Core/IO 实现的统一 catch 出口。
     /// </summary>
+    /// <param name="ex">被包装的原生异常（作为 <see cref="FileIOException"/> 内层异常保留）。</param>
+    /// <param name="operation">触发失败的操作名（如 "Write"）。</param>
+    /// <param name="path">相关文件路径（未知传 null）。</param>
+    /// <returns>带分类的 <see cref="FileIOException"/>（原异常为 InnerException）。</returns>
     public static FileIOException Wrap(this Exception ex, string operation, string? path = null)
         => new(Classify(ex), $"{operation} failed: {ex.Message}", path, operation, ex);
 }

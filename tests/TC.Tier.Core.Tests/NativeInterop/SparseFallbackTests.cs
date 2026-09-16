@@ -24,9 +24,10 @@ public sealed class SparseFallbackTests : IDisposable
     /// 降级路径：SetLength 前先标记稀疏——逻辑大小成立、物理分配≈0。
     /// Windows：SetSparse 生效（未标记则 NTFS 即时分配满 64MB）；Linux/macOS：SetLength 天然稀疏，同断言成立。
     /// </summary>
-    [Fact]
+    [SkippableFact]
     public void SparseFallback_MarksSparse_NoPhysicalAllocation()
     {
+        Skip.If(OperatingSystem.IsMacOS(), "APFS punch-hole 物理分配语义不同——稀疏收缩断言跳过。");
         var path = NewPath();
         using var handle = File.OpenHandle(path, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
 

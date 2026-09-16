@@ -17,3 +17,4 @@ global using TC.Tier.Contracts.Structures;
 global using TC.Tier.Contracts.Meta;
 global using TC.Tier.Contracts.Transactions;
 global using TC.Tier.Contracts.Layout;
+global using TC.Tier.Contracts.Serialization;

@@ -25,10 +25,10 @@ public class SortedIndexMainStorageTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void MainStorageRecovery_ZeroReplay_AllFound(bool useBTree)
+    public async Task MainStorageRecovery_ZeroReplay_AllFound(bool useBTree)
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             SortedIndexBase<long> index = useBTree
                 ? TestSortedIndexSettingsFactory.NewBTree<long>(vol,
@@ -47,7 +47,7 @@ public class SortedIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         SortedIndexBase<long> index2 = useBTree
             ? TestSortedIndexSettingsFactory.NewBTree<long>(vol,
                 TestSortedIndexSettingsFactory.BTreeOn(vol, "ms-bt", deleteOnClose: false,
@@ -86,10 +86,10 @@ public class SortedIndexMainStorageTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void MainStorageRecovery_IncrementalReplay(bool useBTree)
+    public async Task MainStorageRecovery_IncrementalReplay(bool useBTree)
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             SortedIndexBase<long> index = useBTree
                 ? TestSortedIndexSettingsFactory.NewBTree<long>(vol,
@@ -113,7 +113,7 @@ public class SortedIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         SortedIndexBase<long> index2 = useBTree
             ? TestSortedIndexSettingsFactory.NewBTree<long>(vol,
                 TestSortedIndexSettingsFactory.BTreeOn(vol, "ms-bt3", deleteOnClose: false,
@@ -141,10 +141,10 @@ public class SortedIndexMainStorageTests
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
-    public void NoFrame_FallsBackToFullReplay(bool useBTree)
+    public async Task NoFrame_FallsBackToFullReplay(bool useBTree)
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             SortedIndexBase<long> index = useBTree
                 ? TestSortedIndexSettingsFactory.NewBTree<long>(vol,
@@ -161,7 +161,7 @@ public class SortedIndexMainStorageTests
             index.Dispose();   // ★ 从未 TryDump——账面无锚点帧
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         SortedIndexBase<long> index2 = useBTree
             ? TestSortedIndexSettingsFactory.NewBTree<long>(vol,
                 TestSortedIndexSettingsFactory.BTreeOn(vol, "ms-bt2", deleteOnClose: false,

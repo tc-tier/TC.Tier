@@ -559,6 +559,8 @@ internal sealed class AsyncPriorityQueueV4<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>入队元素。</summary>
+    /// <param name="item">要入队的元素。</param>
+    /// <param name="priority">元素的优先级（值小者先出；同优先级按入队序 FIFO）。</param>
     /// <exception cref="ObjectDisposedException">队列已释放。</exception>
     public void Enqueue(T item, int priority)
     {
@@ -618,6 +620,9 @@ internal sealed class AsyncPriorityQueueV4<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>尝试出队最小元素。</summary>
+    /// <param name="item">成功时接收出队元素；失败时为 <c>default</c>。</param>
+    /// <returns>true 表示成功出队当前 key 最小的元素（priority 值小者先出，同优先级 FIFO）；
+    /// false 表示队列已释放或当前为空。</returns>
     public bool TryDequeue(out T item)
     {
         item = default!;
@@ -736,6 +741,8 @@ internal sealed class AsyncPriorityQueueV4<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>查看队首元素而不移除。</summary>
+    /// <param name="item">成功时接收队首（key 最小）元素；失败时为 <c>default</c>。</param>
+    /// <returns>true 表示查看成功；false 表示队列已释放或当前为空。</returns>
     public bool TryPeek(out T item)
     {
         item = default!;
@@ -771,6 +778,8 @@ internal sealed class AsyncPriorityQueueV4<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>异步出队；队列为空则等待入队或取消。</summary>
+    /// <param name="ct">取消令牌；等待期间被取消则以 <see cref="OperationCanceledException"/> 完成。默认 <c>default</c>。</param>
+    /// <returns>完成后返回出队的最小元素；队列为空时异步等待新元素入队。</returns>
     public ValueTask<T> DequeueAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -788,6 +797,8 @@ internal sealed class AsyncPriorityQueueV4<T> : IDisposable
         }
     }
 
+    /// <summary>释放队列：唤醒所有等待者、排空 hazard 退休链后归还原生槽位内存；调用方须保证无并发操作。</summary>
+    /// <exception cref="InvalidOperationException">退休链无法排空（存在悬挂 hazard，fail-visible）。</exception>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;

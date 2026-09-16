@@ -1,5 +1,8 @@
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// SortedIndexBase 释放 partial——LifecycleBase 模板清理钩子（比较族无引擎外原生资源，空实现）。
+/// </summary>
 public abstract partial class SortedIndexBase<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>同步额外清理钩子（LifecycleBase 模板）——比较族无引擎外原生资源（引擎/arena 归 Resources 统一释放），空实现。</summary>

@@ -155,10 +155,16 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>New——创建新卷（独立"卷"，私有路径空间——测试隔离的正确姿势）。New/Open 同形（内存无存在性概念，§2.3）。</summary>
+    /// <param name="options">卷选项（PageSize/Allocation/QuotaBytes/Access/Label 等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>新建的内存卷实例。</returns>
     public static MemoryFileSystem New(MemoryFileSystemOptions? options = null, ILogger? logger = null)
         => new(options ?? new MemoryFileSystemOptions(), isDefault: false, logger);
 
     /// <summary>Open——New 同形（既非动词差异；保留双名仅为调用点语义可读）。</summary>
+    /// <param name="options">卷选项（null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>内存卷实例（与 New 等价）。</returns>
     public static MemoryFileSystem Open(MemoryFileSystemOptions? options = null, ILogger? logger = null)
         => New(options, logger);
 
@@ -204,7 +210,11 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         UsedBytes = Volatile.Read(ref _physicalUsage),   // 物理占用口径（与配额执法同源）
     };
 
-    /// <inheritdoc/>
+    /// <summary>打开/创建文件句柄（路径→(槽, 代际) 一次解析；共享检查 + 追加预留盒挂接）。</summary>
+    /// <param name="path">文件相对路径（层级路径父目录须存在）。</param>
+    /// <param name="options">打开选项（Access/Mode/Sharing/Hints/PreallocateSize）。</param>
+    /// <returns>新开句柄（DIO 形态由 Hints.NoBuffering 决定）。</returns>
+    /// <exception cref="FileIOException">文件不存在（OpenExisting）、已存在（CreateNew）、路径是目录、父目录缺失或共享冲突。</exception>
     public IFileHandle Open(string path, FileOpenOptions options)
     {
         ThrowIfDisposed();
@@ -299,7 +309,9 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         ThrowIfDisposed();   // mem 无持久化——no-op
     }
 
-    /// <inheritdoc/>
+    /// <summary>文件是否存在（目录不计入）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <returns>true = 文件在档；false = 不存在（或路径是目录）。</returns>
     public bool Exists(string path)
     {
         ThrowIfDisposed();
@@ -309,7 +321,8 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
             return _paths.ContainsKey(path);
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除文件（幂等——不存在静默返回；数据延迟到最后观察者关闭）。</summary>
+    /// <param name="path">文件相对路径。</param>
     public void Delete(string path)
     {
         ThrowIfDisposed();
@@ -327,7 +340,11 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         FileDeleted?.Invoke(path);
     }
 
-    /// <inheritdoc/>
+    /// <summary>移动/重命名文件（字典项原子交换——POSIX rename 语义，已开句柄不受扰）。</summary>
+    /// <param name="source">源文件相对路径。</param>
+    /// <param name="dest">目标文件相对路径。</param>
+    /// <param name="overwrite">true = 目标存在时覆盖（旧文件延迟退役）；false = 目标存在抛 AlreadyExists（默认）。</param>
+    /// <exception cref="FileIOException">源不存在或目标已存在（未允许覆盖）。</exception>
     public void Move(string source, string dest, bool overwrite = false)
     {
         ThrowIfDisposed();
@@ -367,7 +384,8 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
 
     // ═══════════════ 目录族（根空间层级——filesystem-root-space-design §3/§6）═══════════════
 
-    /// <inheritdoc/>
+    /// <summary>创建目录（mkdir -p——登记全部祖先组件，幂等）。</summary>
+    /// <param name="path">目录相对路径。</param>
     public void CreateDirectory(string path)
     {
         ThrowIfDisposed();
@@ -386,7 +404,9 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除空目录（不存在或非空即抛）。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <exception cref="FileIOException">目录不存在（NotFound）或非空（DirectoryNotEmpty）。</exception>
     public void DeleteDirectory(string path)
     {
         AccessGate.RejectWrite(_access, nameof(DeleteDirectory));
@@ -403,7 +423,9 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>目录是否存在。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <returns>true = 目录在档（或其下有内容）；false = 不存在。</returns>
     /// <remarks>显式集合 ∨ 前缀下有文件/子目录（derived——与枚举口径一致）。</remarks>
     public bool DirectoryExists(string path)
     {
@@ -430,6 +452,10 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
 
     /// <inheritdoc/>
     /// <remarks>mem：fs 锁内批量 re-key（路径项 + 目录集合）——原子（能力位 AtomicDirectoryMove 置位）。</remarks>
+    /// <summary>移动/重命名目录（fs 锁内批量 re-key——原子）。</summary>
+    /// <param name="source">源目录相对路径。</param>
+    /// <param name="dest">目标目录相对路径。</param>
+    /// <exception cref="FileIOException">源目录不存在或目标已存在。</exception>
     public void MoveDirectory(string source, string dest)
     {
         AccessGate.RejectWrite(_access, nameof(MoveDirectory));
@@ -467,6 +493,11 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     /// <inheritdoc/>
     /// <remarks>★ 与 <see cref="CreateOrReplaceFile"/>（mem 特有覆盖语义）区分：接口语义 = 显式非幂等（已存在抛 AlreadyExists）。
     /// 预分配：Reserved 真租物理块 / Sparse 逻辑长度；FileExtra 入槽字段（§3.6）。</remarks>
+    /// <param name="path">文件相对路径（父目录须存在）。</param>
+    /// <param name="preallocateSize">预分配字节数（≥0，默认 0 = 不预分配）。</param>
+    /// <param name="extra">初始 FileExtra 内容（上限 MaxFileExtraBytes，默认空）。</param>
+    /// <exception cref="FileIOException">文件已存在、路径是目录或父目录不存在。</exception>
+    /// <exception cref="ArgumentException">extra 超限或 preallocateSize 为负。</exception>
     public void CreateFile(string path, long preallocateSize = 0, ReadOnlyMemory<byte> extra = default)
     {
         ThrowIfDisposed();
@@ -501,7 +532,10 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         return last < 0 ? "" : path[..last];
     }
 
-    /// <inheritdoc/>
+    /// <summary>获取条目元信息（文件含长度/时间戳/FileExtra；目录不追踪时间——MinValue/null）。</summary>
+    /// <param name="path">条目相对路径。</param>
+    /// <returns>条目信息。</returns>
+    /// <exception cref="FileIOException">条目不存在。</exception>
     public FsEntryInfo Stat(string path)
     {
         ThrowIfDisposed();
@@ -527,42 +561,66 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
 
     // ═══════════════ 枚举族（模式匹配 = PathPattern 客户端过滤——与 BCL Simple 同语义）═══════════════
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从根；PathPattern 客户端过滤，按 Name Ordinal 排序）。</summary>
+    /// <param name="pattern">文件名通配模式（最终组件名匹配，默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对根的路径）。</returns>
     public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateFiles));
         return EnumerateCore(null, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从指定目录；按 Name Ordinal 排序）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">文件名通配模式（最终组件名匹配）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对起始目录的路径）。</returns>
+    /// <exception cref="FileIOException">目录不存在。</exception>
     public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateFiles));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从根；显式集合 ∪ 文件路径推导）。</summary>
+    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对根的路径）。</returns>
     public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
         return EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从指定目录）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">目录名通配模式。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对起始目录的路径）。</returns>
+    /// <exception cref="FileIOException">目录不存在。</exception>
     public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从根；按 Name Ordinal 排序）。</summary>
+    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</returns>
     public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateEntries));
         return EnumerateCore(null, pattern, recursive, EntryFilter.Both);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从指定目录；按 Name Ordinal 排序）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">名称通配模式。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</returns>
+    /// <exception cref="FileIOException">目录不存在。</exception>
     public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateEntries));
@@ -658,7 +716,11 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         return last < 0 ? path.AsSpan() : path.AsSpan()[(last + 1)..];
     }
 
-    /// <inheritdoc/>
+    /// <summary>进入维护模式——按 scope 拒绝并发操作，返回的租约 Dispose 即退出。</summary>
+    /// <param name="reason">维护原因（诊断/日志用）。</param>
+    /// <param name="scope">维护范围（决定拒绝面——All 连读也拒）。</param>
+    /// <param name="ct">取消令牌（默认 default = 不取消）。</param>
+    /// <returns>维护租约（Dispose 即退出维护）。</returns>
     public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -669,6 +731,8 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     /// <remarks>★ 进程内真锁（补全）：LockWord CAS 互斥 + 自旋等待超时——与 Disk 卷锁行为保真
     /// （防同实例并发采集/维护编排错误；Default 全局盘的多组件共享是真实场景）。RAII lease；
     /// 超时 <see cref="IOError.SharingViolation"/>；非重入（持锁再获取立即失败——与 Disk 一致）。</remarks>
+    /// <param name="timeout">抢锁等待上限（超时抛 SharingViolation）。</param>
+    /// <returns>进程内卷锁租约（RAII——Dispose 即释放）。</returns>
     public IDisposable AcquireExclusive(TimeSpan timeout)
     {
         ThrowIfDisposed();
@@ -687,6 +751,9 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     {
         private int _held;
 
+        /// <summary>尝试获取进程内排他锁（自旋等待，有界超时；非重入——持锁再获取立即失败）。</summary>
+        /// <param name="timeoutMs">自旋等待上限（毫秒，≥0）。</param>
+        /// <returns>true = 获取成功；false = 超时仍被持有。</returns>
         public bool TryEnterExclusive(int timeoutMs)
         {
             var spinner = new SpinWait();
@@ -700,6 +767,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
             return true;
         }
 
+        /// <summary>释放排他锁（复位持有标志）。</summary>
         public void Release() => Volatile.Write(ref _held, 0);
     }
 
@@ -708,6 +776,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     private sealed class ExclusiveLease(MemExclusiveLock @lock) : IDisposable
     {
         private int _disposed;
+        /// <summary>租约释放（幂等——复位卷锁持有标志）。</summary>
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
@@ -747,25 +816,37 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     // ═══════════════ 文件级公开操作（D5 API 重构——path-keyed）═══════════════
 
     /// <summary>显式创建文件（覆盖语义——已存在则旧文件 Detached 替换）。</summary>
+    /// <summary>显式创建文件（覆盖语义——已存在则旧文件 Detached 替换）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <param name="size">初始逻辑长度（字节，≥0）。</param>
+    /// <exception cref="ArgumentOutOfRangeException">size 为负。</exception>
     public void CreateOrReplaceFile(string path, long size)
     {
         AccessGate.RejectWrite(_access, nameof(CreateOrReplaceFile));
         ThrowIfDisposed();
         ValidatePath(path);
         ArgumentOutOfRangeException.ThrowIfNegative(size);
+        byte[]? retiredBuffer = null;
+        SparseLayout? retiredLayout = null;
+        List<byte[]>? retiredPages = null;
         lock (_lock)
         {
             if (_paths.Remove(path, out var old))
             {
                 _slots[old].State = SlotState.Detached;
-                TryRetireSlot(old);
+                TryDetachSlot(old, out retiredBuffer, out retiredLayout, out retiredPages);
             }
             _appendCursors.TryRemove(path, out _);   // ★ CORE-13：覆盖摘除旧盒——新文件 Append 从新长度起（旧盒 = 旧长度 → 覆写/零洞）
             CreateFileNoLock(path, size);
         }
+        // ★ IO-27：在途 IO 屏障在 fs 锁外——原 TryRetireSlot 内联在锁内，慢在途写者拖住全卷元数据操作
+        if (retiredLayout is not null || retiredBuffer is not null)
+            RetireDetached(retiredBuffer, retiredLayout, retiredPages ?? []);
     }
 
     /// <summary>删除文件（<see cref="Delete"/> 的 path-keyed 别名）。</summary>
+    /// <summary>删除文件（<see cref="Delete"/> 的 path-keyed 别名）。</summary>
+    /// <param name="path">文件相对路径。</param>
     public void DeleteFile(string path)
     {
         AccessGate.RejectWrite(_access, nameof(DeleteFile));
@@ -773,6 +854,10 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>移动文件（<see cref="Move"/> 的 path-keyed 别名）。</summary>
+    /// <summary>移动文件（<see cref="Move"/> 的 path-keyed 别名）。</summary>
+    /// <param name="source">源文件相对路径。</param>
+    /// <param name="dest">目标文件相对路径。</param>
+    /// <param name="overwrite">true = 目标存在时覆盖；false = 目标存在抛 AlreadyExists（默认）。</param>
     public void MoveFile(string source, string dest, bool overwrite = false)
     {
         AccessGate.RejectWrite(_access, nameof(MoveFile));
@@ -780,6 +865,11 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>扩展文件逻辑长度（保数据；Sparse 仅逻辑扩展，Reserved 换租拷贝）。</summary>
+    /// <summary>扩展文件逻辑长度（保数据；Sparse 仅逻辑扩展，Reserved 换租拷贝）。</summary>
+    /// <param name="path">文件相对路径（须已存在）。</param>
+    /// <param name="newSize">目标逻辑长度（字节，≥0 且须 ≥ 当前长度——收缩走 TruncateFile）。</param>
+    /// <exception cref="FileIOException">文件不存在。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">newSize 为负。</exception>
     public void GrowFile(string path, long newSize)
     {
         AccessGate.RejectWrite(_access, nameof(GrowFile));
@@ -796,6 +886,11 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>截断文件（扩展方向读零；Reserved 收缩记账不还物理）。</summary>
+    /// <summary>截断文件（扩展方向读零；Reserved 收缩记账不还物理）。</summary>
+    /// <param name="path">文件相对路径（须已存在）。</param>
+    /// <param name="newLength">目标逻辑长度（字节，≥0）。</param>
+    /// <exception cref="FileIOException">文件不存在。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">newLength 为负。</exception>
     public void TruncateFile(string path, long newLength)
     {
         AccessGate.RejectWrite(_access, nameof(TruncateFile));
@@ -831,6 +926,8 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>枚举全部文件路径（恢复扫描——消费者自行 parse 与排序；重命名避免与接口枚举族混淆）。</summary>
+    /// <summary>枚举全部文件路径（恢复扫描——消费者自行 parse 与排序；重命名避免与接口枚举族混淆）。</summary>
+    /// <returns>全部在档文件路径快照（锁内物化数组）。</returns>
     public IEnumerable<string> EnumerateFilePaths()
     {
         ThrowIfDisposed();
@@ -840,6 +937,10 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>摘除文件取走负载（compactor 原语）：路径项摘除 + 负载所有权转移给调用方。</summary>
+    /// <summary>摘除文件取走负载（compactor 原语）：路径项摘除 + 负载所有权转移给调用方。</summary>
+    /// <param name="path">文件相对路径（须已存在）。</param>
+    /// <returns>被摘除文件的负载（缓冲/稀疏布局所有权归调用方；在途 IO 屏障后移交）。</returns>
+    /// <exception cref="FileIOException">文件不存在。</exception>
     public DetachedFile DetachFile(string path)
     {
         AccessGate.RejectWrite(_access, nameof(DetachFile));
@@ -868,18 +969,25 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>安装外部负载为文件（compactor promote 原语——所有权转入 fs）。</summary>
+    /// <summary>安装外部负载为文件（compactor promote 原语——所有权转入 fs）。</summary>
+    /// <param name="path">目标文件相对路径（已存在则被替换——旧文件 Detached）。</param>
+    /// <param name="file">外部负载（不可为 null；所有权转移给 fs）。</param>
+    /// <exception cref="ArgumentNullException">file 为 null。</exception>
     public void InstallFile(string path, DetachedFile file)
     {
         Shared.AccessGate.RejectWrite(_access, nameof(InstallFile));
         ThrowIfDisposed();
         ValidatePath(path);
         ArgumentNullException.ThrowIfNull(file);
+        byte[]? installRetiredBuffer = null;
+        SparseLayout? installRetiredLayout = null;
+        List<byte[]>? installRetiredPages = null;
         lock (_lock)
         {
             if (_paths.Remove(path, out var old))
             {
                 _slots[old].State = SlotState.Detached;
-                TryRetireSlot(old);
+                TryDetachSlot(old, out installRetiredBuffer, out installRetiredLayout, out installRetiredPages);
             }
             _appendCursors.TryRemove(path, out _);   // ★ CORE-13：覆盖摘除旧盒（同 CreateOrReplaceFile 律）
             var slotIdx = AllocateSlotNoLock();
@@ -910,6 +1018,9 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
             slot.ModifiedTicks = now;
             _paths[path] = slotIdx;
         }
+        // ★ IO-27：旧槽在途 IO 屏障在 fs 锁外（同 CreateOrReplaceFile）
+        if (installRetiredLayout is not null || installRetiredBuffer is not null)
+            RetireDetached(installRetiredBuffer, installRetiredLayout, installRetiredPages ?? []);
         FileReplaced?.Invoke("<detached>", path);
     }
 
@@ -999,15 +1110,18 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     }
 
     /// <summary>槽退役检查：Detached 且 RefCount==0 → 回收（缓冲 epoch 延迟归还 + 代际 bump）。</summary>
-    private void TryRetireSlot(int slotIdx)
+    /// <summary>槽摘除（锁内段）——Detached 且无引用时剥离负载/bump 代际/还槽；返回是否发生摘除。
+    /// ★ IO-27：从 TryRetireSlot 拆出——屏障段（DrainLayoutGate）必须在 fs 锁外执行（调用方持锁调用
+    /// 时，慢在途写者会拖住全卷元数据操作）。</summary>
+    private bool TryDetachSlot(int slotIdx, out byte[]? retiredBuffer, out SparseLayout? retiredLayout, out List<byte[]> retiredPages)
     {
-        byte[]? retiredBuffer;
-        SparseLayout? retiredLayout;
-        List<byte[]> retiredPages = [];
+        retiredBuffer = null;
+        retiredLayout = null;
+        retiredPages = [];
         lock (_lock)
         {
             ref var slot = ref _slots[slotIdx];
-            if (slot.State != SlotState.Detached || slot.RefCount != 0) return;
+            if (slot.State != SlotState.Detached || slot.RefCount != 0) return false;
             retiredBuffer = slot.Data?.Buffer;
             retiredLayout = slot.Layout;
             if (slot.Layout is { } layout)
@@ -1027,12 +1141,24 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
             slot.State = SlotState.Empty;
             slot.Generation++;
             _freeSlots.Push(slotIdx);
+            return true;
         }
+    }
+
+    /// <summary>摘除后收尾（锁外段）：在途数据面 IO 屏障 + 缓冲归还池。</summary>
+    private void RetireDetached(byte[]? retiredBuffer, SparseLayout? retiredLayout, List<byte[]> retiredPages)
+    {
         // 在途数据面 IO 屏障：fs 锁内已摘 Layout/bump 代际——其后新 IO 双检失败不触页；
         // 已持 Gate 的在途 IO 退出后归还页才安全（DEBUG 池归还 0xCC 毒化兜底暴露违例）
         DrainLayoutGate(retiredLayout);
         if (retiredBuffer is not null) RetireBuffer(retiredBuffer);
         foreach (var page in retiredPages) RetireBuffer(page);
+    }
+
+    private void TryRetireSlot(int slotIdx)
+    {
+        if (!TryDetachSlot(slotIdx, out var retiredBuffer, out var retiredLayout, out var retiredPages)) return;
+        RetireDetached(retiredBuffer, retiredLayout, retiredPages);
     }
 
     /// <summary>空获取 Gate 排他 = 在途数据面 IO 屏障（等持门者退出；其后页归还/负载移交安全）。</summary>
@@ -1554,6 +1680,10 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
         {
             var data = ReadSlotChecked(slotIdx, gen);
             if (data is null) ThrowStale(slotIdx, gen);
+            // ★ 越界校验（与 PunchHoleReserved/Disk/Remote/TierVolume 平权——抛 IOFailure）
+            if (offset + length > data.Size)
+                throw new FileIOException(IOError.IOFailure,
+                    $"PunchHole 区间 [{offset}, {offset + length}) 超出文件长度 {data.Size}。", null, "PunchHole");
             var layout = _slots[slotIdx].Layout!;
             using var gate = layout.Gate.EnterExclusive();   // 数据面互斥（页在字典移除前禁止他方访问；锁序 _lock→Gate 合法）
 

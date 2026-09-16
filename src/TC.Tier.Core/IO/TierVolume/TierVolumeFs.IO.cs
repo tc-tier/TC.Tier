@@ -8,6 +8,7 @@ using TC.Tier.Core.IO.Shared;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
+/// <summary>TierVolumeFs partial——IFileSystem 平面（打开/目录/文件元操作/枚举/维护门）。</summary>
 public sealed partial class TierVolumeFs
 {
     // ═══════════════ IFileSystem 平面 ═══════════════
@@ -17,7 +18,8 @@ public sealed partial class TierVolumeFs
     /// AtomicDirectoryMove（元数据事务）/ ExclusiveLock（内建）/ MaintenanceGate / ContiguousCapture / CopyRange /
     /// VectorIO / RangeShift（全平台——增强行）/ DirectIO（两档模型：NoBuffering=绕过自管页缓存）/
     /// Advise（Sequential=页缓存预取）/ Mmap（文件载体——单区间 MMF 直映射）/
-    /// WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</remarks>
+    /// WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）；
+    /// CarrierWriteThrough 条件置位（IS-03：仅挂载旋钮 CarrierWriteThrough=true）。</remarks>
     public FileSystemCapabilities Capabilities
     {
         get
@@ -37,7 +39,9 @@ public sealed partial class TierVolumeFs
                        | FileSystemCapabilities.DirectIO      // 两档模型：NoBuffering=绕过自管页缓存（直达档）
                        | FileSystemCapabilities.Advise        // Advise(Sequential)=页缓存预取真行为
                        | FileSystemCapabilities.WriteThrough   // RM-07：Hints.WriteThrough=逐写日志提交（崩溃窗口归零）
-                       | FileSystemCapabilities.FlushDataOnly; // RM-09：FlushData=排干+屏（数据面）≠ Flush（含日志提交）——真可区分
+                        | FileSystemCapabilities.FlushDataOnly; // RM-09：FlushData=排干+屏（数据面）≠ Flush（含日志提交）——真可区分
+            if (_carrierWriteThrough)
+                caps |= FileSystemCapabilities.CarrierWriteThrough;   // IS-03 载体写穿挂载档（仅挂载旋钮置位——契约① 选举窗口介质前提）
             if (!_carrier.IsDevice && !_snapshotMount)
                 caps |= FileSystemCapabilities.Mmap;   // 文件载体：单区间 MMF 直映射（设备/快照挂载诚实不置位）
             if (_snapshotMount)
@@ -75,7 +79,11 @@ public sealed partial class TierVolumeFs
     /// <summary>最后已提交 LSN（V2 §1.2——增量导出的头上界；基点 = 此值时目标卷头部须一致）。</summary>
     public ulong JournalCommittedLsn => Volatile.Read(ref _committedLsn);
 
-    /// <inheritdoc/>
+    /// <summary>打开/创建文件并取得句柄（按 <paramref name="options"/> 的 Mode 决定存在性语义）。</summary>
+    /// <param name="path">文件相对路径（须相对卷根，非法即抛）。</param>
+    /// <param name="options">打开选项（Access/Mode/Sharing/Hints/PreallocateSize）。</param>
+    /// <returns>新开句柄（已挂共享登记与追加游标）。</returns>
+    /// <exception cref="FileIOException">文件不存在（OpenExisting）、已存在（CreateNew）、父目录不存在或卷只读/降级拒写。</exception>
     public IFileHandle Open(string path, FileOpenOptions options)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -155,7 +163,8 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>创建目录（含缺失祖先——mkdir -p 语义，已存在则幂等）。</summary>
+    /// <param name="path">目录相对路径。</param>
     public void CreateDirectory(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -180,7 +189,9 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除空目录（含条目则抛 DirectoryNotEmpty；不存在则抛 NotFound）。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <exception cref="FileIOException">目录不存在或非空。</exception>
     public void DeleteDirectory(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -199,7 +210,9 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>目录是否存在（有子条目也算存在——目录登记可缺失）。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <returns>true = 目录在档（或其下有文件条目）；false = 不存在。</returns>
     public bool DirectoryExists(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -229,8 +242,11 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>重命名/移动目录（不提供 overwrite，目标存在即抛）。</summary>
+    /// <param name="source">源目录相对路径。</param>
+    /// <param name="dest">目标目录相对路径。</param>
     /// <remarks>实例内元数据事务原子（§3.5 增强行——不依赖 OS rename）。</remarks>
+    /// <exception cref="FileIOException">源目录不存在或目标已存在。</exception>
     public void MoveDirectory(string source, string dest)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -275,7 +291,12 @@ public sealed partial class TierVolumeFs
         MetadataDirty = true;
     }
 
-    /// <inheritdoc/>
+    /// <summary>创建文件（可带 FileExtra 与预分配；已存在即抛，不打开）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <param name="preallocateSize">预分配字节数（&gt;0 时按 unwritten 区间预留，默认 0 = 不预分配）。</param>
+    /// <param name="extra">初始 FileExtra 内容（上限 MaxFileExtraBytes，默认空）。</param>
+    /// <exception cref="FileIOException">文件已存在或父目录不存在。</exception>
+    /// <exception cref="ArgumentException">extra 超出 MaxFileExtraBytes 上限。</exception>
     public void CreateFile(string path, long preallocateSize = 0, ReadOnlyMemory<byte> extra = default)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -306,7 +327,9 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>文件是否存在（目录不计入）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <returns>true = 文件在档；false = 不存在（或路径是目录）。</returns>
     public bool Exists(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -316,7 +339,9 @@ public sealed partial class TierVolumeFs
             return _entries.ContainsKey(path);
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除文件（幂等——不存在时静默返回；有打开句柄在档拒删）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <exception cref="FileIOException">文件有打开句柄在档（SharingViolation）。</exception>
     public void Delete(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -348,7 +373,11 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>重命名/移动文件（可选覆盖——覆盖目标即时回收物理块）。</summary>
+    /// <param name="source">源文件相对路径。</param>
+    /// <param name="dest">目标文件相对路径。</param>
+    /// <param name="overwrite">true = 目标存在时覆盖；false = 目标存在抛 AlreadyExists（默认）。</param>
+    /// <exception cref="FileIOException">源不存在、目标已存在（未允许覆盖）或覆盖目标有打开句柄在档。</exception>
     public void Move(string source, string dest, bool overwrite = false)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -394,7 +423,10 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>获取条目元信息（文件或目录）。</summary>
+    /// <param name="path">条目相对路径。</param>
+    /// <returns>条目信息——文件含长度/时间戳/FileExtra；目录长度恒 0、创建时间为 null。</returns>
+    /// <exception cref="FileIOException">条目不存在。</exception>
     public FsEntryInfo Stat(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -413,27 +445,48 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从根，键序输出）。</summary>
+    /// <param name="pattern">文件名通配模式（FileSystem Name Matching 语法，默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对根的路径，键序）。</returns>
     public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
         => EnumerateCore(null, pattern, recursive, EntryFilter.Files);
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从根，键序输出）。</summary>
+    /// <param name="path">起始目录相对路径（传 null 视为根）。</param>
+    /// <param name="pattern">文件名通配模式（FileSystem Name Matching 语法，默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对起始目录的路径，键序）。</returns>
     public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
         => EnumerateCore(path, pattern, recursive, EntryFilter.Files);
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从根，键序输出）。</summary>
+    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对根的路径，键序）。</returns>
     public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
         => EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从根，键序输出）。</summary>
+    /// <param name="path">起始目录相对路径（传 null 视为根）。</param>
+    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对起始目录的路径，键序）。</returns>
     public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
         => EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从根，双有序归并输出）。</summary>
+    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</returns>
     public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
         => EnumerateCore(null, pattern, recursive, EntryFilter.Both);
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从根，双有序归并输出）。</summary>
+    /// <param name="path">起始目录相对路径（传 null 视为根）。</param>
+    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</returns>
     public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
         => EnumerateCore(path, pattern, recursive, EntryFilter.Both);
 
@@ -532,6 +585,8 @@ public sealed partial class TierVolumeFs
 
     /// <inheritdoc/>
     /// <remarks>内建（§3.5 增强行）：实例打开即排他（一卷一实例）——恒成功。</remarks>
+    /// <param name="timeout">等待上限（本实现恒成功，实际不等待）。</param>
+    /// <returns>排他租约句柄（Dispose 即释放；实际为 no-op 租约）。</returns>
     public IDisposable AcquireExclusive(TimeSpan timeout)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -539,6 +594,10 @@ public sealed partial class TierVolumeFs
     }
 
     /// <inheritdoc/>
+    /// <param name="reason">维护原因（诊断/日志用）。</param>
+    /// <param name="scope">维护范围（决定拒绝面——All 连读也拒）。</param>
+    /// <param name="ct">取消令牌（默认 default = 不取消）。</param>
+    /// <returns>维护租约（Dispose 即退出维护）。</returns>
     public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);

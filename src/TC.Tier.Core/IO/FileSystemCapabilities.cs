@@ -82,4 +82,12 @@ public enum FileSystemCapabilities
     /// <para>★ 采集静默快照的通用前置（raw-medium-and-conversion-design §8）；消费者业务在途收敛是消费者契约。</para>
     /// </summary>
     MaintenanceGate = 1 << 17,
+
+    /// <summary>
+    /// 载体句柄级写穿挂载（virtual 介质 CarrierWriteThrough 挂载档——IS-03）：journal 提交免独立 fsync
+    /// （写穿完成即单屏障）。仅 TierVolumeFs 在挂载选项 CarrierWriteThrough=true 时置位；其余介质恒不置。
+    /// <para>★ TierWAL 契约①（选举窗口）的介质前提：virtual 介质未置位 = 元数据持久化基线档实测
+    ///   p99.9 ≥150ms 不达标（perf/tierwal-contracts.md）——TierWalBuilder.StartAsync 据此 fail-fast。</para>
+    /// </summary>
+    CarrierWriteThrough = 1 << 18,
 }

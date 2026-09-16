@@ -70,6 +70,7 @@ public abstract partial class MirrorBase
     /// （数据 fsync 先于 meta fsync，断电时 meta 绝不标记 data 未落盘的 commit 点）。</para>
     /// <para>崩溃在 Prepare 后 Commit 前：seq 未推进 → 恢复按 meta 裁决尾截断悬干（一致）。</para>
     /// </summary>
+    /// <param name="seq">准备提交的事务序号。</param>
     public void Prepare(long seq)
     {
         EnsureNotDisposed();
@@ -80,6 +81,9 @@ public abstract partial class MirrorBase
     }
 
     /// <summary>Prepare 异步轨（flush 原生仅同步，实质等价）。</summary>
+    /// <param name="seq">准备提交的事务序号。</param>
+    /// <param name="ct">取消令牌（当前实现不检查取消）。</param>
+    /// <returns>表示 Prepare 完成的任务（同步完成）；完成后 checkpoint 数据已 fsync + meta 已落盘（悬空状态）。</returns>
     public async ValueTask PrepareAsync(long seq, CancellationToken ct)
     {
         Prepare(seq);
@@ -90,6 +94,7 @@ public abstract partial class MirrorBase
     /// ConfirmCommitted：CAS 推进 LastCommittedSeq + 推进链头（子类 <see cref="OnConfirmSession"/>）+
     /// N=2 立即头截断回收最老 + 刷新 meta + 触发回调。
     /// </summary>
+    /// <param name="seq">确认提交的事务序号（≤ 已提交 seq 时 no-op）。</param>
     public void ConfirmCommitted(long seq)
     {
         long current;
@@ -114,6 +119,7 @@ public abstract partial class MirrorBase
     }
 
     /// <summary>Abort：尾截断回退悬干新 checkpoint（物理丢弃 [_committedChainEnd, AllocatedTail)）+ 回退会话链头状态 + meta。</summary>
+    /// <param name="seq">要回滚的事务序号（≤ 已 abort 的 seq 时幂等 no-op）。</param>
     public void Abort(long seq)
     {
         EnsureNotDisposed();
@@ -138,6 +144,9 @@ public abstract partial class MirrorBase
     }
 
     /// <summary>Abort 异步轨（引擎截断原生同步，实质等价）。</summary>
+    /// <param name="seq">要回滚的事务序号。</param>
+    /// <param name="ct">取消令牌（当前实现不检查取消）。</param>
+    /// <returns>表示回滚完成的任务（同步完成）。</returns>
     public async ValueTask AbortAsync(long seq, CancellationToken ct)
     {
         Abort(seq);
@@ -145,6 +154,9 @@ public abstract partial class MirrorBase
     }
 
     /// <summary>注册提交回调（链式触发）。</summary>
+    /// <param name="seq">注册回调的事务序号。</param>
+    /// <param name="callback">提交回调（已提交到更高 seq 时立即同步触发）。</param>
+    /// <exception cref="ArgumentNullException">callback 为 null 时抛出。</exception>
     public void OnCommitted(long seq, Action callback)
     {
         ArgumentNullException.ThrowIfNull(callback);

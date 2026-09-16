@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
+using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
@@ -21,35 +21,15 @@ public sealed partial class TierVolumeFs
     /// <summary>superblock 内偏移（字段表——v1 布局定稿，§3.9 演进只加不改）。</summary>
     private static class Sb
     {
-        public const int Magic = 0;              // 4B "RAW1"
-        public const int Version = 4;            // u16
-        public const int Flags = 6;              // u16（bit0=clean；其余保留→非零拒开）
-        public const int BlockSize = 8;          // u32
-        public const int CapacityBlocks = 12;    // u64
-        public const int BitmapStart = 20;       // u64
-        public const int BitmapBlocks = 28;      // u64
-        public const int ImageRunCount = 36;     // u32（1..8）
         public const int ImageRuns = 40;         // 8 × (u64 start + u32 count) = 96B
-        public const int ImageLength = 136;      // u64（元数据镜像字节数）
-        public const int ImageCrc = 144;         // u32
-        public const int Generation = 148;       // u64（双份轮写代数——恢复取高者）
         public const int Uuid = 156;             // 16B
-        public const int CarrierIndex = 172;     // u16（多载体 Day-1 预留，§3.8——v1 恒 0）
-        public const int MemberCount = 174;      // u32（v1 恒 1）
-        public const int JournalStart = 178;     // u64（日志两级预留字段级，§3.9——禁用时恒 0）
-        public const int JournalBlocks = 186;    // u64
-        public const int JournalGeneration = 194;// u64
-        public const int JournalState = 202;     // u32
         public const int Label = 206;            // 32B UTF8 零填充
-        public const int JournalCkptLsn = 238;   // u64（raw-journal-design §3.1 零空间扩展——重放下界）
-        public const int JournalHeadLsn = 246;   // u64（最后已提交 LSN——诊断/快速定位）
         public const int MemberTable = 256;      // 成员表（RM-04 §3.8——8 × 40B：UUID16 + cap8 + bitmapStart8 + bitmapBlocks8）
         public const int MemberTableMax = 8;     // v1 上限（加载体 = 纯加法；超 8 载体留布局版本）
         public const int SnapshotTable = 576;    // 快照表（V2 §1.1——16 × 180B：名字/时刻/捕获 LSN + 镜像 runs/CRC + 冻结位图引用）
         public const int SnapshotEntrySize = 180;
         public const int SnapshotMax = 16;       // 上限（初始参数——内存预算反推，判定门 2 实测裁决）
         public const int SnapshotTableEnd = SnapshotTable + SnapshotEntrySize * SnapshotMax;   // = 3456
-        public const int Crc = 4088;             // u32（覆盖 0..4087）
         public const int TotalSize = 4096;
     }
 
@@ -114,58 +94,69 @@ public sealed partial class TierVolumeFs
         // 快照旗标与表空态对称维护（V2 §1.1——Snapshots 置位 ⇔ 表非空；老二进制经未知 flags 拒开）
         sb.Flags = (ushort)(sb.Flags & ~FlagSnapshots);
         if (sb.Snapshots.Count > 0) sb.Flags |= FlagSnapshots;
-        "RAW1"u8.CopyTo(buffer[Sb.Magic..]);
-        BinaryPrimitives.WriteUInt16LittleEndian(buffer[Sb.Version..], TierVolumeLayoutVersion);
-        BinaryPrimitives.WriteUInt16LittleEndian(buffer[Sb.Flags..], sb.Flags);
-        BinaryPrimitives.WriteUInt32LittleEndian(buffer[Sb.BlockSize..], sb.BlockSize);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.CapacityBlocks..], sb.CapacityBlocks);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.BitmapStart..], sb.BitmapStart);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.BitmapBlocks..], sb.BitmapBlocks);
-        BinaryPrimitives.WriteUInt32LittleEndian(buffer[Sb.ImageRunCount..], (uint)sb.ImageRuns.Count);
-        var p = Sb.ImageRuns;
-        foreach (var (start, count) in sb.ImageRuns)
-        {
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[p..], start);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[(p + 8)..], count);
-            p += 12;
-        }
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.ImageLength..], sb.ImageLength);
-        BinaryPrimitives.WriteUInt32LittleEndian(buffer[Sb.ImageCrc..], sb.ImageCrc);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.Generation..], sb.Generation);
-        sb.Uuid.TryWriteBytes(buffer[Sb.Uuid..]);
-        BinaryPrimitives.WriteUInt16LittleEndian(buffer[Sb.CarrierIndex..], 0);   // 成员表见 @256（MemberCount 随成员表段写入）
-        // 日志字段（raw-journal-design §3.1）：Journaled 置位时写实值；否则恒零（老二进制可开）
         var journaled = (sb.Flags & FlagJournaled) != 0;
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.JournalStart..], journaled ? sb.JournalStart : 0);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.JournalBlocks..], journaled ? sb.JournalBlocks : 0);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.JournalGeneration..], journaled ? sb.JournalGeneration : 0);
-        BinaryPrimitives.WriteUInt32LittleEndian(buffer[Sb.JournalState..], journaled ? sb.JournalState : 0);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.JournalCkptLsn..], journaled ? sb.JournalCkptLsn : 0);
-        BinaryPrimitives.WriteUInt64LittleEndian(buffer[Sb.JournalHeadLsn..], journaled ? sb.JournalHeadLsn : 0);
-        // 成员表（RM-04 §3.8）：MultiCarrier 置位时实值；单载体卷恒 [self]（老语义）
         var multi = (sb.Flags & FlagMultiCarrier) != 0 && sb.Members.Count > 1;
         var memberCount = multi ? sb.Members.Count : 1;
         var member0 = multi ? sb.Members[0]
             : new MemberEntry(sb.Uuid, sb.CapacityBlocks, sb.BitmapStart, sb.BitmapBlocks);
-        BinaryPrimitives.WriteUInt32LittleEndian(buffer[Sb.MemberCount..], (uint)memberCount);
+
+        // ★ 域裸区先行（uuid/label/表区——codec 无字段间隙；CRC 计算须在全部字段就位后）
+        sb.Uuid.TryWriteBytes(buffer[Sb.Uuid..]);
+        var p = Sb.ImageRuns;
+        foreach (var (start, count) in sb.ImageRuns)
+        {
+            var run = new SuperblockImageRun { Start = start, Count = count };
+            SuperblockImageRunCodec.Write(buffer[p..], in run);
+            p += SuperblockImageRunCodec.StructSize;
+        }
         for (var i = 0; i < memberCount; i++)
         {
             var mp = Sb.MemberTable + i * 40;
             var m = i == 0 ? member0 : sb.Members[i];
-            m.Uuid.TryWriteBytes(buffer[mp..]);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(mp + 16)..], m.CapacityBlocks);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(mp + 24)..], m.BitmapStartLocal);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(mp + 32)..], m.BitmapBlocksLocal);
+            m.Uuid.TryWriteBytes(buffer.Slice(mp, SuperblockMember.UuidBytes));   // uuid 裸区（条目首部）
+            var mem = new SuperblockMember
+            {
+                CapacityBlocks = m.CapacityBlocks,
+                BitmapStartLocal = m.BitmapStartLocal,
+                BitmapBlocksLocal = m.BitmapBlocksLocal,
+            };
+            SuperblockMemberCodec.Write(buffer.Slice(mp, SuperblockMemberCodec.StructSize), in mem);
         }
         var labelBytes = System.Text.Encoding.UTF8.GetBytes(sb.Label);
-        labelBytes.AsSpan(0, Math.Min(labelBytes.Length, 32)).CopyTo(buffer[Sb.Label..]);
+        labelBytes.AsSpan(0, Math.Min(labelBytes.Length, SuperblockSnapshot.NameBytes)).CopyTo(buffer[Sb.Label..]);
         EncodeSnapshotTable(buffer, sb);
-        BinaryPrimitives.WriteUInt32LittleEndian(buffer[Sb.Crc..],
-            Crc32.HashToUInt32(buffer[..Sb.Crc]));
+
+        // ★ 标量面（G1 0..40 + G2 136..254 + Crc@4088——codec 单结构，间隙由域代码承载）：
+        //   两段式 = 全字段写（Crc=0）→ 算 [0..Offset_Crc) → 生成单值 Write_Crc 覆写
+        var meta = new SuperblockMeta
+        {
+            Magic = SuperblockMeta.MagicValue,
+            Version = TierVolumeLayoutVersion,
+            Flags = sb.Flags,
+            BlockSize = sb.BlockSize,
+            CapacityBlocks = sb.CapacityBlocks,
+            BitmapStart = sb.BitmapStart,
+            BitmapBlocks = sb.BitmapBlocks,
+            ImageRunCount = (uint)sb.ImageRuns.Count,
+            ImageLength = sb.ImageLength,
+            ImageCrc = sb.ImageCrc,
+            Generation = sb.Generation,
+            MemberCount = (uint)memberCount,
+            JournalStart = journaled ? sb.JournalStart : 0,
+            JournalBlocks = journaled ? sb.JournalBlocks : 0,
+            JournalGeneration = journaled ? sb.JournalGeneration : 0,
+            JournalState = journaled ? sb.JournalState : 0,
+            JournalCkptLsn = journaled ? sb.JournalCkptLsn : 0,
+            JournalHeadLsn = journaled ? sb.JournalHeadLsn : 0,
+        };
+        SuperblockMetaCodec.Write(buffer, in meta);
+        meta.Crc = UnifiedCrc.ComputeCrc32C(buffer[..SuperblockMetaCodec.Offset_Crc]);
+        SuperblockMetaCodec.Write_Crc(buffer, meta.Crc);
     }
 
     /// <summary>快照表序列化（V2 §1.1——superblock 内联区；条目序 = 捕获序；在册位 = 每条目 flags bit0）。
-    /// Snapshots 旗标 ⇔ 表非空（删除至空即清旗标——双门对称）。</summary>
+    /// Snapshots 旗标 ⇔ 表非空（删除至空即清旗标——双门对称）。
+    /// ★ 条目 = SuperblockSnapshot 结构 codec（name 裸区 + runs 间隙由域代码承载）。</summary>
     private static void EncodeSnapshotTable(Span<byte> buffer, SuperblockData sb)
     {
         if (sb.Snapshots.Count == 0) return;   // buffer.Clear() 已零化——旗标由 EncodeSuperblock 按表空态维护
@@ -174,22 +165,26 @@ public sealed partial class TierVolumeFs
             var s = sb.Snapshots[i];
             var p = Sb.SnapshotTable + i * Sb.SnapshotEntrySize;
             var nameBytes = System.Text.Encoding.UTF8.GetBytes(s.Name);
-            nameBytes.AsSpan(0, Math.Min(nameBytes.Length, 32)).CopyTo(buffer[p..]);
-            BinaryPrimitives.WriteInt64LittleEndian(buffer[(p + 32)..], s.CaptureTicks);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(p + 40)..], s.CaptureLsn);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[(p + 48)..], (uint)s.ImageRuns.Count);
-            var rp = p + 52;
+            nameBytes.AsSpan(0, Math.Min(nameBytes.Length, SuperblockSnapshot.NameBytes)).CopyTo(buffer[p..]);
+            var snap = new SuperblockSnapshot
+            {
+                CaptureTicks = s.CaptureTicks,
+                CaptureLsn = s.CaptureLsn,
+                RunsCount = (uint)s.ImageRuns.Count,
+                ImageLength = s.ImageLength,
+                ImageCrc = s.ImageCrc,
+                BitmapStart = s.BitmapStart,
+                BitmapBlocks = s.BitmapBlocks,
+                InUse = 1,   // flags bit0 = 在册（其余位零——保留）
+            };
+            SuperblockSnapshotCodec.Write(buffer.Slice(p, Sb.SnapshotEntrySize), in snap);
+            var rp = p + SuperblockSnapshot.RunGapOffset;
             foreach (var (start, count) in s.ImageRuns)
             {
-                BinaryPrimitives.WriteUInt64LittleEndian(buffer[rp..], start);
-                BinaryPrimitives.WriteUInt32LittleEndian(buffer[(rp + 8)..], count);
-                rp += 12;
+                var run = new SuperblockImageRun { Start = start, Count = count };
+                SuperblockImageRunCodec.Write(buffer.Slice(rp, SuperblockImageRunCodec.StructSize), in run);
+                rp += SuperblockImageRunCodec.StructSize;
             }
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(p + 148)..], s.ImageLength);
-            BinaryPrimitives.WriteUInt32LittleEndian(buffer[(p + 156)..], s.ImageCrc);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(p + 160)..], s.BitmapStart);
-            BinaryPrimitives.WriteUInt64LittleEndian(buffer[(p + 168)..], s.BitmapBlocks);
-            BinaryPrimitives.WriteUInt16LittleEndian(buffer[(p + 176)..], 1);   // flags bit0 = 在册（其余位零——保留）
         }
     }
 
@@ -202,7 +197,7 @@ public sealed partial class TierVolumeFs
         for (var i = 0; i < Sb.SnapshotMax; i++)
         {
             var p = Sb.SnapshotTable + i * Sb.SnapshotEntrySize;
-            var inUse = BinaryPrimitives.ReadUInt16LittleEndian(buffer[(p + 176)..]);
+            var inUse = SuperblockSnapshotCodec.Read(buffer.Slice(p, Sb.SnapshotEntrySize)).InUse;
             if (inUse == 0)
             {
                 var allZero = true;
@@ -218,26 +213,27 @@ public sealed partial class TierVolumeFs
                 throw new FileIOException(IOError.Unsupported,
                     $"快照表条目 {i} 含未知 flags：0x{inUse:X4}（未知保留值拒开，§3.9）", null, "Open");
             hasData = true;
-            var runCount = (int)BinaryPrimitives.ReadUInt32LittleEndian(buffer[(p + 48)..]);
+            var snapFields = SuperblockSnapshotCodec.Read(buffer.Slice(p, Sb.SnapshotEntrySize));
+            var runCount = (int)snapFields.RunsCount;
             if (runCount is < 1 or > 8)
                 throw new FileIOException(IOError.IOFailure, $"快照表条目 {i} 镜像区间数非法：{runCount}", null, "Open");
             var nameLen = buffer[p..(p + 32)].IndexOf((byte)0);
             var snap = new SnapshotEntry
             {
                 Name = System.Text.Encoding.UTF8.GetString(buffer[p..(p + (nameLen < 0 ? 32 : nameLen))]),
-                CaptureTicks = BinaryPrimitives.ReadInt64LittleEndian(buffer[(p + 32)..]),
-                CaptureLsn = BinaryPrimitives.ReadUInt64LittleEndian(buffer[(p + 40)..]),
-                ImageLength = BinaryPrimitives.ReadUInt64LittleEndian(buffer[(p + 148)..]),
-                ImageCrc = BinaryPrimitives.ReadUInt32LittleEndian(buffer[(p + 156)..]),
-                BitmapStart = BinaryPrimitives.ReadUInt64LittleEndian(buffer[(p + 160)..]),
-                BitmapBlocks = BinaryPrimitives.ReadUInt64LittleEndian(buffer[(p + 168)..]),
+                CaptureTicks = snapFields.CaptureTicks,
+                CaptureLsn = snapFields.CaptureLsn,
+                ImageLength = snapFields.ImageLength,
+                ImageCrc = snapFields.ImageCrc,
+                BitmapStart = snapFields.BitmapStart,
+                BitmapBlocks = snapFields.BitmapBlocks,
             };
-            var rp = p + 52;
+            var rp = p + SuperblockSnapshot.RunGapOffset;
             for (var k = 0; k < runCount; k++)
             {
-                snap.ImageRuns.Add((BinaryPrimitives.ReadUInt64LittleEndian(buffer[rp..]),
-                    BinaryPrimitives.ReadUInt32LittleEndian(buffer[(rp + 8)..])));
-                rp += 12;
+                var run = SuperblockImageRunCodec.Read(buffer[rp..]);
+                snap.ImageRuns.Add((run.Start, run.Count));
+                rp += SuperblockImageRunCodec.StructSize;
             }
             sb.Snapshots.Add(snap);
         }
@@ -246,19 +242,21 @@ public sealed partial class TierVolumeFs
                 $"Snapshots 旗标与快照表内容不一致（flag={flagSet}, entries={hasData}）", null, "Open");
     }
 
-    /// <summary>解码并校验——magic/版本/未知 flags/未知保留值/CRC 任一违约即 <see cref="IOError.IOFailure"/> 拒读。</summary>
+    /// <summary>解码并校验——magic/版本/未知 flags/未知保留值/CRC 任一违约即 <see cref="IOError.IOFailure"/> 拒读。
+    /// ★ 标量面 = SuperblockMeta 结构 codec 单解码；表区/uuid/label = 域（条目 codec + 裸区）。</summary>
     private static SuperblockData DecodeSuperblock(ReadOnlySpan<byte> buffer)
     {
-        if (!buffer[Sb.Magic..(Sb.Magic + 4)].SequenceEqual("RAW1"u8))
+        var meta = SuperblockMetaCodec.Read(buffer[..SuperblockMetaCodec.StructSize]);
+        if (meta.Magic != SuperblockMeta.MagicValue)
             throw new FileIOException(IOError.IOFailure, "superblock magic 不符（非 TierVolume 卷）", null, "Open");
-        var version = BinaryPrimitives.ReadUInt16LittleEndian(buffer[Sb.Version..]);
+        var version = meta.Version;
         if (version != TierVolumeLayoutVersion)
             throw new FileIOException(IOError.Unsupported,
                 $"布局版本不支持：{version}（本实现 {TierVolumeLayoutVersion}——版本高于支持上限拒开，§3.9）", null, "Open");
-        if (BinaryPrimitives.ReadUInt32LittleEndian(buffer[Sb.Crc..]) != Crc32.HashToUInt32(buffer[..Sb.Crc]))
+        if (meta.Crc != UnifiedCrc.ComputeCrc32C(buffer[..SuperblockMetaCodec.Offset_Crc]))
             throw new FileIOException(IOError.IOFailure, "superblock CRC 校验失败", null, "Open");
 
-        var flags = BinaryPrimitives.ReadUInt16LittleEndian(buffer[Sb.Flags..]);
+        var flags = meta.Flags;
         if ((flags & ~FlagsKnownMask) != 0)
             throw new FileIOException(IOError.Unsupported,
                 $"superblock 含未知 flags：0x{flags:X4}（未知保留值拒开——绝不静默忽略，§3.9）", null, "Open");
@@ -266,33 +264,33 @@ public sealed partial class TierVolumeFs
         var sb = new SuperblockData
         {
             Flags = flags,
-            BlockSize = BinaryPrimitives.ReadUInt32LittleEndian(buffer[Sb.BlockSize..]),
-            CapacityBlocks = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.CapacityBlocks..]),
-            BitmapStart = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.BitmapStart..]),
-            BitmapBlocks = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.BitmapBlocks..]),
-            ImageLength = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.ImageLength..]),
-            ImageCrc = BinaryPrimitives.ReadUInt32LittleEndian(buffer[Sb.ImageCrc..]),
-            Generation = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.Generation..]),
+            BlockSize = meta.BlockSize,
+            CapacityBlocks = meta.CapacityBlocks,
+            BitmapStart = meta.BitmapStart,
+            BitmapBlocks = meta.BitmapBlocks,
+            ImageLength = meta.ImageLength,
+            ImageCrc = meta.ImageCrc,
+            Generation = meta.Generation,
             Uuid = new Guid(buffer[Sb.Uuid..(Sb.Uuid + 16)].ToArray()),
         };
-        var runCount = (int)BinaryPrimitives.ReadUInt32LittleEndian(buffer[Sb.ImageRunCount..]);
+        var runCount = (int)meta.ImageRunCount;
         if (runCount is < 1 or > 8)
             throw new FileIOException(IOError.IOFailure, $"镜像区间数非法：{runCount}", null, "Open");
         var p = Sb.ImageRuns;
         for (var i = 0; i < runCount; i++)
         {
-            sb.ImageRuns.Add((BinaryPrimitives.ReadUInt64LittleEndian(buffer[p..]),
-                BinaryPrimitives.ReadUInt32LittleEndian(buffer[(p + 8)..])));
-            p += 12;
+            var run = SuperblockImageRunCodec.Read(buffer[p..]);
+            sb.ImageRuns.Add((run.Start, run.Count));
+            p += SuperblockImageRunCodec.StructSize;
         }
         // 日志字段（§3.9 前向兼容双门 / raw-journal-design §3.1）：
         // flag 未置 + 字段非零 = 更高版本写入的卷 → 拒开（老语义保持）；flag 置位 = 本特性，解析
-        var jStart = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.JournalStart..]);
-        var jBlocks = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.JournalBlocks..]);
-        var jGen = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.JournalGeneration..]);
-        var jState = BinaryPrimitives.ReadUInt32LittleEndian(buffer[Sb.JournalState..]);
-        var jCkpt = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.JournalCkptLsn..]);
-        var jHead = BinaryPrimitives.ReadUInt64LittleEndian(buffer[Sb.JournalHeadLsn..]);
+        var jStart = meta.JournalStart;
+        var jBlocks = meta.JournalBlocks;
+        var jGen = meta.JournalGeneration;
+        var jState = meta.JournalState;
+        var jCkpt = meta.JournalCkptLsn;
+        var jHead = meta.JournalHeadLsn;
         if ((flags & FlagJournaled) != 0)
         {
             if (jStart == 0 || jBlocks == 0)
@@ -310,7 +308,7 @@ public sealed partial class TierVolumeFs
                 "日志字段非零（v2+ 特性写入的卷）——本卷未置 Journaled 旗标，数据不一致", null, "Open");
 
         // 成员表（RM-04 §3.8）：MultiCarrier 置位 = 多载体卷（老二进制经未知 flags 门拒开）
-        var memberCount = (int)BinaryPrimitives.ReadUInt32LittleEndian(buffer[Sb.MemberCount..]);
+        var memberCount = (int)meta.MemberCount;
         var multi = (flags & FlagMultiCarrier) != 0;
         if (multi)
         {
@@ -321,11 +319,12 @@ public sealed partial class TierVolumeFs
             for (var i = 0; i < memberCount; i++)
             {
                 var dp = Sb.MemberTable + i * 40;
+                var mem = SuperblockMemberCodec.Read(buffer.Slice(dp, SuperblockMemberCodec.StructSize));
                 sb.Members.Add(new MemberEntry(
-                    new Guid(buffer[dp..(dp + 16)].ToArray()),
-                    BinaryPrimitives.ReadUInt64LittleEndian(buffer[(dp + 16)..]),
-                    BinaryPrimitives.ReadUInt64LittleEndian(buffer[(dp + 24)..]),
-                    BinaryPrimitives.ReadUInt64LittleEndian(buffer[(dp + 32)..])));
+                    new Guid(buffer.Slice(dp, SuperblockMember.UuidBytes).ToArray()),
+                    mem.CapacityBlocks,
+                    mem.BitmapStartLocal,
+                    mem.BitmapBlocksLocal));
             }
         }
         else
@@ -340,4 +339,5 @@ public sealed partial class TierVolumeFs
         DecodeSnapshotTable(buffer, flags, sb);   // V2 §1.1（Snapshots 置位 ⇔ 表非空——双门与 journal 字段同族）
         return sb;
     }
+
 }

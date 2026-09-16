@@ -55,4 +55,33 @@ public class BlittableRingCrcTests
         }
         finally { vol.Dispose(); }
     }
+
+    [Fact]
+    public void VerifyCrc_InlineSegmentPath_LengthSweep()
+    {
+        // ★ x64 内联段循环（VerifyCrc CRC32C 分支，read-protection-tiering 优化）跨长度差分：
+        //   0~100B value 全长步进——有效必 true、末字节翻转必 false（覆盖 8B/4B/1B 尾部残余组合）
+        var (settings, vol) = TestRingSettingsFactory.Create();
+        try
+        {
+            using var ring = TestRingSettingsFactory.NewRing<long>(vol, settings);
+            for (int valueLen = 0; valueLen <= 100; valueLen += 7)
+            {
+                var value = new byte[valueLen];
+                new Random(valueLen).NextBytes(value);
+                var addr = ring.Write(0xABCDEF, value);
+
+                var fields = ring.GetFields(addr);
+                int total = BlittableRingHeaderCodec.StructSize + (int)fields.PayloadLength;
+                Span<byte> record = ring.GetSpan(addr, total);
+
+                RecordCodec.VerifyCrc(record, BlittableRingHeader.DefaultFlags, total,
+                    BlittableRingHeaderCodec.Offset_Crc32C).Should().BeTrue($"valueLen={valueLen} 有效记录");
+                record[total - 1] ^= 0xFF;   // 翻转覆盖区末字节（key/value 区）
+                RecordCodec.VerifyCrc(record, BlittableRingHeader.DefaultFlags, total,
+                    BlittableRingHeaderCodec.Offset_Crc32C).Should().BeFalse($"valueLen={valueLen} 翻转须拦截");
+            }
+        }
+        finally { vol.Dispose(); }
+    }
 }

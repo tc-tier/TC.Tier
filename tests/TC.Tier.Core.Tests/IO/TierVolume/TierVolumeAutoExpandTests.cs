@@ -1,5 +1,5 @@
-using System.IO.Hashing;
 using TC.Tier.Core.IO;
+using TC.Tier.Core.Primitives;
 using TC.Tier.Core.IO.TierVolume;
 
 namespace TC.Tier.Core.Tests.IO.TierVolume;
@@ -74,7 +74,7 @@ public sealed class TierVolumeAutoExpandTests : IDisposable
         var path = NewVolumePath();
         var payload = new byte[80L << 20];   // 超初始界 64 MiB
         Random.Shared.NextBytes(payload);
-        var crc = Crc32.HashToUInt32(payload);
+        var crc = UnifiedCrc.ComputeCrc32C(payload);
 
         using (var fs = TierVolumeFs.New(TierVolumeCarrier.File(path), new TierVolumeFormatOptions()))
         {
@@ -89,7 +89,7 @@ public sealed class TierVolumeAutoExpandTests : IDisposable
         reopened.Volume.TotalSpace.Should().Be(128L << 20, "扩容结果持久（superblock）");
         using var rh = reopened.Open("big", ROpts());
         var read = ReadChunked(rh, 0, payload.Length);
-        Crc32.HashToUInt32(read).Should().Be(crc, "扩容后数据保真（reopen 读回）");
+        UnifiedCrc.ComputeCrc32C(read).Should().Be(crc, "扩容后数据保真（reopen 读回）");
     }
 
     [Fact]
@@ -98,7 +98,7 @@ public sealed class TierVolumeAutoExpandTests : IDisposable
         var path = NewVolumePath();
         var payload = new byte[70L << 20];
         Random.Shared.NextBytes(payload);
-        var crc = Crc32.HashToUInt32(payload);
+        var crc = UnifiedCrc.ComputeCrc32C(payload);
 
         var fs = TierVolumeFs.New(TierVolumeCarrier.File(path), new TierVolumeFormatOptions());
         fs.CreateFile("crash-big");
@@ -113,7 +113,7 @@ public sealed class TierVolumeAutoExpandTests : IDisposable
         reopened.Volume.TotalSpace.Should().Be(128L << 20, "扩容容量经恢复路径保真");
         using var rh = reopened.Open("crash-big", ROpts());
         var read = ReadChunked(rh, 0, payload.Length);
-        Crc32.HashToUInt32(read).Should().Be(crc, "崩溃恢复后跨界数据完整");
+        UnifiedCrc.ComputeCrc32C(read).Should().Be(crc, "崩溃恢复后跨界数据完整");
     }
 
     // ═══════════════ 碎片化触发 ═══════════════

@@ -851,33 +851,47 @@ public sealed class MemoryFileSystemTests
     }
 
     [Fact]
-    public void Dio_MisalignedAccess_ThrowsAlignmentError_DiskBehaviorParity()
+    public void Dio_MisalignedAccess_ByteGranularityParity()
     {
-        // ★ 行为保真主测试：Mem 上对齐 bug 必须当场爆炸——不能等切 Disk 生产时才炸
+        // ★ 四介质单一语义：mem NoBuffering 句柄与 Disk 同像——非对齐读写经字节粒度契约正确履行
+        //   （Disk=扇区 RMW，Mem=memcpy 原生任意粒度），不再对齐 fail-fast（旧行为保真模拟已废）。
         using var fs = NewFs(pageSize: 4096);
-        using var h = fs.Open("f", Opts(hints: FileOpenHints.NoBuffering));
         using var mgr = new TC.Tier.Core.Primitives.AlignedMemoryManager(8192, 512);   // 512 扇区对齐缓冲
         var mem = mgr.Memory;
+        // 各子用例独立文件——层叠写入互不污染；非对齐写读同区间数据保真
         // ① offset 非对齐（100 非 512 倍）
-        ((Action)(() => h.Write(100, mem.Span[..4096]))).Should().Throw<FileIOException>()
-            .Where(e => e.Error == IOError.AlignmentError);
+        using (var h = fs.Open("f1", Opts(hints: FileOpenHints.NoBuffering)))
+        {
+            mem.Span[..4096].Fill(0xA1);
+            h.Write(100, mem.Span[..4096]);
+            h.Read(100, mem.Span[..4096]).Should().Be(4096);
+            mem.Span[..4096].ToArray().Should().OnlyContain(b => b == 0xA1, "非对齐 offset 数据保真");
+        }
         // ② length 非对齐
-        ((Action)(() => h.Write(0, mem.Span[..4095]))).Should().Throw<FileIOException>()
-            .Where(e => e.Error == IOError.AlignmentError);
-        // ③ 缓冲地址非对齐（对齐基址 +1 偏移切片）
-        ((Action)(() => h.Write(0, mem.Span.Slice(1, 4096)))).Should().Throw<FileIOException>()
-            .Where(e => e.Error == IOError.AlignmentError);
-        // ④ 读路径同律（offset + 地址）
-        ((Action)(() => h.Read(100, mem.Span[..4096]))).Should().Throw<FileIOException>()
-            .Where(e => e.Error == IOError.AlignmentError);
-        ((Action)(() => h.Read(0, mem.Span.Slice(1, 4096)))).Should().Throw<FileIOException>()
-            .Where(e => e.Error == IOError.AlignmentError);
-        // ⑤ 三重对齐访问正常工作（数据保真）
-        mem.Span[..4096].Fill((byte)0x5A);
-        h.Write(0, mem.Span[..4096]);
-        mem.Span.Clear();
-        h.Read(0, mem.Span[..4096]).Should().Be(4096);
-        mem.Span[..4096].ToArray().Should().OnlyContain(b => b == 0x5A, "对齐路径数据保真");
+        using (var h = fs.Open("f2", Opts(hints: FileOpenHints.NoBuffering)))
+        {
+            mem.Span[..4096].Fill(0xB2);
+            h.Write(0, mem.Span[..4095]);
+            h.Read(0, mem.Span[..4095]).Should().Be(4095);
+            mem.Span[..4095].ToArray().Should().OnlyContain(b => b == 0xB2, "非对齐 length 数据保真");
+        }
+        // ③ 缓冲地址非对齐（对齐基址 +1 切片）
+        using (var h = fs.Open("f3", Opts(hints: FileOpenHints.NoBuffering)))
+        {
+            mem.Span[..4097].Fill(0xC3);
+            h.Write(0, mem.Span.Slice(1, 4096));
+            h.Read(0, mem.Span.Slice(1, 4096)).Should().Be(4096);
+            mem.Span.Slice(1, 4096).ToArray().Should().OnlyContain(b => b == 0xC3, "非对齐缓冲数据保真");
+        }
+        // ④ 三重对齐访问正常工作（数据保真）
+        using (var h = fs.Open("f4", Opts(hints: FileOpenHints.NoBuffering)))
+        {
+            mem.Span[..4096].Fill((byte)0x5A);
+            h.Write(0, mem.Span[..4096]);
+            mem.Span.Clear();
+            h.Read(0, mem.Span[..4096]).Should().Be(4096);
+            mem.Span[..4096].ToArray().Should().OnlyContain(b => b == 0x5A, "对齐路径数据保真");
+        }
         // ⑥ 缓冲句柄不受影响（同卷同文件非 DIO 打开零约束）
         using (var b = fs.Open("f", Opts()))
         {
@@ -885,11 +899,12 @@ public sealed class MemoryFileSystemTests
             act.Should().NotThrow("缓冲句柄恒 1 对齐");
         }
         // ⑦ vector：offset/总长对齐即合法（片长可非对齐——Disk 总长语义）；offset 非对齐抛
+        using var hv = fs.Open("f", Opts(hints: FileOpenHints.NoBuffering));
         using var p1 = new TC.Tier.Core.Primitives.AlignedMemoryManager(2560, 512);
         using var p2 = new TC.Tier.Core.Primitives.AlignedMemoryManager(1536, 512);
-        var act7 = () => h.WriteVector(0, new ReadOnlyMemory<byte>[] { p1.Memory, p2.Memory });   // 总长 4096（512 倍）
+        var act7 = () => hv.WriteVector(0, new ReadOnlyMemory<byte>[] { p1.Memory, p2.Memory });   // 总长 4096（512 倍）
         act7.Should().NotThrow("总长对齐 + 片地址对齐 = 合法（片长 2560/1536 非 512 倍也行——与 Disk 一致）");
-        ((Action)(() => h.WriteVector(100, new ReadOnlyMemory<byte>[] { p2.Memory }))).Should().Throw<FileIOException>()
+        ((Action)(() => hv.WriteVector(100, new ReadOnlyMemory<byte>[] { p2.Memory }))).Should().Throw<FileIOException>()
             .Where(e => e.Error == IOError.AlignmentError, "vector offset 非对齐");
     }
 

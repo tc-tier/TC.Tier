@@ -35,6 +35,21 @@ internal static class SegmentExtentTableExtensions
     }
 
     /// <summary>
+    /// ★ 统一查询原语（#344）：返回「Start ≤ offset 的<b>最早</b>区间」的 index（同 Start 多记录
+    /// 回退到最早一条）；无任何 Start ≤ offset 的区间返回 0（从表头起扫）。
+    /// <para>★ FindContainingIndex 二分在同 Start 多记录下返回最大下标——直接前向扫描会跳过
+    /// 同 Start 的更早区间（重叠判定/投影重建的错漏根因）。本原语收敛 5 处手工回退。</para>
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    internal static int FindEarliestNotAfterIndex(this List<ExtentRecord> list, long offset)
+    {
+        var idx = FindContainingIndex(list, offset);
+        while (idx > 0 && list[idx - 1].Start == list[idx].Start)
+            idx--;
+        return Math.Max(0, idx);
+    }
+
+    /// <summary>
     /// 返回应插入 offset 的 index（Start ≥ offset）。若所有区间的 Start 都小于 offset，则返回 list.Count。
     /// </summary>
     /// <param name="list">区间列表。</param>

@@ -1,4 +1,4 @@
-using TC.Tier.Core.Shared;
+using TC.Tier.Core.Lifecycle;
 using TC.Tier.Contracts.Structures;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
@@ -24,12 +24,17 @@ public abstract partial class SortedIndexBase<TKey>
     private protected class DefaultSortedIndexBaseRecovery(SortedIndexBase<TKey> owner) : RecoveryBase<SortedIndexRecoveryHints>
     {
         /// <summary>层间 join——主引擎异步就绪（OnInitializeBegin 已启动；主存储帧读经主引擎）。</summary>
+        /// <param name="ct">取消令牌，可用于取消异步操作。</param>
+        /// <returns>完成后主引擎已 WaitForReady 就绪。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await owner._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
         }
 
         /// <summary>★ 恢复核心（模板唯一必 override）——先试主存储（帧有效=增量重放），否则建空结构+全量重放。</summary>
+        /// <param name="hints">恢复提示（重放窗口 [Begin, End]，可无窗口——无则只建空结构不重放）。</param>
+        /// <param name="ct">取消令牌，可用于取消异步操作。</param>
+        /// <returns>完成后主存储载入/建空结构与窗口重放全部结束（就绪标记由模板承担）。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(SortedIndexRecoveryHints hints, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
@@ -62,10 +67,13 @@ public abstract partial class SortedIndexBase<TKey>
                     ? $"Main-storage replay [{replayFrom}, {hints.End})"
                     : $"Replay entries [{hints.Begin}, {hints.End})");
                 // begin 传 Empty（最小地址）：重放不做旧条目抑制——同 key 多版本靠流序覆盖（最新写胜出）
-                await foreach (var (key, addr) in owner.KeyResolver.ScanAsync(replayFrom, hints.End, ct)
+                await foreach (var (key, addr, isTombstone) in owner.KeyResolver.ScanAsync(replayFrom, hints.End, ct)
                                    .ConfigureAwait(false))
                 {
-                    owner.Insert(key, addr, LogicalAddress.Empty);
+                    if (isTombstone)
+                        owner.Delete(key);   // 墓碑 → 删除语义（已删 key 不复活；窗口内旧 put 先插后删收敛）
+                    else
+                        owner.Insert(key, addr, LogicalAddress.Empty);
                 }
             }
             ct.ThrowIfCancellationRequested();

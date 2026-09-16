@@ -54,6 +54,8 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
     ///   （一块 = 当前水位 + opaque）。</para>
     /// <para>⚠️ 写侧拦截：MetaPolicyKind=Disabled 抛 <see cref="InvalidOperationException"/>（禁用即报错，
     ///   不静默吞）；超 MetaOpaqueBytes 由策略抛 ArgumentException。</para></summary>
+    /// <param name="data">opaque meta 字节；长度须 ≤ MetaOpaqueBytes（超限由策略抛 ArgumentException）。
+    /// stage 后随下次水位提交原子落盘，本调用本身不产生 IO。</param>
     public void SetOpaqueMeta(ReadOnlySpan<byte> data)
     {
         if (_settings.MetaPolicyKind == MetaPolicyKind.Disabled)
@@ -65,6 +67,7 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
     }
 
     /// <summary>读外部 opaque meta（最近已提交块的 opaque；Empty = 无数据/未开启——读侧不抛，空即答案）。</summary>
+    /// <returns>最近已提交 meta 块内的 opaque 字节视图；无数据或 MetaPolicyKind=Disabled 时为空 Span。</returns>
     public ReadOnlySpan<byte> ReadOpaqueMeta()
         => MetaPolicy.ReadPayload();
 
@@ -144,7 +147,11 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
     /// 写未初始化或空页时 = 已落盘水位 _logicalTail）。</summary>
     public LogicalAddress TailAddress => GetCurrentWriteTail();
 
-    internal LogicalAddress FlushedTail => _logicalTail;
+    /// <summary>★ 已落盘水位 = 最后一个<b>已确认写完成</b> frame 的尾地址（游标默认扫描终点 /
+    /// 早期提交循环的提交边界——让渡轨先行推进写游标后，在途数据不可读、不可提交）。
+    /// <para>★ 与写游标（<see cref="TailAddress"/>）脱钩：让渡轨（FlushPageYield）先行推进
+    /// _logicalTail（含在途写），本水位只在写完成观察点（DrainInFlight*/FlushPage）推进。</para></summary>
+    internal LogicalAddress FlushedTail => _flushedDurableTail;
 
     /// <summary>页大小（2^LogPageSizeBits）——页攒批单位（一页组装一个 frame 写窗口）。</summary>
     public int PageSize { get; }

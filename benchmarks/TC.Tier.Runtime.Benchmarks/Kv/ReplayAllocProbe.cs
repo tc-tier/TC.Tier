@@ -56,7 +56,7 @@ public static class ReplayAllocProbe
             var keys = new long[RecordCount];
             var addrs = new LogicalAddress[RecordCount];
             int n = 0;
-            await foreach (var (k, a) in ring.ScanAsync(w, ring.TailAddress))
+            await foreach (var (k, a, _) in ring.ScanAsync(w, ring.TailAddress))
             {
                 keys[n] = k; addrs[n] = a; n++;
             }
@@ -123,18 +123,18 @@ public static class ReplayAllocProbe
 
         public LogicalAddress GetFlushedWatermark() => LogicalAddress.Empty;
 
-        public async IAsyncEnumerable<(long Key, LogicalAddress Address)> ScanAsync(
+        public async IAsyncEnumerable<(long Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(
             LogicalAddress begin, LogicalAddress end,
             [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
         {
             for (int i = 0; i < count; i++)
             {
                 if (i % 512 == 0) await Task.Yield();
-                yield return (keys[i], addrs[i]);
+                yield return (keys[i], addrs[i], false);
             }
         }
 
-        public IAsyncEnumerable<(long Key, LogicalAddress Address)> ScanAsync(CancellationToken ct = default)
+        public IAsyncEnumerable<(long Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(CancellationToken ct = default)
             => ScanAsync(LogicalAddress.Empty, LogicalAddress.Invalid, ct);
     }
 }

@@ -2,17 +2,33 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <IsRoslynComponent>true</IsRoslynComponent>
+    <!-- 仓库策略：Directory.Build.props 默认 IsPackable=false，可打包项目显式 opt-in -->
+    <IsPackable>true</IsPackable>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <RootNamespace>TC.Tier.CodeGen.Analyzers</RootNamespace>
     <AssemblyName>TC.Tier.CodeGen.Analyzers</AssemblyName>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
-    <NoWarn>$(NoWarn);RS2008</NoWarn>
+    <NoWarn>$(NoWarn);RS2008;NU5128</NoWarn>
+    <!-- 分析器包配方：构建产物不走 lib/，经 None+相对路径落 analyzers/dotnet/cs
+         （NU5128 豁免=无 lib 有意；DevelopmentDependency=消费方项目不流式传递）——
+         与 TC.Tier.Analyzers 同款（64ecc501 判例） -->
+    <Description>TC.Tier 仓库专属编译期纪律分析器——TierFs.New/Open spec 实参编译期校验（TCSG120-122）</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <!-- embedded 符号模式下 snupkg 无内容（NU5017）——符号随主包，关掉二次符号包（同 TC.Tier.Analyzers） -->
+    <IncludeSymbols>false</IncludeSymbols>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
   </ItemGroup>
 
 </Project>

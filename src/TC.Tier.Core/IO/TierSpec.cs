@@ -92,6 +92,9 @@ public sealed record TierSpec
     public IReadOnlyList<string> Members { get; init; } = [];
 
     /// <summary>解析 spec 字符串（失败抛 <see cref="FormatException"/>——fail-fast，含修正提示）。</summary>
+    /// <param name="spec">spec 字符串（四本性 scheme 头 + path + query 参数，语法见设计 §2.1）。</param>
+    /// <returns>结构化 spec（往返稳定——Parse(ToString(s)) 恒等）。</returns>
+    /// <exception cref="FormatException">语法/参数非法（含修正提示）。</exception>
     public static TierSpec Parse(string spec)
     {
         if (string.IsNullOrEmpty(spec)) throw Err("spec 为空。");

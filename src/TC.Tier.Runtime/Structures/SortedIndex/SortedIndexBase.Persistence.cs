@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
@@ -33,6 +32,7 @@ public abstract partial class SortedIndexBase<TKey>
     // === 后台落盘循环状态 ===
     private BackgroundWorkerLoop? _dumpWorker;
     private long _lastDumpTick;
+    private readonly TimeProvider _clock = TimeProvider.System;   // 时钟供给源（时钟缝 件一 P2；基类构造期覆盖）
     private long _entryCountAtLastDump;
 
     /// <summary>锚点槽长（头+体+尾——帧长固定，覆写无需轮替）。</summary>
@@ -57,6 +57,7 @@ public abstract partial class SortedIndexBase<TKey>
     // ════════════════════════════════════════════════════════════
 
     /// <summary>体长（头 BodyLength 字段——写头时先知：几何 + 结构内容）。</summary>
+    /// <returns>帧体长度（字节）。</returns>
     protected abstract long ComputeBodyLength();
 
     /// <summary>写体内容（几何 + 结构内容全在体内——比较族=32B 几何，分片经 <see cref="WriteBodyChunk"/>）。</summary>
@@ -68,6 +69,10 @@ public abstract partial class SortedIndexBase<TKey>
     /// W==End（零增量）无混入 → 几何计数直接可信，跳过 O(n) 遍历（实测 SkipList 物化 72.9ms 大头）。
     /// 返回 true 且 <paramref name="entryCount"/> 给出物化后条目数。
     /// </summary>
+    /// <param name="head">锚点帧地址（几何从这里读起）。</param>
+    /// <param name="recountNeeded">是否需要重数实收（true = 重放窗口非空，W&lt;End——dump 后插入混入树）。</param>
+    /// <param name="entryCount">输出：物化后条目数；失败时无意义。</param>
+    /// <returns>true = 物化成功且 entryCount 有效；false = 帧无效/物化失败（恢复核心转全量重放）。</returns>
     protected abstract bool TryMaterializeFrame(LogicalAddress head, bool recountNeeded, out long entryCount);
 
     /// <summary>当前条目数（后台策略触发用）。</summary>
@@ -78,9 +83,10 @@ public abstract partial class SortedIndexBase<TKey>
     // ════════════════════════════════════════════════════════════
 
     private LogicalAddress _frameWriteEnd;
-    private Crc64? _frameCrc;
+    private UnifiedCrc64? _frameCrc;
 
     /// <summary>写体分片（子类 WriteBody 内调用——CRC 边写边累积，帧长任意边界）。</summary>
+    /// <param name="chunk">本分片字节（写入引擎并累积进帧 CRC）。</param>
     protected void WriteBodyChunk(ReadOnlySpan<byte> chunk)
     {
         if (_frameCrc is null)
@@ -97,6 +103,9 @@ public abstract partial class SortedIndexBase<TKey>
 
     private sealed class SortedIndexDumpWorker(SortedIndexBase<TKey> owner) : BackgroundWorkerLoop(null, 1, "SortedIndexDumpWorker")
     {
+        /// <summary>后台 dump 单周期——1s 轮询粒度，到点按策略触发 TryDumpIfDue。</summary>
+        /// <param name="ct">取消令牌（轮询 Delay 响应取消——取消即终止后台循环）。</param>
+        /// <returns>true = 继续下一周期；false = 结束循环（当前实现恒 true，除非取消）。</returns>
         protected override async ValueTask<bool> RunOneCycleAsync(CancellationToken ct)
         {
             await Task.Delay(1000, ct).ConfigureAwait(false);   // 1s 轮询粒度（后台低频）
@@ -109,7 +118,7 @@ public abstract partial class SortedIndexBase<TKey>
     protected override void OnInitializeComplete()
     {
         if (_settings.PersistenceKind != SortedIndexPersistenceKind.Builtin) return;
-        _lastDumpTick = Environment.TickCount64;   // ★ 首周期不立即触发（时间阈值从就绪起算）
+        _lastDumpTick = _clock.GetMsTimestamp();   // ★ 首周期不立即触发（时间阈值从就绪起算）
         _dumpWorker = new SortedIndexDumpWorker(this);
         ConfigureBackgroundWorker(_dumpWorker);
     }
@@ -119,7 +128,7 @@ public abstract partial class SortedIndexBase<TKey>
     {
         if (_settings.PersistenceKind != SortedIndexPersistenceKind.Builtin) return;
         var policy = _settings.PersistencePolicy;
-        var elapsed = TimeSpan.FromMilliseconds(Environment.TickCount64 - _lastDumpTick);
+        var elapsed = TimeSpan.FromMilliseconds(_clock.GetMsTimestamp() - _lastDumpTick);
         long delta = CurrentEntryCount - Volatile.Read(ref _entryCountAtLastDump);
         if (policy.IsTriggered(elapsed, delta))
             TryDump();
@@ -128,6 +137,14 @@ public abstract partial class SortedIndexBase<TKey>
     // ════════════════════════════════════════════════════════════
     // === dump 编排（帧三拍——头/体/尾覆写固定锚点，机制归基类）===
     // ════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 显式帧落盘（公开检查点触发口——TierKv 检查点编排/运维手动触发；语义同 <c>TryDump</c>）。
+    /// <para>★ W = KeyResolver 已落盘水位（组合层契约保证 ≤ W 记录必已入索引）——
+    /// 调用前须先落盘真相源（如 Ring FlushUntil(Tail)）。</para>
+    /// </summary>
+    /// <returns>true = 本次成功产出锚点帧；false = 未就绪/未启用 Builtin 持久化/缺 KeyResolver/已释放。</returns>
+    public bool CheckpointFrame() => TryDump();
 
     /// <summary>
     /// 快照当前结构为锚点帧（后台循环触发；测试可直调）。
@@ -139,6 +156,8 @@ public abstract partial class SortedIndexBase<TKey>
         if (!IsReady) return false;
         if (_settings.PersistenceKind != SortedIndexPersistenceKind.Builtin) return false;
         if (KeyResolver is null) return false;   // ★ 无恢复数据面（比较族判等不需要 resolver）——帧无 W 锚点，跳过
+
+        using var _ = EnterOp();   // ★ 操作闸：与全部读写互斥——脏集回写/根快照/几何三字段的一致性窗口
 
         var W = KeyResolver.GetFlushedWatermark();                   // ★ 已落盘水位锚点
         long bodyLen = ComputeBodyLength();
@@ -170,7 +189,7 @@ public abstract partial class SortedIndexBase<TKey>
 
         _engine.Flush();                                      // 锚点整体落盘（帧完整才可见——写尾中断=CRC 不过=无效帧）
         Volatile.Write(ref _entryCountAtLastDump, CurrentEntryCount);
-        _lastDumpTick = Environment.TickCount64;
+        _lastDumpTick = _clock.GetMsTimestamp();
         return true;
     }
 
@@ -217,9 +236,10 @@ public abstract partial class SortedIndexBase<TKey>
     }
 
     /// <summary>物化后回调（子类设置条目计数）。</summary>
+    /// <param name="entryCount">物化得到的条目数（几何计数或重数实收结果）。</param>
     protected virtual void OnMaterialized(long entryCount) { }
 
-    private bool AppendFrameBodyCrc(Crc64 crc, LogicalAddress at, long bodyLen)
+    private bool AppendFrameBodyCrc(UnifiedCrc64 crc, LogicalAddress at, long bodyLen)
     {
         Span<byte> buf = stackalloc byte[PersistBodyChunk];
         var off = at;
@@ -237,6 +257,10 @@ public abstract partial class SortedIndexBase<TKey>
     }
 
     /// <summary>读体分片（子类物化用——整读/分段读 helper）。</summary>
+    /// <param name="at">读取起始地址。</param>
+    /// <param name="dst">接收缓冲区（至多读满 dst.Length 字节）。</param>
+    /// <param name="got">输出实际读到的字节数（字节）；无数据时为 0。</param>
+    /// <returns>true = 读到数据（got &gt; 0）；false = 无数据（got 为 0）。</returns>
     protected bool ReadBodyChunk(LogicalAddress at, Span<byte> dst, out int got)
     {
         got = _engine.Read(at, dst);

@@ -7,13 +7,17 @@ namespace TC.Tier.Contracts.Storage;
 /// <para>★ 两值可空：null = 该尾不修正（维持持久化 footer / 构造默认）。引擎恢复流程负责
 ///   翻译为段表的 <c>SetStartupTails(StartupParameters)</c>。</para>
 /// </summary>
+/// <param name="committedTailHint">提交尾修正（null = 不修正）。小值触发段级截断联动。</param>
+/// <param name="allocatedTailHint">分配尾修正（null = 不修正）。</param>
 public readonly struct EngineRecoveryHints(
     LogicalAddress? committedTailHint = null,
     LogicalAddress? allocatedTailHint = null)
 {
     /// <summary>提交尾修正（null = 不修正）。小值触发段级截断联动。</summary>
+    /// <returns>提交尾修正（null = 不修正）。</returns>
     public LogicalAddress? CommittedTailHint { get; init; } = committedTailHint;
 
     /// <summary>分配尾修正（null = 不修正）。</summary>
+    /// <returns>分配尾修正（null = 不修正）。</returns>
     public LogicalAddress? AllocatedTailHint { get; init; } = allocatedTailHint;
 }

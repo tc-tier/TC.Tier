@@ -12,6 +12,7 @@ public sealed class AsyncCountDown
 {
     private int _counter;
     private readonly AsyncManualResetEvent _event;
+    private readonly object _gate = new();
 
     /// <summary>创建倒计时器（唤醒默认线程池异步调度——安全）。</summary>
     public AsyncCountDown() => _event = new AsyncManualResetEvent(initialState: true);
@@ -23,17 +24,27 @@ public sealed class AsyncCountDown
     /// <summary>计数加 1。计数从 0 → 1 时事件 reset。</summary>
     public void Add()
     {
-        // 先 Add 再判断：若之前是 0（已 set），Add 后变为 >0，需 reset
-        if (Interlocked.Increment(ref _counter) == 1)
-            _event.Reset();
+        lock (_gate)
+        {
+            if (_counter == int.MaxValue)
+                throw new OverflowException("AsyncCountDown counter overflow.");
+            if (++_counter == 1)
+                _event.Reset();
+        }
     }
 
     /// <summary>计数减 1。计数降到 0 时事件 set，唤醒所有等待者。</summary>
     public void Remove()
     {
-        // 先 Remove 再判断：若降到 0，set 唤醒
-        if (Interlocked.Decrement(ref _counter) == 0)
-            _event.Set();
+        AsyncManualResetEvent.SetCompletion completion = default;
+        lock (_gate)
+        {
+            if (_counter == 0)
+                throw new InvalidOperationException("AsyncCountDown counter is already zero.");
+            if (--_counter == 0)
+                completion = _event.PrepareSet();
+        }
+        completion.Complete();
     }
 
     /// <summary>计数器是否为零。</summary>
@@ -42,6 +53,8 @@ public sealed class AsyncCountDown
     /// <summary>
     /// 当计数为 0 时同步返回（可复用等待：计数再次 &gt;0 后会重新阻塞）。
     /// </summary>
+    /// <param name="cancellationToken">取消令牌，默认 <see cref="CancellationToken.None"/>；取消时等待以 <see cref="OperationCanceledException"/> 完成。</param>
+    /// <returns>计数为 0 时同步完成的 ValueTask；否则在计数经 <see cref="Remove"/> 降到 0 时完成。</returns>
     public ValueTask WaitUntilEmptyAsync(CancellationToken cancellationToken = default)
         => _event.WaitAsync(cancellationToken);
 }

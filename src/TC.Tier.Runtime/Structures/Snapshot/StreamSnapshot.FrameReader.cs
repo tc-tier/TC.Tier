@@ -1,9 +1,11 @@
 using System.Buffers;
-using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Runtime.Structures.Snapshot;
 
+/// <summary>
+/// StreamSnapshot 帧读取 partial——嵌套 StreamFrameReader（帧头/帧尾解析 + CRC64 增量校验）。
+/// </summary>
 public sealed partial class StreamSnapshot
 {
     /// <summary>
@@ -14,7 +16,7 @@ public sealed partial class StreamSnapshot
         private const int StreamChunkSize = 64 * 1024;
 
         private readonly ISnapshotReadSession _session;
-        private readonly Crc64 _hash = new();
+        private readonly UnifiedCrc64 _hash = new();
         private readonly byte[] _headerBuffer = new byte[StreamFrameHeaderCodec.StructSize];
         private readonly long _dataAvailable;
         private long _dataRead;
@@ -42,6 +44,10 @@ public sealed partial class StreamSnapshot
         public ulong StoredChecksum => _storedChecksum;
 
         /// <summary>读 data（EOF 后返回 0；自动解析并校验 footer CRC64）。</summary>
+        /// <param name="dest">调用方目标缓冲区（至多填满）。</param>
+        /// <param name="ct">取消令牌。默认 default。</param>
+        /// <returns>实际读取的 data 字节数；0 = 到达 data 末尾（此时 footer 已解析，<see cref="IsFooterValid"/> 可查）。
+        /// 帧头过短/magic 非法抛 IOException。</returns>
         public async ValueTask<int> ReadDataAsync(Memory<byte> dest, CancellationToken ct = default)
         {
             if (!_headerParsed)
@@ -69,6 +75,8 @@ public sealed partial class StreamSnapshot
         }
 
         /// <summary>读全部 data 为 chunk 流。</summary>
+        /// <param name="ct">取消令牌（枚举时检查）。默认 default。</param>
+        /// <returns>帧内全部 data 的 64KB chunk 异步枚举（EOF 自然结束；不校验 footer——校验在 ReadDataAsync EOF 路径）。</returns>
         public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAllChunksAsync(
             [EnumeratorCancellation] CancellationToken ct = default)
         {
@@ -137,6 +145,7 @@ public sealed partial class StreamSnapshot
         }
 
         /// <summary>释放读取器（幂等）——释放底层读会话。</summary>
+        /// <returns>表示释放完成的任务。</returns>
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;

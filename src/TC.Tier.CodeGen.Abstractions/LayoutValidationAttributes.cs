@@ -14,6 +14,7 @@ namespace TC.Tier.CodeGen;
 
 /// <summary>字段必须 == 指定常量。用于规范字段（MagicValue/Version/Flags 等）。</summary>
 /// <example><c>[ValidEquals(LogMetaHeader.Magic)] public uint MagicValue;</c></example>
+/// <param name="expected">字段必须等于的常量值（uint/ushort/ulong/long/int/byte/string 等——SG 按 SpecialType 还原比较）。</param>
 [AttributeUsage(AttributeTargets.Field, AllowMultiple = false, Inherited = false)]
 public sealed class ValidEqualsAttribute(object expected) : Attribute
 {

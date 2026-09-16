@@ -106,6 +106,10 @@ public sealed partial class SegmentTable
     /// 检查 [start, end) 是否含终态不可读区间（Aborted/Wasted）——读侧活性守卫用
     /// （AcquireReadPlan 自旋中探测：终态不可读永不变可读，须快速失败防挂死）。
     /// </summary>
+    /// <param name="segId">目标段号。</param>
+    /// <param name="start">起始偏移（字节）。</param>
+    /// <param name="end">结束偏移（字节，不含）。</param>
+    /// <returns>true = 含终态不可读区间（或段不存在时恒 false）；false = 不含，可继续等待变为可读。</returns>
     public bool ContainsPermanentlyUnreadable(int segId, long start, long end)
     {
         if (TryGetSegmentRaw(segId, out var seg) && seg is not null)
@@ -159,6 +163,8 @@ public sealed partial class SegmentTable
     ///   无需前置 Broken/Invalid 检查（单一检查点）。</para>
     /// <para>★ 有界放弃协议保留：1s 分片 / 5s 周期告警 / 60s 超时抛出（worker 病理性停摆的安全闹）。</para>
     /// </summary>
+    /// <param name="segId">目标段号。</param>
+    /// <param name="logger">可选日志器——慢路径周期告警输出用；null 表示不记录。</param>
     public void WaitSegmentReady(int segId, ILogger? logger = null)
     {
         // ★ 单段模式：非 MinSegId 的段不存在也不应存在——直接返回（lease 已校验数据全在 seg0）。

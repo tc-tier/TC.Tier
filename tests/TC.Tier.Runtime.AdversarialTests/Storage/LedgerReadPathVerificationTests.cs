@@ -40,6 +40,110 @@ public sealed class LedgerReadPathVerificationTests : IDisposable
     //  L19：贴边追加 × RangeCompact——不失败不丢（旧实现 P0 静默丢写）
     // ═══════════════════════════════════════════════════════════════
 
+    /// <summary>★ 全量 Compact 与尾写并行契约（2026-08-29 活跃尾段语义销案配套）：
+    /// 全量 StartCompact 期间并发 append 不被阻塞（旧 lease 扩全段形态阻塞 ~118ms/条）、
+    /// 不失败、数据逐字节完好（活跃尾段不 rename——原地搬移 + 源区打洞，写者句柄恒有效）。</summary>
+    [Fact]
+    public async Task FullCompact_ParallelAppend_NeverBlocked_NeverLost()
+    {
+        const long Growth = 64 * 1024;
+        var vol = NewVol();
+        using var dev = new StorageEngineOptions("full-parallel", segmentGrowthLimit: Growth).WithPreallocateFile(false).Builder(vol.Fs).Start();
+        dev.WaitForReady();
+
+        var buf = new byte[512];
+        for (var i = 0; i < 20000; i++) dev.Append(buf);
+
+        var book = new ConcurrentDictionary<long, LogicalAddress>();
+        var failures = new List<Exception>();
+        var op = dev.StartCompact();
+
+        var sw = Stopwatch.StartNew();
+        var id = 0L;
+        var maxMs = 0d;
+        while (!op.IsCompleted)
+        {
+            var t0 = Stopwatch.GetTimestamp();
+            try
+            {
+                var payload = MakePattern(512, (byte)(++id & 0xFF));
+                book[id] = dev.Append(payload);
+            }
+            catch (Exception ex) { failures.Add(ex); break; }
+            maxMs = Math.Max(maxMs, Stopwatch.GetElapsedTime(t0).TotalMilliseconds);
+            if (sw.Elapsed > TimeSpan.FromSeconds(10)) break;
+        }
+        await op.WaitAsync();
+
+        failures.Should().BeEmpty($"append 失败：{string.Join("; ", failures.Select(f => f.GetType().Name + ": " + f.Message))}");
+        maxMs.Should().BeLessThan(50, $"DIAG appends={id} maxAppendMs={maxMs:F2}（并行期望 < 50ms，阻塞形态 ~118ms）");
+        book.Should().NotBeEmpty("compact 期间必须发生并发 append（否则契约无效）");
+
+        // 终局全簿逐字节校验（活跃尾段原地搬移——并发写数据不得丢）
+        foreach (var (rid, addr) in book)
+        {
+            var dst = new byte[512];
+            var n = dev.Read(addr, dst);
+            if (n != 512 || !dst.AsSpan().SequenceEqual(MakePattern(512, (byte)(rid & 0xFF))))
+                throw new InvalidOperationException(
+                    $"并发 append 记录 {rid} @{addr} 内容不一致 read={n} head={Convert.ToHexString(dst.AsSpan(0, 8))}");
+        }
+    }
+
+    /// <summary>
+    /// ★ L19 最小确定性回归（2026-08-29 销案配套）：写者与单窗口 Compact 并发——旧实现
+    /// 清池→lease 两步之间写者开旧 inode 句柄（promote rename 后写孤儿 inode 静默丢写，
+    /// 坏区 = 入口清池后写者句柄覆盖的整段尾区，8/8 复现）。修复 = 活跃尾段不 rename
+    /// （原地搬移 + 源区打洞）+ lease 上界钳水位线（写者并行）。
+    /// </summary>
+    [Fact]
+    public async Task CompactConcurrentAppend_SingleWindow_NeverLost()
+    {
+        const int recordSize = 512;
+        var vol = NewVol();
+        var options = new StorageEngineOptions("l19-min", segmentGrowthLimit: 64 * 1024).WithPreallocateFile(false);
+        using var dev = options.Builder(vol.Fs).Start();
+        dev.WaitForReady();
+
+        var book = new ConcurrentDictionary<long, LogicalAddress>();
+        var failures = new ConcurrentQueue<Exception>();
+        var stop = 0;
+        var writer = Task.Run(() =>
+        {
+            long id = 0;
+            while (Volatile.Read(ref stop) == 0)
+            {
+                try
+                {
+                    var i = Interlocked.Increment(ref id);
+                    book[i] = dev.Append(MakePattern(recordSize, (byte)(i & 0xFF)));
+                    Thread.Sleep(1);
+                }
+                catch (Exception ex) { failures.Enqueue(ex); break; }
+            }
+        });
+
+        while (book.IsEmpty) await Task.Yield();
+        var live = new List<(LogicalAddress Start, long Length)> { (book[1], recordSize) };
+        await dev.StartRangeCompact(new LogicalAddress(0, 0), new LogicalAddress(0, 0x200), live).WaitAsync();
+
+        await Task.Delay(200);
+        Volatile.Write(ref stop, 1);
+        await writer;
+
+        failures.Should().BeEmpty();
+        var bads = new List<string>();
+        foreach (var (id, addr) in book)
+        {
+            var expected = MakePattern(recordSize, (byte)(id & 0xFF));
+            var dst = new byte[recordSize];
+            var n = dev.Read(addr, dst);
+            if (n != recordSize || !dst.AsSpan().SequenceEqual(expected))
+                bads.Add($"id={id} @{addr} read={n} head={Convert.ToHexString(dst.AsSpan(0, 8))} exp={Convert.ToHexString(expected.AsSpan(0, 8))}");
+        }
+        bads.Should().BeEmpty($"并发单窗口（{book.Count} 条）：{string.Join(" | ", bads)}");
+    }
+
     /// <summary>
     /// 写者以 1ms/条节流持续追加（bookEnd 紧贴 CommittedTail——贴边形态高频出现），
     /// 整理者反复把窗口尾顶到 bookEnd ≈ CommittedTail；终局全簿逐字节校验 + 稠密前缀顺序读。
@@ -134,14 +238,23 @@ public sealed class LedgerReadPathVerificationTests : IDisposable
         failures.Should().BeEmpty("贴边追加在整理期间不得失败（引擎违约）");
 
         // 终局全簿校验：每条记录逐字节可读且内容正确（静默丢写检测点）
+        var bad = new List<(long Id, LogicalAddress Addr, string Read, string Exp)>();
         foreach (var (id, addr) in book)
         {
             var expected = MakePattern(recordSize, (byte)(id & 0xFF));
             var dst = new byte[recordSize];
             var n = dev.Read(addr, dst);
-            n.Should().Be(recordSize, $"记录 {id} @{addr} 读全");
-            dst.AsSpan().SequenceEqual(expected).Should().BeTrue($"记录 {id} @{addr} 内容一致");
+            if (n != recordSize || !dst.AsSpan().SequenceEqual(expected))
+            {
+                var firstBad = Array.FindIndex(dst, b => b != expected[0]);
+                bad.Add((id, addr,
+                    $"read={n} firstDiff@{(firstBad < 0 ? -1 : firstBad)}={Convert.ToHexString(dst.AsSpan(0, Math.Min(16, dst.Length)))}",
+                    $"exp={Convert.ToHexString(expected.AsSpan(0, 16))}"));
+            }
         }
+        bad.Should().BeEmpty($"全簿逐字节校验——静默丢写：{bad.Count}/{book.Count} 坏。前 10 条：\n" +
+            string.Join("\n", bad.Take(10).Select(b => $"  id={b.Id} @{b.Addr} {b.Read} {b.Exp}")) +
+            $"\ncommittedTail={dev.CommittedTail} allocatedTail={dev.AllocatedTail}");
 
         // 重置整理后稠密前缀顺序读 = 全部记录按地址序精确拼接（无洞、无乱序）
         var ordered = book.OrderBy(kv => kv.Value).ToList();
@@ -191,10 +304,10 @@ public sealed class LedgerReadPathVerificationTests : IDisposable
             using var dev = options.Builder(vol.Fs).Start();
             dev.WaitForReady();
 
-            var pattern = MakePattern(totalLen, 0x5A);
+            byte[] pattern = MakePattern(totalLen, 0x5A);   // ★ 显式 byte[]（非 var）——闭包捕获经流分析后 var 推断为可空，致 CS8602
             dev.Append(pattern);
 
-            var torn = new ConcurrentQueue<string>();
+            ConcurrentQueue<string> torn = new();   // ★ 显式类型（非 var）——同 pattern：闭包捕获经流分析推断为可空，致 CS8602
             var stop = 0;
 
             void CheckFrame(ReadOnlySpan<byte> buf)

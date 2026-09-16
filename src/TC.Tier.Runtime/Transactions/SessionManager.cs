@@ -1,7 +1,7 @@
 using System.Threading.Channels;
 using TC.Tier.Contracts.Storage;
 using TC.Tier.Contracts.Transactions;
-using TC.Tier.Core.Shared;
+using TC.Tier.Core.Lifecycle;
 
 namespace TC.Tier.Runtime.Transactions;
 
@@ -59,6 +59,7 @@ public sealed class SessionManager : LifecycleBase
     /// <param name="name">域名（诊断）。</param>
     /// <param name="resolution">悬挂裁决域声明（恢复时悬干前推 vs 丢尾；缺省 forward-commit）。</param>
     /// <param name="participants">参与者全集（名称+实例；同结构写必经同一域——§2 多域规则）。</param>
+    /// <returns>以纯内存序协调器为内芯的 <see cref="SessionManager"/>（调用方随后 Initialize 启动）。</returns>
     public static SessionManager Create(IFileSystem fs, string? name = null,
         HangingResolution resolution = HangingResolution.ForwardCommit,
         params (string Name, ITransactionParticipant Participant)[] participants)
@@ -73,6 +74,9 @@ public sealed class SessionManager : LifecycleBase
     /// <para>参与者同时 Register 到注入 txn（同名覆盖语义）；恢复裁决=txn.LoadAndReconcile()。
     /// ★ 不支持 ReplicatedRound（seq 真源在 txn 内部无法分段预订）——复制域用默认档。</para>
     /// </summary>
+    /// <param name="txn">外部事务日志（作协调器并接收参与者注册），非空。</param>
+    /// <param name="participants">参与者全集（名称+实例，注册到 txn）。</param>
+    /// <returns>以注入协调器为内芯的 <see cref="SessionManager"/>（调用方随后 Initialize 启动）。</returns>
     public static SessionManager Create(ITransactionLog txn,
         params (string Name, ITransactionParticipant Participant)[] participants)
     {
@@ -146,6 +150,8 @@ public sealed class SessionManager : LifecycleBase
     /// <summary>
     /// 开会话（会话=运行期概念，无持久身份）。单线程会话契约（TierSession）。
     /// </summary>
+    /// <param name="name">会话名（诊断用）；null 表示匿名。</param>
+    /// <returns>新的 <see cref="TierSession"/>（使用方负责 Dispose 归还计数）。</returns>
     public TierSession OpenSession(string? name = null)
     {
         ThrowIfDisposed();
@@ -159,6 +165,9 @@ public sealed class SessionManager : LifecycleBase
     /// ★ 检查点回合入队（管线串行——与事务回合天然全序；时机归协议，内容归组合层）。
     /// plan 收当前已提交水位 seq；回执=该水位。
     /// </summary>
+    /// <param name="plan">检查点执行计划（入参为当前已提交水位 seq），非空。</param>
+    /// <param name="ct">取消等待令牌（仅取消"等待入队"，不取消已入队回合），默认 default。</param>
+    /// <returns>完成后得到该检查点回合执行时的已提交水位 seq。</returns>
     public async ValueTask<long> EnqueueCheckpoint(Action<long> plan, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -454,6 +463,7 @@ public sealed class SessionManager : LifecycleBase
 
     /// <summary>异步 Dispose——关管线通道后有界等待管线排空（超时强制排水），再释放注入 txn。</summary>
     /// <param name="disposing">true = 主动 Dispose；false = 终结器路径（本实现无终结器，不做处理）。</param>
+    /// <returns>管线排空（或超时强制排水）并释放注入 txn 后完成。</returns>
     protected override async ValueTask DisposeOverrideAsync(bool disposing)
     {
         if (!disposing) return;
@@ -481,14 +491,14 @@ public sealed class SessionManager : LifecycleBase
         if (!disposing) return;
         if (_channel is { } ch && ch.Writer.TryComplete())
         {
-#pragma warning disable TCSG031 // 设计必需：Dispose 排水必须同步完成（IDisposable 契约，有界超时）
+#pragma warning disable TCSG137 // 设计必需：Dispose 排水必须同步完成（IDisposable 契约，有界超时）
             if (!_pipelineTask.Wait(DrainTimeout))
             {
                 FaultPipeline(new TimeoutException(
                     $"Session 管线 Dispose 排水超时（{DrainTimeout.TotalSeconds:0}s）——强制排水"));
                 try { _pipelineTask.Wait(DrainTimeout); } catch { /* 已强制排水 */ }
             }
-#pragma warning restore TCSG031
+#pragma warning restore TCSG137
         }
         _injectedTxn?.Dispose();
     }
@@ -525,9 +535,11 @@ internal sealed class TxRound
     }
 
     /// <summary>管线取走（排队撤销竞争败者=false=丢弃）。</summary>
+    /// <returns>true = 取走成功（进入在途）；false = 已被撤销，回合应丢弃。</returns>
     public bool TryTake() => Interlocked.CompareExchange(ref _roundState, Taken, Queued) == Queued;
 
     /// <summary>排队撤销标记（仅排队中生效；已取走=false——在途不可打断）。</summary>
+    /// <returns>true = 撤销成功；false = 已被管线取走，撤销失败。</returns>
     public bool TryCancel() => Interlocked.CompareExchange(ref _roundState, Cancelled, Queued) == Queued;
 
     /// <summary>登记到会话在途回合位（快照入队时——Abort 二分判定用）。</summary>
@@ -539,25 +551,30 @@ internal sealed class TxRound
         if (!TryCancel())
         {
             // 已被管线取走——回合中不可打断，等终态（异常吞：Abort 只关心"已终态"）
-#pragma warning disable TCSG031 // 设计必需：Abort 同步 API 契约——等回合终态
+#pragma warning disable TCSG137 // 设计必需：Abort 同步 API 契约——等回合终态
             try { Completion.Task.GetAwaiter().GetResult(); }
-#pragma warning restore TCSG031
+#pragma warning restore TCSG137
             catch { /* 终态即返回 */ }
         }
     }
 
+    /// <summary>回执成功——以提交 seq 完成等待者并清会话在途位。</summary>
+    /// <param name="seq">本回合提交得到的域 seq。</param>
     public void Complete(long seq)
     {
         Completion.TrySetResult(seq);
         Session.ClearPending(this);
     }
 
+    /// <summary>回执失败——以异常完成等待者并清会话在途位。</summary>
+    /// <param name="ex">失败原因异常，非空。</param>
     public void CompleteFault(Exception ex)
     {
         Completion.TrySetException(ex);
         Session.ClearPending(this);
     }
 
+    /// <summary>回执取消——以取消态完成等待者并清会话在途位。</summary>
     public void CompleteCancelled()
     {
         Completion.TrySetCanceled();
@@ -577,10 +594,19 @@ internal sealed class CheckpointRound
 
     public CheckpointRound(Action<long> plan) => Plan = plan;
 
+    /// <summary>管线取走（排队撤销竞争败者=false=丢弃）。</summary>
+    /// <returns>true = 取走成功；false = 已被撤销/取走，回合应丢弃。</returns>
     public bool TryTake() => Interlocked.CompareExchange(ref _roundState, Taken, Queued) == Queued;
+    /// <summary>排队撤销标记（仅排队中生效；已取走=false——在途不可打断）。</summary>
+    /// <returns>true = 撤销成功；false = 已被管线取走，撤销失败。</returns>
     public bool TryCancel() => Interlocked.CompareExchange(ref _roundState, Cancelled, Queued) == Queued;
 
+    /// <summary>回执成功——以检查点水位完成等待者。</summary>
+    /// <param name="seq">检查点执行时的已提交水位 seq。</param>
     public void Complete(long seq) => Completion.TrySetResult(seq);
+    /// <summary>回执失败——以异常完成等待者。</summary>
+    /// <param name="ex">失败原因异常，非空。</param>
     public void CompleteFault(Exception ex) => Completion.TrySetException(ex);
+    /// <summary>回执取消——以取消态完成等待者。</summary>
     public void CompleteCancelled() => Completion.TrySetCanceled();
 }

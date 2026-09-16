@@ -13,6 +13,8 @@ public abstract partial class RingBase<TKey>
     /// <summary>
     /// ★ 头截断：推进 BeginAddress 到 address + 可选物理段回收（engine.ReclaimHead）。
     /// </summary>
+    /// <param name="address">新头边界（单调不回退；须 ≤ FlushedUntilAddress 否则抛异常）。</param>
+    /// <param name="truncateDevice">是否同时物理回收引擎段（true = 调 ReclaimHead，失败不阻断逻辑截断）。默认 false。</param>
     public void TruncatePrefix(LogicalAddress address, bool truncateDevice = false)
     {
         EnsureReady();
@@ -26,8 +28,8 @@ public abstract partial class RingBase<TKey>
             throw new InvalidOperationException(
                 $"TruncatePrefix({address}) beyond FlushedUntilAddress({FlushedUntilAddress}) — 未落盘数据会丢失");
 
-        // CAS 单调推进 BeginAddress
-        if (!MonotonicUpdateAddr(ref _beginAddress, address, out _)) return;
+        // CAS128 单调推进 BeginAddress（#163——并发 TruncatePrefix/flush 交错不回退）
+        if (!MonotonicUpdateAddr(WmBegin, address, out _)) return;
 
         // 引擎物理段回收（可选——逻辑截断不受物理失败影响）
         if (truncateDevice)

@@ -30,6 +30,8 @@ public abstract partial class SnapshotBase
     /// <summary>★ 登记外部 opaque meta——stage 进策略缓冲，随水位线落盘原子携带（设计决策：
     /// opaque 搭水位线的车，同一块同一 CRC；无独立提交路径，需确定性持久化点走 Prepare/ConfirmCommitted）。
     /// ⚠️ 写侧拦截：Disabled 抛 InvalidOperationException（禁用即报错）；超 MetaOpaqueBytes 策略抛 ArgumentException。</summary>
+    /// <param name="data">opaque meta 字节；长度须 ≤ MetaOpaqueBytes（超限由策略抛 ArgumentException）。
+    /// stage 后随下次水位提交原子落盘，本调用本身不产生 IO。</param>
     public void SetOpaqueMeta(ReadOnlySpan<byte> data)
     {
         if (_settings.MetaPolicyKind == MetaPolicyKind.Disabled)
@@ -40,6 +42,7 @@ public abstract partial class SnapshotBase
     }
 
     /// <summary>读外部 opaque meta（最近已提交块；Empty = 无数据/未开启——空即答案）。</summary>
+    /// <returns>最近已提交 meta 块内的 opaque 字节视图；无数据或 MetaPolicyKind=Disabled 时为空 Span。</returns>
     public ReadOnlySpan<byte> ReadOpaqueMeta()
         => MetaPolicy.ReadPayload();
 
@@ -75,19 +78,45 @@ public abstract partial class SnapshotBase
         public ushort CurrentVersion => SnapshotMetaHeader.CurrentVersion;
         public ushort DefaultFlags => SnapshotMetaHeader.DefaultFlags;
 
+        /// <summary>序列化 header 到 Span（validate=true 时校验 Magic/Version）。</summary>
+        /// <param name="dst">目标缓冲（长度 ≥ HeaderSize）。</param>
+        /// <param name="header">header 值。</param>
+        /// <param name="validate">是否校验 Magic/Version。</param>
         public void WriteHeader(Span<byte> dst, in SnapshotMetaHeader header, bool validate)
             => SnapshotMetaHeaderCodec.Write(dst, in header, validate);
 
+        /// <summary>从 Span 反序列化 header。</summary>
+        /// <param name="src">源缓冲（长度 ≥ HeaderSize）。</param>
+        /// <returns>解析出的 SnapshotMetaHeader。</returns>
         public SnapshotMetaHeader ReadHeader(ReadOnlySpan<byte> src) => SnapshotMetaHeaderCodec.Read(src);
 
+        /// <summary>序列化 payload 到 Span。</summary>
+        /// <param name="dst">目标缓冲（长度 ≥ PayloadSize）。</param>
+        /// <param name="payload">payload 值。</param>
         public void WritePayload(Span<byte> dst, in SnapshotMetaPayload payload) =>
             SnapshotMetaPayloadCodec.Write(dst, in payload);
 
+        /// <summary>从 Span 反序列化 payload。</summary>
+        /// <param name="src">源缓冲（长度 ≥ PayloadSize）。</param>
+        /// <returns>解析出的 SnapshotMetaPayload。</returns>
         public SnapshotMetaPayload ReadPayload(ReadOnlySpan<byte> src) => SnapshotMetaPayloadCodec.Read(src);
+        /// <summary>读 header 的 MagicValue（用于校验）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <returns>MagicValue 字段值。</returns>
         public uint GetMagicValue(in SnapshotMetaHeader h) => h.MagicValue;
+        /// <summary>读 header 的 Version（用于校验）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <returns>Version 字段值。</returns>
         public ushort GetVersion(in SnapshotMetaHeader h) => h.Version;
+        /// <summary>读 header 的 PayloadLength（用于计算 opaque 长度）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <returns>PayloadLength 字段值。</returns>
         public ushort GetPayloadLength(in SnapshotMetaHeader h) => h.PayloadLength;
 
+        /// <summary>设置 header 的 PayloadLength（WritePayload 后按实际数据长度更新）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <param name="len">新的 PayloadLength（字节）。</param>
+        /// <returns>更新后的 header。</returns>
         public SnapshotMetaHeader WithPayloadLength(in SnapshotMetaHeader h, ushort len)
         {
             var x = h;
@@ -95,6 +124,8 @@ public abstract partial class SnapshotBase
             return x;
         }
 
+        /// <summary>创建一个填好规范字段（Magic/Version/Flags）的默认 header。</summary>
+        /// <returns>默认 SnapshotMetaHeader（规范字段常量填好，PayloadLength/PaddingLength 为零）。</returns>
         public SnapshotMetaHeader CreateDefaultHeader() => new()
         {
             MagicValue = SnapshotMetaHeader.Magic,
@@ -112,12 +143,17 @@ public abstract partial class SnapshotBase
     {
         private byte[]? _lastBlock;
 
+        /// <summary>读回最后一个 meta 帧的 payload（Backward 扫描找最后帧尾 + IS_META 校验）。</summary>
+        /// <returns>meta block 字节视图（视图有效至本传输下一次调用）；无 meta 帧时为空 Span。</returns>
         public ReadOnlySpan<byte> ReadLastBlock()
         {
             _lastBlock = ScanLastMetaFrame();
             return _lastBlock;
         }
 
+        /// <summary>读回最后一个 meta 帧的 payload（异步对等版——当前实现同步扫描）。</summary>
+        /// <param name="ct">取消令牌（当前实现不检查取消）。</param>
+        /// <returns>meta block 字节视图（视图有效至本传输下一次调用）；无 meta 帧时为空 Memory。</returns>
         public async ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct)
         {
             _lastBlock = await ValueTask.FromResult(ScanLastMetaFrame()).ConfigureAwait(false);
@@ -126,6 +162,7 @@ public abstract partial class SnapshotBase
 
         /// <summary>把 meta block 作为 payload 追加为带 IS_META flag 的完整帧。
         /// 布局 [Header][block][Footer][padding]（padding 在 Footer 后——帧头位置 = Footer 前移 HeaderSize+TotalLength，确定可算）。</summary>
+        /// <param name="block">完整 meta 块字节。</param>
         public void WriteBlock(ReadOnlySpan<byte> block)
         {
             var sectorSize = owner._sectorSize;
@@ -153,6 +190,9 @@ public abstract partial class SnapshotBase
         }
 
         /// <summary>异步写 meta block（引擎写/flush 原生同步，实质等价）。</summary>
+        /// <param name="block">完整 meta 块字节。</param>
+        /// <param name="ct">取消令牌（当前实现不检查取消）。</param>
+        /// <returns>表示异步写入完成的任务；完成后 meta block 已作为 IS_META 帧落盘（含引擎 flush）。</returns>
         public async ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct)
         {
             WriteBlock(block.Span);

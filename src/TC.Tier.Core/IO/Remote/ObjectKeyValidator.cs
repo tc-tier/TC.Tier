@@ -9,6 +9,8 @@ public static class ObjectKeyValidator
     public const int MaxKeyBytes = 1024;
 
     /// <summary>校验对象键——非法抛 <see cref="ArgumentException"/>（空键/超长/含 '\0' 或 CR/LF）。</summary>
+    /// <param name="key">对象键（UTF-8 ≤1024 字节，不含 '\0'/CR/LF）。</param>
+    /// <exception cref="ArgumentException">空键、超长或含非法控制字符。</exception>
     public static void Validate(string key)
     {
         if (string.IsNullOrEmpty(key))

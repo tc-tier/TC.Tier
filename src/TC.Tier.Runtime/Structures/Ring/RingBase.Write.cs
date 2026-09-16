@@ -4,11 +4,19 @@ using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Runtime.Structures.Ring;
 
+/// <summary>
+/// RingBase 写入 partial——公开 K/V 写入面（Write/WriteTombstone 及异步版、分段写、原位 UpdateValue）。
+/// </summary>
 public abstract partial class RingBase<TKey>
 {
     private unsafe LogicalAddress WriteRecordCore(TKey key, ReadOnlySpan<byte> payload, ushort flags, LogicalAddress previousAddress = default)
+        => WriteRecordCore(key, [], payload, flags, previousAddress);
+
+    private unsafe LogicalAddress WriteRecordCore(TKey key, scoped ReadOnlySpan<byte> prefix,
+        scoped ReadOnlySpan<byte> payload, ushort flags, LogicalAddress previousAddress = default)
     {
-        int keyLen = KeySize, payloadLen = payload.Length;
+        EnsureReady();   // ★ #258：Dispose 竞态 fail-fast（写入口统一门禁）
+        int keyLen = KeySize, payloadLen = checked(prefix.Length + payload.Length);
         uint totalPayload = (uint)(keyLen + payloadLen);
         int unaligned = RingCodec.HeaderSize + (int)totalPayload;
         int aligned = (unaligned + RingCodec.Alignment - 1) & ~(RingCodec.Alignment - 1);
@@ -17,22 +25,49 @@ public abstract partial class RingBase<TKey>
         _epoch.Resume();
         try
         {
-            LogicalAddress addr = Allocate(aligned);
-            long phys = GetPhysicalAddress(addr);
+            while (true)
+            {
+                LogicalAddress addr;
+                // ★ 分配+完整写入同一临界区（分配原子化）：TryAllocateLocked 成功即写全
+                //   header/payload/CRC 并推进 _safeSnapshotTail——锁外不存在「已分配未写完」的
+                //   在途槽（其被扫描跳过并越过 ⇒ 写者后续换绑落旧索引即永久丢失，压强回归实锤）。
+                lock (_tailLock)
+                {
+                    addr = TryAllocateLocked(aligned);
+                    if (addr.IsValid)
+                    {
+                        long phys = GetPhysicalAddress(addr);
 
-            var fields = new RingRecordFields(
-                (ushort)(flags | RecordFlags.FLAG_RINGRECORD_VALID | RecordFlags.FLAG_RINGRECORD_SEALED),
-                totalPayload, paddingLen, previousAddress);
-            var headerSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize);
-            RingCodec.WriteHeader(headerSpan, in fields);
-            Unsafe.WriteUnaligned((void*)(phys + RingCodec.HeaderSize), key);
-            payload.CopyTo(new Span<byte>((void*)(phys + RingCodec.HeaderSize + keyLen), payloadLen));
-            if (paddingLen > 0)
-                new Span<byte>((void*)(phys + unaligned), paddingLen).Clear();
-            var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + (int)totalPayload);
-            RingCodec.FillCrc(recordSpan, RingCodec.HeaderSize, (int)totalPayload);
-            Seal(addr, aligned);
-            return addr;
+                        var fields = new RingRecordFields(
+                            (ushort)(flags | RecordFlags.FLAG_RINGRECORD_VALID | RecordFlags.FLAG_RINGRECORD_SEALED),
+                            totalPayload, paddingLen, previousAddress);
+                        var headerSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize);
+                        RingCodec.WriteHeader(headerSpan, in fields);
+                        Unsafe.WriteUnaligned((void*)(phys + RingCodec.HeaderSize), key);
+                        var destination = new Span<byte>((void*)(phys + RingCodec.HeaderSize + keyLen), payloadLen);
+                        prefix.CopyTo(destination);
+                        payload.CopyTo(destination[prefix.Length..]);
+                        if (paddingLen > 0)
+                            new Span<byte>((void*)(phys + unaligned), paddingLen).Clear();
+                        var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + (int)totalPayload);
+                        RingCodec.FillCrc(recordSpan, RingCodec.HeaderSize, (int)totalPayload);
+                        Seal(addr, aligned);
+                        // ★ header+payload+CRC 完整——锁内推进安全快照尾（锁内顺序=分配序，单调无洞；
+                        //   8B 读侧判据水位同点 CAS-max 发布——读路径无锁分档的可见性前提）
+                        var addrEnd = _engine.CalculationAddress(addr, aligned);
+                        AdvanceSafeSnapshotTail(addrEnd);
+                    }
+                }
+
+                if (addr.IsValid)
+                    return addr;
+
+                // ★ 背压：环形满——锁外 flush readonly 区腾 slot（锁内禁止 flush/evict IO 路径）
+                var ro = ReadOnlyAddress;
+                var flushed = FlushedUntilAddress;
+                if (ro > flushed) WriteThroughUntil(ro);
+                else Thread.Yield();
+            }
         }
         finally
         {
@@ -41,8 +76,41 @@ public abstract partial class RingBase<TKey>
     }
 
     /// <summary>★ 公开写入：大 value 自动溢出到溢出引擎（同步）。flags 由引擎内部管理，不对外暴露。</summary>
+    /// <param name="key">待写 key（TKey 定长 blittable）。</param>
+    /// <param name="value">payload 字节（超溢出阈值时整值写溢出引擎，record 内只留指针）。</param>
+    /// <returns>本条 record 的逻辑地址（写完即在页池完整可见；永不返回 <see cref="LogicalAddress.Empty"/>）。</returns>
     public LogicalAddress Write(TKey key, ReadOnlySpan<byte> value)
         => WriteWithFlags(key, value, 0);
+
+    /// <summary>
+    /// 分段写入 inline value；prefix/value 直接复制到 Ring，避免调用方拼接临时数组。
+    /// Overflow 开启时应使用连续 value 的现有 Write/WriteAsync 路径。
+    /// </summary>
+    /// <param name="key">待写 key（TKey 定长 blittable）。</param>
+    /// <param name="prefix">value 前段字节（与 value 顺序拼接为完整 value）。</param>
+    /// <param name="value">value 后段字节。</param>
+    /// <returns>本条 record 的逻辑地址（超溢出阈值时抛 InvalidOperationException）。</returns>
+    public unsafe LogicalAddress Write(TKey key, scoped ReadOnlySpan<byte> prefix,
+        scoped ReadOnlySpan<byte> value)
+    {
+        EnsureNotDisposed();
+        EnsureReady();
+        int valueLength = checked(prefix.Length + value.Length);
+        if (_overflowPolicy == OverflowPolicy.Enabled && valueLength > _minOverflowSize)
+            throw new InvalidOperationException("超过 Overflow 阈值的分段 Ring 写入需要使用连续 value 的 Write/WriteAsync");
+
+        return WriteRecordCore(key, prefix, value, 0);
+    }
+
+    /// <summary>
+    /// ★ 公开墓碑写入（KV 删除标记——spec §1 KV 组合配方）：写入 FLAG_RINGRECORD_TOMBSTONE + 空 value，
+    /// 返回墓碑地址。恢复时索引重建跳过墓碑（RecordKey.IsTombstone 过滤——已删 key 不复活）。
+    /// <para>大 value 场景墓碑为空 payload（无溢出——删除标记轻量）。</para>
+    /// </summary>
+    /// <param name="key">要删除的 key（写入 FLAG_RINGRECORD_TOMBSTONE 墓碑 record）。</param>
+    /// <returns>墓碑 record 的逻辑地址（恢复/索引重建按 RecordKey.IsTombstone 过滤）。</returns>
+    public LogicalAddress WriteTombstone(TKey key)
+        => WriteWithFlags(key, [], RecordFlags.FLAG_RINGRECORD_TOMBSTONE);
 
     /// <summary>
     /// ★ 引擎/子类扩展点：带 flags 的写入（如将来设 <see cref="RecordFlags.FLAG_RINGRECORD_TOMBSTONE"/>）。
@@ -66,8 +134,13 @@ public abstract partial class RingBase<TKey>
 
     /// <summary>
     /// ★ 公开异步写入：大 value 走真异步溢出路径（<see cref="WriteOverflowAsync"/>），小 value 走同步快路径。
-    /// <para>★ 快/慢路径分离——inline 写是纯内存操作无 I/O，仅溢出落盘需 await。</para>
+    /// <para>★ 快/慢路径分离——inline 写通常纯内存操作（页满让渡时 Allocate 内可能触发
+    /// FlushUntil→引擎 Flush/fsync，同步完成）；溢出落盘才需 await。</para>
     /// </summary>
+    /// <param name="key">待写 key（TKey 定长 blittable）。</param>
+    /// <param name="value">payload 字节（超溢出阈值走真异步溢出路径）。</param>
+    /// <param name="ct">取消令牌（溢出慢路径响应取消）。默认 <c>default</c>。</param>
+    /// <returns>完成后结果为本条 record 的逻辑地址（inline 快路径同步完成）。</returns>
     public ValueTask<LogicalAddress> WriteAsync(TKey key, ReadOnlyMemory<byte> value, CancellationToken ct = default)
     {
         EnsureNotDisposed();
@@ -75,6 +148,17 @@ public abstract partial class RingBase<TKey>
         if (_overflowPolicy == OverflowPolicy.Enabled && value.Length > _minOverflowSize)
             return WriteOverflowThenRecordAsync(key, value, ct);   // 慢路径:真异步
         return new ValueTask<LogicalAddress>(WriteRecordCore(key, value.Span, 0));  // 快路径:同步,零 async 开销
+    }
+
+    /// <summary>★ 公开异步墓碑写入（KV 删除——对齐 <see cref="WriteTombstone"/> 的异步版）。</summary>
+    /// <param name="key">要删除的 key。</param>
+    /// <param name="ct">取消令牌（当前实现纯内存写，未消费）。默认 <c>default</c>。</param>
+    /// <returns>完成后结果为墓碑 record 的逻辑地址（同步完成，零 async 开销）。</returns>
+    public ValueTask<LogicalAddress> WriteTombstoneAsync(TKey key, CancellationToken ct = default)
+    {
+        EnsureNotDisposed();
+        EnsureReady();
+        return new ValueTask<LogicalAddress>(WriteRecordCore(key, [], RecordFlags.FLAG_RINGRECORD_TOMBSTONE));
     }
 
     /// <summary>★ 引擎/子类异步扩展点（带 flags）。对齐 <see cref="WriteWithFlags"/> 的异步版。</summary>
@@ -175,6 +259,10 @@ public abstract partial class RingBase<TKey>
     /// 纯 inline 翻转（含 overflow→inline 回退）是内存操作，同步完成返回 <see cref="ValueTask.CompletedTask"/>。
     /// <para>对齐 <see cref="UpdateValue"/> 的 4 分支语义。</para>
     /// </summary>
+    /// <param name="addr">目标 record 的逻辑地址。</param>
+    /// <param name="newValue">新 value 字节（overflow→inline 回退时受原槽 inline 容量约束）。</param>
+    /// <param name="ct">取消令牌（溢出慢路径响应取消）。默认 <c>default</c>。</param>
+    /// <returns>完成后原位更新结束（纯 inline 分支同步完成）。</returns>
     public unsafe ValueTask UpdateValueAsync(LogicalAddress addr, ReadOnlyMemory<byte> newValue, CancellationToken ct = default)
     {
         EnsureNotDisposed();

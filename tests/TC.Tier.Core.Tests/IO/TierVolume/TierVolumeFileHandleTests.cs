@@ -94,6 +94,118 @@ public sealed class TierVolumeFileHandleTests : IDisposable
         buf.Should().OnlyContain(b => b == 0, "打洞区间读零");
     }
 
+    // ═══════════════ PunchHole 字节粒度契约（与 Disk/Mem 平权——A4 任意 offset/length）═══════════════
+
+    [Fact]
+    public void PunchHole_UnalignedOffsetAndLength_EdgesZeroed_InteriorReclaimed()
+    {
+        using var h = _fs.Open("pu", RWOpts());
+        const int fileLen = 16384;
+        var data = new byte[fileLen];
+        Array.Fill(data, (byte)0xCD);
+        h.Write(0, data);
+        // [100, 8292)：头边缘 [100,4096) 零写（块0保留），内块 [4096,8192) 物理回收，尾边缘 [8192,8292) 零写（块2保留）
+        h.PunchHole(100, 8192);
+        h.Length.Should().Be(fileLen, "逻辑长度不动");
+
+        var buf = new byte[fileLen];
+        h.Read(0, buf).Should().Be(fileLen);
+        buf[..100].Should().OnlyContain(b => b == 0xCD, "打洞起点前数据完好");
+        buf[100..8292].Should().OnlyContain(b => b == 0, "打洞区间（含非对齐边缘）读零");
+        buf[8292..].Should().OnlyContain(b => b == 0xCD, "打洞终点后数据完好");
+
+        var ranges = h.EnumerateAllocatedRanges();
+        ranges.Should().NotContain(r => r.Start < 8192 && r.End > 4096, "整块 [4096,8192) 已物理回收");
+        ranges.Should().Contain(r => r.Start == 0, "头边缘所在块保留（零写不回收）");
+    }
+
+    [Fact]
+    public void PunchHole_EntirelyWithinOneBlock_Zeroed_NoAlignmentThrow()
+    {
+        using var h = _fs.Open("pw", RWOpts());
+        var data = new byte[4096];
+        Array.Fill(data, (byte)0xAB);
+        h.Write(0, data);
+        h.PunchHole(10, 100);   // 全在块 0 内——无整块回收，纯边缘零写
+        var buf = new byte[4096];
+        h.Read(0, buf).Should().Be(4096);
+        buf[..10].Should().OnlyContain(b => b == 0xAB);
+        buf[10..110].Should().OnlyContain(b => b == 0, "块内非对齐区间读零");
+        buf[110..].Should().OnlyContain(b => b == 0xAB, "区间外完好");
+    }
+
+    [Fact]
+    public void PunchHole_BeyondEOF_Throws_IOFailure()
+    {
+        using var h = _fs.Open("px", RWOpts());
+        h.Write(0, new byte[4096]);
+        var act = () => h.PunchHole(4096, 4096);   // 紧接 EOF 起打洞 = 越界
+        act.Should().Throw<FileIOException>().Which.Error.Should().Be(IOError.IOFailure,
+            "越出文件长度与 Disk/Mem 平权抛 IOFailure");
+    }
+
+    [Fact]
+    public void PunchHole_DirectHandle_Unaligned_Succeeds_AndReadsZeroAfterFlush()
+    {
+        using var h = _fs.Open("pd", new FileOpenOptions
+        {
+            Access = AccessMode.ReadWrite,
+            Mode = FileOpenMode.OpenOrCreate,
+            Sharing = FileSharing.ReadWrite,
+            Hints = FileOpenHints.NoBuffering,
+        });
+        var data = new byte[8192];
+        Array.Fill(data, (byte)0xEF);
+        h.Write(0, data);   // DIO 对齐写
+        h.PunchHole(100, 4096);   // 非对齐——边缘内部走缓冲零写，不抛 AlignmentError
+        h.Flush();   // 边缘零页落载体（DIO 读绕自管页缓存——flush 后载体/缓存一致）
+        var buf = new byte[8192];
+        h.Read(0, buf).Should().Be(8192);
+        buf[..100].Should().OnlyContain(b => b == 0xEF);
+        buf[100..4196].Should().OnlyContain(b => b == 0, "DIO 句柄非对齐打洞读零");
+        buf[4196..].Should().OnlyContain(b => b == 0xEF, "尾后完好");
+    }
+
+    [Fact]
+    public void PunchHole_Unaligned_PersistsAcrossReopen()
+    {
+        var volPath = Path.Combine(_dir, $"reopen-{Guid.NewGuid():N}.tier");
+        using (var fs = TierVolumeFs.New(TierVolumeCarrier.File(volPath),
+                   new TierVolumeFormatOptions { QuotaBytes = 32L << 20 }))
+        {
+            using var h = fs.Open("rp", new FileOpenOptions
+            { Access = AccessMode.ReadWrite, Mode = FileOpenMode.OpenOrCreate, Sharing = FileSharing.ReadWrite });
+            var data = new byte[8192];
+            Array.Fill(data, (byte)0x77);
+            h.Write(0, data);
+            h.PunchHole(50, 5000);   // [50,5050)：跨块非对齐
+            h.Flush();
+        }
+        using (var fs = TierVolumeFs.Open(TierVolumeCarrier.File(volPath)))
+        using (var h = fs.Open("rp", new FileOpenOptions
+               { Access = AccessMode.ReadWrite, Mode = FileOpenMode.OpenExisting, Sharing = FileSharing.ReadWrite }))
+        {
+            var buf = new byte[8192];
+            h.Read(0, buf).Should().Be(8192);
+            buf[..50].Should().OnlyContain(b => b == 0x77, "重开后区间前完好");
+            buf[50..5050].Should().OnlyContain(b => b == 0, "重开后打洞区间（journal 元数据 + 载体零页）持续读零");
+            buf[5050..].Should().OnlyContain(b => b == 0x77, "重开后区间后完好");
+        }
+    }
+
+    [Fact]
+    public void PunchHole_Aligned_Idempotent()
+    {
+        using var h = _fs.Open("pi", RWOpts());
+        h.Write(0, new byte[8192]);
+        h.PunchHole(0, 4096);
+        h.PunchHole(0, 4096);   // 二次打洞（已回收区间）——幂等不抛
+        var buf = new byte[8192];
+        h.Read(0, buf).Should().Be(8192);
+        buf[..4096].Should().OnlyContain(b => b == 0);
+        buf[4096..].Should().OnlyContain(b => b == 0, "写入即零——全零文件");
+    }
+
     [Fact]
     public void HundredGLogical_OnSmallVolume_Succeeds_PhysicalCriterion()
     {

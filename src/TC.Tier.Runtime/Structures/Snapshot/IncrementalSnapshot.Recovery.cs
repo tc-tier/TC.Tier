@@ -16,6 +16,8 @@ public sealed partial class IncrementalSnapshot
         private readonly IncrementalSnapshot _self = (IncrementalSnapshot)owner;
 
         /// <summary>层间 join——主引擎 + meta 引擎（Managed 模式）双 await（OnInitializeBegin 已并行启动）。</summary>
+        /// <param name="ct">取消令牌（透传引擎 <c>WaitForReadyAsync</c>）。</param>
+        /// <returns>表示主引擎 + meta 引擎全部就绪的任务。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await _self._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
@@ -30,6 +32,9 @@ public sealed partial class IncrementalSnapshot
         ///   尾截断回滚到提交点（未提交段物理清除——失败即清理）；</para>
         /// <para>3. opaque 段表解析（O(1) 段起点列表——恢复免全盘扫描；仅含已提交段）。</para>
         /// </summary>
+        /// <param name="hints">恢复提示（外部注入水位；WriteAddress 缺省时走 meta / Backward 扫描）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>表示恢复核心完成的任务；完成后水位已裁决、悬干段已回滚、段表与事务序号已续接。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(SnapshotRecoveryHints hints, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();

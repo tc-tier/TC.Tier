@@ -50,10 +50,14 @@ public sealed record StorageEngineOptimization
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>设置 worker 消费者数（返回新实例）。</summary>
+    /// <param name="consumers">消费者个数（建议 ≥ 1；过多增加线程切换开销，过少导致任务堆积）。</param>
+    /// <returns>替换 WorkerConsumers 后的新 <see cref="StorageEngineOptimization"/> 实例。</returns>
     public StorageEngineOptimization WithWorkerConsumers(int consumers)
         => this with { WorkerConsumers = consumers };
 
     /// <summary>设置段表初始容量（返回新实例）。</summary>
+    /// <param name="capacity">段表索引初始容量（段条目数，非负）。</param>
+    /// <returns>替换 IndexCapacity 后的新 <see cref="StorageEngineOptimization"/> 实例。</returns>
     public StorageEngineOptimization WithIndexCapacity(int capacity)
         => this with { IndexCapacity = capacity };
 }

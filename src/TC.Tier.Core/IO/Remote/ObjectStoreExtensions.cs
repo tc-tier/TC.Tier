@@ -18,35 +18,69 @@ public static class ObjectStoreExtensions
     private static readonly SyncBridgeOptions SCopyOpts = new() { Name = "objectstore-copy", TimeoutMs = 60_000 };
 
     /// <summary>PutAsync 同步包装（桥接，默认 15s 有界）。</summary>
+    /// <param name="store">目标对象存储（扩展方法接收者）。</param>
+    /// <param name="key">对象键。</param>
+    /// <param name="data">对象数据。</param>
+    /// <param name="metadata">用户元数据快照（null = 空）。</param>
+    /// <param name="condition">写入条件（null = 无条件）。</param>
     public static void Put(this IObjectStore store, string key, ReadOnlyMemory<byte> data,
                            ObjectMetadata? metadata = null, PutCondition? condition = null)
         => SyncAsyncBridge.Run(ct => store.PutAsync(key, data, metadata, condition, ct), SPutOpts);
 
     /// <summary>GetAsync 同步包装（桥接，默认 15s 有界）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="key">对象键。</param>
+    /// <param name="offset">对象内读取起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即最多读取字节数）。</param>
+    /// <returns>实际读取的字节数（0 = offset 已到对象末尾）。</returns>
     public static int Get(this IObjectStore store, string key, long offset, Memory<byte> destination)
         => SyncAsyncBridge.Run(ct => store.GetAsync(key, offset, destination, ct), SGetOpts);
 
     /// <summary>HeadAsync 同步包装（桥接，默认 15s 有界）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="key">对象键。</param>
+    /// <returns>对象元信息；不存在为 null。</returns>
     public static ObjectInfo? Head(this IObjectStore store, string key)
         => SyncAsyncBridge.Run(ct => store.HeadAsync(key, ct), SHeadOpts);
 
     /// <summary>DeleteAsync 同步包装（桥接，默认 15s 有界）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="key">对象键。</param>
+    /// <param name="condition">删除条件（null = 无条件）。</param>
     public static void Delete(this IObjectStore store, string key, DeleteCondition? condition = null)
         => SyncAsyncBridge.Run(ct => store.DeleteAsync(key, condition, ct), SDeleteOpts);
 
     /// <summary>ListAsync 同步包装（桥接，默认 15s 有界）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="prefix">键前缀过滤（null/空 = 全量）。</param>
+    /// <returns>匹配条目清单。</returns>
     public static IReadOnlyList<ObjectEntry> List(this IObjectStore store, string? prefix = null)
         => SyncAsyncBridge.Run(ct => store.ListAsync(prefix, ct), SListOpts);
 
     /// <summary>CopyAsync 同步包装（桥接，60s 预算——服务端拷贝大对象放宽）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="sourceKey">源对象键。</param>
+    /// <param name="destKey">目标对象键。</param>
+    /// <param name="metadata">目标元数据处理（null = 继承源）。</param>
     public static void Copy(this IObjectStore store, string sourceKey, string destKey, CopyMetadata? metadata = null)
         => SyncAsyncBridge.Run(ct => store.CopyAsync(sourceKey, destKey, metadata, ct), SCopyOpts);
 
     /// <summary>CopyMetadataAsync 同步包装（桥接，60s 预算）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="sourceKey">源对象键。</param>
+    /// <param name="replace">替换用元数据（null = 仅复制源元数据）。</param>
+    /// <returns>写入目标后的对象元数据。</returns>
     public static ObjectMetadata CopyMetadata(this IObjectStore store, string sourceKey, ObjectMetadata? replace = null)
         => SyncAsyncBridge.Run(ct => store.CopyMetadataAsync(sourceKey, replace, ct), SCopyOpts);
 
     /// <summary>CopyRangeAsync 同步包装（桥接，60s 预算——服务端拷贝放宽）。</summary>
+    /// <param name="store">目标对象存储。</param>
+    /// <param name="sourceKey">源对象键。</param>
+    /// <param name="destKey">目标对象键。</param>
+    /// <param name="sourceOffset">源对象内起始偏移（字节，≥0）。</param>
+    /// <param name="length">拷贝字节数。</param>
+    /// <param name="metadata">目标元数据处理（null = 继承源）。</param>
+    /// <returns>服务端实际拷贝的字节数（字节）。</returns>
     public static long CopyRange(this IObjectStore store, string sourceKey, string destKey,
                                  long sourceOffset, long length, CopyMetadata? metadata = null)
         => SyncAsyncBridge.Run(ct => store.CopyRangeAsync(sourceKey, destKey, sourceOffset, length, metadata, ct), SCopyOpts);

@@ -41,12 +41,12 @@ public class RingClosedSpecializationTests
     }
 
     [Fact]
-    public void RingOfLong_CreateFactory_OneStepLifecycle()
+    public async Task RingOfLong_CreateFactory_OneStepLifecycle()
     {
         var (settings, vol) = TestRingSettingsFactory.Create();
         try
         {
-            using var ring = RingOfLong.Create(settings, vol.Fs);
+            using var ring = await RingOfLong.CreateAsync(settings, vol.Fs);
 
             ring.IsReady.Should().BeTrue("Create = 构造 + Initialize + WaitForReady 一步");
             ring.Write(7L, new byte[] { 9 }).Should().NotBe(LogicalAddress.Empty);
@@ -58,14 +58,14 @@ public class RingClosedSpecializationTests
     }
 
     [Fact]
-    public void RingOfLong_IsClosedFormOf_GenericKernel()
+    public async Task RingOfLong_IsClosedFormOf_GenericKernel()
     {
         // 封闭类型 = 泛型内核的编译期封闭：赋值面兼容 + IKeyResolver 契约（判等闭环数据面）成立
         // （内联强转证明契约——避免接口型局部/参数触发 CA1859 表演性抑制）
         var (settings, vol) = TestRingSettingsFactory.Create();
         try
         {
-            using RingOfLong closed = RingOfLong.Create(settings, vol.Fs);
+            using RingOfLong closed = await RingOfLong.CreateAsync(settings, vol.Fs);
             var addr = closed.Write(100L, new byte[] { 5 });
 
             ((IKeyResolver<long>)closed).TryGetKey(addr, out var key).Should().BeTrue();
@@ -78,13 +78,13 @@ public class RingClosedSpecializationTests
     }
 
     [Fact]
-    public void RingOfOrderId_CustomKey_InConsumingAssembly_WritesAndReads()
+    public async Task RingOfOrderId_CustomKey_InConsumingAssembly_WritesAndReads()
     {
         // 消费程序集自定义 Key：[assembly: RingKey(typeof(OrderId))] → RingOfOrderId 生成于本程序集
         var (settings, vol) = TestRingSettingsFactory.Create();
         try
         {
-            using var ring = RingOfOrderId.Create(settings, vol.Fs);
+            using var ring = await RingOfOrderId.CreateAsync(settings, vol.Fs);
 
             var key = new OrderId(12345L);
             var addr = ring.Write(key, new byte[] { 7, 7, 7, 7 });
@@ -105,13 +105,13 @@ public class RingClosedSpecializationTests
     // ═══ 索引封闭形态（同一 [RingKey] 声明产出全套——开放泛型不落消费面三索引同闸门）═══
 
     [Fact]
-    public void HashOfLong_ClosedForm_PutFindWithRingResolver()
+    public async Task HashOfLong_ClosedForm_PutFindWithRingResolver()
     {
         var (settings, vol) = TestRingSettingsFactory.Create();
         try
         {
-            using var ring = RingOfLong.Create(settings, vol.Fs);
-            using var index = HashOfLong.Create(vol.Fs,
+            using var ring = await RingOfLong.CreateAsync(settings, vol.Fs);
+            using var index = await HashOfLong.CreateAsync(vol.Fs,
                 new HashIndexSettings(new StorageEngineOptions("closed-hash", 1L << 24, true, true, true)), ring);
 
             index.EntryCount.Should().Be(0);
@@ -127,12 +127,12 @@ public class RingClosedSpecializationTests
     }
 
     [Fact]
-    public void BTreeOfLong_ClosedForm_InsertFindScan()
+    public async Task BTreeOfLong_ClosedForm_InsertFindScan()
     {
         var vol = new TestVolume();
         try
         {
-            using var index = BTreeOfLong.Create(vol.Fs,
+            using var index = await BTreeOfLong.CreateAsync(vol.Fs,
                 new BTreeIndexSettings(new StorageEngineOptions("closed-bt", 1L << 24, true, true, true)));
 
             for (long k = 5; k >= 0; k--)
@@ -152,12 +152,12 @@ public class RingClosedSpecializationTests
     }
 
     [Fact]
-    public void SkipListOfLong_ClosedForm_InsertFind()
+    public async Task SkipListOfLong_ClosedForm_InsertFind()
     {
         var vol = new TestVolume();
         try
         {
-            using var index = SkipListOfLong.Create(vol.Fs,
+            using var index = await SkipListOfLong.CreateAsync(vol.Fs,
                 new SkipListIndexSettings(new StorageEngineOptions("closed-sl", 1L << 24, true, true, true)));
 
             index.Insert(7L, new LogicalAddress(0, 70), LogicalAddress.Empty);
@@ -171,14 +171,14 @@ public class RingClosedSpecializationTests
     }
 
     [Fact]
-    public void HashOfOrderId_ClosedForm_CustomKey()
+    public async Task HashOfOrderId_ClosedForm_CustomKey()
     {
         // 自定义 Key 的全套封闭：同一 [assembly: RingKey(typeof(OrderId))] 声明产出索引封闭形态
         var (settings, vol) = TestRingSettingsFactory.Create();
         try
         {
-            using var ring = RingOfOrderId.Create(settings, vol.Fs);
-            using var index = HashOfOrderId.Create(vol.Fs,
+            using var ring = await RingOfOrderId.CreateAsync(settings, vol.Fs);
+            using var index = await HashOfOrderId.CreateAsync(vol.Fs,
                 new HashIndexSettings(new StorageEngineOptions("closed-hash-o", 1L << 24, true, true, true)), ring);
 
             var key = new OrderId(7L);

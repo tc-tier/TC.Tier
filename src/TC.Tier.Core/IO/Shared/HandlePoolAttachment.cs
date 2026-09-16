@@ -17,12 +17,16 @@ internal sealed class HandlePoolAttachment
     private readonly (string Op, int Tid, int Usage)[] _ops = new (string, int, int)[16];
     private int _opsIdx;
 
+    /// <summary>记录一次借还操作（Debug 环形示波器——下溢诊断现场；Release 版 no-op）。</summary>
+    /// <param name="op">操作名（如 acquire-hit/release）。</param>
     public void Trace(string op)
     {
         var i = Interlocked.Increment(ref _opsIdx) - 1;
         _ops[i % _ops.Length] = (op, Environment.CurrentManagedThreadId, Volatile.Read(ref Usage));
     }
 
+    /// <summary>导出借还历史（新→旧，环形缓冲上限内）——计数下溢异常的现场附件。</summary>
+    /// <returns>多行诊断字符串（每行 = 一次操作 + 线程 id + 当时计数）。</returns>
     public string Dump()
     {
         var sb = new System.Text.StringBuilder();
@@ -36,11 +40,15 @@ internal sealed class HandlePoolAttachment
         return sb.ToString();
     }
 #else
+    /// <summary>记录一次借还操作（Release 版 no-op）。</summary>
+    /// <param name="op">操作名（被忽略）。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Trace(string op)
     {
     }
 
+    /// <summary>导出借还历史（Release 版恒空——无示波器）。</summary>
+    /// <returns>空字符串。</returns>
     public string Dump() => string.Empty;
 #endif
 }

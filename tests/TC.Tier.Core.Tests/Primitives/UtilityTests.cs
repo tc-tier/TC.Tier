@@ -26,6 +26,33 @@ public class UtilityTests
         Utility.ParseSize("12345").Should().Be(12345);
     }
 
+    [Theory]
+    [InlineData("4kb")]
+    [InlineData("8MB")]
+    [InlineData("2GiB")]
+    public void ParseSize_WithBSuffix_ParsesCorrectly(string input)
+    {
+        var expected = input.ToLowerInvariant()[0] switch
+        {
+            '4' => 4096L,
+            '8' => 8388608L,
+            _ => 2L * 1024 * 1024 * 1024,
+        };
+        Utility.ParseSize(input).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("4x")]
+    [InlineData("1.5k")]
+    [InlineData("abc")]
+    [InlineData("4kx")]
+    [InlineData("k")]
+    public void ParseSize_InvalidInput_ThrowsFormat(string input)
+    {
+        Action act = () => Utility.ParseSize(input);
+        act.Should().Throw<FormatException>();
+    }
+
     // ══ PreviousPowerOf2 ══
 
     [Theory]
@@ -235,6 +262,37 @@ public class UtilityTests
         var h1 = Utility.GetHashCode(42L);
         var h2 = Utility.GetHashCode(43L);
         h1.Should().NotBe(h2);
+    }
+
+    [Fact]
+    public unsafe void HashBytes_PreservesLittleEndianGoldenValues()
+    {
+        var bytes = new byte[] { 1, 2, 3 };
+
+        fixed (byte* ptr = bytes)
+        {
+            Utility.HashBytes(ptr, 1).Should().Be(unchecked((long)0x80000000061032CAUL));
+            Utility.HashBytes(ptr, 2).Should().Be(unchecked((long)0x900000000C340E9BUL));
+            Utility.HashBytes(ptr, 3).Should().Be(unchecked((long)0xB0000B3E9C4E1F9EUL));
+        }
+    }
+
+    [Fact]
+    public unsafe void HashBytes_UnalignedInput_MatchesAlignedInput()
+    {
+        var aligned = new byte[] { 0, 1, 2, 3, 4 };
+        var padded = new byte[aligned.Length + 1];
+        aligned.CopyTo(padded, 1);
+
+        fixed (byte* alignedPtr = aligned)
+        fixed (byte* paddedPtr = padded)
+        {
+            var alignedHash = Utility.HashBytes(alignedPtr, aligned.Length);
+            var unalignedHash = Utility.HashBytes(paddedPtr + 1, aligned.Length);
+
+            alignedHash.Should().Be(4287610130084252834L);
+            unalignedHash.Should().Be(alignedHash);
+        }
     }
 
     // ══ Is32Bit ══

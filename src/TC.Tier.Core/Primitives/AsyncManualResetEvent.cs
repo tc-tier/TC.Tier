@@ -45,11 +45,27 @@ public sealed class AsyncManualResetEvent
     private readonly bool _runContinuationsAsynchronously;
     private readonly object _lock = new();
 
-    private sealed class WaitNode
+    internal sealed class WaitNode
     {
         public PooledValueTaskSource Source = null!;
         public WaitNode? Next;
         public AsyncManualResetEvent? Owner;   // 清理钩子 state（链表路径）
+    }
+
+    internal readonly struct SetCompletion
+    {
+        private readonly AsyncManualResetEvent? _owner;
+        private readonly WaitNode? _toWake;
+        private readonly PooledValueTaskSource? _single;
+
+        internal SetCompletion(AsyncManualResetEvent owner, WaitNode? toWake, PooledValueTaskSource? single)
+        {
+            _owner = owner;
+            _toWake = toWake;
+            _single = single;
+        }
+
+        internal void Complete() => _owner?.CompleteSet(_single, _toWake);
     }
 
     // ★ 清理钩子（static 零分配）：GetResult 完成态时清槽/摘链表 + 归还 source
@@ -109,6 +125,8 @@ public sealed class AsyncManualResetEvent
     /// ⚠️ 仅限 Set 调用点不持锁场景（持 SpinLock 等不可重入锁时内联续体会自死锁）。</item>
     /// </list></para>
     /// </summary>
+    /// <param name="cancellationToken">取消令牌，默认 <see cref="CancellationToken.None"/>；取消时等待者出队并以 <see cref="OperationCanceledException"/> 完成。</param>
+    /// <returns>事件已 set 时同步完成的 ValueTask；否则在 <see cref="Set"/> 唤醒时完成，取消时以取消状态完成。</returns>
     public ValueTask WaitAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -210,6 +228,7 @@ public sealed class AsyncManualResetEvent
     /// 同步等待事件被 set，阻塞调用线程。
     /// <para>基于自旋等待实现，不走 sync-over-async。</para>
     /// </summary>
+    /// <param name="cancellationToken">取消令牌，默认 <see cref="CancellationToken.None"/>；等待期间取消立即抛出 <see cref="OperationCanceledException"/>。</param>
     public void Wait(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -276,17 +295,19 @@ public sealed class AsyncManualResetEvent
     /// 将事件设置为 set 状态，唤醒所有当前等待者。事件保持 set 直到 <see cref="Reset"/>。
     /// <para>重复 Set（已 set 再 Set）为 no-op（幂等）。</para>
     /// </summary>
-    public void Set()
+    public void Set() => PrepareSet().Complete();
+
+    internal SetCompletion PrepareSet()
     {
         // 快速路径：已 set，幂等返回
         if (Volatile.Read(ref _isSet))
-            return;
+            return default;
 
         WaitNode? toWake;
         PooledValueTaskSource? single;
         lock (_lock)
         {
-            if (Volatile.Read(ref _isSet)) return;
+            if (Volatile.Read(ref _isSet)) return default;
             Volatile.Write(ref _isSet, true);
             // 原子取出整个 waiter 链表 + 单 waiter 快路径槽
             toWake = _head;
@@ -294,6 +315,11 @@ public sealed class AsyncManualResetEvent
             single = Interlocked.Exchange(ref _singleWaiter, null);
         }
 
+        return new SetCompletion(this, toWake, single);
+    }
+
+    private void CompleteSet(PooledValueTaskSource? single, WaitNode? toWake)
+    {
         // 锁外唤醒单槽 waiter（MarkOrComplete：完成先于注册安全协议——未注册时留待 OnCompleted 兜底）
         single?.MarkOrComplete();
 

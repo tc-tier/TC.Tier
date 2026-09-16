@@ -7,6 +7,8 @@ namespace TC.Tier.Core.IO.S3;
 public readonly record struct S3Credentials(string AccessKeyId, string SecretAccessKey, string? SessionToken)
 {
     /// <summary>从 AWS 标准环境变量读取（AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN）。</summary>
+    /// <returns>凭证（SessionToken = AWS_SESSION_TOKEN，未设置时为 null——静态密钥形态）。</returns>
+    /// <exception cref="InvalidOperationException">AccessKeyId 或 SecretAccessKey 环境变量未设置。</exception>
     public static S3Credentials FromEnvironment()
     {
         var key = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");

@@ -23,6 +23,10 @@ public sealed class DiskFileSystem : IFileSystem
     private readonly string _root;
     private readonly ILogger? _logger;
     private readonly DiskMetadataMode _metaMode;
+    private readonly bool _metaWriteDurable;
+
+    /// <summary>FileExtra 元数据写是否随写 fsync（卷级耐久策略——false = 缓存写，锚点刷盘免。</summary>
+    internal bool MetaWriteDurable => _metaWriteDurable;
     private readonly PreallocationMode _preallocation;
     private int _metaChannelProbe;   // ExtendedAttr 模式惰性探测结果：0=未探，1=可用，-1=不可用
     private readonly PinnedBufferPool _ioBufferPool = new();
@@ -44,6 +48,18 @@ public sealed class DiskFileSystem : IFileSystem
 
     /// <summary>挂载访问三态（G2——DiskFileHandle.Map 经此过络校验）。</summary>
     internal AccessMode Access => _access;
+
+    private int _directIoDowngradeWarned;
+
+    /// <summary>DIO 降级平台警告（进程内去重——同 fs 实例只告警一次，防句柄池 churn 刷屏）。
+    /// 触发：NoBuffering 请求遭卷 open 即拒（平台无 O_DIRECT 能力），DiskFileHandle 降级缓冲句柄。</summary>
+    internal void WarnDirectIoDowngrade(string path, Exception ex)
+    {
+        if (Interlocked.Exchange(ref _directIoDowngradeWarned, 1) == 0)
+            _logger?.LogWarning(ex,
+                "Volume rejected O_DIRECT open — NoBuffering request downgraded to buffered handle " +
+                "(UnbufferedSupport=Ignored, RequiredAlignment=1). path={Path}", path);
+    }
 
     // ═══════════════ G3：磁盘配额（opt-in——写前拒·惰性基线·按实例记账）═══════════════
 
@@ -101,11 +117,12 @@ public sealed class DiskFileSystem : IFileSystem
             _quotaKnownSizes.Count, sum, _root);
     }
 
-    private DiskFileSystem(string root, DiskMetadataMode metadataMode, PreallocationMode preallocation, ILogger? logger)
+    private DiskFileSystem(string root, DiskMetadataMode metadataMode, PreallocationMode preallocation, bool metaWriteDurable, ILogger? logger)
     {
         _root = root;
         _logger = logger;
         _metaMode = metadataMode;
+        _metaWriteDurable = metaWriteDurable;
         _preallocation = preallocation;
         _baseVolume = ProbeVolume(root);
         Capabilities = ProbeCapabilities(root);
@@ -113,20 +130,25 @@ public sealed class DiskFileSystem : IFileSystem
 
     /// <summary>构造核（绑定根目录——绝对路径，路径分隔符归一；不立即创建，<see cref="EnsureRoot"/> 幂等建）。
     /// 旧公共入口 Create 已退役（P2 收尾）：动词面 = New / Open / OpenOrCreate。</summary>
-    private static DiskFileSystem BindCore(string root, DiskMetadataMode metadataMode, PreallocationMode preallocation, ILogger? logger)
+    private static DiskFileSystem BindCore(string root, DiskMetadataMode metadataMode, PreallocationMode preallocation, bool metaWriteDurable, ILogger? logger)
     {
         PathValidator.ValidateRoot(root);
         var full = Path.GetFullPath(root);
-        return new DiskFileSystem(full, metadataMode, preallocation, logger);
+        return new DiskFileSystem(full, metadataMode, preallocation, metaWriteDurable, logger);
     }
 
     /// <summary>OpenOrCreate = 懒初始化糖（设计 §2.3 可选形态——显式表达"我接受两种状态"）：
     /// 根不存在则建（New 语义）、存在则开（Open 语义，不校验空否）——bind-any 场景的终态入口。
     /// label 语义随形态：既有根 = 校验（不符抛）、新根 = 写入。</summary>
+    /// <param name="root">镜像根目录（绝对化；不存在则建）。</param>
+    /// <param name="options">文件系统选项（Access/Label/QuotaBytes/MetadataMode 等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>已打开或新建完成的文件系统实例。</returns>
+    /// <exception cref="FileIOException">label 校验不符（既有根形态）。</exception>
     public static DiskFileSystem OpenOrCreate(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)
     {
         options ??= new DiskFileSystemOptions();
-        var fs = BindCore(root, options.MetadataMode, options.Preallocation, logger);
+        var fs = BindCore(root, options.MetadataMode, options.Preallocation, options.MetaWriteDurable, logger);
         var existed = Directory.Exists(fs._root);
         fs.EnsureRoot();   // 幂等建（ApplyOptions 前——默认访问不触 ro 拒写，与 New 同序）
         fs.ApplyOptions(options, existed ? TierFsVerbDummy.Open : TierFsVerbDummy.New);
@@ -134,23 +156,36 @@ public sealed class DiskFileSystem : IFileSystem
     }
 
     /// <summary>New = 创建空镜像并打开（设计 §2.3：根不存在则建、已存在且非空抛 AlreadyExists、空根幂等成功）。</summary>
+    /// <param name="root">镜像根目录（绝对化；不存在则建）。</param>
+    /// <param name="options">文件系统选项（Label 写入一次等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>创建完成的新文件系统实例。</returns>
+    /// <exception cref="FileIOException">目标根非空（AlreadyExists——含隐藏残留）。</exception>
     public static DiskFileSystem New(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)
     {
         options ??= new DiskFileSystemOptions();
-        var fs = BindCore(root, options.MetadataMode, options.Preallocation, logger);
+        var fs = BindCore(root, options.MetadataMode, options.Preallocation, options.MetaWriteDurable, logger);
         fs.EnsureRoot();   // New+ro = 建完即封存——创建动作本身不算写（封络在建后生效）
-        if (fs.EnumerateEntries("*").Any())
+        // ★ IO-21：判空须含隐藏项——"*" 排除点前缀（PathPattern），根内仅剩 .tier-volume 残留时
+        //   原判定为空 → New 静默重置卷（"防误格式化事故底线"旁路；Remote 用原始列举抛 AlreadyExists）。
+        //   ".*" = 显式隐藏豁免视图（PathPattern.HiddenExempt）。
+        if (fs.EnumerateEntries("*").Any() || fs.EnumerateEntries(".*").Any())
             throw new FileIOException(IOError.AlreadyExists,
-                $"New 目标根空间非空：{fs._root}（已存在且非空即抛；打开既有请用 Open）。", fs._root, "disk-new");
+                $"New 目标根空间非空：{fs._root}（已存在且非空即抛——含隐藏残留；打开既有请用 Open）。", fs._root, "disk-new");
         fs.ApplyOptions(options, TierFsVerbDummy.New);
         return fs;
     }
 
     /// <summary>Open = 打开既有（设计 §2.3：根不存在即抛 NotFound——本地文件系统不代建根）。</summary>
+    /// <param name="root">镜像根目录（绝对化；必须已存在）。</param>
+    /// <param name="options">文件系统选项（Label 断言等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>打开的文件系统实例。</returns>
+    /// <exception cref="FileIOException">根不存在（NotFound）或 label 校验不符。</exception>
     public static DiskFileSystem Open(string root, DiskFileSystemOptions? options = null, ILogger? logger = null)
     {
         options ??= new DiskFileSystemOptions();
-        var fs = BindCore(root, options.MetadataMode, options.Preallocation, logger);
+        var fs = BindCore(root, options.MetadataMode, options.Preallocation, options.MetaWriteDurable, logger);
         if (!Directory.Exists(fs._root))
             throw new FileIOException(IOError.NotFound,
                 $"Open 目标根不存在：{fs._root}（创建请用 New）。", fs._root, "disk-open");
@@ -263,7 +298,11 @@ public sealed class DiskFileSystem : IFileSystem
         return _labelMarkerCache.Length == 0 ? null : _labelMarkerCache[1..];
     }
 
-    /// <inheritdoc/>
+    /// <summary>打开文件句柄（BCL File.OpenHandle 通道；含共享登记与追加预留盒挂接）。</summary>
+    /// <param name="path">文件相对路径（相对根目录；层级路径父目录须存在）。</param>
+    /// <param name="options">打开选项（Access/Mode/Sharing/Hints/PreallocateSize）。</param>
+    /// <returns>新开句柄（DIO 支持由 Hints 与平台探测共同决定）。</returns>
+    /// <exception cref="FileIOException">父目录不存在（NotFound）或共享冲突（SharingViolation）。</exception>
     public IFileHandle Open(string path, FileOpenOptions options)
     {
         AccessGate.CheckHandleOpen(_access, options.Access, path);   // G2 包络：构造期 fail-fast
@@ -311,7 +350,9 @@ public sealed class DiskFileSystem : IFileSystem
         { throw ex.Wrap(nameof(FlushRoot), _root); }
     }
 
-    /// <inheritdoc/>
+    /// <summary>文件是否存在（File.Exists 单请求）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <returns>true = 文件在档；false = 不存在（目录不计入）。</returns>
     public bool Exists(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -319,17 +360,19 @@ public sealed class DiskFileSystem : IFileSystem
         return File.Exists(GetFullPath(path));
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除文件（耐久删除 + sidecar 伴生随删；不存在抛 NotFound）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <exception cref="FileIOException">文件不存在。</exception>
     public void Delete(string path)
     {
         AccessGate.RejectWrite(_access, nameof(Delete));
-        QuotaRelease(path);   // G3：删除回收投影
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var gate = _maintenance.BeginMutation(nameof(Delete), path);
         var full = GetFullPath(path);
         try
         {
             FileNative.DeleteFileDurably(full);
+            QuotaRelease(path);   // G3：删除成功后回收投影（★ IO-25：原前置——删除失败投影已丢，记账单调性破坏）
             // sidecar 伴生生命周期绑定（§3.6）——best-effort：主文件已删，残留伴生只占目录项
             var sidecarFull = GetFullPath(PathPattern.SidecarOf(path));
             if (File.Exists(sidecarFull))
@@ -340,7 +383,11 @@ public sealed class DiskFileSystem : IFileSystem
         finally { _appendCursors.TryRemove(path, out _); }   // 追加预留盒摘除（下次重建按新 Length）
     }
 
-    /// <inheritdoc/>
+    /// <summary>移动/重命名文件（耐久换名 + sidecar 伴生随迁）。</summary>
+    /// <param name="source">源文件相对路径。</param>
+    /// <param name="dest">目标文件相对路径。</param>
+    /// <param name="overwrite">true = 目标存在时覆盖；false = 目标存在抛 AlreadyExists（默认）。</param>
+    /// <exception cref="FileIOException">目标已存在（未允许覆盖）。</exception>
     public void Move(string source, string dest, bool overwrite = false)
     {
         AccessGate.RejectWrite(_access, nameof(Move));
@@ -376,7 +423,8 @@ public sealed class DiskFileSystem : IFileSystem
     //  目录族（filesystem-root-space-design §3）
     // ═══════════════════════════════════════════════════════════════
 
-    /// <inheritdoc/>
+    /// <summary>创建目录（mkdir -p 幂等；新建时父目录目录项 fsync 耐久化）。</summary>
+    /// <param name="path">目录相对路径。</param>
     public void CreateDirectory(string path)
     {
         AccessGate.RejectWrite(_access, nameof(CreateDirectory));
@@ -398,7 +446,9 @@ public sealed class DiskFileSystem : IFileSystem
         { throw ex.Wrap(nameof(CreateDirectory), path); }
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除空目录（POSIX rmdir——仅限空；不存在或非空即抛）。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <exception cref="FileIOException">目录不存在（NotFound）或非空（DirectoryNotEmpty）。</exception>
     public void DeleteDirectory(string path)
     {
         AccessGate.RejectWrite(_access, nameof(DeleteDirectory));
@@ -425,7 +475,9 @@ public sealed class DiskFileSystem : IFileSystem
         { throw ex.Wrap(nameof(DeleteDirectory), path); }
     }
 
-    /// <inheritdoc/>
+    /// <summary>目录是否存在。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <returns>true = 目录在档；false = 不存在。</returns>
     public bool DirectoryExists(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -434,6 +486,10 @@ public sealed class DiskFileSystem : IFileSystem
 
     /// <inheritdoc/>
     /// <remarks>同根内必同卷 → <see cref="Directory.Move"/> 原子（能力位 AtomicDirectoryMove 置位）。</remarks>
+    /// <summary>移动/重命名目录（同根内原子——Directory.Move）。</summary>
+    /// <param name="source">源目录相对路径。</param>
+    /// <param name="dest">目标目录相对路径。</param>
+    /// <exception cref="FileIOException">源目录不存在或目标已存在。</exception>
     public void MoveDirectory(string source, string dest)
     {
         AccessGate.RejectWrite(_access, nameof(MoveDirectory));
@@ -465,7 +521,12 @@ public sealed class DiskFileSystem : IFileSystem
     //  文件创建（与句柄解耦）+ 元数据通道（§3.6）
     // ═══════════════════════════════════════════════════════════════
 
-    /// <inheritdoc/>
+    /// <summary>创建文件（FileMode.CreateNew——已存在即抛；可带预分配与 FileExtra）。</summary>
+    /// <param name="path">文件相对路径（父目录须存在）。</param>
+    /// <param name="preallocateSize">预分配字节数（按挂载档 Full/Metadata 语义，默认 0 = 不预分配）。</param>
+    /// <param name="extra">初始 FileExtra 内容（按 MetadataMode 路由写入，默认空）。</param>
+    /// <exception cref="FileIOException">文件已存在或父目录不存在。</exception>
+    /// <exception cref="ArgumentException">extra 超出 MaxFileExtraBytes 上限。</exception>
     public void CreateFile(string path, long preallocateSize = 0, ReadOnlyMemory<byte> extra = default)
     {
         AccessGate.RejectWrite(_access, nameof(CreateFile));
@@ -527,7 +588,7 @@ public sealed class DiskFileSystem : IFileSystem
     /// sidecar 强一致写：tmp 同目录 + WriteThrough + Flush(true) + MoveFileDurably 原子换名。
     /// ★ 空 = 清除语义（SetFileExtra(空)）：xattr 通道 best-effort 删键 + sidecar 伴生删除。
     /// </summary>
-    private void WriteFileExtraCore(string full, string relPath, ReadOnlySpan<byte> metadata, bool consistent = true)
+    private void WriteFileExtraCore(string full, string relPath, ReadOnlySpan<byte> metadata, bool consistent = true, bool flush = true)
     {
         if (metadata.IsEmpty)
         {
@@ -541,7 +602,7 @@ public sealed class DiskFileSystem : IFileSystem
         if (_metaMode != DiskMetadataMode.Sidecar)
         {
             EnsureMetaChannelAvailable();
-            if (FileNative.WriteFileMeta(full, metadata, logger: _logger))
+            if (FileNative.WriteFileMeta(full, metadata, logger: _logger, flush: flush && _metaWriteDurable))
                 return;
             if (_metaMode == DiskMetadataMode.ExtendedAttr)
                 throw new FileIOException(IOError.IOFailure, $"xattr/ADS FileExtra 写入失败: {relPath}", relPath, "metadata-write");
@@ -550,8 +611,8 @@ public sealed class DiskFileSystem : IFileSystem
     }
 
     /// <summary>句柄侧路由入口（FileExtra 平面——DiskFileHandle 四成员复用模式路由通道）。</summary>
-    internal void WriteFileExtraRouted(string relPath, ReadOnlySpan<byte> extra)
-        => WriteFileExtraCore(GetFullPath(relPath), relPath, extra);
+    internal void WriteFileExtraRouted(string relPath, ReadOnlySpan<byte> extra, bool flush = true)
+        => WriteFileExtraCore(GetFullPath(relPath), relPath, extra, flush: flush);
 
     /// <summary>句柄侧路由读取（FileExtra——返回有效长度；0 = 无）。</summary>
     internal int ReadFileExtraRouted(string relPath, Span<byte> buffer)
@@ -560,6 +621,7 @@ public sealed class DiskFileSystem : IFileSystem
     /// <summary>sidecar 伴生写（consistent = tmp+WriteThrough+Flush(true)+MoveFileDurably 原子换名；否则直写页缓存）。</summary>
     private void WriteSidecarMetadata(string relPath, ReadOnlySpan<byte> metadata, bool consistent)
     {
+        consistent &= _metaWriteDurable;   // ★ 卷级耐久策略——false = 缓存写（免 WriteThrough/rename fsync）
         var sidecarFull = GetFullPath(PathPattern.SidecarOf(relPath));
         if (!consistent)
         {
@@ -614,7 +676,10 @@ public sealed class DiskFileSystem : IFileSystem
         FileNative.MoveFileDurably(srcSidecar, GetFullPath(PathPattern.SidecarOf(dest)), overwrite: true);
     }
 
-    /// <inheritdoc/>
+    /// <summary>获取条目元信息（文件含长度/时间戳/FileExtra；目录长度 0）。</summary>
+    /// <param name="path">条目相对路径。</param>
+    /// <returns>条目信息（创建时间无语义的 FS 上为 null——不可得诚实表达）。</returns>
+    /// <exception cref="FileIOException">条目不存在。</exception>
     public FsEntryInfo Stat(string path)
     {
         AccessGate.RejectRead(_access, nameof(Stat));
@@ -658,7 +723,10 @@ public sealed class DiskFileSystem : IFileSystem
     //  枚举族（§3.5：BCL EnumerationOptions.MatchType.Simple——与 Mem/Remote 客户端过滤同语义）
     // ═══════════════════════════════════════════════════════════════
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从根；BCL Simple 匹配 + sidecar 伴生隐藏，惰性迭代）。</summary>
+    /// <param name="pattern">文件名通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对根的路径，'/' 分隔）。</returns>
     public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, "Enumerate");
@@ -666,7 +734,12 @@ public sealed class DiskFileSystem : IFileSystem
         return EnumerateCore(null, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从指定目录；BCL Simple 匹配 + sidecar 伴生隐藏，惰性迭代）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">文件名通配模式。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对起始目录的路径，'/' 分隔）。</returns>
+    /// <exception cref="FileIOException">目录不存在。</exception>
     public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
     {
         AccessGate.RejectRead(_access, "Enumerate");
@@ -674,7 +747,10 @@ public sealed class DiskFileSystem : IFileSystem
         return EnumerateCore(path, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从根；BCL Simple 匹配，惰性迭代）。</summary>
+    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对根的路径，'/' 分隔）。</returns>
     public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, "Enumerate");
@@ -682,7 +758,12 @@ public sealed class DiskFileSystem : IFileSystem
         return EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从指定目录；BCL Simple 匹配，惰性迭代）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">目录名通配模式。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对起始目录的路径，'/' 分隔）。</returns>
+    /// <exception cref="FileIOException">目录不存在。</exception>
     public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
     {
         AccessGate.RejectRead(_access, "Enumerate");
@@ -690,7 +771,10 @@ public sealed class DiskFileSystem : IFileSystem
         return EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从根；BCL Simple 匹配，惰性迭代）。</summary>
+    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，'/' 分隔）。</returns>
     public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, "Enumerate");
@@ -698,7 +782,12 @@ public sealed class DiskFileSystem : IFileSystem
         return EnumerateCore(null, pattern, recursive, EntryFilter.Both);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从指定目录；BCL Simple 匹配，惰性迭代）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">名称通配模式。</param>
+    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，'/' 分隔）。</returns>
+    /// <exception cref="FileIOException">目录不存在。</exception>
     public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
     {
         AccessGate.RejectRead(_access, "Enumerate");
@@ -764,7 +853,11 @@ public sealed class DiskFileSystem : IFileSystem
     }
 
 
-    /// <inheritdoc/>
+    /// <summary>进入维护模式——按 scope 拒绝并发操作，返回的租约 Dispose 即退出。</summary>
+    /// <param name="reason">维护原因（诊断/日志用）。</param>
+    /// <param name="scope">维护范围（决定拒绝面——All 连读也拒）。</param>
+    /// <param name="ct">取消令牌（默认 default = 不取消）。</param>
+    /// <returns>维护租约（Dispose 即退出维护）。</returns>
     public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -776,6 +869,8 @@ public sealed class DiskFileSystem : IFileSystem
     /// ★ 非重入：持有期间的二次 Acquire（任何线程——重入与跨线程争用不可区分且重入语义易误用）
     ///   按争用处理——轮询至超时抛 <see cref="IOError.SharingViolation"/>。
     /// </remarks>
+    /// <param name="timeout">抢锁等待上限（超时抛 SharingViolation）。</param>
+    /// <returns>卷锁租约（RAII——Dispose 即释放）。</returns>
     public IDisposable AcquireExclusive(TimeSpan timeout)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -897,6 +992,7 @@ public sealed class DiskFileSystem : IFileSystem
     {
         private int _released;
 
+        /// <summary>卷锁租约释放（幂等——释放锁文件句柄并删除锁文件）。</summary>
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _released, 1) != 0) return;

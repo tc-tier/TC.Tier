@@ -8,6 +8,7 @@ using TC.Tier.Core.IO.Shared;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
+/// <summary>TierVolumeFs partial——dd 快道（§6.2）：载体直视流与单连续区间 MMF 映射区。</summary>
 public sealed partial class TierVolumeFs
 {
     // ═══════════════ IContiguousVolume（dd 快道——§6.2）═══════════════
@@ -119,14 +120,18 @@ public sealed partial class TierVolumeFs
             }
         }
 
+        /// <summary>映射级访问提示——v1 未接（no-op）。</summary>
+        /// <param name="advise">访问提示（当前被忽略）。</param>
         public void Advise(FileAdvise advise) { /* no-op（映射级提示——v1 未接） */ }
 
+        /// <summary>把映射视图的脏页刷回载体（msync 语义）。</summary>
         public void Flush()
         {
             ObjectDisposedException.ThrowIf(_disposed != 0, this);
             _accessor.Flush();
         }
 
+        /// <summary>关闭映射——刷视图脏页、释放 MMF 资源并回调 fs 再失效区间块（幂等）。</summary>
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
@@ -148,22 +153,32 @@ public sealed partial class TierVolumeFs
         private readonly int _length = length;
         private int _disposed;
 
+        /// <summary>暴露映射区间的可写内存视图（请求长度切片，指针零拷贝）。</summary>
+        /// <returns>覆盖映射区间的 <see cref="Span{T}"/>（长度 = 映射请求长度）。</returns>
         public override Span<byte> GetSpan()
         {
             ObjectDisposedException.ThrowIf(_disposed != 0, this);
             return new Span<byte>(_ptr, _length);
         }
 
+        /// <summary>固定视图内存并取得指针句柄（视图常驻地址空间——Pin 实际不移动内存）。</summary>
+        /// <param name="elementIndex">起始元素索引（0 基，须在视图长度内）。</param>
+        /// <returns>指向该元素的 <see cref="MemoryHandle"/>。</returns>
+        /// <exception cref="ArgumentOutOfRangeException">elementIndex 越界。</exception>
         public override MemoryHandle Pin(int elementIndex = 0)
         {
             if (elementIndex < 0 || elementIndex >= _length) throw new ArgumentOutOfRangeException(nameof(elementIndex));
             return new MemoryHandle(_ptr + elementIndex);
         }
 
+        /// <summary>解除固定——本实现视图地址固定，no-op。</summary>
         public override void Unpin() { }
 
+        /// <summary>显式释放出口——置位 disposed 标志（MMF 资源由 <see cref="TierVolumeMappedSection.Dispose"/> 统一回收）。</summary>
         public void Dispose() => _disposed = 1;   // MemoryManager 的 Dispose 是显式接口实现——自持 public 出口
 
+        /// <summary>MemoryManager 释放回调——置位 disposed 标志。</summary>
+        /// <param name="disposing">true = 显式释放；false = 终结器（本实现两者等价，只置标志）。</param>
         protected override void Dispose(bool disposing) { _disposed = 1; }
     }
 
@@ -206,6 +221,11 @@ public sealed partial class TierVolumeFs
         public override long Length => _length;
         public override long Position { get => _position; set => _position = value; }
 
+        /// <summary>从载体当前位置读取——不足 count（到流末尾）时返回实际读到的字节数。</summary>
+        /// <param name="buffer">接收缓冲。</param>
+        /// <param name="offset">buffer 内写入起始索引。</param>
+        /// <param name="count">最多读取字节数。</param>
+        /// <returns>实际读取的字节数（0 = 已到流末尾）。</returns>
         public override int Read(byte[] buffer, int offset, int count)
         {
             var n = Math.Min(count, (int)Math.Max(0, _length - _position));
@@ -215,12 +235,21 @@ public sealed partial class TierVolumeFs
             return n;
         }
 
+        /// <summary>向载体当前位置写入并前移位置。</summary>
+        /// <param name="buffer">源数据缓冲。</param>
+        /// <param name="offset">buffer 内读取起始索引。</param>
+        /// <param name="count">写入字节数。</param>
         public override void Write(byte[] buffer, int offset, int count)
         {
             _fs.WriteCarrier(_position, buffer.AsSpan(offset, count));
             _position += count;
         }
 
+        /// <summary>移动流位置。</summary>
+        /// <param name="offset">相对 <paramref name="origin"/> 的偏移（字节）。</param>
+        /// <param name="origin">基准位置（Begin/Current/End）。</param>
+        /// <returns>移动后的绝对位置（字节）。</returns>
+        /// <exception cref="ArgumentOutOfRangeException">origin 非 Begin/Current/End。</exception>
         public override long Seek(long offset, SeekOrigin origin)
             => _position = origin switch
             {
@@ -230,7 +259,9 @@ public sealed partial class TierVolumeFs
                 _ => throw new ArgumentOutOfRangeException(nameof(origin)),
             };
 
+        /// <summary>刷载体（fsync 语义）。</summary>
         public override void Flush() => _fs.FlushCarrier();
+        /// <summary>不支持改长——恒抛 <see cref="NotSupportedException"/>。</summary>
         public override void SetLength(long value) => throw new NotSupportedException();
     }
 

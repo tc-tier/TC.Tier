@@ -2,13 +2,17 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// BTreeIndex 查找 partial——操作闸+epoch 读保护点查与扁平缓存下降（FindNoEpoch）。
+/// </summary>
 public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
-    /// <summary>点查 key → value 逻辑地址（epoch 读保护内转发 <see cref="FindNoEpoch"/>）。</summary>
+    /// <summary>点查 key → value 逻辑地址（操作闸 + epoch 读保护内转发 <see cref="FindNoEpoch"/>）。</summary>
     /// <param name="key">查找键。</param>
     /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     public override LogicalAddress Find(TKey key)
     {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥——无锁读可下降成环活锁，见类注）
         _epoch.Resume();
         try
         {
@@ -27,6 +31,8 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     /// 两跳依赖 + out/局部两次 160B 拷贝，点查 ~370ns/层的主成分）。ref 局部仅限迭代内——
     /// 宽窄转义混指（数组元素↔栈局部）是 CS8374，按值单拷贝即绕开且代价 ~10ns/层。</para>
     /// </summary>
+    /// <param name="key">查找键。</param>
+    /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     protected override LogicalAddress FindNoEpoch(TKey key)
     {
         if (_rootAddress == LogicalAddress.Empty)

@@ -1,0 +1,35 @@
+/// <summary><c>[RingKey(typeof({{TYPE_NAME}}))]</c> 封闭薄类——开放泛型内核的编译期封闭，消费面只见本类型。</summary>
+public sealed class {{CLASS_NAME}} : global::TC.Tier.Runtime.Structures.Ring.BlittableRing<{{KEY_FQN}}>
+{
+    public {{CLASS_NAME}}(global::TC.Tier.Runtime.Structures.Ring.BlittableRingSettings settings,
+        global::TC.Tier.Core.IO.IFileSystem fs,
+        global::TC.Tier.Contracts.Lifecycle.IRecovery<global::TC.Tier.Runtime.Structures.Ring.RingRecoveryHints>? recovery = null,
+        global::TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory<global::TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor>? cursorFactory = null,
+        global::TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot? ringSnapshot = null,
+        global::TC.Tier.Contracts.Meta.MetaPolicyFactory<global::TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader, global::TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload>? metaPolicyFactory = null,
+        global::TC.Tier.Contracts.Meta.IMetaTransport? metaTransport = null,
+        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null,
+        global::TC.Tier.Core.Logging.ILogger? logger = null)
+        : base(settings, fs, recovery, cursorFactory, ringSnapshot, metaPolicyFactory, metaTransport, epoch, logger)
+    {
+    }
+
+    /// <summary>★ 工厂（异步）：构造 + Initialize(hints) + WaitForReadyAsync 一步到位——hints 注入恢复窗口（缺省空结构首开）；同步 WaitForReady 在异步上下文死锁，异步调用方禁用。</summary>
+    public static async global::System.Threading.Tasks.Task<{{CLASS_NAME}}> CreateAsync(global::TC.Tier.Runtime.Structures.Ring.BlittableRingSettings settings,
+        global::TC.Tier.Core.IO.IFileSystem fs,
+        global::TC.Tier.Contracts.Lifecycle.IRecovery<global::TC.Tier.Runtime.Structures.Ring.RingRecoveryHints>? recovery = null,
+        global::TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory<global::TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor>? cursorFactory = null,
+        global::TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot? ringSnapshot = null,
+        global::TC.Tier.Contracts.Meta.MetaPolicyFactory<global::TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader, global::TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload>? metaPolicyFactory = null,
+        global::TC.Tier.Contracts.Meta.IMetaTransport? metaTransport = null,
+        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null,
+        global::TC.Tier.Runtime.Structures.Ring.RingRecoveryHints hints = default,
+        global::System.Threading.CancellationToken ct = default)
+    {
+        var ring = new {{CLASS_NAME}}(settings, fs, recovery, cursorFactory, ringSnapshot, metaPolicyFactory, metaTransport, epoch);
+        ring.Initialize(hints);
+        await ring.WaitForReadyAsync(ct);
+        return ring;
+    }
+}
+

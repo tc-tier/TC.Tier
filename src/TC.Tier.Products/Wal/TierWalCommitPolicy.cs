@@ -13,6 +13,8 @@ internal sealed class GroupCommitThresholdPolicy : ICommitPolicy
     private readonly int _maxUnflushedCount;
     private readonly TimeSpan _interval;
 
+    /// <summary>构造（从 Options 映射三维度阈值）。</summary>
+    /// <param name="options">TierWAL 选项（取 MaxUnflushedBytes/MaxUnflushedCount/CommitInterval）。</param>
     public GroupCommitThresholdPolicy(TierWalOptions options)
     {
         _maxUnflushedBytes = options.MaxUnflushedBytes;
@@ -20,6 +22,9 @@ internal sealed class GroupCommitThresholdPolicy : ICommitPolicy
         _interval = options.CommitInterval;
     }
 
+    /// <summary>判定是否应触发组提交（三维度任一满足即提交）。</summary>
+    /// <param name="s">当前未提交快照（字节数/条数/距上次提交时间）。</param>
+    /// <returns>true = 应提交；false = 未达阈值。</returns>
     public bool ShouldCommit(in CommitSnapshot s) =>
         s.UnflushedBytes >= _maxUnflushedBytes ||
         (_interval != TimeSpan.FromMilliseconds(-1) && s.SinceLastCommit >= _interval) ||
@@ -35,6 +40,8 @@ internal sealed class OpaqueStager(ILogger? logger)
     private TierWal? _wal;
     private readonly ILogger? _logger = logger;
 
+    /// <summary>绑定 TierWal 实例（恢复后调用——Attach 前所有提交路径 no-op）。</summary>
+    /// <param name="wal">已恢复完成的 TierWal 实例。</param>
     public void Attach(TierWal wal) => _wal = wal;
 
     /// <summary>stage opaque（提交前序列化容器 → SetOpaqueMeta 随水位落盘）。</summary>
@@ -68,6 +75,9 @@ internal sealed class OpaqueStager(ILogger? logger)
 /// </summary>
 internal sealed class OpaqueStagingCommitPolicy(OpaqueStager stager, ICommitPolicy inner) : ICommitPolicy
 {
+    /// <summary>判定是否提交：inner 策略触发时先 stage opaque（容器随本次提交原子落盘）再推进自动提交水位。</summary>
+    /// <param name="snapshot">当前未提交快照（字节数/条数/距上次提交时间）。</param>
+    /// <returns>true = inner 触发且已 stage、应提交；false = inner 未达阈值，不提交（零副作用）。</returns>
     public bool ShouldCommit(in CommitSnapshot snapshot)
     {
         if (!inner.ShouldCommit(snapshot)) return false;

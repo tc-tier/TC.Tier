@@ -12,6 +12,8 @@ namespace TC.Tier.Core.IO.S3;
 internal static class S3Xml
 {
     /// <summary>ListObjectsV2 单页解析——条目 + 公共前缀（delimiter 聚合）+ 分页游标。</summary>
+    /// <param name="body">ListObjectsV2 响应正文（XML 流）。</param>
+    /// <returns>解析结果元组：<see cref="IReadOnlyList{ObjectEntry}"/> Entries=对象条目；<see cref="IReadOnlyList{String}"/> CommonPrefixes=delimiter 聚合的公共前缀；IsTruncated=是否还有后续页；NextContinuationToken=下一页游标（仅 IsTruncated=true 时非 null）。</returns>
     internal static (IReadOnlyList<ObjectEntry> Entries, IReadOnlyList<string> CommonPrefixes,
                      bool IsTruncated, string? NextContinuationToken)
         ParseListPage(Stream body)
@@ -45,11 +47,17 @@ internal static class S3Xml
     }
 
     /// <summary>InitiateMultipartUploadResult → UploadId。</summary>
+    /// <param name="body">InitiateMultipartUpload 响应正文（XML 流）。</param>
+    /// <returns>本次分片上传会话的唯一 UploadId。</returns>
+    /// <exception cref="FileIOException">响应根元素非 InitiateMultipartUploadResult 或缺 UploadId 子元素——抛 <see cref="IOError.IOFailure"/>。</exception>
     internal static string ParseUploadId(Stream body)
         => (string?)LocalElement(Parse(body, "InitiateMultipartUploadResult"), "UploadId")
            ?? throw new FileIOException(IOError.IOFailure, "CreateMultipartUpload 响应缺 UploadId。", null, "CreateMultipartUpload");
 
     /// <summary>CopyPartResult / CopyObjectResult → ETag（去引号归一）。</summary>
+    /// <param name="body">CopyPart/CopyObject 响应正文（XML 流）。</param>
+    /// <returns>已去除首尾引号的 ETag 字符串。</returns>
+    /// <exception cref="FileIOException">响应缺 ETag 子元素——抛 <see cref="IOError.IOFailure"/>。</exception>
     internal static string ParseCopyEtag(Stream body)
     {
         var root = Parse(body, null);
@@ -60,10 +68,14 @@ internal static class S3Xml
     }
 
     /// <summary>CompleteMultipartUploadResult → 对象 ETag（可缺失——宽松取）。</summary>
+    /// <param name="body">CompleteMultipartUpload 响应正文（XML 流）。</param>
+    /// <returns>对象最终 ETag（已去引号）；响应未含 ETag 时返回 null（不抛异常——完成态宽松）。</returns>
     internal static string? ParseCompleteEtag(Stream body)
         => LocalElement(Parse(body, "CompleteMultipartUploadResult"), "ETag")?.Value?.Trim('"');
 
     /// <summary>Error 响应 → (Code, Message)。</summary>
+    /// <param name="body">S3 Error 响应正文（XML 流）。</param>
+    /// <returns>错误元组：Code=错误代码（根元素非 Error 时为 "Unknown"，缺 Code 时为 "Unknown"）；Message=错误描述（缺 Message 时为空串）。</returns>
     internal static (string Code, string Message) ParseError(Stream body)
     {
         try
@@ -85,6 +97,9 @@ internal static class S3Xml
     /// ★ S3 特性检测：200 + Error body（CompleteMultipartUpload 的延迟失败形态）——
     /// 根元素为 Error 时返回 true 并给出错误元组（调用方走错误映射）。
     /// </summary>
+    /// <param name="body">响应正文（XML 流，可能为 Error body 或正常 body）。</param>
+    /// <param name="error">当返回 true 时，为解析出的 (Code, Message) 错误元组；返回 false 时为 default。</param>
+    /// <returns>true=响应为 Error body（延迟失败）；false=非 Error 响应（调用方按成功处理）。</returns>
     internal static bool TryReadErrorBody(Stream body, out (string Code, string Message) error)
     {
         try
@@ -106,6 +121,8 @@ internal static class S3Xml
     }
 
     /// <summary>ListMultipartUploads 单页解析——会话 + 分页游标（key-marker 语义）。</summary>
+    /// <param name="body">ListMultipartUploads 响应正文（XML 流）。</param>
+    /// <returns>解析结果元组：<see cref="IReadOnlyList{MultipartUploadSession}"/> Sessions=进行中的分片上传会话；IsTruncated=是否还有后续页；NextKeyMarker=下一页 key 游标（仅 IsTruncated=true 时非 null）；NextUploadIdMarker=下一页 uploadId 游标（仅 IsTruncated=true 时非 null）。</returns>
     internal static (IReadOnlyList<MultipartUploadSession> Sessions, bool IsTruncated,
                      string? NextKeyMarker, string? NextUploadIdMarker)
         ParseMultipartUploadsPage(Stream body)
@@ -131,6 +148,8 @@ internal static class S3Xml
     }
 
     /// <summary>CompleteMultipartUpload 请求体。</summary>
+    /// <param name="parts">已上传的各分片结果（PartNumber + ETag），无需预排序——内部按 PartNumber 升序排列。</param>
+    /// <returns>UTF-8 编码的 CompleteMultipartUpload XML 请求体字节数组。</returns>
     internal static byte[] BuildCompleteMultipart(IReadOnlyList<UploadPartResult> parts)
     {
         var ns = XNamespace.None;
@@ -142,6 +161,11 @@ internal static class S3Xml
         return Encoding.UTF8.GetBytes(xml.ToString(SaveOptions.DisableFormatting));
     }
 
+    /// <summary>XML 流解析 + 根元素校验（命名空间免疫）。</summary>
+    /// <param name="body">S3 响应正文（XML 流）。</param>
+    /// <param name="expectedRoot">期望的根元素 LocalName；null=不校验。</param>
+    /// <returns>解析得到的根 <see cref="XElement"/>。</returns>
+    /// <exception cref="FileIOException">XML 解析失败或根元素 LocalName 与 <paramref name="expectedRoot"/> 不符——抛 <see cref="IOError.IOFailure"/>。</exception>
     private static XElement Parse(Stream body, string? expectedRoot)
     {
         XElement root;
@@ -160,6 +184,9 @@ internal static class S3Xml
     }
 
     /// <summary>命名空间免疫子元素读取（LocalName 匹配——xmlns 使用差异吸收）。</summary>
+    /// <param name="parent">父元素。</param>
+    /// <param name="name">目标子元素 LocalName。</param>
+    /// <returns>首个 LocalName 匹配的子元素；无匹配返回 null。</returns>
     private static XElement? LocalElement(XElement parent, string name)
         => parent.Elements().FirstOrDefault(e => e.Name.LocalName == name);
 }

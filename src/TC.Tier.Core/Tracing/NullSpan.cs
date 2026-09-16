@@ -10,14 +10,22 @@ public sealed class NullSpan : ISpan
     public static readonly NullSpan Instance = new();
     private NullSpan() { }
     /// <inheritdoc/>
+    /// <param name="key">标签名（如 "entry.size"、"page.number"）。本实现为 no-op。</param>
+    /// <param name="value">标签值，可为 null。本实现为 no-op。</param>
     public void SetTag(string key, string? value) { }
     /// <inheritdoc/>
+    /// <param name="key">标签名（如 "entry.size"、"page.number"）。本实现为 no-op。</param>
+    /// <param name="value">标签数值。本实现为 no-op。</param>
     public void SetTag(string key, long value) { }
     /// <inheritdoc/>
+    /// <param name="ex">要记录的异常对象。本实现为 no-op。</param>
     public void RecordException(Exception ex) { }
     /// <inheritdoc/>
+    /// <param name="status">span 状态（Ok/Error）。本实现为 no-op。</param>
+    /// <param name="description">可选状态描述，默认 null。本实现为 no-op。</param>
     public void SetStatus(SpanStatus status, string? description = null) { }
     /// <inheritdoc/>
+    /// <param name="name">事件名称（如 "page.flushed"、"checkpoint.started"）。本实现为 no-op。</param>
     public void AddEvent(string name) { }
     /// <inheritdoc/>
     public void Dispose() { }

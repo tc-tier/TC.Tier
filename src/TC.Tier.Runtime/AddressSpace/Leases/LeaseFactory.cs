@@ -38,6 +38,8 @@ public abstract class LeaseFactory
     /// <summary>
     /// 池化工厂——对象池复用（可指定池容量上限，防内存膨胀）。
     /// </summary>
+    /// <param name="maxPoolSize">每种 lease 类型池的最大驻留对象数（超出即丢弃不再复用），默认 64。</param>
+    /// <returns>带池容量上限的池化 <see cref="LeaseFactory"/> 实例（无诊断）。</returns>
     public static LeaseFactory PooledWithLimit(int maxPoolSize = 64) => new PooledFactory(false, maxPoolSize);
     // ═══ 创建入口（类型化返回——命名方法区分协议，不用 bool 选择子）═══
 

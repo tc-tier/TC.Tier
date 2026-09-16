@@ -28,23 +28,32 @@ public static class Utility
     /// <returns>解析后的字节数。</returns>
     public static long ParseSize(string value)
     {
-        char[] suffix = ['k', 'm', 'g', 't', 'p'];
+        ArgumentException.ThrowIfNullOrEmpty(value);
         long result = 0;
-        foreach (var c in value)
+        int i = 0;
+        for (; i < value.Length && IsDigit(value[i]); i++)
+            result = checked(result * 10 + (byte)value[i] - '0');
+
+        if (i == 0)
+            throw new FormatException($"ParseSize: \"{value}\" 缺少数字部分");
+
+        if (i < value.Length)
         {
-            if (IsDigit(c))
+            var exp = ToLower(value[i]) switch
             {
-                result = result * 10 + (byte)c - '0';
-            }
-            else
-            {
-                for (var i = 0; i < suffix.Length; i++)
-                {
-                    if (ToLower(c) != suffix[i]) continue;
-                    result *= (long)Math.Pow(1024, i + 1);
-                    return result;
-                }
-            }
+                'k' => 1,
+                'm' => 2,
+                'g' => 3,
+                't' => 4,
+                'p' => 5,
+                _ => throw new FormatException($"ParseSize: \"{value}\" 含非法后缀 '{value[i]}'（支持 k/m/g/t/p + 可选 B）"),
+            };
+            i++;
+            if (i < value.Length && ToLower(value[i]) == 'i') i++;   // "KiB"/"GiB" 的 IEC 标记（1024 语义本就是二进制前缀）
+            if (i < value.Length && ToLower(value[i]) == 'b') i++;   // "KB"/"MB" 的 B 尾
+            if (i < value.Length)
+                throw new FormatException($"ParseSize: \"{value}\" 后缀后有多余字符");
+            result = checked(result * (long)Math.Pow(1024, exp));
         }
 
         return result;
@@ -94,14 +103,6 @@ public static class Utility
         char[] suffix = ['K', 'M', 'G', 'T', 'P'];
         double v = value;
         var exp = 0;
-        while (v - Math.Floor(v) > 0)
-        {
-            if (exp >= 18)
-                break;
-            exp += 3;
-            v *= 1024;
-            v = Math.Round(v, 12);
-        }
 
         while (Math.Floor(v).ToString(CultureInfo.InvariantCulture).Length > 3)
         {
@@ -213,16 +214,17 @@ public static class Utility
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     internal static unsafe long HashBytes(byte* pbString, int len)
     {
-        var pwString = (char*)pbString;
-        var cbBuf = len / 2;
         var hashState = (ulong)len;
+        var pairedLength = len & ~1;
 
-        for (var i = 0; i < cbBuf; i++, pwString++)
-            hashState = HashMultiplier * hashState + *pwString;
+        for (var i = 0; i < pairedLength; i += 2)
+        {
+            var word = (ushort)(pbString[i] | (pbString[i + 1] << 8));
+            hashState = HashMultiplier * hashState + word;
+        }
 
         if ((len & 1) <= 0) return (long)Rotr64(HashMultiplier * hashState, 4);
-        var pC = (byte*)pwString;
-        hashState = HashMultiplier * hashState + *pC;
+        hashState = HashMultiplier * hashState + pbString[pairedLength];
 
         return (long)Rotr64(HashMultiplier * hashState, 4);
     }

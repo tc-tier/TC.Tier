@@ -2,13 +2,17 @@ using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// SkipListIndex 查找 partial——操作闸+epoch 读保护点查与塔链下降（FindNoEpoch）。
+/// </summary>
 public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
-    /// <summary>点查 key → value 逻辑地址（epoch 读保护内转发 <see cref="FindNoEpoch"/>）。</summary>
+    /// <summary>点查 key → value 逻辑地址（操作闸 + epoch 读保护内转发 <see cref="FindNoEpoch"/>）。</summary>
     /// <param name="key">查找键。</param>
     /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     public override LogicalAddress Find(TKey key)
     {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥）
         _epoch.Resume();
         try
         {
@@ -26,6 +30,8 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
     /// <para>★ 零拷贝跳链：GetNode 返回 arena 驻留指针，逐跳只碰 Key+目标层指针（~24B）——
     /// 旧形每跳 288B 全量 header 槽→局部拷贝（~25 跳/Find 的逐跳税）。</para>
     /// </summary>
+    /// <param name="key">查找键。</param>
+    /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
     protected override unsafe LogicalAddress FindNoEpoch(TKey key)
     {
         var current = _headPtr;

@@ -195,13 +195,16 @@ public interface IStorageEngine  : IStorageInfo, ILifecycle<EngineRecoveryHints>
     /// <summary>地址租借水位（CAS 推进，含未落盘空洞）。Append 的起点；上层据此算剩余容量。
     /// <para>★ 注意：此值含「租借未写」的空洞，不是真实已写水位。Read/Scan/Reclaim 的合法上界请用 <see cref="CommittedTail"/>。</para>
     /// <para>语义契约：<see cref="MinAddress"/> ≤ <see cref="CommittedTail"/> ≤ AllocatedTail。</para></summary>
+    /// <returns>地址租借水位（CAS 推进，含未落盘空洞）。</returns>
     LogicalAddress AllocatedTail { get; }
 
     /// <summary>真实已写水位（pwrite 后推进，数据已写）。所有非 Append 操作的合法上界。
     /// <para>类比数据库事务提交=逻辑写入确认（pwrite 完成），不暗示 fsync（fsync 由 Flush 负责）。</para></summary>
+    /// <returns>真实已写水位（pwrite 后推进，数据已写）。</returns>
     LogicalAddress CommittedTail { get; }
 
     /// <summary>最小有效地址（头部段被 ReclaimHead 删除后后移）。</summary>
+    /// <returns>最小有效地址（头部段被 ReclaimHead 删除后后移）。</returns>
     LogicalAddress MinAddress { get; }
 
     /// <summary>指定区间空洞率——逐段查询 OS 真实物理分配（稀疏文件 allocated ranges）。

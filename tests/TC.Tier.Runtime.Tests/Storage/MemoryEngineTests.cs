@@ -5,6 +5,8 @@ using TC.Tier.Core.Primitives;
 using TC.Tier.Runtime.Storage.Compact;
 using Xunit;
 
+using TC.Tier.Core.Tests;
+using Skip = Xunit.Skip;
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
@@ -315,9 +317,10 @@ public sealed class MemoryEngineTests : StorageEngineTestBase
         dev.MinAddress.SegId.Should().Be(1);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task RangeCompact_ReclaimedRange_IsOmittedAndDataIsPacked()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         using var dev = NewEngine(segmentGrowthLimit: 512);
         var firstData = MakePattern(64, 0x31);
         var reclaimedData = MakePattern(64, 0x42);

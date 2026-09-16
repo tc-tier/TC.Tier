@@ -1,5 +1,5 @@
 using TC.Tier.Core.Primitives;
-using TC.Tier.Core.Shared;
+using TC.Tier.Core.Lifecycle;
 
 namespace TC.Tier.Runtime.Structures.Ring;
 
@@ -13,11 +13,13 @@ namespace TC.Tier.Runtime.Structures.Ring;
 public abstract partial class RingBase<TKey>
 {
     /// <summary>
-    /// 默认恢复实现（模板派生——只填恢复算法）。
+    /// 默认恢复实现（模板派生——只填恢复算法）。internal（友元程序集单测可达——撕裂重同步扫描器直测）。
     /// </summary>
-    private protected class DefaultRingRecovery(RingBase<TKey> owner) : RecoveryBase<RingRecoveryHints>
+    internal class DefaultRingRecovery(RingBase<TKey> owner) : RecoveryBase<RingRecoveryHints>
     {
         /// <summary>层间 join——主引擎 + 溢出引擎 + meta 引擎（Managed 模式）全异步轨（OnInitializeBegin 已并行启动）。</summary>
+        /// <param name="ct">取消令牌，可用于取消异步操作。</param>
+        /// <returns>完成后主/溢出/meta（Managed）三引擎均已 WaitForReady 就绪。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await owner._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
@@ -32,6 +34,9 @@ public abstract partial class RingBase<TKey>
         /// <para>装配顺序固定：(a) InitializePagePool（纯内存）→ (b) InitWatermarks（引擎基线，必须在
         ///   ApplyWatermarks 前否则覆盖被抹）→ (c) OnInitialize（coldPageCache + RecoverOverflowTail）。</para>
         /// </summary>
+        /// <param name="hints">恢复提示（外部注入的 RecoverTail/FlushedUntil，可为空——空则走 meta/引擎/扫盘回退）。</param>
+        /// <param name="ct">取消令牌，可用于取消异步操作。</param>
+        /// <returns>完成后页池/水位/策略装配与四级回退全部结束（就绪标记 MarkReady 由模板承担）。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(RingRecoveryHints hints, CancellationToken ct)
         {
             RaiseProgress(10, "page pool / watermarks / policies");
@@ -89,6 +94,8 @@ public abstract partial class RingBase<TKey>
             LogicalAddress? begin = null, LogicalAddress? readOnly = null, LogicalAddress? safeReadOnly = null, long? committedSeq = null)
         {
             owner._tailAddress = tail;
+            // ★ 注意：_safeSnapshotTail 不在此推进——恢复后页池是空壳（数据只在设备），保持其
+            //   低水位使重放/恢复扫描全走冷区设备读（设备权威）；首次写后随写者写完推进。
             owner._flushedUntilAddress = flushedUntil;
             if (begin is { } ba) owner._beginAddress = ba;
             if (readOnly is { } roa) owner._readOnlyAddress = roa;
@@ -138,8 +145,13 @@ public abstract partial class RingBase<TKey>
             return lastValidEnd;
         }
 
-        /// <summary>扫描单页内的 records，返回最后一个有效 record 的尾地址。null = 遇坏帧。</summary>
-        private static LogicalAddress? ScanPageForRecords(Span<byte> pageData, LogicalAddress pageAddr, int pageSize, int pageMask, int headerSize, int alignment, IRingCodec codec)
+        /// <summary>
+        /// 扫描单页内的 records，返回最后一个有效 record 的尾地址。null = 本页无任何有效帧（全零/全垃圾）。
+        /// <para>★ 撕裂帧同页重同步（STORAGE-082 / #302）：崩溃撕裂只伤尾写，撕裂点之后的<b>同页</b>
+        ///   有效帧不再连带丢失——坏帧（header 不可解析 / CRC 失败 / 长度越页）按对齐粒度步进续扫；
+        ///   重同步只在当前页内生效，跨页仍保守止步（页起点解析保证 + 防陈旧帧过度恢复）。</para>
+        /// </summary>
+        internal static LogicalAddress? ScanPageForRecords(Span<byte> pageData, LogicalAddress pageAddr, int pageSize, int pageMask, int headerSize, int alignment, IRingCodec codec)
         {
             LogicalAddress lastValidEnd = LogicalAddress.Empty;
             long pageOff = pageAddr.Offset;
@@ -155,17 +167,25 @@ public abstract partial class RingBase<TKey>
                         addrOff += alignment;
                         continue;
                     }
-                    return lastValidEnd != LogicalAddress.Empty ? lastValidEnd : null;
+                    addrOff += alignment;   // ★ 撕裂/坏帧——对齐粒度重同步（不再弃页）
+                    continue;
                 }
 
                 int payloadLen = (int)fields.PayloadLength;
                 int total = headerSize + payloadLen + fields.PaddingLength;
                 int crcCoverEnd = headerSize + payloadLen;
 
-                if (off + crcCoverEnd > pageSize) return lastValidEnd != LogicalAddress.Empty ? lastValidEnd : null;
+                if (off + crcCoverEnd > pageSize)
+                {
+                    addrOff += alignment;   // ★ 垃圾长度越页——重同步（信任对齐粒度而非坏 header 的长度声明）
+                    continue;
+                }
 
                 if (!codec.VerifyCrc(pageData.Slice(off, crcCoverEnd), headerSize, payloadLen))
-                    return lastValidEnd != LogicalAddress.Empty ? lastValidEnd : null;
+                {
+                    addrOff += alignment;   // ★ CRC 失败——重同步（#302 主诉求：不再丢同页后续有效帧）
+                    continue;
+                }
 
                 int aligned = (total + alignment - 1) & ~(alignment - 1);
 

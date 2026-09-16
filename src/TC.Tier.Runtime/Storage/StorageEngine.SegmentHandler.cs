@@ -8,6 +8,10 @@ internal sealed partial class StorageEngine
     /// <param name="owner">引擎实例</param>
     private sealed class DefaultSegmentHandler(StorageEngine owner) : ISegmentHandler
     {
+        /// <summary>段创建事件——未注册段只补预备池（lookahead）；预备池命中同步转正；未命中入队 worker 异步建段（高优先级可指定）。</summary>
+        /// <param name="segId">段号。</param>
+        /// <param name="growthLimit">段生长上限（字节）。</param>
+        /// <param name="isHighPriority">true = Critical 优先级（Allocate 缺段强制建，lease 等就绪）；false = High 优先级（预建/恢复建段）。</param>
         public void OnSegmentCreate(int segId, long growthLimit, bool isHighPriority)
         {
             // ★ 未注册的前置通知（ExtentLease 段满时预建下一段）= 纯预建提示——只喂预备池
@@ -40,6 +44,10 @@ internal sealed partial class StorageEngine
             owner.ReplenishSegmentPool();       // 池空也补（下一次命中）
         }
 
+        /// <summary>段满事件——入队 worker 更新段 meta（maxOffset 定格、state=Full）并提前补预备池。</summary>
+        /// <param name="segId">段号。</param>
+        /// <param name="finalSize">段满时的最终大小（字节）。</param>
+        /// <param name="growthLimit">段生长上限（字节）。</param>
         public void OnSegmentFull(int segId, long finalSize, long growthLimit)
         {
             // ★ 段满事件入队——worker 更新段 meta（maxOffset 定格、state=Full）。
@@ -54,21 +62,34 @@ internal sealed partial class StorageEngine
             owner.ReplenishSegmentPool();
         }
 
+        /// <summary>段删除事件——仅事件通知，物理段删除由 Compact/Reclaim 子系统直接处理，本 handler 无动作。</summary>
+        /// <param name="segId">段号。</param>
         public void OnSegmentDelete(int segId)
         {
             // ★ 仅事件通知——段表自洽管理段状态，引擎侧物理段删除由 Compact/Reclaim 子系统直接处理，handler 无需动作。
         }
 
+        /// <summary>段替换事件——仅事件通知，Compact 重建段由 Compact 子系统自管，本 handler 无动作。</summary>
+        /// <param name="segId">段号。</param>
+        /// <param name="growthLimit">新段生长上限（字节）。</param>
+        /// <param name="maxOffset">新段最大有效偏移（字节）。</param>
         public void OnSegmentReplace(int segId, long growthLimit, long maxOffset)
         {
             // ★ 仅事件通知——Compact 重建段由 Compact 子系统自管，handler 无需动作。
         }
 
+        /// <summary>段回收事件——仅事件通知，Reclaim 回收由 Reclaim 子系统自管，本 handler 无动作。</summary>
+        /// <param name="segId">段号。</param>
+        /// <param name="from">回收起始偏移（字节）。</param>
+        /// <param name="to">回收结束偏移（字节）。</param>
+        /// <param name="growthLimit">段生长上限（字节）。</param>
         public void OnSegmentReclaim(int segId, long from, long to, long growthLimit)
         {
             // ★ 仅事件通知——Reclaim 回收由 Reclaim 子系统自管，handler 无需动作。
         }
 
+        /// <summary>提交低频后台任务——入队 worker 按提交顺序异步执行（不区分优先级，不阻塞热路径）。</summary>
+        /// <param name="work">完整的工作单元（闭包捕获所需状态），非空。</param>
         public void SubmitBackgroundWork(Action work)
         {
             // ★ 低频段表自洽任务入队（顺序执行，不需要优先级区分）。

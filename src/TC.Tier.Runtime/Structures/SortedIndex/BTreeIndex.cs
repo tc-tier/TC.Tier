@@ -5,6 +5,10 @@ using TC.Tier.Contracts.Structures;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// BTreeIndex 主 partial——B+树内核（定长槽位节点 160B×9 槽、节点缓存 LogicalAddressMap、
+/// 脏节点延迟写回集合与节点读写原语）。
+/// </summary>
 public partial class BTreeIndex<TKey> : SortedIndexBase<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     private const int MaxEntries = 9;
@@ -158,10 +162,16 @@ public partial class BTreeIndex<TKey> : SortedIndexBase<TKey> where TKey : unman
     }
 
     /// <summary>ctor 收 protected internal——开放泛型不落消费面闸门（同 BlittableRing）：外部用 [RingKey] 封闭类型。</summary>
+    /// <param name="fileSystem">文件系统（组合根注入）。</param>
+    /// <param name="settings">BTreeIndexSettings（NodeSize/MinFillPercent/节点缓存容量等）。</param>
+    /// <param name="epoch">epoch 保护（null = 自建 LightEpoch）。默认 null。</param>
+    /// <param name="keyResolver">恢复重放数据面（null = 默认，重放窗口期需要——缺失时恢复 fail-fast）。默认 null。</param>
+    /// <param name="keyComparer">key 比较器（null = 默认 <c>KeyComparer&lt;TKey&gt;</c>）。默认 null。</param>
     protected internal BTreeIndex(IFileSystem fileSystem, BTreeIndexSettings settings,
         LightEpoch? epoch = null,
-        IKeyResolver<TKey>? keyResolver = null)
-        : base(BTreeIndexCodec.Instance, fileSystem, settings, epoch, keyResolver: keyResolver)
+        IKeyResolver<TKey>? keyResolver = null,
+        IKeyComparer<TKey>? keyComparer = null)
+        : base(BTreeIndexCodec.Instance, fileSystem, settings, epoch, keyComparer, keyResolver: keyResolver)
     {
         _nodeSize = ComputeNodeSize(settings.NodeSize, Unsafe.SizeOf<BTreeNode>());
         _minFillPercent = settings.MinFillPercent;

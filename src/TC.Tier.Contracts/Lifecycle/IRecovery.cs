@@ -6,9 +6,11 @@ namespace TC.Tier.Contracts.Lifecycle;
 public interface IRecovery
 {
     /// <summary>恢复状态快照（原子可读，并发安全）。只读——由实现内部推进。</summary>
+    /// <returns>恢复状态快照。</returns>
     RecoveryState RecoveryState { get; }
 
     /// <summary>恢复进度变化事件（进度条订阅）。可空。</summary>
+    /// <returns>恢复进度变化事件（进度条订阅）。</returns>
     event Action<RecoveryProgress>? RecoveryProgressChanged;
 
     /// <summary>恢复开始钩子（生命周期骨架起点）。</summary>
@@ -44,5 +46,6 @@ public interface IRecovery<in TRecoveryHints> : IRecovery
     ///   调用方用 WaitForReady/WaitForReadyAsync 观测就绪。</para></summary>
     /// <param name="hints">恢复 hints（可选，缺省值为 default(TRecoveryHints)）</param>
     /// <param name="ct">取消令牌——取消恢复时本方法抛 <see cref="OperationCanceledException"/>。</param>
+    /// <returns>异步恢复任务。</returns>
     ValueTask RecoverAsync(TRecoveryHints hints, CancellationToken ct = default);
 }

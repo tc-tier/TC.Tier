@@ -109,19 +109,25 @@ dotnet add package TC.Tier.Runtime --prerelease
 ## 架构
 
 ```
-官方产品（规划中）：TierKV / TierWAL / TierBlob / TierQueue / TierTimeSeries
+官方产品：TierKV / TierWAL / TierQueue（时序等组装中）
 ────────────────────────────────────────────────
 Storage Runtime（可组合内核）
-  Index（Hash/BTree/SkipList）· Ring · Log · Blob（元数据/镜像/快照）
+  Index（Hash/BTree/SkipList）· Ring · Log ＋ 搭配件（镜像/元数据/快照）
 ────────────────────────────────────────────────
 Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地址空间）
 ────────────────────────────────────────────────
 文件系统层（local:// / memory: / virtual:// / network:///s3）
+────────────────────────────────────────────────
+Core.Net（分布式协议层）
+  raft 共识 × 节点通信三形态 × HyParView/Swarm——Wire 统一帧，传输可换（TCP/UDP/QUIC）
+官方节点：TierRaftNode（raft × TierWAL 开箱节点，TC.Tier.Products.Net）
 ```
 
-依赖单向无环：`TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products`。源生成器（`TC.Tier.CodeGen`）横切——BinaryLayout / 注册桥编译期生成，零运行时反射。
+依赖单向无环：`TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products`（存储支柱）；网络支柱 `TC.Tier.Core` → `TC.Tier.Core.Net` → `TC.Tier.Products.Net`。源生成器（`TC.Tier.CodeGen`）横切——BinaryLayout / 注册桥编译期生成，零运行时反射。
 
+- 开发指南（架构与设计思想、代码组织范式）：[DEVELOPMENT.md](DEVELOPMENT.md)
 - 引擎使用指南：[storage-engine.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)
+- 网络与共识层指南：[net.md](https://docs.mytzz.top/docs/src/TC.Tier.Core.Net/docs/net.html)
 - 结构层总览：[structures.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html)
 - 生命周期模型：[lifecycle.md](https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html)
 
@@ -134,7 +140,7 @@ Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地
 
 ## 贡献
 
-见 [CONTRIBUTING.md](CONTRIBUTING.md)——构建、测试约定、代码规范（编译期强制：禁反射 TCSG030 / 禁 sync-over-async TCSG031）。
+见 [CONTRIBUTING.md](CONTRIBUTING.md)——构建、测试约定、代码规范（编译期强制：禁反射 TCSG136 / 禁 sync-over-async TCSG137 / 禁 fire-and-forget TCSG138）。
 
 ## License
 

@@ -6,18 +6,23 @@ namespace TC.Tier.Contracts.Storage;
 public interface ISequentialReader : IDisposable
 {
     /// <summary>当前读游标（下一次读取的起始地址）。</summary>
+    /// <returns>当前读游标（下一次读取的起始地址）。</returns>
     LogicalAddress Position { get; }
 
     /// <summary>读取窗口起点。</summary>
+    /// <returns>读取窗口起点。</returns>
     LogicalAddress Start { get; }
 
     /// <summary>读取窗口终点（读到/越过返回 0 = EOF）。</summary>
+    /// <returns>读取窗口终点（读到/越过返回 0 = EOF）。</returns>
     LogicalAddress End { get; }
 
     /// <summary>正序 / 倒序。</summary>
+    /// <returns>正序 / 倒序。</returns>
     ReadDirection Direction { get; }
 
     /// <summary>快照模式。</summary>
+    /// <returns>快照模式。</returns>
     SnapshotMode SnapshotMode { get; }
 
     /// <summary>

@@ -6,14 +6,17 @@ namespace TC.Tier.Contracts.Storage;
 public readonly struct CompactResult
 {
     /// <summary>Compact 后的新低水位线。</summary>
+    /// <returns>Compact 后的新低水位线。</returns>
     public LogicalAddress NewLowWaterMark { get; init; }
 
     /// <summary>Compact 后的新高水位线。</summary>
+    /// <returns>Compact 后的新高水位线。</returns>
     public LogicalAddress NewHighWaterMark { get; init; }
 
     /// <summary>
     /// 旧地址 → 新地址 对照表。
     /// <para>RangeCompact 为每个不同的请求地址保留一项；hole、不存在或区间外地址映射到 null。</para>
     /// </summary>
+    /// <returns>旧地址 → 新地址 对照表。</returns>
     public IReadOnlyDictionary<LogicalAddress, LogicalAddress?> MigrationMap { get; init; }
 }

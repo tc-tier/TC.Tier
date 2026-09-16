@@ -36,27 +36,39 @@ internal static class ExtentStateCode
     // ═══ 快速判定（位运算，无 switch）═══
 
     /// <summary>是否 Committed（成功终态，有数据可读）。投影热路径用。</summary>
+    /// <param name="s">区间状态 byte 编码（高 4 bit Src + 低 4 bit Phase）。</param>
+    /// <returns>true 表示该区间处于 Committed 成功终态（数据可读）；false 表示其他任意状态。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsCommitted(byte s) => (s & 0x0F) == PhaseCommitted;
 
     /// <summary>是否在途（中间态，排他）。</summary>
+    /// <param name="s">区间状态 byte 编码（高 4 bit Src + 低 4 bit Phase）。</param>
+    /// <returns>true 表示该区间处于 Leased 在途态（带 Src 来源）；false 表示非在途态。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsInFlight(byte s) => (s & 0x0F) == PhaseLeased;
 
     /// <summary>是否可被 Write/Reclaim/Compact 占（Committed 或 Wasted）。</summary>
+    /// <param name="s">区间状态 byte 编码（高 4 bit Src + 低 4 bit Phase）。</param>
+    /// <returns>true 表示 Phase 为 Committed（可覆写）或 Wasted（空洞）；false 表示其他状态（在途/毒化洞）不可占。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsOccupiable(byte s)
         => (s & 0x0F) == PhaseCommitted || (s & 0x0F) == PhaseWasted;
 
     /// <summary>是否毒化洞（punch/commit 非原子窗口二态未知——Reclaim 族可幂等重占（L1），Compact 可整理）。</summary>
+    /// <param name="s">区间状态 byte 编码（高 4 bit Src + 低 4 bit Phase）。</param>
+    /// <returns>true 表示该区间为 Aborted 毒化洞（读拒绝）；false 表示非毒化状态。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static bool IsAborted(byte s) => (s & 0x0F) == PhaseAborted;
 
     /// <summary>取 Src（高 4 bit）——Rollback 分发/诊断用。</summary>
+    /// <param name="s">区间状态 byte 编码（高 4 bit Src + 低 4 bit Phase）。</param>
+    /// <returns>高 4 bit 的 Src 部分（lease 来源，如 SrcAppend/SrcWrite）；终态无 Src 时返回 0x00。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte SourceOf(byte s) => (byte)(s & 0xF0);
 
     /// <summary>取 Phase（低 4 bit）。</summary>
+    /// <param name="s">区间状态 byte 编码（高 4 bit Src + 低 4 bit Phase）。</param>
+    /// <returns>低 4 bit 的 Phase 部分（如 PhaseLeased/PhaseCommitted/PhaseWasted/PhaseAborted）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static byte PhaseOf(byte s) => (byte)(s & 0x0F);
 }

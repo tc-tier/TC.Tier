@@ -166,6 +166,7 @@ internal sealed class TailWatermarkSlot : IDisposable
         _committed.Store(value);
     }
 
+    /// <summary>释放双尾水位槽——Dispose 两个 128 位 CAS 背板；之后读水位返回 <see cref="LogicalAddress.Invalid"/>、写被忽略（不抛异常）。</summary>
     public void Dispose()
     {
         _allocated.Dispose();

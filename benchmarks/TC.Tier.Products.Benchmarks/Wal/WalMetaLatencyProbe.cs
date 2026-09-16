@@ -29,7 +29,7 @@ public static class WalMetaLatencyProbe
             using var vol = carrierWriteThrough
                 ? new BenchVolume(WalProbeCommon.SpecOf(spec), new TierVolumeFormatOptions { CarrierWriteThrough = true })
                 : new BenchVolume(WalProbeCommon.SpecOf(spec));
-            var options = TierWalOptions.Default.WithHints(h);
+            var options = TierWalOptions.Default.WithHints(h).WithDurabilityValidation(false);   // ★ 探针测量基线档（含不达标数字本身）——地板验证关闭
             await using var wal = await WalProbeCommon.StartAsync(vol.Fs, options);
             Console.WriteLine($"── IO 模式 {hName}：迭代 {iterations:N0} 次（128B term/vote 元数据；WriteMetaAsync = stage + 一次 fsync 提交 = 应答持久化）");
 

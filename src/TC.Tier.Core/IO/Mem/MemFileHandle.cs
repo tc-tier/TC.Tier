@@ -7,8 +7,9 @@ namespace TC.Tier.Core.IO.Mem;
 /// <summary>
 /// 内存文件句柄——<see cref="MemoryFileSystem"/> 的槽视图（open 时 path→(槽, 代际) 解析一次，热路径零字典开销）。
 /// <para>★ 与磁盘同构：open 时解析身份，之后 IO 只走 (slot, gen)，不再碰 path。</para>
-/// <para>★ 无 syscall；DIO 形态模拟（NoBuffering → Supported + 对齐强制——Disk 行为保真，见 <see cref="UnbufferedSupport"/>）。
-/// Flush/Advise=no-op，xattr=字典模拟。</para>
+/// <para>★ 无 syscall；DIO 形态模拟（NoBuffering → Supported——Disk 行为保真，见 <see cref="UnbufferedSupport"/>）。
+/// 单值读写无对齐强制：内存 memcpy 天然任意粒度，与 Disk 句柄的 DIO 字节粒度契约（RMW）同像——
+/// 四介质单一语义；向量 API 保留对齐 fail-fast（与 Disk 向量同款）。Flush/Advise=no-op，xattr=字典模拟。</para>
 /// <para>★ 句柄 Dispose 自动释放其全部范围锁 + 注销共享注册 + 槽引用计数减一。</para>
 /// </summary>
 internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
@@ -18,6 +19,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     private readonly int _slotIdx;
     private readonly int _gen;
     private readonly FileOpenOptions _options;
+    private readonly bool _writable;   // ★ IO-13：句柄打开语义（Access）——变更面统一守卫（原全裸，读句柄可静默改数据）
     private readonly long _preallocateSize;
     private long _position;      // 句柄书签（D7：会话状态——Position/Seek；追加预留另见 _appendCursor）
     private AppendCursor? _appendCursor;   // 文件级追加预留（fs.Open 注入——同 fs 同路径全部实例共享）
@@ -34,6 +36,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         _slotIdx = slotIdx;
         _gen = generation;
         _options = options;
+        _writable = options.Access is AccessMode.Write or AccessMode.ReadWrite;
         _preallocateSize = options.PreallocateSize;
         OpenRegistryEntry = openRegistryEntry;
         _position = options.Mode == FileOpenMode.Append ? Length : 0;   // Append：游标初始化于 EOF
@@ -66,28 +69,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         ? MemoryFileSystem.SimulatedSectorSize
         : 1;
 
-    /// <summary>DIO 三重对齐校验（offset/length/缓冲地址）——Disk 同款语义（Violation → AlignmentError）。</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private unsafe void ThrowIfMisaligned(long fileOffset, int length, ref byte bufferRef)
-    {
-        if (UnbufferedSupport != UnbufferedIoSupport.Supported || RequiredAlignment <= 1) return;
-        var mask = (ulong)(RequiredAlignment - 1);
-        if (((ulong)fileOffset & mask) != 0)
-            throw new FileIOException(IOError.AlignmentError,
-                $"DIO requires fileOffset aligned to {RequiredAlignment}, got {fileOffset}.", _path, "alignment");
-        if (length > 0 && ((ulong)length & mask) != 0)
-            throw new FileIOException(IOError.AlignmentError,
-                $"DIO requires length aligned to {RequiredAlignment}, got {length}.", _path, "alignment");
-        if (length > 0)
-        {
-            var bufAddr = (ulong)Unsafe.AsPointer(ref bufferRef);
-            if ((bufAddr & mask) != 0)
-                throw new FileIOException(IOError.AlignmentError,
-                    $"DIO requires buffer address aligned to {RequiredAlignment}.", _path, "alignment");
-        }
-    }
-
-    /// <summary>向量 IO 的 DIO 对齐校验——offset/总长/各片缓冲地址（Disk 同款）。</summary>
+    /// <summary>向量 IO 的 DIO 对齐校验——offset/总长/各片缓冲地址（Disk 同款；单值 IO 无对齐强制——字节粒度契约）。</summary>
     private unsafe void ThrowIfVectorMisaligned(long fileOffset, long total, ReadOnlySpan<ReadOnlyMemory<byte>> sources)
     {
         if (UnbufferedSupport != UnbufferedIoSupport.Supported || RequiredAlignment <= 1) return;
@@ -142,12 +124,13 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     // ══════════════════ 位置读写（pwrite/pread 铁律）══════════════════
 
     /// <inheritdoc/>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="source">源数据（空则 no-op）。</param>
     public void Write(long offset, ReadOnlySpan<byte> source)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(Write), _path);
-        if (!source.IsEmpty)
-            ThrowIfMisaligned(offset, source.Length, ref MemoryMarshal.GetReference(source));
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 Write。");   // ★ IO-13（对齐 Remote/TierVolume）
         WriteCore(offset, source);
     }
 
@@ -160,6 +143,10 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="source">源数据（空则 no-op）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>写入完成后即完成的 <see cref="ValueTask"/>。</returns>
     public ValueTask WriteAsync(long offset, ReadOnlyMemory<byte> source, CancellationToken ct)
     {
         Write(offset, source.Span);   // 内存模式无异步原语——同步拷贝
@@ -167,12 +154,13 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即单次最多读取字节数）。</param>
+    /// <returns>实际读取的字节数（0 = offset 已到文件末尾，pread 语义）。</returns>
     public int Read(long offset, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         _fs.Maintenance.ThrowIfReadsRejected(nameof(Read), _path);
-        if (!destination.IsEmpty)
-            ThrowIfMisaligned(offset, destination.Length, ref MemoryMarshal.GetReference(destination));
         return _fs.IsReserved
             ? _fs.ReadDirect(_slotIdx, _gen, offset, destination)
             : _fs.ReadSparse(_slotIdx, _gen, offset, destination);
@@ -185,6 +173,10 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
             : _fs.ReadSparse(_slotIdx, _gen, offset, destination);
 
     /// <inheritdoc/>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即单次最多读取字节数）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到实际读取的字节数（0 = offset 已到文件末尾）。</returns>
     public ValueTask<int> ReadAsync(long offset, Memory<byte> destination, CancellationToken ct)
         => new(Read(offset, destination.Span));
 
@@ -194,10 +186,14 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     public long Position => Volatile.Read(ref _position);
 
     /// <inheritdoc/>
+    /// <param name="source">要追加的数据（空则原样返回当前游标位置）。</param>
+    /// <returns>本次数据被预留到的起始偏移（字节）。</returns>
+    /// <exception cref="FileIOException">配额超限等写入失败——<see cref="FileIOException.ReservedOffset"/> 携带已预留区间起点（D7 失败语义）。</exception>
     public long Append(ReadOnlySpan<byte> source)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(Append), _path);
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 Append。");   // ★ IO-13：预留前拒（防游标留洞）
         if (source.IsEmpty) return Position;
         var reserved = _appendCursor is { } cursor
             ? Interlocked.Add(ref cursor.Value, source.Length) - source.Length
@@ -222,10 +218,17 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <param name="source">要追加的数据。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到本次数据被预留到的起始偏移（字节）。</returns>
     public ValueTask<long> AppendAsync(ReadOnlyMemory<byte> source, CancellationToken ct)
         => new(Append(source.Span));
 
     /// <inheritdoc/>
+    /// <param name="offset">相对 <paramref name="origin"/> 的偏移（字节，可为负）。</param>
+    /// <param name="origin">基准位置（Begin/Current/End）。</param>
+    /// <returns>移动后的绝对位置（字节）。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">origin 非 Begin/Current/End。</exception>
     public long Seek(long offset, SeekOrigin origin)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -248,6 +251,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(Preallocate), _path);
         if (_preallocateSize <= 0) return;
+        if (!_writable) return;   // ★ IO-13：只读句柄不扩容（对齐 Remote 静默跳过——open 即预分配不自炸）
         var current = Length;
         if (_preallocateSize > current)
         {
@@ -274,7 +278,9 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
             ObjectDisposedException.ThrowIf(_disposed != 0, this);
             lock (_fs.SyncRoot)
             {
-                return _fs.GetSlot(_slotIdx).Data?.Size ?? 0;
+                var slot = _fs.GetSlot(_slotIdx);
+                if (slot.Generation != _gen) MemoryFileSystem.ThrowStale(_slotIdx, _gen);   // ★ IO-24：槽已换主（CORE-14 同纪律——防身份混淆）
+                return slot.Data?.Size ?? 0;
             }
         }
     }
@@ -289,11 +295,13 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>设置槽逻辑长度（截断/扩展——扩展零填充；追加预留盒权威复位）。</summary>
+    /// <param name="length">目标逻辑长度（字节，≥0）。</param>
     public void SetLength(long length)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(SetLength), _path);
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 SetLength。");   // ★ IO-13
         // ★ CORE-14：slot-keyed（代际校验——旧句柄不再截断/扩展同名新文件；path 重解析 = 跨代越权）；
         // 游标经本句柄注入盒复位（盒按 path 共享——同 path 全部句柄生效；path 已换主 = 旧盒复位无害）
         _fs.TruncateSlot(_slotIdx, _gen, length);
@@ -301,11 +309,14 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
             Interlocked.Exchange(ref cursor.Value, length);
     }
 
-    /// <inheritdoc/>
+    /// <summary>打洞——字节粒度精确归零（读零等价；整页空间归还，物理地板 = 页）。</summary>
+    /// <param name="offset">洞起始偏移（字节，≥0）。</param>
+    /// <param name="length">洞长度（字节，≤0 时 no-op）。</param>
     public void PunchHole(long offset, long length)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(PunchHole), _path);
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 PunchHole。");   // ★ IO-13
         if (length <= 0) return;
         // ★ 字节精确（extent 代数本就字节级——Reserved memset / Sparse 页边界零化）；
         //   空间归还仅整页生效（物理地板=页），可观测语义（读零 + 区间洞）任意粒度等价——
@@ -323,6 +334,9 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
 
     /// <inheritdoc/>
     /// <remarks>mem 全支持（能力位置位）——memmove + 长度变更 + 页表重映射。</remarks>
+    /// <param name="offset">待删除区间起始偏移（字节；须按 AllocationUnit(PageSize) 对齐）。</param>
+    /// <param name="length">待删除区间长度（字节，≤0 时 no-op；须按 AllocationUnit 对齐）。</param>
+    /// <exception cref="FileIOException">offset/length 未按 AllocationUnit 对齐。</exception>
     public void CollapseRange(long offset, long length)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -333,7 +347,10 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         else _fs.ShiftRangeSparse(_slotIdx, _gen, offset, length, insert: false);
     }
 
-    /// <inheritdoc/>
+    /// <summary>插入区间——在 offset 处开 length 长度的洞，其后数据整体后移（memmove + 页表重映射）。</summary>
+    /// <param name="offset">插入点偏移（字节；须按 AllocationUnit(PageSize) 对齐）。</param>
+    /// <param name="length">插入长度（字节，≤0 时 no-op；须按 AllocationUnit 对齐）。</param>
+    /// <exception cref="FileIOException">offset/length 未按 AllocationUnit 对齐。</exception>
     public void InsertRange(long offset, long length)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -346,7 +363,15 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
 
     // ══════════════════ 文件间拷贝 ══════════════════
 
-    /// <inheritdoc/>
+    /// <summary>文件间拷贝——同卷 mem 句柄间对齐缓冲搬运（64KB 分块）。</summary>
+    /// <param name="destination">目标句柄（须为同卷 mem 句柄，否则抛 <see cref="ArgumentException"/>）。</param>
+    /// <param name="sourceOffset">源起始偏移（字节，≥0）。</param>
+    /// <param name="destinationOffset">目标起始偏移（字节，≥0）。</param>
+    /// <param name="length">计划拷贝字节数（≥0；超出源剩余部分按实际可得截取）。</param>
+    /// <returns>实际拷贝的字节数（字节）。</returns>
+    /// <exception cref="ArgumentException">目标不是同卷 mem 句柄。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">偏移/长度为负。</exception>
+    /// <exception cref="FileIOException">失败——<see cref="FileIOException.CompletedLength"/> 携带已完成字节数。</exception>
     public long CopyRange(IFileHandle destination, long sourceOffset, long destinationOffset, long length)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -394,11 +419,15 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
 
     /// <inheritdoc/>
     /// <remarks>mem 无引用克隆原语——回退 CopyRange 全量（能力位 CopyRange 未置位，诚实表达）。</remarks>
+    /// <returns>实际拷贝的字节数（字节，通常等于本文件逻辑长度）。</returns>
     public long CloneRange(IFileHandle destination) => CopyRange(destination, 0, 0, Length);
 
     // ══════════════════ 向量化 IO（回退逐片——语义等价）══════════════════
 
-    /// <inheritdoc/>
+    /// <summary>向量写——把 sources 各片按序连续写到 offset 起始位置（DIO 句柄对齐 fail-fast；逐片回退）。</summary>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="sources">写入片段序列（逻辑上首尾相接）。</param>
+    /// <exception cref="FileIOException">DIO 句柄上 offset/总长/缓冲地址未对齐。</exception>
     public void WriteVector(long offset, ReadOnlySpan<ReadOnlyMemory<byte>> sources)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -416,14 +445,21 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>向量写（异步形态——同步完成后即完成）。</summary>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="sources">写入片段序列（逻辑上首尾相接）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>全部片段写完后即完成的 <see cref="ValueTask"/>。</returns>
     public ValueTask WriteVectorAsync(long offset, ReadOnlyMemory<ReadOnlyMemory<byte>> sources, CancellationToken ct)
     {
         WriteVector(offset, sources.Span);
         return ValueTask.CompletedTask;
     }
 
-    /// <inheritdoc/>
+    /// <summary>向量读——从 offset 起按序填入 destinations 各片，读到文件末尾或某片未读满即停。</summary>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destinations">接收片段序列（逻辑上首尾相接）。</param>
+    /// <returns>实际读取的总字节数（字节）。</returns>
     public int ReadVector(long offset, ReadOnlySpan<Memory<byte>> destinations)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -447,7 +483,11 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         return got;
     }
 
-    /// <inheritdoc/>
+    /// <summary>向量读（异步形态——同步完成后即完成）。</summary>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destinations">接收片段序列（逻辑上首尾相接）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到实际读取的总字节数（字节）。</returns>
     public ValueTask<int> ReadVectorAsync(long offset, Memory<Memory<byte>> destinations, CancellationToken ct)
         => new(ReadVector(offset, destinations.Span));
 
@@ -465,7 +505,8 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         ObjectDisposedException.ThrowIf(_disposed != 0, this);   // ≡ Flush（no-op）
     }
 
-    /// <inheritdoc/>
+    /// <summary>访问提示——mem 介质 no-op（能力位 Advise 未置位）。</summary>
+    /// <param name="advise">访问提示（被忽略）。</param>
     public void Advise(FileAdvise advise)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);   // no-op（能力位 Advise 未置位）
@@ -473,15 +514,24 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
 
     // ══════════════════ 字节范围锁（进程内区间表——多句柄协调真实生效）══════════════════
 
-    /// <inheritdoc/>
+    /// <summary>获取进程内字节范围锁（冲突抛异常阻塞等待）。</summary>
+    /// <param name="offset">锁区间起始偏移（字节，≥0）。</param>
+    /// <param name="length">锁区间长度（字节，&gt;0）。</param>
+    /// <param name="mode">锁模式（Shared/Exclusive）。</param>
     public void Lock(long offset, long length, FileLockMode mode)
         => _fs.LockRange(_slotIdx, _gen, offset, length, mode, blocking: true, owner: this);
 
-    /// <inheritdoc/>
+    /// <summary>尝试获取进程内字节范围锁（冲突立即返回失败，不阻塞）。</summary>
+    /// <param name="offset">锁区间起始偏移（字节，≥0）。</param>
+    /// <param name="length">锁区间长度（字节，&gt;0）。</param>
+    /// <param name="mode">锁模式（Shared/Exclusive）。</param>
+    /// <returns>true = 获取成功；false = 与其他 owner 的重叠排他冲突。</returns>
     public bool TryLock(long offset, long length, FileLockMode mode)
         => _fs.LockRange(_slotIdx, _gen, offset, length, mode, blocking: false, owner: this);
 
-    /// <inheritdoc/>
+    /// <summary>释放本句柄此前获取的字节范围锁。</summary>
+    /// <param name="offset">锁区间起始偏移（字节，须与获锁时一致）。</param>
+    /// <param name="length">锁区间长度（字节，须与获锁时一致）。</param>
     public void Unlock(long offset, long length) => _fs.UnlockRange(_slotIdx, offset, length, owner: this);
 
     // ══════════════════ 内存映射 ══════════════════
@@ -492,6 +542,13 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     /// Sparse = 物化拷贝（ReadWrite 带脏标记，Flush/Dispose 写回——可见时点=Flush/Dispose 非实时）。
     /// 映射生命周期独立于父句柄（RefCount 钉住槽/旧 buffer）。
     /// </remarks>
+    /// <summary>内存映射文件区间——Reserved 直址零拷贝 / Sparse 物化拷贝（见 remarks）。</summary>
+    /// <param name="offset">映射起始偏移（字节，≥0）。</param>
+    /// <param name="length">映射长度（字节，&gt;0 且 ≤2GB）。</param>
+    /// <param name="access">映射访问模式（无只写映射；不得超出挂载访问权）。</param>
+    /// <returns>映射区段（<see cref="IMappedSection"/>，生命周期独立于父句柄）。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">offset 为负、length ≤0 或 &gt;2GB。</exception>
+    /// <exception cref="ArgumentException">映射区间超出文件长度。</exception>
     public IMappedSection Map(long offset, long length, AccessMode access)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -503,7 +560,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
             throw new ArgumentException($"映射区间 [{offset}, {offset + length}) 超出文件长度 {Length}。");
 
         return _fs.IsReserved
-            ? MemDirectMappedSection.Create(_fs, _slotIdx, offset, length, access, _path)
+            ? MemDirectMappedSection.Create(_fs, _slotIdx, _gen, offset, length, access, _path)   // ★ IO-24：Reserved 直址同带代际（Sparse 原有）
             : MemSparseMappedSection.Create(_fs, _slotIdx, _gen, offset, length, access, _path);
     }
 
@@ -520,7 +577,10 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>读取 FileExtra（槽 blob 承载）片段。</summary>
+    /// <param name="offset">FileExtra 内起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲。</param>
+    /// <returns>实际读取的字节数（0 = 缓冲为空、FileExtra 未设或 offset 已达末尾，pread EOF 契约）。</returns>
     public int ReadFileExtra(long offset, Span<byte> destination)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -533,22 +593,29 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
         return n;
     }
 
-    /// <inheritdoc/>
+    /// <summary>按偏移写入 FileExtra——锁内 RMW（越当前长度零扩展），原子生效。</summary>
+    /// <param name="offset">FileExtra 内起始偏移（字节，≥0）。</param>
+    /// <param name="data">写入数据。</param>
+    /// <exception cref="ArgumentException">offset + data.Length 超出 MaxFileExtraBytes 上限。</exception>
     public void WriteFileExtra(long offset, ReadOnlySpan<byte> data)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(WriteFileExtra), _path);
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 WriteFileExtra。");   // ★ IO-14（对齐 Remote）
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset + data.Length > IFileSystem.MaxFileExtraBytes)
             throw new ArgumentException($"FileExtra 超限（{offset + data.Length} > {IFileSystem.MaxFileExtraBytes}）。");
         _fs.WriteSlotExtraRange(_slotIdx, offset, data);   // 锁内 RMW——真原子
     }
 
-    /// <inheritdoc/>
+    /// <summary>整体替换 FileExtra 内容（槽 blob 整写；上限 MaxFileExtraBytes）。</summary>
+    /// <param name="extra">新 FileExtra 内容。</param>
+    /// <exception cref="ArgumentException">extra.Length 超出 MaxFileExtraBytes 上限。</exception>
     public void SetFileExtra(ReadOnlyMemory<byte> extra)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var _gate = _fs.Maintenance.BeginMutation(nameof(SetFileExtra), _path);
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 SetFileExtra。");   // ★ IO-14（对齐 Remote）
         if (extra.Length > IFileSystem.MaxFileExtraBytes)
             throw new ArgumentException($"FileExtra 超限（{extra.Length} > {IFileSystem.MaxFileExtraBytes}）。", nameof(extra));
         _fs.WriteSlotExtra(_slotIdx, extra.Span);
@@ -569,6 +636,7 @@ internal sealed class MemFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <returns>释放完成后即完成的 <see cref="ValueTask"/>（与 <see cref="Dispose"/> 同步等价）。</returns>
     public ValueTask DisposeAsync()
     {
         Dispose();

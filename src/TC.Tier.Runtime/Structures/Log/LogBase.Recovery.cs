@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace TC.Tier.Runtime.Structures.Log;
 
 /// <summary>
@@ -10,6 +12,7 @@ public abstract partial class LogBase
 {
     /// <summary>★ 恢复算法工厂——默认 DefaultLogRecovery。在 Initialize 的 CAS 闸门内被调一次
     /// （基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</summary>
+    /// <returns>默认恢复器 <see cref="DefaultLogRecovery"/>（模板派生——层间 join 与恢复算法全默认）。</returns>
     protected override IRecovery<LogRecoveryHints> CreateRecovery()
         => new DefaultLogRecovery(this);
 
@@ -26,6 +29,8 @@ public abstract partial class LogBase
     {
         /// <summary>层间 join——主引擎 + meta 引擎（Managed 模式）双 await，全异步轨。
         /// <para>两引擎在 OnInitializeBegin 已并行启动，此处只 join——零同步阻塞。</para></summary>
+        /// <param name="ct">取消令牌（透传引擎 <c>WaitForReadyAsync</c>）。</param>
+        /// <returns>表示主引擎 + meta 引擎（Managed 模式）全部就绪的任务。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await owner._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
@@ -38,6 +43,9 @@ public abstract partial class LogBase
         /// ① hints（外部主动注入的初始化水位——最高优先级，TailAddress 精确 → FileSize 近似）
         /// ② meta（结构自管持久化水位）③ 扫盘。与 Metadata/Mirror/Snapshot 统一（设计决策）。
         /// </summary>
+        /// <param name="hints">恢复提示（外部主动注入的初始化水位；TailAddress/FileSize 均缺省时走 meta/扫盘）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>表示恢复核心完成的任务；完成后水位已裁决、引擎尾已对齐帧边界、<see cref="OnLogRecovered"/> 已回调。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(LogRecoveryHints hints, CancellationToken ct)
         {
             // ★ 依赖引擎就绪的初始化（SectorSize）——引擎后台恢复未完成时 SectorSize=0 会导致
@@ -57,7 +65,7 @@ public abstract partial class LogBase
             // ① hints.TailAddress（上层已知 tail——外部主动注入，最高优先级）
             if (hints.TailAddress is { } hintTail)
             {
-                owner._logicalTail = hintTail;
+                owner.ResetLogicalTail(hintTail);
                 RaiseProgress(90, $"hints tail={hintTail}");
                 ReconcileEngineTail();
                 OnLogRecovered();
@@ -67,7 +75,7 @@ public abstract partial class LogBase
             // ①' hints.FileSize（DeltaLog 临时文件场景——近似水位，仍属外部注入）
             if (hints.FileSize is { } fileSize)
             {
-                owner._logicalTail = new LogicalAddress(0, fileSize);
+                owner.ResetLogicalTail(new LogicalAddress(0, fileSize));
                 RaiseProgress(90, $"file size={fileSize}");
                 ReconcileEngineTail();
                 OnLogRecovered();
@@ -77,7 +85,7 @@ public abstract partial class LogBase
             // ② meta（持久化水位）
             if (metaPayload is { } payload && payload.TailAddress > LogicalAddress.Empty)
             {
-                owner._logicalTail = payload.TailAddress;
+                owner.ResetLogicalTail(payload.TailAddress);
                 // ★ 2PC 事务水位还原（悬干裁决依据——TransactionLog.LoadAndReconcile 据此判
                 //   LastPreparedSeq > LastCommittedSeq 并驱动 Abort；不还原则恢复后恒 -1、悬干永不可见）。
                 Volatile.Write(ref owner._lastCommittedSeq, payload.LastCommittedSeq);
@@ -92,7 +100,7 @@ public abstract partial class LogBase
             // ③ 扫盘兜底
             RaiseProgress(50, "scanning tail");
             var scannedTail = await ScanTailAsync(ct).ConfigureAwait(false);
-            owner._logicalTail = scannedTail;
+            owner.ResetLogicalTail(scannedTail);
             RaiseProgress(90, $"scanned tail={scannedTail}");
             ReconcileEngineTail();
             OnLogRecovered();
@@ -176,6 +184,8 @@ public abstract partial class LogBase
         /// <para>★ 帧布局 = 顺序追加 + 扇区填充，<b>非页对齐</b>（帧可跨扫描页）——起点必须是
         ///   已知帧边界（MinAddress/BeginAddress），不能用 MagicLocator 的页起点（会落在上一帧
         ///   中段的填充零里断链——DIO 小页场景实测暴露）。扫到 magic 不连续处 = 空洞/EOF。</para>
+        /// <para>★ CRC 验收：每帧验证 footer（cover=header+dataLen，与 Cursor 同口径）——
+        ///   撕裂/坏帧止步于前一有效帧，坏数据不再被当作"最后有效帧"通过恢复。</para>
         /// </summary>
         private LogicalAddress ForwardScanFromRegionSync(LogicalAddress regionStart)
         {
@@ -193,17 +203,36 @@ public abstract partial class LogBase
                 if (hdr.MagicValue != RecordMagic.LogPageFrame) break;   // 空洞/EOF（全零 magic）
                 int dataLen = hdr.DataLength;
                 if (dataLen <= 0 || dataLen > owner.PageSize) break;
-                reader.Skip(dataLen + crcLen + owner.ComputeFramePadding(dataLen));
+                if (!TryVerifyFrameCrcSync(reader, hdrBuf, dataLen)) break;
+                reader.Skip(owner.ComputeFramePadding(dataLen));
                 lastFrameEnd = owner._engine.CalculationAddress(frameStart, hdrLen + dataLen + crcLen);
             }
             return lastFrameEnd;
+        }
+
+        /// <summary>★ 帧尾 CRC 验收（同步轨）：读 data+CRC 并比对（cover = header+dataLen，
+        ///   与 Cursor.VerifyPageCrc 同口径——DataLength 即写侧 alignedLen，帧尾 padding 在 CRC 之后）。
+        ///   数据/CRC 读不满（物理截断）按验收失败处理——止步于前一有效帧。</summary>
+        private bool TryVerifyFrameCrcSync(ISequentialReader reader, ReadOnlySpan<byte> rawHeader, int dataLen)
+        {
+            int crcLen = Crc32FooterCodec.StructSize;
+            int coverLen = rawHeader.Length + dataLen + crcLen;
+            byte[] buf = ArrayPool<byte>.Shared.Rent(coverLen);
+            try
+            {
+                rawHeader.CopyTo(buf);
+                var tail = buf.AsSpan(rawHeader.Length, dataLen + crcLen);
+                if (reader.Read(tail) < dataLen + crcLen) return false;
+                return VerifyFrameCrcCover(buf.AsSpan(0, coverLen), dataLen);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buf); }
         }
 
         /// <summary>异步扫盘找 tail——从 MinAddress（已知帧边界）前向走帧到最后一个有效帧尾。</summary>
         private async ValueTask<LogicalAddress> ScanTailAsync(CancellationToken ct)
             => await ForwardScanFromRegionAsync(owner._engine.MinAddress, ct).ConfigureAwait(false);
 
-        /// <summary>阶段 2（异步）：从 page 起点前向扫帧求精。对等同步版。</summary>
+        /// <summary>阶段 2（异步）：从 page 起点前向扫帧求精。对等同步版（含 CRC 验收）。</summary>
         private async ValueTask<LogicalAddress> ForwardScanFromRegionAsync(LogicalAddress regionStart, CancellationToken ct)
         {
             LogicalAddress lastFrameEnd = LogicalAddress.Empty;
@@ -220,10 +249,36 @@ public abstract partial class LogBase
                 if (hdr.MagicValue != RecordMagic.LogPageFrame) break;
                 int dataLen = hdr.DataLength;
                 if (dataLen <= 0 || dataLen > owner.PageSize) break;
-                reader.Skip(dataLen + crcLen + owner.ComputeFramePadding(dataLen));
+                if (!await TryVerifyFrameCrcAsync(reader, hdrArr, dataLen, ct).ConfigureAwait(false)) break;
+                reader.Skip(owner.ComputeFramePadding(dataLen));
                 lastFrameEnd = owner._engine.CalculationAddress(frameStart, hdrLen + dataLen + crcLen);
             }
             return lastFrameEnd;
+        }
+
+        /// <summary>★ 帧尾 CRC 验收（异步轨）——口径同 <see cref="TryVerifyFrameCrcSync"/>。</summary>
+        private async ValueTask<bool> TryVerifyFrameCrcAsync(ISequentialReader reader, byte[] rawHeader, int dataLen, CancellationToken ct)
+        {
+            int crcLen = Crc32FooterCodec.StructSize;
+            int coverLen = rawHeader.Length + dataLen + crcLen;
+            byte[] buf = ArrayPool<byte>.Shared.Rent(coverLen);
+            try
+            {
+                rawHeader.CopyTo(buf, 0);
+                if (await reader.ReadAsync(buf.AsMemory(rawHeader.Length, dataLen + crcLen), ct).ConfigureAwait(false) < dataLen + crcLen)
+                    return false;
+                return VerifyFrameCrcCover(buf.AsSpan(0, coverLen), dataLen);
+            }
+            finally { ArrayPool<byte>.Shared.Return(buf); }
+        }
+
+        /// <summary>★ CRC 比对纯函数（零 IO）：cover = [header+dataLen] 与帧尾 footer 比对。
+        ///   口径与 Cursor.VerifyPageCrc 一致（原始磁盘字节——避免 codec 规范化产生不同 CRC）。</summary>
+        private static bool VerifyFrameCrcCover(ReadOnlySpan<byte> headerDataCrc, int dataLen)
+        {
+            int hdrLen = LogPageFrameHeaderCodec.StructSize;
+            var footer = Crc32FooterCodec.Read(headerDataCrc.Slice(hdrLen + dataLen, Crc32FooterCodec.StructSize));
+            return UnifiedCrc.ComputeCrc32C(headerDataCrc[..(hdrLen + dataLen)]) == footer.Crc;
         }
     }
 }

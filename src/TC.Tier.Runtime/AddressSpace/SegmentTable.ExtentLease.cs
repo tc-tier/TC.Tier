@@ -62,16 +62,21 @@ public sealed partial class SegmentTable
                     refresh = true;   // park 过——下轮重取
                     continue;
                 }
-                using var lk = seg.AcquireExtentLock();
-
+                // ★ 锁作用域=检查块（析构先于自旋）：using var 声明在循环体级会把锁的 Dispose
+                //   拖到 SpinOnce 之后——持锁 Sleep 自旋与"持区间等锁"的租约提交方
+                //   （CompleteAndMerge 等锁释放）互等成环（W8 磁盘组提交死锁 dump 实锤：
+                //   持锁者栈顶即本方法，29 等待者堵死整段 Extent 链路）。
+                ExtentLease? acquired = null;
+                using (var lk = seg.AcquireExtentLock())
                 {
                     var version = seg.CompactVersion;   // 锁内权威（与内脏变更互斥）
                     if (seg.CanAcquireUnsafe(start, end, extentState))
                     {
                         seg.InsertUnsafe(start, end, extentState, refresh: true);
-                        return new ExtentLease(this, segId, start, end, extentState, version);
+                        acquired = new ExtentLease(this, segId, start, end, extentState, version);
                     }
-                }
+                }   // ★ 锁在此释放——自旋绝不持锁
+                if (acquired.HasValue) return acquired.Value;
                 if (Environment.TickCount64 > deadline)
                     throw new TimeoutException(
                         $"AcquireExtent 占区间超时 segId={segId} [{start},{end})——区间被长期排他占用 attempts={attempts}");

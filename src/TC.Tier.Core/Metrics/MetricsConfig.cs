@@ -24,4 +24,10 @@ public sealed class MetricsConfig
 
     /// <summary>Segment 分配器维度（段表专用）。默认 false（高频，建议按需开）。</summary>
     public bool EnableSegmentAllocatorMetrics { get; init; }
+
+    /// <summary>Net 传输维度（帧量/RTT/丢弃/重连/握手失败——spec-12 §9.1 第六维度视图）。默认 true。</summary>
+    public bool EnableNetMetrics { get; init; } = true;
+
+    /// <summary>Raft 共识维度（二期-I2——选举/换届/水位/快照安装/转让，第七维度视图）。默认 true。</summary>
+    public bool EnableRaftMetrics { get; init; } = true;
 }

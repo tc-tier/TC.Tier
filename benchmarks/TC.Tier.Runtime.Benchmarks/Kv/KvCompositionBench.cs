@@ -111,7 +111,7 @@ public class KvCompositionBench
     private void CreateComposition(int prefill)
     {
         _fs = TierFs.New("memory:");
-        _ring = RingOfLong.Create(RingSettings(), _fs);
+        _ring = CreateRing(_fs);
         _index = CreateIndex();
 
         _value = new byte[ValueSize];
@@ -122,6 +122,15 @@ public class KvCompositionBench
             _index.Insert(k, addr, LogicalAddress.Empty);
         }
         _writeKey = prefill;
+    }
+
+    /// <summary>封闭形态装配（[RingKey] 生成物的公开面 = ctor + Initialize + WaitForReady——同步 Create 已随泛型改版退役）。</summary>
+    private static RingOfLong CreateRing(IFileSystem fs)
+    {
+        var ring = new RingOfLong(RingSettings(), fs);
+        ring.Initialize();
+        ring.WaitForReady();
+        return ring;
     }
 
     /// <summary>装配+启动索引（Initialize/WaitForReady 在具体类型上调——IIndex 最小协议不含生命周期）。</summary>
@@ -180,7 +189,7 @@ public class KvRecoveryBench
     {
         // 源 Ring：写 N + Prepare（数据+水位落盘）→ Dispose——留给基准体重开恢复
         _fs = TierFs.New("memory:");
-        using var ring1 = RingOfLong.Create(RingSettings(), _fs);
+        using var ring1 = CreateRing(_fs);
         _value = new byte[ValueSize];
         new Random(42).NextBytes(_value);
         for (long k = 0; k < RecordCount; k++)
@@ -194,7 +203,7 @@ public class KvRecoveryBench
     [Benchmark(Description = "KV.Recovery(reopen+full-replay)")]
     public long FullReplayRecovery()
     {
-        using var ring = RingOfLong.Create(RingSettings(), _fs);
+        using var ring = CreateRing(_fs);
         var w = ring.BeginAddress;   // 无镜像 → W=Begin 全量重建
         switch (Kind)
         {
@@ -221,7 +230,7 @@ public class KvRecoveryBench
     [Benchmark(Description = "KV.MirrorRecovery(load-image+delta0)")]
     public long MirrorRecovery()
     {
-        using var ring = RingOfLong.Create(RingSettings(), _fs);
+        using var ring = CreateRing(_fs);
         var w = ring.BeginAddress;
         switch (Kind)
         {
@@ -259,6 +268,15 @@ public class KvRecoveryBench
             PageSize = 8192,
             MemorySize = 32L << 20,
         };
+
+    /// <summary>封闭形态装配（[RingKey] 生成物的公开面 = ctor + Initialize + WaitForReady——同步 Create 已随泛型改版退役）。</summary>
+    private static RingOfLong CreateRing(IFileSystem fs)
+    {
+        var ring = new RingOfLong(RingSettings(), fs);
+        ring.Initialize();
+        ring.WaitForReady();
+        return ring;
+    }
 
     private static HashIndex<long> NewHash(IFileSystem fs, RingOfLong ring, ProbingIndexRecoveryHints hints)
     {

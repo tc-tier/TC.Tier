@@ -1,0 +1,9 @@
+    /// <summary>编码到池化租借缓冲（零分配热路径——返回写入长度；缓冲由调用方
+    /// <c>ArrayPool&lt;byte&gt;.Shared.Return(rented)</c> 归还。载荷经传输同步拷贝入帧后即可归还）。</summary>
+    public static int EncodePooled({{ROOT_NAME}} message, out byte[] rented)
+    {
+        var len = ComputeLength(message);
+        rented = ArrayPool<byte>.Shared.Rent(len);
+        EncodeInto(rented.AsSpan(0, len), message);
+        return len;
+    }

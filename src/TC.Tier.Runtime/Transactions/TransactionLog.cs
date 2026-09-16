@@ -1,4 +1,3 @@
-using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -107,6 +106,7 @@ public sealed class TransactionLog : ITransactionLog
     /// <para>- LastCommittedSeq &lt; committedSeq → ConfirmCommitted(committedSeq)（正向：未同步推进）</para>
     /// <para>- LastPreparedSeq &gt; committedSeq → Abort(LastPreparedSeq)（反向：超前悬干丢弃）</para>
     /// </summary>
+    /// <returns>对账后的已提交 seq（空盘/损坏 = 0）。</returns>
     public long LoadAndReconcile()
     {
         long committedSeq = Load();
@@ -270,7 +270,7 @@ public sealed class TransactionLog : ITransactionLog
         unsafe
         {
             fixed (CommitRecord* p = &rec)
-                rec.Crc = Crc32.HashToUInt32(new ReadOnlySpan<byte>(p, sizeof(CommitRecord)));
+                rec.Crc = UnifiedCrc.ComputeCrc32(new ReadOnlySpan<byte>(p, sizeof(CommitRecord)));
         }
     }
 

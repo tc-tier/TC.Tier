@@ -27,6 +27,12 @@ public interface IRingCodec
     void WriteHeader(Span<byte> dest, in RingRecordFields fields);
     /// <summary>读 + 验 header（magic + 长度边界）。失败返回 false。</summary>
     bool TryReadHeader(ReadOnlySpan<byte> source, out RingRecordFields fields);
+    /// <summary>
+    /// ★ 热路径轻量门（read-protection-tiering）：magic + PayloadLength 上界 + Flags 单字段直读，
+    /// 免全量 header 解码（Version/PreviousAddress/Padding 不解析）。仅用于<b>本进程写入</b>的
+    /// 页池热读（版本隐含当前）；设备回源/恢复路径必须走全量 <see cref="TryReadHeader"/>（旧盘兼容）。
+    /// </summary>
+    bool TryReadHeaderLight(ReadOnlySpan<byte> source, out RingRecordFields fields);
     /// <summary>计算并填 CRC32C。</summary>
     void FillCrc(Span<byte> record, int headerSize, int payloadLength);
     /// <summary>校验 CRC32C。</summary>

@@ -2,6 +2,9 @@ using System.Runtime.InteropServices;
 
 namespace TC.Tier.Runtime.Structures.Snapshot;
 
+/// <summary>
+/// StreamSnapshot 帧布局 partial——嵌套 <see cref="StreamFrameHeader"/>（14B）+ <see cref="StreamFrameFooter"/>（28B）。
+/// </summary>
 public sealed partial class StreamSnapshot
 {
     /// <summary>

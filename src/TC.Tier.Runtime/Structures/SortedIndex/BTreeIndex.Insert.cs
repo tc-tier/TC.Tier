@@ -1,5 +1,8 @@
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// BTreeIndex 插入 partial——Insert（同 key 覆写）与节点分裂/提升吸收算法。
+/// </summary>
 public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>internal 节点容量：k 键须有 k+1 个子指针，struct 仅 9 个 Value 槽（Value0..8）——上限 8 键/9 子。
@@ -20,6 +23,7 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     /// <returns>插入后地址。</returns>
     public override LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)
     {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥——根/缓存/分裂路径一致性）
         _epoch.Resume();
         try
         {

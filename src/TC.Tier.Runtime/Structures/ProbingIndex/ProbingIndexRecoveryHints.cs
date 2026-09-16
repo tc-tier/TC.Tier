@@ -6,6 +6,8 @@ namespace TC.Tier.Runtime.Structures.ProbingIndex;
 ///   连同 Ring 尾一起经 <c>Initialize(hints)</c> 注入——结构层水位正位通道。</para>
 /// <para>★ 默认（无窗口）= 空结构首开，不重放；降级全量重建不是第二条路——W=Begin 走同一条 ScanAsync 路径。</para>
 /// </summary>
+/// <param name="begin">重放窗口起点（组合层锚点 W——含于窗口，写入 <see cref="Begin"/>）。</param>
+/// <param name="end">重放窗口终点（Ring 尾——半开区间不含，写入 <see cref="End"/>）。</param>
 public readonly struct ProbingIndexRecoveryHints(LogicalAddress begin, LogicalAddress end)
 {
     /// <summary>重放窗口起点（组合层锚点 W——含于窗口）。</summary>

@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
+using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
@@ -26,8 +26,6 @@ public sealed partial class TierVolumeFs : IJournaledVolume
     private static ReadOnlySpan<byte> DeltaFooterMagic => "TCD2"u8;
     private static ReadOnlySpan<byte> DeltaDataMagic => "TCD3"u8;
     private const ushort DeltaFormatVersion = 1;
-    private const int DeltaHeaderSize = 44;
-    private const int DeltaFooterSize = 16;
 
     SnapshotDeltaSummary IJournaledVolume.ExportDeltaTo(Stream output, ulong baseLsn)
         => ExportDelta(output, baseLsn);
@@ -62,6 +60,10 @@ public sealed partial class TierVolumeFs : IJournaledVolume
     /// baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，先导全量）。
     /// ★ 调用纪律：导出读载体数据块——须静默（无并发写；管线面 <see cref="Image.RootSpaceImage.ExportDelta"/>
     /// 自动经维护门闩静默 WriteOperations——Parallel 档数据段锁外写载体会撕裂嵌入块）。</summary>
+    /// <param name="output">delta 流输出目标（头 + 记录流 + 脏块数据段 + 尾）。</param>
+    /// <param name="baseLsn">增量基点 LSN（须 ∈ [CkptLsn, 已提交头]，且须为已存在的基点）。</param>
+    /// <returns>导出摘要（记录数、基点与末端 LSN）。</returns>
+    /// <exception cref="FileIOException">非日志卷/降级卷、基点越界、窗口不完整或导出期有并发写。</exception>
     public SnapshotDeltaSummary ExportDelta(Stream output, ulong baseLsn)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -93,23 +95,26 @@ public sealed partial class TierVolumeFs : IJournaledVolume
             // 时间戳/分配决策不随记录流确定性重放；完整性由头对齐 + 逐记录 CRC + 载荷 CRC 承担）。
             var baseCrc = _sb.Snapshots.FirstOrDefault(s => s.CaptureLsn == baseLsn)?.ImageCrc ?? 0u;
 
-            Span<byte> header = stackalloc byte[DeltaHeaderSize];
+            Span<byte> header = stackalloc byte[DeltaFileHeaderCodec.StructSize];
             header.Clear();
-            DeltaHeaderMagic.CopyTo(header);
-            BinaryPrimitives.WriteUInt16LittleEndian(header[4..], DeltaFormatVersion);
-            BinaryPrimitives.WriteUInt16LittleEndian(header[6..], 0);   // flags 保留（未知拒读）
-            BinaryPrimitives.WriteUInt32LittleEndian(header[8..], _sb.BlockSize);
-            _sb.Uuid.TryWriteBytes(header[12..28]);
-            BinaryPrimitives.WriteUInt64LittleEndian(header[28..], baseLsn);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[36..], baseCrc);
-            BinaryPrimitives.WriteUInt32LittleEndian(header[40..],
-                Crc32.HashToUInt32(header[..40]));
+            var fileHdr = new DeltaFileHeader
+            {
+                Magic = DeltaFileHeader.MagicValue,
+                Version = DeltaFileHeader.FormatVersion,
+                BlockSize = _sb.BlockSize,
+                BaseLsn = baseLsn,
+                BaseCrc = baseCrc,
+            };
+            DeltaFileHeaderCodec.Write(header, in fileHdr);   // 全字段（HeaderCrc=0）
+            _sb.Uuid.TryWriteBytes(header.Slice(DeltaFileHeader.UuidOffset, DeltaFileHeader.UuidBytes));   // uuid 裸区——范围自常量推导
+            fileHdr.HeaderCrc = UnifiedCrc.ComputeCrc32C(header[..DeltaFileHeaderCodec.Offset_HeaderCrc]);       // CRC 覆盖 [0..crc 字段首)——字段已就位
+            DeltaFileHeaderCodec.Write_HeaderCrc(header, fileHdr.HeaderCrc);                               // 生成单值写——只覆写 crc 区
             output.Write(header);
 
             // 记录流：日志区原帧字节直拷（零重编码；Pad/快照表记录跳过——见类型注释）
             var frames = ScanJournalFrames(out _);
             var buf = new byte[1 << 20];
-            var payloadCrc = new Crc32();
+            uint payloadCrc = 0;   // CRC32C 分段累加（UnifiedCrc——initialCrc 续算，硬件加速）
             ulong count = 0;
             foreach (var f in frames)
             {
@@ -122,7 +127,7 @@ public sealed partial class TierVolumeFs : IJournaledVolume
                 {
                     var take = Math.Min(buf.Length, f.FramedLen - done);
                     ReadCarrierExactly(carrierOffset + done, buf.AsSpan(0, take));
-                    payloadCrc.Append(buf.AsSpan(0, take));
+                    payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, buf.AsSpan(0, take));
                     output.Write(buf, 0, take);
                     done += take;
                 }
@@ -131,33 +136,39 @@ public sealed partial class TierVolumeFs : IJournaledVolume
 
             // 数据段（V2 §1.2 数据面）：窗口内写块内容——记录给出物理事实，内容给出数据。
             // 仅嵌入仍在使用块（已释放块无需内容——重放侧释放它们；已重用块 = 新属主内容，收敛一致）
-            Span<byte> dataHeader = stackalloc byte[12];
-            dataHeader.Clear();
-            DeltaDataMagic.CopyTo(dataHeader);
+            Span<byte> dataHeader = stackalloc byte[DeltaSectionHeaderCodec.StructSize];
             ulong[] dirty;
             lock (_deltaDirtyGate)
                 dirty = _deltaDirtyBlocks!.Where(IsBlockUsed).OrderBy(b => b).ToArray();   // 锁内摘快照（Parallel 档数据段并发登记）
-            BinaryPrimitives.WriteUInt64LittleEndian(dataHeader[4..], (ulong)dirty.LongLength);
-            payloadCrc.Append(dataHeader);
+            var secHdr = new DeltaSectionHeader
+            {
+                Magic = DeltaSectionHeader.MagicValue,
+                Count = (ulong)dirty.LongLength,
+            };
+            DeltaSectionHeaderCodec.Write(dataHeader, in secHdr);
+            payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, dataHeader);
             output.Write(dataHeader);
             var pageBuf = new byte[_pageSize];
+            Span<byte> entry = stackalloc byte[12];   // ★ CA2014：固定 12B 循环外复用（每轮全量覆写）
             foreach (var b in dirty)
             {
                 ReadCarrierExactly((long)(b * (ulong)_pageSize), pageBuf);
-                Span<byte> entry = stackalloc byte[12];
-                BinaryPrimitives.WriteUInt64LittleEndian(entry, b);
-                BinaryPrimitives.WriteUInt32LittleEndian(entry[8..], Crc32.HashToUInt32(pageBuf));
-                payloadCrc.Append(entry);
-                payloadCrc.Append(pageBuf);
+                var eh = new DeltaEntryHeader { Block = b, BlockCrc = UnifiedCrc.ComputeCrc32C(pageBuf) };
+                DeltaEntryHeaderCodec.Write(entry, in eh);
+                payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, entry);
+                payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, pageBuf);
                 output.Write(entry);
                 output.Write(pageBuf);
             }
 
-            Span<byte> footer = stackalloc byte[DeltaFooterSize];
-            footer.Clear();
-            DeltaFooterMagic.CopyTo(footer);
-            BinaryPrimitives.WriteUInt64LittleEndian(footer[4..], count);
-            BinaryPrimitives.WriteUInt32LittleEndian(footer[12..], payloadCrc.GetCurrentHashAsUInt32());
+            Span<byte> footer = stackalloc byte[DeltaFooterHeaderCodec.StructSize];
+            var fh = new DeltaFooterHeader
+            {
+                Magic = DeltaFooterHeader.MagicValue,
+                Count = count,
+                PayloadCrc = payloadCrc,
+            };
+            DeltaFooterHeaderCodec.Write(footer, in fh);
             output.Write(footer);
             return new SnapshotDeltaSummary(count, baseLsn, _committedLsn);
         }
@@ -165,6 +176,9 @@ public sealed partial class TierVolumeFs : IJournaledVolume
 
     /// <summary>增量还原：基线校验（卷 UUID + 头对齐 + 可选镜像 CRC）→ 逐记录重放 → 检查点收口
     /// （应用态原子持久 + CkptLsn 前进——链路增量可续）。目标必须恰在基点（头 == baseLsn）。</summary>
+    /// <param name="input">delta 流来源（由 <see cref="ExportDelta"/> 生成）。</param>
+    /// <returns>应用摘要（重放记录数、基点与末端 LSN）。</returns>
+    /// <exception cref="FileIOException">流格式/身份/基线校验失败，或目标不在基点。</exception>
     public SnapshotDeltaSummary ApplyDelta(Stream input)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -177,22 +191,23 @@ public sealed partial class TierVolumeFs : IJournaledVolume
             ThrowIfReadOnly(nameof(ApplyDelta));
             JournalCommit();   // 在途提交先落（还原后 CkptLsn 前进——旧记录语义被检查点吸收）
 
-            Span<byte> header = stackalloc byte[DeltaHeaderSize];
+            Span<byte> header = stackalloc byte[DeltaFileHeaderCodec.StructSize];
             ReadDeltaExact(input, header, required: false);
-            if (!header[..4].SequenceEqual(DeltaHeaderMagic))
+            var fileHdr = DeltaFileHeaderCodec.Read(header);
+            if (fileHdr.Magic != DeltaFileHeader.MagicValue)
                 throw NewDeltaError("流头 magic 不符（非 TierVolume delta 流）");
-            if (BinaryPrimitives.ReadUInt16LittleEndian(header[4..]) != DeltaFormatVersion)
-                throw NewDeltaError($"delta 版本不支持：{BinaryPrimitives.ReadUInt16LittleEndian(header[4..])}");
-            if (BinaryPrimitives.ReadUInt16LittleEndian(header[6..]) != 0)
-                throw NewDeltaError($"delta 含未知 flags：0x{BinaryPrimitives.ReadUInt16LittleEndian(header[6..]):X4}（未知保留值拒读）");
-            if (BinaryPrimitives.ReadUInt32LittleEndian(header[8..]) != _sb.BlockSize)
-                throw NewDeltaError($"块大小不符：delta {BinaryPrimitives.ReadUInt32LittleEndian(header[8..])} vs 卷 {_sb.BlockSize}");
-            if (new Guid(header[12..28].ToArray()) != _sb.Uuid)
+            if (fileHdr.Version != DeltaFileHeader.FormatVersion)
+                throw NewDeltaError($"delta 版本不支持：{fileHdr.Version}");
+            if (fileHdr.Flags != 0)
+                throw NewDeltaError($"delta 含未知 flags：0x{fileHdr.Flags:X4}（未知保留值拒读）");
+            if (fileHdr.BlockSize != _sb.BlockSize)
+                throw NewDeltaError($"块大小不符：delta {fileHdr.BlockSize} vs 卷 {_sb.BlockSize}");
+            if (new Guid(header.Slice(DeltaFileHeader.UuidOffset, DeltaFileHeader.UuidBytes).ToArray()) != _sb.Uuid)
                 throw NewDeltaError("卷身份不符——还原目标必须同卷/同基线副本（UUID 基线校验）");
-            if (Crc32.HashToUInt32(header[..40]) != BinaryPrimitives.ReadUInt32LittleEndian(header[40..]))
+            if (UnifiedCrc.ComputeCrc32C(header[..DeltaFileHeaderCodec.Offset_HeaderCrc]) != fileHdr.HeaderCrc)
                 throw NewDeltaError("delta 头 CRC 校验失败");
-            var baseLsn = BinaryPrimitives.ReadUInt64LittleEndian(header[28..]);
-            var baseCrc = BinaryPrimitives.ReadUInt32LittleEndian(header[36..]);
+            var baseLsn = fileHdr.BaseLsn;
+            var baseCrc = fileHdr.BaseCrc;
             // 目标头对齐校验：目标须恰在基点，或缺口仅含快照表变更记录（命名空间零影响——
             // 导出侧已滤除快照表记录；如：快照捕获后 clean 关闭提交了 SnapshotCreate 记录，
             // 副本头 = 捕获 LSN+1——缺口可验证即放行，流内命名空间记录全部在缺口之上，无双重应用）。
@@ -216,8 +231,9 @@ public sealed partial class TierVolumeFs : IJournaledVolume
                 throw NewDeltaError($"基线镜像 CRC 不符：delta {baseCrc} vs 卷 {_sb.ImageCrc}（目标状态非基点）");
 
             // 记录重放（与崩溃恢复同闸——发射器静默、共用操作函数）
-            var payloadCrc = new Crc32();
-            var recHeader = new byte[JournalHeaderSize];
+            uint payloadCrc = 0;   // CRC32C 分段累加（UnifiedCrc——initialCrc 续算，硬件加速）
+            var recHeader = new byte[JournalFrameHeaderCodec.StructSize];
+            Span<byte> deltaEntry = stackalloc byte[12];   // ★ CA2014：数据段条目（固定 12B——全部循环外声明，内层每轮全量覆写）
             var bodyBuf = new byte[256 << 10];
             var padBuf = new byte[4096];
             ulong count = 0;
@@ -227,38 +243,39 @@ public sealed partial class TierVolumeFs : IJournaledVolume
             {
                 while (true)
                 {
-                    if (!TryReadDeltaExact(input, recHeader.AsSpan(0, 4)))
+                    if (!TryReadDeltaExact(input, recHeader.AsSpan(0, JournalFrameHeaderCodec.Size_Magic)))
                         throw NewDeltaError(count == 0
                             ? "delta 流尾缺失（记录后须有 TCD2 尾帧）"
                             : "delta 流截断（记录不完整）");
-                    if (recHeader.AsSpan(0, 4).SequenceEqual(DeltaFooterMagic))
+                    if (recHeader.AsSpan(0, DeltaFooterHeaderCodec.Size_Magic).SequenceEqual(DeltaFooterMagic))
                     {
-                        ReadDeltaExact(input, recHeader.AsSpan(4, DeltaFooterSize - 4), required: true);
-                        var wantCount = BinaryPrimitives.ReadUInt64LittleEndian(recHeader.AsSpan(4, 8));
-                        var wantCrc = BinaryPrimitives.ReadUInt32LittleEndian(recHeader.AsSpan(12, 4));
+                        ReadDeltaExact(input, recHeader.AsSpan(DeltaFooterHeaderCodec.Size_Magic, DeltaFooterHeaderCodec.StructSize - DeltaFooterHeaderCodec.Size_Magic), required: true);
+                        var tail = DeltaFooterHeaderCodec.Read(recHeader.AsSpan(0, DeltaFooterHeaderCodec.StructSize));
+                        var wantCount = tail.Count;
+                        var wantCrc = tail.PayloadCrc;
                         if (wantCount != count)
                             throw NewDeltaError($"记录数与尾帧不符：流 {count} vs 尾 {wantCount}");
-                        if (wantCrc != payloadCrc.GetCurrentHashAsUInt32())
+                        if (wantCrc != payloadCrc)
                             throw NewDeltaError("delta 载荷 CRC 校验失败（记录/数据流损毁）");
                         break;
                     }
-                    if (recHeader.AsSpan(0, 4).SequenceEqual(DeltaDataMagic))
+                    if (recHeader.AsSpan(0, DeltaSectionHeaderCodec.Size_Magic).SequenceEqual(DeltaDataMagic))
                     {
                         // 数据段：窗口内写块内容 → 直落载体（记录重放已给出物理事实——写块即数据面）
-                        ReadDeltaExact(input, recHeader.AsSpan(4, 8), required: true);
-                        payloadCrc.Append(recHeader.AsSpan(0, 12));
-                        var dataCount = BinaryPrimitives.ReadUInt64LittleEndian(recHeader.AsSpan(4, 8));
+                        ReadDeltaExact(input, recHeader.AsSpan(DeltaSectionHeaderCodec.Size_Magic, DeltaSectionHeaderCodec.StructSize - DeltaSectionHeaderCodec.Size_Magic), required: true);
+                        payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, recHeader.AsSpan(0, DeltaSectionHeaderCodec.StructSize));
+                        var dataCount = DeltaSectionHeaderCodec.Read(recHeader.AsSpan(0, DeltaSectionHeaderCodec.StructSize)).Count;
                         var pageBuf = new byte[_pageSize];
                         for (ulong i = 0; i < dataCount; i++)
                         {
-                            Span<byte> entry = stackalloc byte[12];
-                            ReadDeltaExact(input, entry, required: true);
-                            payloadCrc.Append(entry);
-                            var phys = BinaryPrimitives.ReadUInt64LittleEndian(entry);
-                            var blockCrc = BinaryPrimitives.ReadUInt32LittleEndian(entry[8..]);
+                            ReadDeltaExact(input, deltaEntry, required: true);
+                            payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, deltaEntry);
+                            var de = DeltaEntryHeaderCodec.Read(deltaEntry);
+                            var phys = de.Block;
+                            var blockCrc = de.BlockCrc;
                             ReadDeltaExact(input, pageBuf, required: true);
-                            payloadCrc.Append(pageBuf);
-                            if (Crc32.HashToUInt32(pageBuf) != blockCrc)
+                            payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, pageBuf);
+                            if (UnifiedCrc.ComputeCrc32C(pageBuf) != blockCrc)
                                 throw NewDeltaError($"数据块 CRC 校验失败（phys {phys}）");
                             if (phys >= _sb.CapacityBlocks)
                                 throw NewDeltaError($"数据块越界（phys {phys} ≥ 容量 {_sb.CapacityBlocks}）");
@@ -267,14 +284,15 @@ public sealed partial class TierVolumeFs : IJournaledVolume
                         }
                         continue;
                     }
-                    ReadDeltaExact(input, recHeader.AsSpan(4, JournalHeaderSize - 4), required: true);
-                    payloadCrc.Append(recHeader);
-                    if (!recHeader.AsSpan(0, 4).SequenceEqual("RJRN"u8))
+                    ReadDeltaExact(input, recHeader.AsSpan(JournalFrameHeaderCodec.Size_Magic, JournalFrameHeaderCodec.StructSize - JournalFrameHeaderCodec.Size_Magic), required: true);
+                    payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, recHeader);
+                    if (!recHeader.AsSpan(0, JournalFrameHeaderCodec.Size_Magic).SequenceEqual("RJRN"u8))
                         throw NewDeltaError("记录帧 magic 不符");
-                    var type = (JournalRecordType)recHeader[4];
-                    var lsn = BinaryPrimitives.ReadUInt64LittleEndian(recHeader.AsSpan(8));
-                    var bodyLen = (int)BinaryPrimitives.ReadUInt32LittleEndian(recHeader.AsSpan(24));
-                    var bodyCrc = BinaryPrimitives.ReadUInt32LittleEndian(recHeader.AsSpan(28));
+                    var jh = JournalFrameHeaderCodec.Read(recHeader);
+                    var type = (JournalRecordType)jh.Type;
+                    var lsn = jh.Lsn;
+                    var bodyLen = (int)jh.BodyLength;
+                    var bodyCrc = jh.BodyCrc;
                     var framed = FramedSize(bodyLen);
                     if (bodyLen < 0 || bodyLen > bodyBuf.Length)
                         throw NewDeltaError($"记录体长非法：{bodyLen}");
@@ -284,15 +302,15 @@ public sealed partial class TierVolumeFs : IJournaledVolume
                         throw NewDeltaError("Pad 记录不得出现于增量流");
                     var body = new byte[bodyLen];
                     ReadDeltaExact(input, body, required: true);
-                    payloadCrc.Append(body);
-                    if (Crc32.HashToUInt32(body) != bodyCrc)
+                    payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, body);
+                    if (UnifiedCrc.ComputeCrc32C(body) != bodyCrc)
                         throw NewDeltaError($"记录体 CRC 校验失败（LSN {lsn}）");
-                    var pad = framed - JournalHeaderSize - bodyLen;
+                    var pad = framed - JournalFrameHeaderCodec.StructSize - bodyLen;
                     while (pad > 0)
                     {
                         var take = Math.Min(padBuf.Length, pad);
                         ReadDeltaExact(input, padBuf.AsSpan(0, take), required: true);
-                        payloadCrc.Append(padBuf.AsSpan(0, take));   // 载荷 CRC 覆盖对齐 padding（与导出侧逐帧全字节一致）
+                        payloadCrc = UnifiedCrc.ComputeCrc32C(payloadCrc, padBuf.AsSpan(0, take));   // 载荷 CRC 覆盖对齐 padding（与导出侧逐帧全字节一致）
                         pad -= take;
                     }
                     ApplyJournalRecord(type, body);
@@ -306,6 +324,7 @@ public sealed partial class TierVolumeFs : IJournaledVolume
             }
             _lsn = Math.Max(_lsn, maxLsn);
             _committedLsn = Math.Max(_committedLsn, maxLsn);
+            AssertExtentOrder();   // ★ 回归防线（同 JournalReplay——增量应用后有序不变量）
             CommitMetadata();   // 应用态原子持久 + CkptLsn 前进（链路增量可续——下一 delta 基点头 = 本批头）
             return new SnapshotDeltaSummary(count, baseLsn, maxLsn);
         }

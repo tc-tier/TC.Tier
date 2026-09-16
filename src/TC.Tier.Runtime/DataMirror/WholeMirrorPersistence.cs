@@ -112,6 +112,7 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
         /// <summary>会话完成/失败收官：true = 三段式完整后的成功收官（幂等）；
         /// false = 主动失败 = Abort（镜像尾截断回退，本次内容对读侧不可见）；
         /// 未写尾调 Complete(true) = 相位违约抛（WriteFooter 才是原子提交点）。</summary>
+        /// <param name="isSuccess">true = 成功收官（须已写尾）；false = Abort（尾截断回退）。默认 true。</param>
         public void Complete(bool isSuccess = true)
         {
             ThrowIfDisposed();
@@ -124,6 +125,8 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
             }
             throw new InvalidOperationException("未写尾不可完成——先 WriteFooter（写尾 = 原子提交点）。");
         }
+        /// <summary>写会话头（三段式第一拍）——开启镜像会话并直写头字节。</summary>
+        /// <param name="header">头段字节（消费方格式自定；长度不得超过会话上限）。</param>
         public void WriteHeader(ReadOnlySpan<byte> header)
         {
             ThrowIfDisposed();
@@ -135,6 +138,8 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
             _phase = 1;
         }
 
+        /// <summary>写数据段（三段式第二拍，可多次调用）——逐段直写镜像会话，零缓冲。</summary>
+        /// <param name="chunk">数据段字节（长度不得超过会话上限）。</param>
         public void WritePayload(ReadOnlySpan<byte> chunk)
         {
             ThrowIfDisposed();
@@ -146,6 +151,8 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
             owner._mirror.AppendChunk(chunk);
         }
 
+        /// <summary>写尾并提交（三段式第三拍）——结束镜像会话并 Confirm（写尾 = 原子提交点，内容对读侧可见）。</summary>
+        /// <param name="footer">尾段字节（消费方格式自定；长度不得超过会话上限）。</param>
         public void WriteFooter(ReadOnlySpan<byte> footer)
         {
             ThrowIfDisposed();
@@ -186,10 +193,16 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
         private bool _disposed;
 
         public int MaxTransferBytes => maxTransferBytes;
+        /// <summary>读会话收官（账面机制——本实现仅置完成相位，无副作用）。</summary>
+        /// <param name="isSuccess">true = 成功收官；false = 失败收官（读会话无存储副作用，两者等价）。</param>
         public void Complete(bool isSuccess = true)
         {
             _phase = 2;
         }
+
+        /// <summary>读会话头（三段式第一拍）。</summary>
+        /// <param name="dst">目标缓冲区（长度不得超过会话上限）。</param>
+        /// <returns>实际读入的字节数（0 = 无数据可读——消费方按自身格式判定合法性）。</returns>
         public int ReadHeader(Span<byte> dst)
         {
             ThrowIfDisposed();
@@ -200,6 +213,9 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
             return got;
         }
 
+        /// <summary>读数据段（三段式第二拍，可多次调用）——按游标连续供给，不越过账面像长。</summary>
+        /// <param name="dst">目标缓冲区（长度不得超过会话上限）。</param>
+        /// <returns>实际读入的字节数（0 = 已到像尾）。</returns>
         public int ReadPayload(Span<byte> dst)
         {
             ThrowIfDisposed();
@@ -210,6 +226,9 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
             return ReadCore(dst);
         }
 
+        /// <summary>读会话尾（三段式第三拍）——读完置完成相位。</summary>
+        /// <param name="dst">目标缓冲区（长度不得超过会话上限）。</param>
+        /// <returns>实际读入的字节数（0 = 无尾数据）。</returns>
         public int ReadFooter(Span<byte> dst)
         {
             ThrowIfDisposed();
@@ -222,6 +241,7 @@ public sealed class WholeMirrorPersistence : ITransferPersistence
             return got;
         }
 
+        /// <summary>释放读会话（读侧无存储副作用——仅标记 disposed）。</summary>
         public void Dispose() => _disposed = true;
 
         private int ReadCore(Span<byte> dst)
