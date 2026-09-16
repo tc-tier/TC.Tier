@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -120,6 +120,24 @@ Classes
 </dd>
     </dl>
     <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.NetView.html">ObservabilityHub.NetView</a></dt>
+      <dd><p>Net 传输维度视图（spec-12 §9.1 第五轮裁定：在 Hub 加视图，不是自己造——第六维度，
+对齐 Storage/Log/Index/SegmentAllocator 形态）。peer 一律以 hex32 文本标签过界
+（Core 不依赖 Core.Net——兄弟层不互依）。</p>
+<p>★ 语义：帧量 <b>采样</b>（确定性百分比——热路径零开销）；
+  错误/丢弃<b>全采</b>（reconnect/CRC/握手失败/UDP 发送失败/保活断连/丢弃计数）；
+  per-protocol = tag（维度即 tag 零字段爆炸）。Core.Net 只调本视图，绝不直调 sink。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.RaftView.html">ObservabilityHub.RaftView</a></dt>
+      <dd><p>Raft 共识维度视图（二期-I2——第七维度，对齐 NetView 形态）：
+选举/换届/任期/提交与应用水位/快照安装/转让的共识面指标。</p>
+<p>★ 语义：水位 <b>gauge 直写</b>（低频状态变化时上报）；事件 <b>counter</b>；
+  错误/转让<b>全采</b>。Core.Net 只调本视图，绝不直调 sink。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.SegmentAllocatorView.html">ObservabilityHub.SegmentAllocatorView</a></dt>
       <dd><p>Segment 分配器维度视图——段表的 Segment 分配/释放/FreeList 深度（段表专用，非通用 Allocator 原语；
 命名如实标明作用域，勿再泛化）。</p>
@@ -158,7 +176,7 @@ Classes
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

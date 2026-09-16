@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierQueue 使用指南 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierQueue 使用指南 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierqueue.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierqueue-使用指南">TierQueue 使用指南</h1>
+
+<blockquote>
+<p>TierQueue = 内核 Ring + 消费组 + 死信 + 延迟 + 幂等 + Session 恰好一次的组合产品
+（tc-tier-queue-spec）。数据真相源 = RingOfQueueKey；每组独立持久位点域（VersionedMetadata
+版本链原子提交）；投递簿记 pending 纯内存（崩溃丢失 = at-least-once 重放窗口）。</p>
+</blockquote>
+<h2 id="快速开始">快速开始</h2>
+<pre><code class="lang-csharp">var fs = TierFs.New(&quot;memory:&quot;);          // 或 TierFs.New(&quot;local:///path/to/volume&quot;)
+await using var q = await new TierQueueBuilder(fs, new TierQueueOptions
+{
+    QueueName = &quot;orders&quot;,
+    PageSize = 64 &lt;&lt; 10,                   // 64KB 页（消息粒度小，小页 = 细粒度环绕）
+    MemorySize = 8 &lt;&lt; 20,                  // 8MB 内存（测试/dev；磁盘大积压按需调大）
+}).StartAsync();
+
+// 入队
+var r = await q.EnqueueAsync(new byte[] { 1, 2, 3 }, default);
+await q.WaitForDurableAsync(r.Address, default); // 等待/推进落盘水位覆盖该消息
+
+// 消费（$default 组）
+var batch = await q.DequeueAsync(10, default);
+foreach (var d in batch)
+{
+    // 处理 d.Payload ...
+    await q.AckAsync([d.Address], default);
+}
+</code></pre>
+<h2 id="核心语义">核心语义</h2>
+<h3 id="确认契约spec-61">确认契约（spec §6.1）</h3>
+<ul>
+<li><strong>AckAsync 返回 = 位点已持久</strong>（数据先于位点 flush → 原子提交 → 物化）。此后断电不重投。</li>
+<li><strong>未 ack 崩溃 = at-least-once 重投</strong>（pending 不持久，重放从 Cursor 起）。</li>
+<li><strong>乱序 ack = Skip 表</strong>（非前缀确认进 Skip 持久，重放跳过已确认空洞）。Skip 表上限 =
+<code>MaxInFlight</code>，超出抛 <code>InvalidOperationException</code>（消费侧背压）。</li>
+</ul>
+<h3 id="投递令牌与-fencingspec-62">投递令牌与 fencing（spec §6.2）</h3>
+<pre><code class="lang-csharp">var consumerA = q.CreateConsumerAsync(&quot;$default&quot;);
+var consumerB = q.CreateConsumerAsync(&quot;$default&quot;);
+
+var got = await consumerA.DequeueAsync(1, default);
+var receipt = new DeliveryReceipt(got[0].Address, got[0].Token);
+
+// B 抢占（minIdle=0 → 立即改派，epoch +1）
+var claimed = await consumerB.ClaimAsync(new ClaimFilter(TimeSpan.Zero), default);
+
+// A 迟交（旧 token）→ StaleDeliveryException（不双计）
+await consumerA.AckAsync([receipt], default);   // 抛
+</code></pre>
+<p>组级 <code>GroupEpoch</code> 单调递增（claim/抢占/复位 +1）。旧 token 的 Ack 被确定性拒绝。</p>
+<h2 id="消费组">消费组</h2>
+<pre><code class="lang-csharp">var g = await q.CreateGroupAsync(new GroupOptions
+{
+    Name = &quot;payments&quot;,
+    StartAt = GroupStartAt.Earliest,
+    VisibilityTimeout = TimeSpan.FromSeconds(60),
+    MaxRedeliveries = 16,
+    RetryBackoff = n =&gt; TimeSpan.FromSeconds(Math.Pow(2, n)),  // 指数退避
+}, default);
+
+var consumer = q.CreateConsumerAsync(&quot;payments&quot;);
+</code></pre>
+<ul>
+<li>每组独立位点（Cursor/Skip/Epoch/Fenced），持久于 <code>{queue}.group.{name}</code>。</li>
+<li>组间天然并行；组内 Dequeue/Ack/Claim/Nack 串行（SemaphoreSlim）。</li>
+<li>删组 → 截断下界抬升（最慢组不再钉住数据头）。</li>
+</ul>
+<h3 id="可见性超时与重试退避">可见性超时与重试退避</h3>
+<p><code>VisibilityTimeout</code>：在途未 ack 的重投等待。超时未 ack → 计数 +1 重投。</p>
+<p><code>RetryBackoff</code>（spec §7.1）：可配置重投延迟。null/Zero = 立即重投（回队 ReadPoint 回卷）；
+否则保留在 pending，<code>NextDeliverableTick</code> 推到未来，到期由 ExpireOverdueAsync 回收重投。</p>
+<pre><code class="lang-csharp">// 指数退避：2s, 4s, 8s, ...
+RetryBackoff = n =&gt; TimeSpan.FromSeconds(Math.Pow(2, n))
+
+// 固定退避 5s
+RetryBackoff = _ =&gt; TimeSpan.FromSeconds(5)
+</code></pre>
+<p>崩溃丢失 pending → 退避失效、立即重投（at-least-once 兜底，可接受）。</p>
+<p>达 <code>MaxRedeliveries</code> → 死信路由（见下）。</p>
+<h2 id="死信队列spec-7">死信队列（spec §7）</h2>
+<p>默认开启（独立 TierQueue 实例 <code>{queue}.dlq</code>）。达重投上限 → DLQ envelope 写入（durable 先行）
+→ 原位终结（skip 标记）。</p>
+<pre><code class="lang-csharp">// DLQ 恰好一条 + 溯源字段
+var dlqBatch = await q.DeadLetterQueue!.DequeueAsync(10, default);
+DeadLetterEnvelope.TryUnwrap(dlqBatch[0].Payload, out var srcAddr, out var srcGroup,
+    out var finalCount, out var payload);
+
+// 回放：死信还原原 payload 入目标队列
+await q.DeadLetterQueue!.ReplayAsync(dlqBatch[0].Address, targetQueue, default);
+// 或全部回放
+await q.DeadLetterQueue!.ReplayAllAsync(targetQueue, default);
+</code></pre>
+<p>关闭档：<code>DeadLetter = null</code> → 达上限仅推进位点 + 告警，不进 DLQ。</p>
+<h2 id="延迟队列spec-4">延迟队列（spec §4）</h2>
+<p><code>Delayed</code> 配置默认开启（BTree 就绪索引）。<code>DueTime</code> = UTC Ticks，晚于 <code>MaxDelay</code> 拒绝
+（<code>DelayedOptions.MaxDelay</code> 缺省 24 小时）。</p>
+<pre><code class="lang-csharp">long due = DateTime.UtcNow.Ticks + TimeSpan.FromMinutes(5).Ticks;
+await q.EnqueueAsync(new EnqueueOptions { DueTime = due }, payload, default);
+await q.EnqueueBatchAsync(new EnqueueOptions { ProducerId = 42, Seq = 100 }, payloads, default);
+// 批量幂等：Seq 按批内序号递增，键为 (42, 100), (42, 101)...
+
+// 取消（按地址 / 按区间）
+await q.CancelDelayedAsync(CancelDelayedFilter.ByAddress(r.Address), default);
+await q.CancelDelayedAsync(CancelDelayedFilter.ByRange(from, to), default);
+
+// 窥视
+var pending = await q.ListDelayedAsync(default);
+var page = await q.ListDelayedAsync(new DelayedQuery(from, to, Offset: 100, Limit: 50), default);
+</code></pre>
+<ul>
+<li>同 dueTime 按地址 FIFO（索引键 tiebreaker = 地址）。</li>
+<li>未就绪延迟消息钉住截断下界（<code>MinFloor</code> 含延迟索引最小存活地址）。</li>
+<li>崩溃窗口：索引未持久 → 恢复对账从 Ring 重建（零丢失）。</li>
+</ul>
+<h2 id="幂等生产spec-64-档三">幂等生产（spec §6.4 档三）</h2>
+<p><code>Idempotency</code> 配置开启后，<code>(ProducerId, Seq)</code> 判重（HashIndex）。同 key 重发返回首次地址，
+Ring 恰一条。</p>
+<pre><code class="lang-csharp">await q.EnqueueAsync(new EnqueueOptions { ProducerId = 42, Seq = 1 }, payload, default);
+var dup = await q.EnqueueAsync(new EnqueueOptions { ProducerId = 42, Seq = 1 }, payload, default);
+// dup.Address == 首次地址
+</code></pre>
+<h2 id="恰好一次spec-63-档二">恰好一次（spec §6.3 档二）</h2>
+<p>组位点与业务效果经 Session 2PC 同生共死。业务存储需实现 <code>ITransactionParticipant</code>。</p>
+<pre><code class="lang-csharp">var session = SessionManager.Create(fs, &quot;order-domain&quot;, HangingResolution.ForwardCommit,
+    (&quot;biz&quot;, bizStore), (&quot;queue.orders&quot;, q.GetGroupParticipant(&quot;orders&quot;)));
+session.Initialize();
+await session.WaitForReadyAsync(default);
+
+using var ts = session.OpenSession(&quot;consumer&quot;);
+ts.Stage(() =&gt; bizStore.Process(order));                              // 业务效果 staged
+await consumer.AckInRoundAsync(ts, [receipt], default);               // 确认挂进回合
+await ts.CommitAsync();                                                // 2PC 原子：业务 + 位点同落地
+</code></pre>
+<p>Abort = 组位点与业务效果同回退，消息重投（at-least-once 兜底）。</p>
+<h2 id="积压治理spec-82">积压治理（spec §8.2）</h2>
+<p><code>MaxBacklogBytes</code> + <code>Backlog</code> 策略：</p>
+<table>
+<thead>
+<tr>
+<th>模式</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Block</code>（默认）</td>
+<td>阻塞生产者至回收跟上，有界等待 <code>BacklogBlockTimeout</code>，超时抛 <code>QueueFullException</code></td>
+</tr>
+<tr>
+<td><code>Reject</code></td>
+<td>超限即抛 <code>QueueFullException</code></td>
+</tr>
+<tr>
+<td><code>EvictOldest</code></td>
+<td>淘汰最慢组（fence → <code>DataLostFencedException</code>），显式 <code>ResetGroupAsync</code> 才能续</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">new TierQueueOptions
+{
+    MaxBacklogBytes = 1 &lt;&lt; 30,          // 1GB 积压上限
+    Backlog = BacklogPolicy.Block,
+    BacklogBlockTimeout = TimeSpan.FromSeconds(10),
+}
+</code></pre>
+<h2 id="溢出-payload">溢出 payload</h2>
+<p><code>OverflowPolicy.Enabled</code> + <code>MinOverflowSize</code>：超大消息分离到溢出引擎，入队/消费/死信往返一致。</p>
+<h2 id="运维与诊断">运维与诊断</h2>
+<pre><code class="lang-csharp">// 组管理
+var groups = await q.ListGroupsAsync(default);                        // 组名清单
+await q.DeleteGroupAsync(&quot;payments&quot;, default);                        // 删组（截断下界抬升）
+await q.ResetGroupAsync(&quot;payments&quot;, GroupStartAt.Earliest, LogicalAddress.Empty, default);
+                                                                      // EvictOldest 被 fence 后复位续用
+
+// 统计与积压观测
+QueueStats s = await q.GetStatsAsync(default);                        // 头/尾/durable 尾/积压字节/各组位点
+foreach (var g in s.Groups) Console.WriteLine($&quot;{g.Name}: cursor={g.Cursor}&quot;);
+
+// 消费者侧诊断
+var pending = await consumer.PendingAsync(default);                   // PEL 在途表（地址/持有者/空闲时长/重投计数）
+await consumer.NackAsync([d.Address], default);                       // 显式 nack——回队按可见性/退避重投
+
+// 存储面
+await q.FlushAsync(default);                                          // Ring 全量刷盘（durable 尾推进到 tail）
+await q.TruncateAsync(uptoExclusive, default);                        // 物理截断（回收治理）
+</code></pre>
+<h2 id="配置参考">配置参考</h2>
+<h3 id="tierqueueoptions">TierQueueOptions</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QueueName</code></td>
+<td><code>&quot;tc.queue&quot;</code></td>
+<td>引擎空间隔离名（数据 Ring = <code>{name}.ring</code>，组注册表 = <code>{name}.groups</code>）</td>
+</tr>
+<tr>
+<td><code>PageSize</code></td>
+<td>1MB</td>
+<td>Ring 页大小（消息小→小页）</td>
+</tr>
+<tr>
+<td><code>MemorySize</code></td>
+<td>64MB</td>
+<td>Ring 内存容量（<strong>测试勿抄大缺省——mem 卷物化实占</strong>）</td>
+</tr>
+<tr>
+<td><code>SegmentGrowthLimit</code></td>
+<td>64MB</td>
+<td>数据 Ring 段生长上限</td>
+</tr>
+<tr>
+<td><code>MaxInFlight</code></td>
+<td>4096</td>
+<td>组在途窗口上限（Skip 表 + pending 容量）</td>
+</tr>
+<tr>
+<td><code>BufferedAckBatchSize</code></td>
+<td>1</td>
+<td><code>AckBufferedAsync</code> 自动 durable 阈值；1 = 不缓冲，普通 <code>AckAsync</code> 始终立即 durable</td>
+</tr>
+<tr>
+<td><code>BufferedAckCommitInterval</code></td>
+<td>Infinite</td>
+<td><code>AckBufferedAsync</code> 最长驻留时间；正值时无后续 Ack 也会后台 flush</td>
+</tr>
+<tr>
+<td><code>GroupRegistryPayloadSize</code></td>
+<td>1MB</td>
+<td>组注册表持久容量；超过时建组明确失败，禁止静默截断</td>
+</tr>
+<tr>
+<td><code>ColdReadRatio</code></td>
+<td>0.25</td>
+<td>冷页缓存占比（冷读回源 ClockCache）</td>
+</tr>
+<tr>
+<td><code>OverflowPolicy</code></td>
+<td><code>Disabled</code></td>
+<td>溢出策略</td>
+</tr>
+<tr>
+<td><code>MinOverflowSize</code></td>
+<td>0</td>
+<td>溢出阈值（Enabled 时生效）</td>
+</tr>
+<tr>
+<td><code>MaxBacklogBytes</code></td>
+<td>null</td>
+<td>积压上限（null = 不限）</td>
+</tr>
+<tr>
+<td><code>Backlog</code></td>
+<td><code>Block</code></td>
+<td>治理模式</td>
+</tr>
+<tr>
+<td><code>BacklogBlockTimeout</code></td>
+<td>10s</td>
+<td>Block 有界等待上限</td>
+</tr>
+<tr>
+<td><code>DeadLetter</code></td>
+<td><code>new()</code></td>
+<td>死信配置（null = 关闭）</td>
+</tr>
+<tr>
+<td><code>Delayed</code></td>
+<td><code>new()</code></td>
+<td>延迟队列配置（null = 不装配索引）</td>
+</tr>
+<tr>
+<td><code>Idempotency</code></td>
+<td>null</td>
+<td>幂等生产配置（null = 关闭）</td>
+</tr>
+</tbody>
+</table>
+<p>即时、非溢出、无积压上限的 <code>EnqueueBatchAsync</code> 会使用 Ring 独占写窗口，将 tail 锁竞争降至按页领取；
+启用延迟、幂等、溢出或积压治理时保留逐条完整协调路径。延迟查询和范围取消通过 BTree lower-bound
+seek 起扫，不再从索引头扫描。<code>AckBufferedAsync</code> 是显式吞吐档：未达到阈值时调用返回不代表 durable，
+需要以 <code>FlushAcknowledgementsAsync</code> 建立持久化边界；崩溃前缓冲项按 at-least-once 重投。</p>
+<p><code>DelayedOptions</code> 支持 <code>NodeSize</code>、<code>MinFillPercent</code> 与持久化策略；<code>IdempotencyOptions</code>
+支持 <code>HashTableCapacity</code>、<code>OverflowPoolCapacity</code>。需要完整覆盖各结构的持久化类型、缓存、
+文件打开 hints、段元组 flush 周期或引擎优化参数时，在 builder 注入统一变换器：</p>
+<pre><code class="lang-csharp">var builder = new TierQueueBuilder(fs, options)
+    .WithStorageOptionsFactory((component, defaults) =&gt; component switch
+    {
+        &quot;ring&quot; =&gt; defaults.WithHints(FileOpenHints.WriteThrough),
+        &quot;delay&quot; =&gt; defaults.WithMetaTupleFlushInterval(TimeSpan.FromSeconds(1)),
+        _ =&gt; defaults,
+    });
+
+await using var queue = await builder.StartAsync();
+</code></pre>
+<p>该变换器应用于 Ring、组注册表、每个组状态域、延迟索引、幂等索引及 DLQ。<code>MemoryFileSystem</code>
+上的默认 Ring 自动禁用文件预分配。若需替换整个结构实例，可分别使用
+<code>WithRingFactory</code>、<code>WithRegistryMetaFactory</code>、<code>WithGroupMetaFactory</code>、
+<code>WithDelayedIndexFactory</code> 与 <code>WithIdempotencyIndexFactory</code>。</p>
+<h3 id="groupoptions">GroupOptions</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Name</code></td>
+<td>required</td>
+<td>组名</td>
+</tr>
+<tr>
+<td><code>StartAt</code></td>
+<td><code>Earliest</code></td>
+<td>创建位点（Earliest/Latest/Address）</td>
+</tr>
+<tr>
+<td><code>VisibilityTimeout</code></td>
+<td>60s</td>
+<td>在途未 ack 重投等待</td>
+</tr>
+<tr>
+<td><code>MaxRedeliveries</code></td>
+<td>16</td>
+<td>重投上限（达上限死信）</td>
+</tr>
+<tr>
+<td><code>RetryBackoff</code></td>
+<td>null</td>
+<td>重试退避策略（null/Zero = 立即）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="验证矩阵spec-13">验证矩阵（spec §13）</h2>
+<p>18 项验收矩阵全覆盖（见 <code>tests/TC.Tier.Products.Tests/Queue/</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>项</th>
+<th>测试文件</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>FIFO 保序</td>
+<td>TierQueueTests</td>
+</tr>
+<tr>
+<td>2</td>
+<td>组独立</td>
+<td>TierQueueGroupTests</td>
+</tr>
+<tr>
+<td>3</td>
+<td>乱序 ack Skip 持久</td>
+<td>TierQueueTests</td>
+</tr>
+<tr>
+<td>4</td>
+<td>ack 后断电不重投</td>
+<td>TierQueueTests</td>
+</tr>
+<tr>
+<td>5</td>
+<td>崩溃窗口重投有界</td>
+<td>TierQueueGroupTests</td>
+</tr>
+<tr>
+<td>6</td>
+<td>fencing 迟交拒绝</td>
+<td>TierQueueGroupTests</td>
+</tr>
+<tr>
+<td>7</td>
+<td>档二恰好一次</td>
+<td>TierQueueSessionRoundTests</td>
+</tr>
+<tr>
+<td>8</td>
+<td>幂等生产</td>
+<td>TierQueueDelayedTests</td>
+</tr>
+<tr>
+<td>9</td>
+<td>延迟就绪序</td>
+<td>TierQueueDelayedTests</td>
+</tr>
+<tr>
+<td>10</td>
+<td>延迟崩溃对账</td>
+<td>TierQueueDelayedTests</td>
+</tr>
+<tr>
+<td>11</td>
+<td>延迟取消解锚</td>
+<td>TierQueueDelayedTests</td>
+</tr>
+<tr>
+<td>12</td>
+<td>MaxDelay 锚定治理</td>
+<td>TierQueueDelayedTests</td>
+</tr>
+<tr>
+<td>13</td>
+<td>可见性超时 + 退避</td>
+<td>TierQueueGroupTests</td>
+</tr>
+<tr>
+<td>14</td>
+<td>死信 + Replay</td>
+<td>TierQueueDeadLetterTests</td>
+</tr>
+<tr>
+<td>15</td>
+<td>治理三模式</td>
+<td>TierQueueGroupTests</td>
+</tr>
+<tr>
+<td>16</td>
+<td>截断守卫（含延迟索引）</td>
+<td>TierQueueDelayedTests</td>
+</tr>
+<tr>
+<td>17</td>
+<td>溢出 payload 死信往返</td>
+<td>TierQueueDeadLetterTests</td>
+</tr>
+<tr>
+<td>18</td>
+<td>组状态原子崩溃</td>
+<td>TierQueueDurabilityTests</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierqueue.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class DeltaLog | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="DeltaLog — KV 增量 checkpoint delta 流实现类。 codec 绑定 DeltaLogCodec（不可替换）。其余参数全部可注入。">
+      <meta name="description" content="DeltaLog 编解码 partial——嵌套 Codec（ 实现）：记录头写入与解析。 ★ Header 布局见 ；CRC 由  统一处理。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,8 +97,8 @@ Class DeltaLog
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>DeltaLog — KV 增量 checkpoint delta 流实现类。</p>
-<p>codec 绑定 DeltaLogCodec（不可替换）。其余参数全部可注入。</p>
+  <div class="markdown summary"><p>DeltaLog 编解码 partial——嵌套 Codec（<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCodec.html">ILogCodec</a> 实现）：记录头写入与解析。</p>
+<p>★ Header 布局见 <a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLog.DeltaLogHeader.html">DeltaLog.DeltaLogHeader</a>；CRC 由 <a class="xref" href="TC.Tier.Runtime.Structures.RecordCodec.html">RecordCodec</a> 统一处理。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -113,7 +113,7 @@ Class DeltaLog
     <dt>Inheritance</dt>
     <dd>
       <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</div>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></div>
       <div><span class="xref">DeltaLog</span></div>
     </dd>
@@ -143,7 +143,7 @@ Class DeltaLog
       <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_ReadOpaqueMeta">LogBase.ReadOpaqueMeta()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OpenCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_">LogBase.OpenCursor(LogicalAddress, LogicalAddress, bool)</a>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OpenCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_TC_Tier_Contracts_Storage_SnapshotMode_System_Boolean_">LogBase.OpenCursor(LogicalAddress, LogicalAddress, bool, SnapshotMode, bool)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Prepare_System_Int64_">LogBase.Prepare(long)</a>
@@ -203,40 +203,40 @@ Class DeltaLog
       <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_LastPreparedSeq">LogBase.LastPreparedSeq</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;LogRecoveryHints&gt;.GetAliveInstances(string)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;LogRecoveryHints&gt;.GetAliveInstances(string)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady(int)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady(int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;LogRecoveryHints&gt;.CancelRecovery()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;LogRecoveryHints&gt;.CancelRecovery()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;LogRecoveryHints&gt;.Initialize(LogRecoveryHints)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;LogRecoveryHints&gt;.Initialize(LogRecoveryHints)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;LogRecoveryHints&gt;.Dispose()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;LogRecoveryHints&gt;.Dispose()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;LogRecoveryHints&gt;.DisposeAsync()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;LogRecoveryHints&gt;.DisposeAsync()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;LogRecoveryHints&gt;.Id</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;LogRecoveryHints&gt;.Id</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;LogRecoveryHints&gt;.IsReady</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;LogRecoveryHints&gt;.IsReady</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryState</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryState</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryProgressChanged</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryProgressChanged</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
@@ -334,7 +334,7 @@ Class DeltaLog
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

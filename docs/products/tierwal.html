@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierWAL 使用指南 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierWAL 使用指南 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierwal.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierwal-使用指南">TierWAL 使用指南</h1>
+
+<blockquote>
+<p>TierWAL = 协议中立 WAL 产品（raft/p2p 的存储中线）：底层 EntryLog 封装 + 自定 opaque 容器
+布局。<strong>全部持久化语义做齐、内容零知识</strong>——entry 与元数据均不解析（Opaque 槽），
+raft/p2p 是纯消费方，直接接线。核心面：批/单条追加 × 显式提交（组提交三维度自动触发）
+× 随机起点重放 × 头/尾截断 × 元数据 Opaque 槽 × 镜像快照（导出/导入）。
+泛型产品类 <code>TierWal</code>，经 <code>TierWalBuilder</code> 装配（StartAsync 一步到位 = 构建 + 恢复 + 就绪）。</p>
+</blockquote>
+<h2 id="快速上手">快速上手</h2>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Products.Wal;
+
+var fs = TierFs.New(&quot;memory:&quot;);                    // 或 TierFs.New(&quot;local:///path/to/volume&quot;)
+await using var wal = await TierWalOptions.Default
+    .WithWalName(&quot;raft-log&quot;)
+    .Builder(fs)
+    .StartAsync();                                  // 构建 + 恢复 + WaitForReady 一体
+
+// 追加一批 entry（每条 = 一帧 payload——帧格式知识归调用方）
+var entries = new List&lt;ReadOnlyMemory&lt;byte&gt;&gt; { new byte[] { 1, 2 }, new byte[] { 3 } };
+var r = await wal.AppendBatchAsync(entries, default);
+// r.StartIndex = 本批起始 index；r.Count = 条数
+
+await wal.CommitAsync(default);                     // 显式提交（一次 fsync = 一批持久化）
+Console.WriteLine(wal.PersistedIndex);              // ≥ r.StartIndex + r.Count - 1
+
+// 从任意 index 顺序重放
+await foreach (var e in wal.ReadFromAsync(r.StartIndex, default))
+    Console.WriteLine($&quot;{e.Index}: {e.Data.Length}B&quot;);
+</code></pre>
+<p>组件入口也可直接 <code>new TierWalBuilder(fs, options)</code>（<code>Options.Builder(fs)</code> 是糖）。
+恢复 hints 通常无需提供（default 让底层自恢复）；进程外已知水位时注入 <code>WalRecoveryHints</code>
+（TailAddress/BeginAddress/CommittedOffset——地址直透 EntryLog）。</p>
+<h2 id="心智模型三条铁律">心智模型（三条铁律）</h2>
+<ul>
+<li><strong>index = 起点 + 顺序计数</strong>（设计 §8.7）：raft 日志连续无空洞——帧内零 index，恢复按
+「快照起点/重放起点 + 扫帧计数」推导；段 anchor 表随 opaque 原子落盘（恢复 O(1) 读全表）。</li>
+<li><strong>双水位分离</strong>：<code>AllocatedIndex</code> = 内存分配尾（含攒批窗口，未持久）；
+<code>PersistedIndex</code> = 本地 fsync 水位（last persisted index，CommitAsync 后推进——自动提交
+只提前落盘不推进）。raft 语义注意：<strong>PersistedIndex 不是集群 commitIndex</strong>（多数派确认
+归协议层按复制进度计算），是应答/推进 matchIndex 的本地依据。</li>
+<li><strong>分配与持久化分离</strong>：Append 只写入不 fsync；持久化时机 = 组提交策略自动触发，或调用方
+显式 <code>CommitAsync</code>——raft 攒批 → CommitAsync → 应答（一次 fsync = 一批持久化）。</li>
+</ul>
+<h2 id="追加与提交">追加与提交</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>形态</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AppendBatchAsync(entries)</code></td>
+<td>批 → <code>WalAppendResult(StartIndex, Count)</code></td>
+<td>raft 攒批主路径</td>
+</tr>
+<tr>
+<td><code>AppendSingleAsync(entry)</code></td>
+<td>单条 → <code>[index, 1]</code></td>
+<td>稀疏写；三维度全 0 配置 = 每写即提交</td>
+</tr>
+<tr>
+<td><code>BeginAppendBatch()</code> 租约</td>
+<td>ref struct，逐条 <code>Append</code>/<code>AppendAsync</code> 返回 index</td>
+<td>适配器甜区：scratch 逐条帧化直写（集合形态的 N+1 次分配 → ~0）</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">// 批追加租约：using 包裹，绝不跨 await 持有（持 WAL 写锁——ref struct 编译器强制不逃逸）
+using (var lease = wal.BeginAppendBatch())
+{
+    foreach (var frame in frames)
+        lease.Append(frame);                        // 页满 = 底层让渡零阻塞；双页在途才背压
+    // lease.StartIndex = 批起点；lease.Count = 已追加条数
+}
+</code></pre>
+<p>持久化触发（<code>TierWalOptions</code> 组提交三维度，任一满足即提交）：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>时间</td>
+<td><code>CommitInterval</code></td>
+<td>10ms</td>
+<td>距上次提交；<code>-1ms</code> 禁用</td>
+</tr>
+<tr>
+<td>数据量</td>
+<td><code>MaxUnflushedBytes</code></td>
+<td>64KB</td>
+<td>未提交字节</td>
+</tr>
+<tr>
+<td>条数</td>
+<td><code>MaxUnflushedCount</code></td>
+<td>1000</td>
+<td>未提交条数</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>单条提交形态 = 三维度全 0</strong>（每次 Append 即触发提交）；显式 <code>CommitAsync</code> 与自动提交并存。</li>
+<li><code>WaitForPersistedAsync(index)</code>：阻塞等到 index 已持久化（raft 推进 commitIndex 的依据）；
+<code>IsPersisted(index)</code> 非阻塞查询。</li>
+</ul>
+<h2 id="重放随机起点顺序读">重放（随机起点顺序读）</h2>
+<pre><code class="lang-csharp">// 异步轨：冷启动/追赶主路径
+await foreach (var e in wal.ReadFromAsync(SnapshotIndex + 1, ct)) { ... }
+
+// 同步轨：专用 worker 线程（apply 管道）——零异步排队，页切片零拷贝
+foreach (var e in wal.ReadFromSync(startIndex)) { ... }   // e.Data 仅枚举存活期有效，跨枚举持有须拷贝
+
+// 批读租约：复制读热路径零分配（页切片视图流）
+using (var lease = wal.ReadBatchLeaseSync(startIndex, maxCount, ct))
+    await foreach (var e in lease.Entries) { ... }        // Dispose 后视图失效（页归还池）
+</code></pre>
+<p>定位 = O(1)：任意起点 = 段表二分 + 段内扫帧计数（与起点无关、与总量无关，~5-11ms 量级，
+见<a href="perf/tierwal.html">性能</a>契约②）。重放吞吐 ~3M 条/s（64B entry，mem/local 同量级）。</p>
+<h2 id="截断冲突修正--日志压缩">截断（冲突修正 / 日志压缩）</h2>
+<pre><code class="lang-csharp">await wal.TruncateSuffixAsync(newTailIndex, ct);    // 截尾 [newTail+1, ∞)——raft 冲突日志修正
+await wal.TruncatePrefixAsync(newHeadIndex, ct);    // 戴头 [0, newHead)——快照压缩回收，与写完全并行
+</code></pre>
+<h2 id="元数据-opaque-槽termvoteconfig">元数据 Opaque 槽（term/vote/config）</h2>
+<pre><code class="lang-csharp">await wal.WriteMetaAsync(opaqueBytes, ct);          // 原子替换：搭 EntryLog 水位线落盘 + CRC 校验兜底
+ReadOnlyMemory&lt;byte&gt; meta = wal.ReadMeta();          // 未写 = Empty
+</code></pre>
+<ul>
+<li><strong>内容零知识</strong>：blob 由协议层定义（如 term/vote/集群配置序列化）；TierWAL 只做原子替换。</li>
+<li><strong>容器布局</strong>：<code>[TailIndex 8B][HeadIndex 8B][段表条目数 4B][pad 4B][段 anchor 表 N×24B][raft 元数据预留区]</code>
+——段表与协议元数据共用容器（<code>MetaOpaqueBytes</code>，默认 16KB，配置多大都可以）；
+段表容量 = (总容量 − 24 − 预留区) / 24，预留区 = 剩余（配置表达）。</li>
+<li><strong>meta 策略</strong>：默认 <code>Managed</code>（独立 .meta 引擎、恒单段、单槽覆盖原子语义、O(1) 恢复）；
+外部/远程托管走 <code>WithMetaPolicyKind(Transport)</code> + <code>WithMetaTransport(...)</code> 构建期一行注入。</li>
+</ul>
+<h2 id="镜像快照日志压缩--冷节点追赶">镜像快照（日志压缩 / 冷节点追赶）</h2>
+<pre><code class="lang-csharp">long n0 = await wal.SnapshotAsync(ct);              // N₀ = 调用时 PersistedIndex；一体：镜像生成 → 本地存储 → 增量压缩截断
+Console.WriteLine($&quot;{wal.SnapshotHeadIndex}..{wal.SnapshotIndex}&quot;);   // 快照覆盖的 index 区间
+
+// 冷启动：本地快照自动载入；重建状态机消费帧流（与导出格式同构）
+await foreach (var frame in wal.ReadSnapshotEntriesAsync(ct)) { ... }
+</code></pre>
+<ul>
+<li><strong>快照内容 = 主数据 [Head..N₀] 的原始条目帧流</strong>（WAL 自己生成，非 raft 状态机镜像）；
+快照后自动 <code>TruncatePrefixAsync(N₀+1)</code> 压缩已镜像段（先快照后截断——被截区有覆盖）。</li>
+<li><strong>本地存储 = IncrementalSnapshot 段增量</strong>（每次只写增量段；raft 冷启动必须本地载入，
+低频合并阈值内建）。</li>
+<li><strong>跨节点传输</strong> = 注入 <code>WithSnapshotPersistence(IAsyncTransferPersistence)</code>（网络/对象存储/
+备份介质），随后 <code>ExportSnapshotAsync</code>（Header(N₀) + 帧流 + Footer CRC）/<code>ImportSnapshotAsync</code>
+（读入校验 → <strong>替换</strong>本地快照；导入后 SnapshotIndex = N₀，应用快照内容后向 leader 汇报 N₀）。
+未注入传输面 = 单机形态：快照本地化开箱即用，Export/Import 抛 <code>InvalidOperationException</code>。</li>
+</ul>
+<h2 id="装配与介质选型">装配与介质选型</h2>
+<p><code>TierWalBuilder</code> 注入面（不注入回落默认；Meta 校验兜底不可绕过）：</p>
+<table>
+<thead>
+<tr>
+<th>注入</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithMetaPolicyFactory</code> / <code>WithMetaTransport</code></td>
+<td>自定义 meta 策略 / 元数据托管版本链（Transport 模式）</td>
+</tr>
+<tr>
+<td><code>WithCommitPolicy</code></td>
+<td>替换组提交策略（默认 = Options 三维度阈值）</td>
+</tr>
+<tr>
+<td><code>WithSnapshotPersistence</code></td>
+<td>快照跨节点传输面（Export/Import 前提）</td>
+</tr>
+<tr>
+<td><code>WithLogger</code></td>
+<td>日志器</td>
+</tr>
+</tbody>
+</table>
+<p><strong>持久化质量地板</strong>（<code>DurabilityValidation</code>，默认 true——StartAsync 零 IO fail-fast）：</p>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Network（network://）</td>
+<td><strong>拒绝</strong>——远端对象存储无 fsync 语义、延迟无界，契约① 无保障</td>
+</tr>
+<tr>
+<td>Virtual（.tier）</td>
+<td>须挂载 <code>CarrierWriteThrough</code>（载体写穿档——四 IO 模式全达标；基线档 p99.9 ≥150ms 不达标）</td>
+</tr>
+<tr>
+<td>Local / Memory</td>
+<td>通过（mem = 零 fsync 地板，稳定环境高吞吐首选；持久化取舍由部署方自权衡）</td>
+</tr>
+</tbody>
+</table>
+<p>IO hints（<code>WithHints</code>，默认 <code>NoBuffering</code>）：TierWal 页模型 4MB 页 = 大块顺序写，落 DIO 甜区；
+<strong>磁盘 raft 部署建议 <code>NoBuffering | WriteThrough</code>（DIO+WT 全介质最优）</strong>——机械盘上 buffered
+与 DIO 单独在选举窗口口径不达标（DIO 单独是反模式，p99.9=178ms；DIO+WT p99.9=0.43ms），
+实测矩阵见<a href="perf/tierwal.html">性能</a>契约①。读侧不受影响（重放经游标自管页缓存吸收）。</p>
+<h2 id="反模式">反模式</h2>
+<ul>
+<li><strong>租约跨 await 持有</strong>——<code>BeginAppendBatch</code> 租约持 WAL 写锁（ref struct 编译器强制不逃逸）；
+<code>AppendAsync</code> 的背压 await 发生在底层批内部，租约本体不跨 await。</li>
+<li><strong>把 PersistedIndex 当集群 commitIndex</strong>——它是本地 fsync 水位；多数派确认归协议层。</li>
+<li><strong>跨枚举持有重放切片</strong>——<code>ReadFromSync</code> 产出的 <code>Data</code> 是页缓冲切片（仅枚举存活期有效）；
+复制读收集后发送须自行拷贝（或用 <code>ReadBatchLeaseSync</code> 并在租约存活期内消费）。</li>
+<li><strong>网络介质挂载 / virtual 不带 CarrierWriteThrough</strong>——DurabilityValidation 直接 fail-fast
+（测量/非 raft 用途显式 <code>WithDurabilityValidation(false)</code>）。</li>
+<li><strong>机械盘 DIO 单独用 / buffered 顶选举窗口</strong>——见上（DIO+WT 全介质最优）。</li>
+<li><strong>opaque 容量配 0</strong>——TierWAL 必须显式 <code>MetaOpaqueBytes &gt; 0</code>（底层 Settings 基类默认 0 =
+无 opaque 区，段表/元数据搭车通道不可用；Options 默认 16KB 已兜底）。</li>
+<li><strong>高频 SnapshotAsync</strong>——快照 = 镜像生成 + 截断（raft 惯例 = leader 定期低频压缩）。</li>
+</ul>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>设计文档：<code>docs/design/tierwal-design.md</code>、<code>docs/design/tierwal-mirror-snapshot-design.md</code>（内部仓）</li>
+<li>性能数据：<a href="perf/tierwal.html"><code>perf/tierwal.md</code></a>（三契约 + 稳定性矩阵，随包发布）</li>
+<li>结构层积木：EntryLog / 存储引擎使用指南（TC.Tier.Runtime 包）</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierwal.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

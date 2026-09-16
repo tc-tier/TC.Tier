@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class FakeTimeProvider | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class FakeTimeProvider | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="假时钟（故障注入面补全设计 件一——时钟缝测试替身，零外部依赖；不用 Microsoft.Extensions.TimeProvider.Testing 包）。 ★ 双钟模型：单调钟（——快进推进、停走/倒流免疫、墙钟跳变不污染）   + 墙钟（——跳变/漂移可注入，建模真实 NTP 校时与走速偏差）。 ★ 单调戳 ms 域（ = 1000，与 Environment.TickCount64 同域）——   落点 deadline 算术零变更。 ★ 快进： 同步推进双钟并触发到期定时器（回调在 Advance 调用线程按到期序   同步执行——零真实睡等、确定性重现）；Advance(TimeSpan.Zero) = 冲刷已到期定时器。 ★ 定时器： 返回的  由假钟驱动——周期定时器在单次   大跨度 Advance 内按周期连发（对齐真实周期语义）。定时器回调抛出的异常原样冒泡到 Advance 调用方   （测试可见性优先，不静默吞）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Testing.FakeTimeProvider">
+
+
+
+  <h1 id="TC_Tier_Core_Testing_FakeTimeProvider" data-uid="TC.Tier.Core.Testing.FakeTimeProvider" class="text-break">
+Class FakeTimeProvider  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Testing.html">Testing</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>假时钟（故障注入面补全设计 件一——时钟缝测试替身，零外部依赖；不用 Microsoft.Extensions.TimeProvider.Testing 包）。</p>
+<p>★ 双钟模型：<b>单调钟</b>（<a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_GetTimestamp">GetTimestamp()</a>——快进推进、停走/倒流免疫、墙钟跳变不污染）
+  + <b>墙钟</b>（<a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_GetUtcNow">GetUtcNow()</a>——跳变/漂移可注入，建模真实 NTP 校时与走速偏差）。</p>
+<p>★ 单调戳 ms 域（<a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_TimestampFrequency">TimestampFrequency</a> = 1000，与 <code>Environment.TickCount64</code> 同域）——
+  落点 deadline 算术零变更。</p>
+<p>★ 快进：<a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_Advance_System_TimeSpan_">Advance(TimeSpan)</a> 同步推进双钟并触发到期定时器（回调在 Advance 调用线程按到期序
+  同步执行——零真实睡等、确定性重现）；<code>Advance(TimeSpan.Zero)</code> = 冲刷已到期定时器。</p>
+<p>★ 定时器：<a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_CreateTimer_System_Threading_TimerCallback_System_Object_System_TimeSpan_System_TimeSpan_">CreateTimer(TimerCallback, object?, TimeSpan, TimeSpan)</a> 返回的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.itimer">ITimer</a> 由假钟驱动——周期定时器在单次
+  大跨度 Advance 内按周期连发（对齐真实周期语义）。定时器回调抛出的异常原样冒泡到 Advance 调用方
+  （测试可见性优先，不静默吞）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class FakeTimeProvider : TimeProvider</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></div>
+      <div><span class="xref">FakeTimeProvider</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.getlocalnow">TimeProvider.GetLocalNow()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.getelapsedtime#system-timeprovider-getelapsedtime(system-int64-system-int64)">TimeProvider.GetElapsedTime(long, long)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.getelapsedtime#system-timeprovider-getelapsedtime(system-int64)">TimeProvider.GetElapsedTime(long)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.system">TimeProvider.System</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.localtimezone">TimeProvider.LocalTimeZone</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Execution.TimeProviderExtensions.html#TC_Tier_Core_Execution_TimeProviderExtensions_Delay_System_TimeProvider_System_Int32_System_Threading_CancellationToken_">TimeProviderExtensions.Delay(TimeProvider, int, CancellationToken)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Execution.TimeProviderExtensions.html#TC_Tier_Core_Execution_TimeProviderExtensions_Delay_System_TimeProvider_System_TimeSpan_System_Threading_CancellationToken_">TimeProviderExtensions.Delay(TimeProvider, TimeSpan, CancellationToken)</a>
+  </div>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Execution.TimeProviderExtensions.html#TC_Tier_Core_Execution_TimeProviderExtensions_GetMsTimestamp_System_TimeProvider_">TimeProviderExtensions.GetMsTimestamp(TimeProvider)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider__ctor_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider__ctor_System_Nullable_System_DateTimeOffset__" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.#ctor(System.Nullable{System.DateTimeOffset})">
+  FakeTimeProvider(DateTimeOffset?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（起始墙钟默认 <a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_DefaultStart">DefaultStart</a>，单调钟 0）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FakeTimeProvider(DateTimeOffset? startWallClock = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startWallClock</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a>?</dt>
+    <dd><p>起始墙钟（可选）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_DefaultStart" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.DefaultStart">
+  DefaultStart
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>缺省起始墙钟（固定——测试确定性；时间起点无关断言用相对量）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly DateTimeOffset DefaultStart</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_TimestampFrequency_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.TimestampFrequency*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_TimestampFrequency" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.TimestampFrequency">
+  TimestampFrequency
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单调钟频率（ms 域——与 <code>Environment.TickCount64</code> 同域，deadline 算术零变更）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override long TimestampFrequency { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_Advance_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.Advance*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_Advance_System_TimeSpan_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.Advance(System.TimeSpan)">
+  Advance(TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>同步快进——单调钟 + 墙钟（按当前走速）推进 <code class="paramref">delta</code>，并按到期序触发
+到期定时器（周期定时器按周期连发）。回调在调用线程同步执行。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Advance(TimeSpan delta)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>delta</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>推进量（可为零——冲刷已到期定时器；须非负）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_CreateTimer_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.CreateTimer*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_CreateTimer_System_Threading_TimerCallback_System_Object_System_TimeSpan_System_TimeSpan_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.CreateTimer(System.Threading.TimerCallback,System.Object,System.TimeSpan,System.TimeSpan)">
+  CreateTimer(TimerCallback, object?, TimeSpan, TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>callback</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.timercallback">TimerCallback</a></dt>
+    <dd></dd>
+    <dt><code>state</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+    <dt><code>dueTime</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>period</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.itimer">ITimer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Testing_FakeTimeProvider_CreateTimer_System_Threading_TimerCallback_System_Object_System_TimeSpan_System_TimeSpan__remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>假钟驱动：<code class="paramref">dueTime</code> ≤ 0 的定时器即刻到期（下一次 Advance——含零跨度冲刷——触发）；
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.timeout.infinitetimespan">InfiniteTimeSpan</a> = 永不触发。</p>
+</div>
+
+
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_GetTimestamp_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.GetTimestamp*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_GetTimestamp" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.GetTimestamp">
+  GetTimestamp()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前单调戳（ms 域——快进推进；墙钟跳变/漂移不影响）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override long GetTimestamp()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_GetUtcNow_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.GetUtcNow*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_GetUtcNow" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.GetUtcNow">
+  GetUtcNow()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前墙钟（跳变/漂移可见——TTL/租约消费点）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override DateTimeOffset GetUtcNow()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_SetDrift_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.SetDrift*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_SetDrift_System_Double_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.SetDrift(System.Double)">
+  SetDrift(double)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>墙钟走速（漂移注入）——后续 <a class="xref" href="TC.Tier.Core.Testing.FakeTimeProvider.html#TC_Tier_Core_Testing_FakeTimeProvider_Advance_System_TimeSpan_">Advance(TimeSpan)</a> 的墙钟增量按 <code class="paramref">rate</code>
+缩放（1 = 正常；单调钟恒定不受影响）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetDrift(double rate)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>rate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>走速比（须 &gt; 0）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Testing_FakeTimeProvider_SetWallClock_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.SetWallClock*"></a>
+
+  <h3 id="TC_Tier_Core_Testing_FakeTimeProvider_SetWallClock_System_DateTimeOffset_" data-uid="TC.Tier.Core.Testing.FakeTimeProvider.SetWallClock(System.DateTimeOffset)">
+  SetWallClock(DateTimeOffset)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>墙钟跳变（建模 NTP 校时）——墙钟立即置为 <code class="paramref">utcNow</code>；单调钟不受污染。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetWallClock(DateTimeOffset utcNow)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>utcNow</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.datetimeoffset">DateTimeOffset</a></dt>
+    <dd><p>新墙钟（UTC）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

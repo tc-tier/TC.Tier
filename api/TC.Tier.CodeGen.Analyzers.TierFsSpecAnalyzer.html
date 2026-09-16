@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierFsSpecAnalyzer | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierFsSpecAnalyzer | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierFs const spec 诊断器（spec-typed-frontend-and-generator-design &#167;4 P-d）——L1 运行时校验的 编译期前置层：识别 TierFs.New/Open 常量字符串实参 → 内嵌语法真值表诊断 （scheme 非法 / 参数名未知 / 参数 &#215; 介质违规）。非常量字符串零诊断（运行时校验保留——纵深防御）。 ★ 真值表同源保证：本表与 TierSpec 参数面的一致性由 Core 契约测试钉死   （TierFsSpecAnalyzerTableTests——TierSpec 属性集漂移即红）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer">
+
+
+
+  <h1 id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer" class="text-break">
+Class TierFsSpecAnalyzer  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.CodeGen.html">CodeGen</a>.<a class="xref" href="TC.Tier.CodeGen.Analyzers.html">Analyzers</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.CodeGen.Analyzers.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierFs const spec 诊断器（spec-typed-frontend-and-generator-design §4 P-d）——L1 运行时校验的
+编译期前置层：识别 <code>TierFs.New/Open</code> 常量字符串实参 → 内嵌语法真值表诊断
+（scheme 非法 / 参数名未知 / 参数 × 介质违规）。非常量字符串零诊断（运行时校验保留——纵深防御）。</p>
+<p>★ 真值表同源保证：本表与 TierSpec 参数面的一致性由 Core 契约测试钉死
+  （TierFsSpecAnalyzerTableTests——TierSpec 属性集漂移即红）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierFsSpecAnalyzer : DiagnosticAnalyzer</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierFsSpecAnalyzer</span></div>
+    </dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer__ctor_" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.#ctor*"></a>
+
+  <h3 id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer__ctor" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.#ctor">
+  TierFsSpecAnalyzer()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierFsSpecAnalyzer()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer_ParamMedia" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.ParamMedia">
+  ParamMedia
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>参数 → 适用介质（回退表——TierSpec 符号不可得时用；正常路径从编译内 [SpecParam] 符号派生——单一事实源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly ImmutableDictionary&lt;string, string&gt; ParamMedia</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutabledictionary-2">ImmutableDictionary</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer_SupportedDiagnostics_" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.SupportedDiagnostics*"></a>
+
+  <h3 id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer_SupportedDiagnostics" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.SupportedDiagnostics">
+  SupportedDiagnostics
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本分析器支持的全部诊断规则（TCSG120 scheme 非法 / TCSG121 参数未知 / TCSG122 参数 × 介质违规）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override ImmutableArray&lt;DiagnosticDescriptor&gt; SupportedDiagnostics { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<span class="xref">DiagnosticDescriptor</span>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer_Initialize_" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.Initialize*"></a>
+
+  <h3 id="TC_Tier_CodeGen_Analyzers_TierFsSpecAnalyzer_Initialize_Microsoft_CodeAnalysis_Diagnostics_AnalysisContext_" data-uid="TC.Tier.CodeGen.Analyzers.TierFsSpecAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext)">
+  Initialize(AnalysisContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注册 InvocationExpression 语法节点回调（AnalyzeInvocation）——生成代码不分析、启用并发执行。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override void Initialize(AnalysisContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <span class="xref">AnalysisContext</span></dt>
+    <dd><p>分析上下文。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

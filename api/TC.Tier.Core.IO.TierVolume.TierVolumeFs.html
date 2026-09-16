@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -192,7 +192,8 @@ Class TierVolumeFs
 AtomicDirectoryMove（元数据事务）/ ExclusiveLock（内建）/ MaintenanceGate / ContiguousCapture / CopyRange /
 VectorIO / RangeShift（全平台——增强行）/ DirectIO（两档模型：NoBuffering=绕过自管页缓存）/
 Advise（Sequential=页缓存预取）/ Mmap（文件载体——单区间 MMF 直映射）/
-WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
+WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）；
+CarrierWriteThrough 条件置位（IS-03：仅挂载旋钮 CarrierWriteThrough=true）。</p>
 </div>
 
 
@@ -397,9 +398,11 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>carrier</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.html">TierVolumeCarrier</a></dt>
-    <dd></dd>
+    <dd><p>要并入的载体（须非 TC 卷成员）。</p>
+</dd>
     <dt><code>capacityBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>文件成员容量（字节，必填且 &gt;0；设备成员忽略——容量自几何）。</p>
+</dd>
   </dl>
 
 
@@ -410,6 +413,15 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>文件成员未声明 capacityBytes。</p>
+</dd>
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>成员表满、快照在档、几何不兼容或载体已是 TC 卷成员。</p>
+</dd>
+  </dl>
 
 
 
@@ -432,13 +444,15 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>input</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></dt>
-    <dd></dd>
+    <dd><p>delta 流来源（由 <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeFs.html#TC_Tier_Core_IO_TierVolume_TierVolumeFs_ExportDelta_System_IO_Stream_System_UInt64_">ExportDelta(Stream, ulong)</a> 生成）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.html">SnapshotDeltaSummary</a></dt>
-    <dd></dd>
+    <dd><p>应用摘要（重放记录数、基点与末端 LSN）。</p>
+</dd>
   </dl>
 
 
@@ -448,6 +462,12 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>流格式/身份/基线校验失败，或目标不在基点。</p>
+</dd>
+  </dl>
 
 
 
@@ -458,7 +478,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>mkdir -p（幂等，登记全部祖先组件）+ 耐久（新建目录与父目录 fsync）。</p>
+  <div class="markdown level1 summary"><p>创建目录（含缺失祖先——mkdir -p 语义，已存在则幂等）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -469,7 +489,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>目录相对路径。</p>
 </dd>
   </dl>
 
@@ -491,9 +511,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>显式提前创建文件（与 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_Open_System_String_TC_Tier_Core_IO_FileOpenOptions_">Open(string, FileOpenOptions)</a> 解耦）——空文件 + 可选预分配（毫秒级真预留）+
-可选 FileExtra（≤<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_MaxFileExtraBytes">MaxFileExtraBytes</a>）+ 目录项 fsync。已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>
-（幂等由消费者 Exists 前置组合——显式创建语义，重复初始化 bug 不静默吞）。</p>
+  <div class="markdown level1 summary"><p>创建文件（可带 FileExtra 与预分配；已存在即抛，不打开）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -504,13 +522,13 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径（父目录须存在——对齐 Open 的 ENOENT 语义）。</p>
+    <dd><p>文件相对路径。</p>
 </dd>
     <dt><code>preallocateSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd><p>预分配字节数（0 = 不预分配）。</p>
+    <dd><p>预分配字节数（&gt;0 时按 unwritten 区间预留，默认 0 = 不预分配）。</p>
 </dd>
     <dt><code>extra</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd><p>FileExtra 附加数据（default = 无）。</p>
+    <dd><p>初始 FileExtra 内容（上限 MaxFileExtraBytes，默认空）。</p>
 </dd>
   </dl>
 
@@ -522,6 +540,15 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件已存在或父目录不存在。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>extra 超出 MaxFileExtraBytes 上限。</p>
+</dd>
+  </dl>
 
 
 
@@ -545,13 +572,15 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>快照名（非空、UTF-8 ≤32 字节、不含 '/'、卷内唯一）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.TierVolume.SnapshotInfo.html">SnapshotInfo</a></dt>
-    <dd></dd>
+    <dd><p>新快照信息（捕获时刻/LSN/镜像 CRC）。</p>
+</dd>
   </dl>
 
 
@@ -561,6 +590,12 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>非日志卷、只读卷、快照表满或名字已存在。</p>
+</dd>
+  </dl>
 
 
 
@@ -571,7 +606,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>耐久删除文件（=FileNative.DeleteFileDurably 语义）。</p>
+  <div class="markdown level1 summary"><p>删除文件（幂等——不存在时静默返回；有打开句柄在档拒删）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -582,7 +617,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径。</p>
+    <dd><p>文件相对路径。</p>
 </dd>
   </dl>
 
@@ -594,6 +629,12 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件有打开句柄在档（SharingViolation）。</p>
+</dd>
+  </dl>
 
 
 
@@ -604,9 +645,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>删除目录（POSIX rmdir：仅限空——非空抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_DirectoryNotEmpty">DirectoryNotEmpty</a>）+ 父目录 fsync。</p>
-<pre><code>        &lt;p&gt;★ 不提供递归删除（危险操作不藏糖：EnumerateFiles+Delete+DeleteDirectory 显式组合）。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>删除空目录（含条目则抛 DirectoryNotEmpty；不存在则抛 NotFound）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -617,7 +656,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>目录相对路径。</p>
 </dd>
   </dl>
 
@@ -629,6 +668,12 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>目录不存在或非空。</p>
+</dd>
+  </dl>
 
 
 
@@ -651,7 +696,8 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>快照名（须已存在）。</p>
+</dd>
   </dl>
 
 
@@ -662,6 +708,12 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>快照不存在或有活跃挂载实例在档。</p>
+</dd>
+  </dl>
 
 
 
@@ -672,7 +724,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>目录存在性（Remote：前缀下有对象或子前缀——能力位 EmptyDirectories 未置位时创建后未必可见）。</p>
+  <div class="markdown level1 summary"><p>目录是否存在（有子条目也算存在——目录登记可缺失）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -683,14 +735,15 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>目录相对路径。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 目录在档（或其下有文件条目）；false = 不存在。</p>
+</dd>
   </dl>
 
 
@@ -819,7 +872,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举根层子目录。</p>
+  <div class="markdown level1 summary"><p>枚举目录（从根，键序输出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -830,17 +883,17 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>目录名通配模式（默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅直接子级（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>目录条目序列（Name 为相对根的路径，键序）。</p>
 </dd>
   </dl>
 
@@ -861,7 +914,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举子目录的一层子目录（recursive=true = 全部后代目录）。</p>
+  <div class="markdown level1 summary"><p>枚举目录（从根，键序输出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -872,20 +925,20 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>起始目录相对路径（传 null 视为根）。</p>
 </dd>
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>目录名通配模式（默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅直接子级（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>目录条目序列（Name 为相对起始目录的路径，键序）。</p>
 </dd>
   </dl>
 
@@ -906,8 +959,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>混合枚举（文件+目录一次产出——引擎扫盘形态；Remote 单次列举同时出 Objects+CommonPrefixes）。
-契约：同参下结果 = EnumerateFiles ∪ EnumerateDirectories。</p>
+  <div class="markdown level1 summary"><p>枚举文件与目录（从根，双有序归并输出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -918,17 +970,17 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>名称通配模式（默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅直接子级（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</p>
 </dd>
   </dl>
 
@@ -949,7 +1001,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>混合枚举（子目录范围）。</p>
+  <div class="markdown level1 summary"><p>枚举文件与目录（从根，双有序归并输出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -960,20 +1012,20 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>起始目录相对路径（传 null 视为根）。</p>
 </dd>
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>名称通配模式（默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅直接子级（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</p>
 </dd>
   </dl>
 
@@ -994,7 +1046,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举根层文件（pattern 缺省 &quot;*&quot; 全匹配；recursive=true 全部后代）。</p>
+  <div class="markdown level1 summary"><p>枚举文件（从根，键序输出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1005,17 +1057,17 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>文件名通配模式（FileSystem Name Matching 语法，默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅直接子级（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件条目序列（Name 为相对根的路径，键序）。</p>
 </dd>
   </dl>
 
@@ -1026,12 +1078,6 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
-  <h4 class="section">Exceptions</h4>
-  <dl class="parameters">
-    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
-    <dd><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
-</dd>
-  </dl>
 
 
 
@@ -1042,7 +1088,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举子目录层文件。Name = 相对所枚举目录的路径（recursive 时多组件）。</p>
+  <div class="markdown level1 summary"><p>枚举文件（从根，键序输出）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1053,20 +1099,20 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>起始目录相对路径（传 null 视为根）。</p>
 </dd>
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>文件名通配模式（FileSystem Name Matching 语法，默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅直接子级（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件条目序列（Name 为相对起始目录的路径，键序）。</p>
 </dd>
   </dl>
 
@@ -1077,12 +1123,6 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
 
 
 
-  <h4 class="section">Exceptions</h4>
-  <dl class="parameters">
-    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
-    <dd><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
-</dd>
-  </dl>
 
 
 
@@ -1093,7 +1133,7 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   
   </h3>
 
-  <div class="markdown level1 summary"><p>文件存在性（目录存在性见 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_DirectoryExists_System_String_">DirectoryExists(string)</a>）。</p>
+  <div class="markdown level1 summary"><p>文件是否存在（目录不计入）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1104,14 +1144,15 @@ WriteThrough（RM-07 接线）/ FlushDataOnly（RM-09 接线）。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径。</p>
+    <dd><p>文件相对路径。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 文件在档；false = 不存在（或路径是目录）。</p>
+</dd>
   </dl>
 
 
@@ -1145,15 +1186,18 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>output</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></dt>
-    <dd></dd>
+    <dd><p>delta 流输出目标（头 + 记录流 + 脏块数据段 + 尾）。</p>
+</dd>
     <dt><code>baseLsn</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></dt>
-    <dd></dd>
+    <dd><p>增量基点 LSN（须 ∈ [CkptLsn, 已提交头]，且须为已存在的基点）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.TierVolume.SnapshotDeltaSummary.html">SnapshotDeltaSummary</a></dt>
-    <dd></dd>
+    <dd><p>导出摘要（记录数、基点与末端 LSN）。</p>
+</dd>
   </dl>
 
 
@@ -1163,6 +1207,12 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>非日志卷/降级卷、基点越界、窗口不完整或导出期有并发写。</p>
+</dd>
+  </dl>
 
 
 
@@ -1212,7 +1262,8 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.IO.TierVolume.SnapshotInfo.html">SnapshotInfo</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>全部快照信息（按捕获顺序排列）。</p>
+</dd>
   </dl>
 
 
@@ -1232,8 +1283,7 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   
   </h3>
 
-  <div class="markdown level1 summary"><p>文件移动/换名（=MoveFileDurably 语义，内建父目录刷盘——能力位 DurableRename）。</p>
-<p>★ overwrite 必须显式：true=POSIX rename 原子覆盖；false=目标已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>。</p>
+  <div class="markdown level1 summary"><p>重命名/移动文件（可选覆盖——覆盖目标即时回收物理块）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1244,13 +1294,13 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对源路径。</p>
+    <dd><p>源文件相对路径。</p>
 </dd>
     <dt><code>dest</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目标路径。</p>
+    <dd><p>目标文件相对路径。</p>
 </dd>
     <dt><code>overwrite</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否覆盖已存在的目标文件。</p>
+    <dd><p>true = 目标存在时覆盖；false = 目标存在抛 AlreadyExists（默认）。</p>
 </dd>
   </dl>
 
@@ -1262,6 +1312,12 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>源不存在、目标已存在（未允许覆盖）或覆盖目标有打开句柄在档。</p>
+</dd>
+  </dl>
 
 
 
@@ -1272,9 +1328,7 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   
   </h3>
 
-  <div class="markdown level1 summary"><p>目录整树移动。dest 已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>（不提供 overwrite——平台语义分歧大）。</p>
-<p>★ 原子性由能力位 <a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html#TC_Tier_Core_IO_FileSystemCapabilities_AtomicDirectoryMove">AtomicDirectoryMove</a> 表达：
-  Disk/Mem 原子；Remote 回退 = 逐对象 Copy+Delete（非原子，部分失败有残留）。</p>
+  <div class="markdown level1 summary"><p>重命名/移动目录（不提供 overwrite，目标存在即抛）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1285,10 +1339,10 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对源目录路径。</p>
+    <dd><p>源目录相对路径。</p>
 </dd>
     <dt><code>dest</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目标目录路径。</p>
+    <dd><p>目标目录相对路径。</p>
 </dd>
   </dl>
 
@@ -1303,6 +1357,12 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <div class="markdown level1 remarks"><p>实例内元数据事务原子（§3.5 增强行——不依赖 OS rename）。</p>
 </div>
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>源目录不存在或目标已存在。</p>
+</dd>
+  </dl>
 
 
 
@@ -1324,17 +1384,21 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>carrier</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.html">TierVolumeCarrier</a></dt>
-    <dd></dd>
+    <dd><p>目标载体（文件或设备）。</p>
+</dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeFormatOptions.html">TierVolumeFormatOptions</a></dt>
-    <dd></dd>
+    <dd><p>格式化选项（BlockSize/Preallocation 等；null = 类型缺省）。</p>
+</dd>
     <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
-    <dd></dd>
+    <dd><p>日志记录器（可选）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeFs.html">TierVolumeFs</a></dt>
-    <dd></dd>
+    <dd><p>格式化完成的新卷实例。</p>
+</dd>
   </dl>
 
 
@@ -1344,6 +1408,12 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>载体已格式化（AlreadyExists）。</p>
+</dd>
+  </dl>
 
 
 
@@ -1354,7 +1424,7 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   
   </h3>
 
-  <div class="markdown level1 summary"><p>★ 句柄入口——按显式打开语义打开/创建文件（PreallocateSize&gt;0 时 open 即幂等预分配）。</p>
+  <div class="markdown level1 summary"><p>打开/创建文件并取得句柄（按 <code class="paramref">options</code> 的 Mode 决定存在性语义）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1365,17 +1435,17 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>根下相对路径（层级命名空间，经 PathValidator.ValidateRelative 校验）。</p>
+    <dd><p>文件相对路径（须相对卷根，非法即抛）。</p>
 </dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></dt>
-    <dd><p>打开语义四要素 + 预分配。</p>
+    <dd><p>打开选项（Access/Mode/Sharing/Hints/PreallocateSize）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
-    <dd><p>文件句柄</p>
+    <dd><p>新开句柄（已挂共享登记与追加游标）。</p>
 </dd>
   </dl>
 
@@ -1386,6 +1456,12 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件不存在（OpenExisting）、已存在（CreateNew）、父目录不存在或卷只读/降级拒写。</p>
+</dd>
+  </dl>
 
 
 
@@ -1409,17 +1485,21 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>carrier</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.html">TierVolumeCarrier</a></dt>
-    <dd></dd>
+    <dd><p>主载体（文件或设备）。</p>
+</dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeOpenOptions.html">TierVolumeOpenOptions</a></dt>
-    <dd></dd>
+    <dd><p>打开选项（Access/SnapshotName/Label 校验等；null = 类型缺省）。</p>
+</dd>
     <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
-    <dd></dd>
+    <dd><p>日志记录器（可选）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeFs.html">TierVolumeFs</a></dt>
-    <dd></dd>
+    <dd><p>打开的卷实例（快照挂载 = 只读冻结视图）。</p>
+</dd>
   </dl>
 
 
@@ -1451,17 +1531,21 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>carriers</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeCarrier.html">TierVolumeCarrier</a>[]</dt>
-    <dd></dd>
+    <dd><p>全量成员清单（成员 0 = 主载体；缺失成员为 null 占位需 AllowDegraded）。</p>
+</dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeOpenOptions.html">TierVolumeOpenOptions</a></dt>
-    <dd></dd>
+    <dd><p>打开选项（AllowDegraded/QuotaBytes 等；null = 类型缺省）。</p>
+</dd>
     <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
-    <dd></dd>
+    <dd><p>日志记录器（可选）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.TierVolume.TierVolumeFs.html">TierVolumeFs</a></dt>
-    <dd></dd>
+    <dd><p>打开的卷实例（降级打开 = 只读形态）。</p>
+</dd>
   </dl>
 
 
@@ -1471,6 +1555,12 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>清单为空或主载体缺失。</p>
+</dd>
+  </dl>
 
 
 
@@ -1493,7 +1583,8 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>memberIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>成员索引（0 基；0 = 主载体不可移除）。</p>
+</dd>
   </dl>
 
 
@@ -1504,6 +1595,18 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>主载体（成员 0）不可移除。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>索引超成员表范围。</p>
+</dd>
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>快照存在期间拒绝成员增减。</p>
+</dd>
+  </dl>
 
 
 
@@ -1514,7 +1617,7 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   
   </h3>
 
-  <div class="markdown level1 summary"><p>单条目完整信息（基本字段 + 元数据；Name 回显输入路径；文件或目录自动判别）。</p>
+  <div class="markdown level1 summary"><p>获取条目元信息（文件或目录）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1525,14 +1628,14 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径。</p>
+    <dd><p>条目相对路径。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a></dt>
-    <dd><p>条目信息</p>
+    <dd><p>条目信息——文件含长度/时间戳/FileExtra；目录长度恒 0、创建时间为 null。</p>
 </dd>
   </dl>
 
@@ -1546,7 +1649,7 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
   <h4 class="section">Exceptions</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
-    <dd><p>IOError.NotFound——条目不存在。</p>
+    <dd><p>条目不存在。</p>
 </dd>
   </dl>
 
@@ -1571,7 +1674,7 @@ baseLsn &lt; CkptLsn → 拒导（检查点已截断——增量窗口丢失，�
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

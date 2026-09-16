@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -98,7 +98,7 @@ Class ObjectStoreExtensions
   </div>
 
   <div class="markdown summary"><p>同步便捷包装（低频路径专用——高频路径直用异步族）。</p>
-<p>★ 内部经 <a class="xref" href="TC.Tier.Core.Shared.SyncAsyncBridge.html">SyncAsyncBridge</a>（独立池 + 有界等待）桥接，替代裸
+<p>★ 内部经 <a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html">SyncAsyncBridge</a>（独立池 + 有界等待）桥接，替代裸
 <code>GetAwaiter().GetResult()</code>——推进不依赖公共池、等待有界（超时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a> 带现场）。
   详见 docs/sync-async-bridge.md §9 P1。</p>
 </div>
@@ -174,13 +174,17 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>sourceKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>源对象键。</p>
+</dd>
     <dt><code>destKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>目标对象键。</p>
+</dd>
     <dt><code>metadata</code> <a class="xref" href="TC.Tier.Core.IO.Remote.CopyMetadata.html">CopyMetadata</a></dt>
-    <dd></dd>
+    <dd><p>目标元数据处理（null = 继承源）。</p>
+</dd>
   </dl>
 
 
@@ -212,17 +216,21 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>sourceKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>源对象键。</p>
+</dd>
     <dt><code>replace</code> <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></dt>
-    <dd></dd>
+    <dd><p>替换用元数据（null = 仅复制源元数据）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></dt>
-    <dd></dd>
+    <dd><p>写入目标后的对象元数据。</p>
+</dd>
   </dl>
 
 
@@ -253,23 +261,30 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>sourceKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>源对象键。</p>
+</dd>
     <dt><code>destKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>目标对象键。</p>
+</dd>
     <dt><code>sourceOffset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>源对象内起始偏移（字节，≥0）。</p>
+</dd>
     <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>拷贝字节数。</p>
+</dd>
     <dt><code>metadata</code> <a class="xref" href="TC.Tier.Core.IO.Remote.CopyMetadata.html">CopyMetadata</a></dt>
-    <dd></dd>
+    <dd><p>目标元数据处理（null = 继承源）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>服务端实际拷贝的字节数（字节）。</p>
+</dd>
   </dl>
 
 
@@ -300,11 +315,14 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>对象键。</p>
+</dd>
     <dt><code>condition</code> <a class="xref" href="TC.Tier.Core.IO.Remote.DeleteCondition.html">DeleteCondition</a>?</dt>
-    <dd></dd>
+    <dd><p>删除条件（null = 无条件）。</p>
+</dd>
   </dl>
 
 
@@ -336,19 +354,24 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>对象键。</p>
+</dd>
     <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>对象内读取起始偏移（字节，≥0）。</p>
+</dd>
     <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>接收缓冲（长度即最多读取字节数）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>实际读取的字节数（0 = offset 已到对象末尾）。</p>
+</dd>
   </dl>
 
 
@@ -379,15 +402,18 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>对象键。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.Remote.ObjectInfo.html">ObjectInfo</a></dt>
-    <dd></dd>
+    <dd><p>对象元信息；不存在为 null。</p>
+</dd>
   </dl>
 
 
@@ -418,15 +444,18 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储。</p>
+</dd>
     <dt><code>prefix</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>键前缀过滤（null/空 = 全量）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Remote.ObjectEntry.html">ObjectEntry</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>匹配条目清单。</p>
+</dd>
   </dl>
 
 
@@ -457,15 +486,20 @@ Class ObjectStoreExtensions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>store</code> <a class="xref" href="TC.Tier.Core.IO.Remote.IObjectStore.html">IObjectStore</a></dt>
-    <dd></dd>
+    <dd><p>目标对象存储（扩展方法接收者）。</p>
+</dd>
     <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>对象键。</p>
+</dd>
     <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>对象数据。</p>
+</dd>
     <dt><code>metadata</code> <a class="xref" href="TC.Tier.Core.IO.Remote.ObjectMetadata.html">ObjectMetadata</a></dt>
-    <dd></dd>
+    <dd><p>用户元数据快照（null = 空）。</p>
+</dd>
     <dt><code>condition</code> <a class="xref" href="TC.Tier.Core.IO.Remote.PutCondition.html">PutCondition</a>?</dt>
-    <dd></dd>
+    <dd><p>写入条件（null = 无条件）。</p>
+</dd>
   </dl>
 
 
@@ -498,7 +532,7 @@ Class ObjectStoreExtensions
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

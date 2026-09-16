@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Core.Net 形态面 loopback 基线 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Core.Net 形态面 loopback 基线 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/perf/loopback-baseline.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="corenet-形态面-loopback-基线">Core.Net 形态面 loopback 基线</h1>
+
+<blockquote>
+<p>复现入口：<code>dotnet run -c Release --project benchmarks/TC.Tier.Core.Net.Benchmarks</code>
+（测量纪律：AutoFlush 输出不进测量区间 / Stopwatch 净计时 / GC 计数对照 / 收端到齐确认才停表）
+环境：12th Gen Intel Core i5-12400 · Windows 11 (10.0.26200) · .NET 8 · TCP loopback ∥ InProcess 同轮对照</p>
+</blockquote>
+<h2 id="数字2026-09-01-收口轮">数字（2026-09-01 收口轮）</h2>
+<table>
+<thead>
+<tr>
+<th>段</th>
+<th>TCP loopback</th>
+<th>InProcess（直通对照）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>数据报 64B × 100k（串行单向）</td>
+<td>47.7k msg/s</td>
+<td>5.75M msg/s</td>
+</tr>
+<tr>
+<td>数据报 64KiB × 2k</td>
+<td>5.07k msg/s（317 MB/s）</td>
+<td>5.77M msg/s（引用传递）</td>
+</tr>
+<tr>
+<td>请求 RTT 64B × 2k</td>
+<td>均值 0.086ms · p50 0.081ms · p99 0.165ms</td>
+<td>均值 0.002ms</td>
+</tr>
+<tr>
+<td>请求流水线 64B 窗口 256 × 50k</td>
+<td>49.4k op/s</td>
+<td>812k op/s</td>
+</tr>
+<tr>
+<td>流式 64KiB 帧 × 2k（125MB）</td>
+<td>308 MB/s（4.9k 帧/s）</td>
+<td>~118 GB/s（直通）</td>
+</tr>
+<tr>
+<td>流式 1KiB 帧 × 20k（20MB）</td>
+<td>45 MB/s（45.8k 帧/s）</td>
+<td>4.5 GB/s</td>
+</tr>
+</tbody>
+</table>
+<h2 id="怎么读这些数字">怎么读这些数字</h2>
+<ul>
+<li><strong>请求 RTT 86µs</strong> 是单请求同步往返的全链成本（编解码 + 帧头/CRC + TCP loopback 栈 +
+关联表）；InProcess 直通 2µs——<strong>传输税 ≈ 84µs，由 loopback 网络栈主导</strong>，协议面
+（帧编解码/关联表）占比小。</li>
+<li><strong>小帧吞吐地板 ≈ 20µs/帧</strong>：数据报 64B 串行（21µs/条）与流式 1KiB 帧（22µs/帧）同量级
+——单连接逐帧 syscall 写是地板；64KiB 帧摊薄后达 308 MB/s。</li>
+<li><strong>窗口并发收益有界</strong>：流水线窗口 256（49.4k op/s）≈ 串行 RTT 吞吐（11.6k）的 4.3×
+——单链路读循环+写锁串行化是天花板，与 raft 场景实测（单连接流水线
+98.6k op/s）同量级。</li>
+<li><strong>InProcess 是同构基准而非性能目标</strong>：hub 直通零拷贝派发，用于隔离传输栈成本
+（机制/形态代码两介质共用——差异即网络栈+帧编解码税）。</li>
+</ul>
+<h2 id="raft-引擎三节点corenet-夹具装配2026-09-095s-预算窗口径">raft 引擎三节点（Core.Net 夹具装配，2026-09-09——5s 预算窗口径）</h2>
+<p>复现：<code>RAFT_PROBE_SECONDS=5 dotnet run -c Release --project benchmarks/RaftPerfProbe</code>
+（TCP 形态 <code>RAFT_PROBE_NET=tcp</code>；committed 完成档 <code>RAFT_PROBE_COMMITTED=1</code>；<code>RAFT_PROBE_ROUNDS</code>
+改定轮数 / <code>RAFT_PROBE_HOLD</code> 保持窗供剖析；DotNext 对照 = <code>tests/RaftProtocolProbe</code> 同机同轮）。
+装配 = FsRaftStore（memory 卷）+ ApplyPipeline + RaftStateMachine + InProcessTransportHub/
+ClusterTransport（同构夹具模式）。</p>
+<p>测量口径：缺省 5s 时间预算内跑满微轮（数千轮 × 800 in-flight）；<strong>sustained = 总条 / 总墙钟</strong>，
+轮中位/p10/p90 为微轮瞬时吞吐分布——定轮短窗（&lt;100ms）处于调度噪声区出不了性能。
+线编码为 0-Copy 装配（EncodePooled 池化载荷）：全链分配 ~2KB/条（InProcess）· ~12KB/条（TCP），
+编码数组占比 &lt;3%——端到端吞吐对单点分配不敏感（同轮 A/B：新旧 ±4%，在轮方差内）。</p>
+<p><strong>数字（2026-09-09 轮，3 形态 × 3 同轮交替取中位；12 逻辑核 · .NET 8 · Windows 11）：</strong></p>
+<table>
+<thead>
+<tr>
+<th>引擎</th>
+<th>形态/完成档</th>
+<th>串行 p50</th>
+<th>流水线 sustained</th>
+<th>轮中位（p10 / p90）</th>
+<th>分配/条</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TC.Tier Core.Net</td>
+<td>InProcess · applied</td>
+<td>0.09ms</td>
+<td>606k op/s</td>
+<td>1.18M（308k / 1.60M）</td>
+<td>~2.0KB</td>
+</tr>
+<tr>
+<td>TC.Tier Core.Net</td>
+<td>TCP · applied</td>
+<td>0.25ms</td>
+<td>142k op/s</td>
+<td>397k（155k / 497k）</td>
+<td>~12.5KB</td>
+</tr>
+<tr>
+<td>TC.Tier Core.Net</td>
+<td>TCP · committed</td>
+<td>0.22ms</td>
+<td>147k op/s</td>
+<td>517k（174k / 635k）</td>
+<td>~12.7KB</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>完成语义档位</strong>：<code>ReplicateAsync</code> 完成 = <strong>applied</strong>（read-your-writes）；
+<code>ReplicateCommittedAsync</code> 完成 = <strong>committed</strong>（多数派提交即返——DotNext 同口径）。
+两档 TCP sustained 同级（142k ∥ 147k）——完成档不是吞吐差异点。</li>
+<li><strong>轮级方差（sustained 114k–185k）= 队列驱动多执行体调度税</strong>：每节点共识循环/apply worker/
+tick/lane×2/writer×2/reader×2 专执行体 ×3 节点，同机 12 核随机竞争——跨版本/跨轮对比
+取同轮交替 + 中位口径。</li>
+<li><strong>DotNext 同轮对照</strong>（2026-09-09，两探针同机交替 3 轮，测量窗 ≈5-6.5s）：DotNext TCP commit
+sustained 中位 <strong>191k</strong>（189k-191k，极稳）∥ 本探针 TCP committed 中位 <strong>183k</strong>（146k-206k）——
+<strong>0.96× 同级</strong>；串行 p50 DotNext 0.11ms ∥ 本探针 0.23ms（单请求串行 RTT 约 2× 差距，
+loopback 往返主导——引擎侧 InProcess 串行 0.09ms 为协议+引擎净成本）。</li>
+<li>引擎侧每条 ~3.8µs（InProcess）——吞吐上限 = 串行化链摊薄（共识循环单写者 +
+follower 追加门 + apply 单 worker）。</li>
+<li>★ 夹具存储读面 O(1) 直接寻址（index 连续 + 截前缀全量保留 → <code>_entries[index-1]</code>）+
+纯追加定位写（整批单缓冲单次写 + 缓存句柄；坏尾截断 = SetLength 原位）是硬前提：
+O(N) 线性扫/全量重写形态下流水线随日志长度单调退化（90.9k@2k 条 → 35.5k@8k 条、分配 55KB/条）。</li>
+</ul>
+<h2 id="复现">复现</h2>
+<pre><code class="lang-bash">dotnet build benchmarks/TC.Tier.Core.Net.Benchmarks -c Release
+dotnet build-server shutdown        # 净测量——关构建服务
+dotnet run --no-build -c Release --project benchmarks/TC.Tier.Core.Net.Benchmarks
+</code></pre>
+<ul>
+<li>段序固定（数据报小/大 → RTT → 流水线 → 流式 64KiB/1KiB），每段先探测/预热再净计时；</li>
+<li>基准全部走公开消费面（<code>IProtocolTransport</code> 三形态 API）——数字即使用方视角；</li>
+<li>TCP 装配 = 成员制两节点（较大方监听、较小方拨号）；同轮先 TCP 后 InProcess，数字可比。</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/perf/loopback-baseline.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

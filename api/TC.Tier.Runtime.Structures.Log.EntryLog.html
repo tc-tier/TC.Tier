@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class EntryLog | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="EntryLog — 通用 entry 顺序日志实现类（WAL 是其典型用途，非唯一用途）。 ★ EntryLog.md：通用 per-entry [16B EntryCodec header][payload+4B对齐] 纯追加顺序日志。 ★ 提交模型（两层，职责分离）：   1. 底层页提交契约（恒成立，不可配置）：Append 跨页 → FlushPage 数据落盘 →          同步执行 commit 链（meta.Commit + 推进 CommittedOffset）。         这是页模式的本质保证——前一页换出时即持久化，无需任何策略注入。最坏情况：写满一页才提交。   2. 可选提前提交（注入式优化，降延迟）： 在页未满时提前触发提交。         注入 null（默认）= 仅依赖底层页契约；注入  = 三维度提前提交。 ★ 上述两层取代旧的&quot;fire-and-forget 后台循环 + Append 内 spawn 提交&quot;模型——后者线程池饥饿即系统挂，         且错误被静默吞。新模型提交都在写线程同步完成，无并发、错误冒泡。">
+      <meta name="description" content="EntryLog 编解码 partial——嵌套 Codec（ 实现）：记录头写入与解析。 ★ Header 布局见 ；CRC 由  统一处理。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,16 +97,8 @@ Class EntryLog
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>EntryLog — 通用 entry 顺序日志实现类（WAL 是其典型用途，非唯一用途）。</p>
-<p>★ EntryLog.md：通用 per-entry [16B EntryCodec header][payload+4B对齐] 纯追加顺序日志。</p>
-<p>★ 提交模型（两层，职责分离）：</p>
-<p>  1. <b>底层页提交契约（恒成立，不可配置）</b>：Append 跨页 → FlushPage 数据落盘 →
-        <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushed_TC_Tier_Contracts_Storage_LogicalAddress_">OnPageFlushed(LogicalAddress)</a> 同步执行 commit 链（meta.Commit + 推进 CommittedOffset）。
-        这是页模式的本质保证——前一页换出时即持久化，无需任何策略注入。最坏情况：写满一页才提交。</p>
-<p>  2. <b>可选提前提交（注入式优化，降延迟）</b>：<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.html">ICommitPolicy</a> 在页未满时提前触发提交。
-        注入 null（默认）= 仅依赖底层页契约；注入 <span class="xref">TC.Tier.Runtime.Structures.Log.GroupCommitPolicy</span> = 三维度提前提交。</p>
-<p>★ 上述两层取代旧的"fire-and-forget 后台循环 + Append 内 spawn 提交"模型——后者线程池饥饿即系统挂，
-        且错误被静默吞。新模型提交都在写线程同步完成，无并发、错误冒泡。</p>
+  <div class="markdown summary"><p>EntryLog 编解码 partial——嵌套 Codec（<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCodec.html">ILogCodec</a> 实现）：记录头写入与解析。</p>
+<p>★ Header 布局见 <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.EntryLogHeader.html">EntryLog.EntryLogHeader</a>；CRC 由 <a class="xref" href="TC.Tier.Runtime.Structures.RecordCodec.html">RecordCodec</a> 统一处理。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -121,7 +113,7 @@ Class EntryLog
     <dt>Inheritance</dt>
     <dd>
       <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</div>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></div>
       <div><span class="xref">EntryLog</span></div>
     </dd>
@@ -151,7 +143,7 @@ Class EntryLog
       <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_ReadOpaqueMeta">LogBase.ReadOpaqueMeta()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OpenCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_">LogBase.OpenCursor(LogicalAddress, LogicalAddress, bool)</a>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_OpenCursor_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_TC_Tier_Contracts_Storage_SnapshotMode_System_Boolean_">LogBase.OpenCursor(LogicalAddress, LogicalAddress, bool, SnapshotMode, bool)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_Prepare_System_Int64_">LogBase.Prepare(long)</a>
@@ -211,40 +203,40 @@ Class EntryLog
       <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html#TC_Tier_Runtime_Structures_Log_LogBase_LastPreparedSeq">LogBase.LastPreparedSeq</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;LogRecoveryHints&gt;.GetAliveInstances(string)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;LogRecoveryHints&gt;.GetAliveInstances(string)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady(int)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReady(int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;LogRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;LogRecoveryHints&gt;.CancelRecovery()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;LogRecoveryHints&gt;.CancelRecovery()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;LogRecoveryHints&gt;.Initialize(LogRecoveryHints)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;LogRecoveryHints&gt;.Initialize(LogRecoveryHints)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;LogRecoveryHints&gt;.Dispose()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;LogRecoveryHints&gt;.Dispose()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;LogRecoveryHints&gt;.DisposeAsync()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;LogRecoveryHints&gt;.DisposeAsync()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;LogRecoveryHints&gt;.Id</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;LogRecoveryHints&gt;.Id</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;LogRecoveryHints&gt;.IsReady</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;LogRecoveryHints&gt;.IsReady</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryState</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryState</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryProgressChanged</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;LogRecoveryHints&gt;.RecoveryProgressChanged</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
@@ -277,8 +269,8 @@ Class EntryLog
 
   <a id="TC_Tier_Runtime_Structures_Log_EntryLog__ctor_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.#ctor*"></a>
 
-  <h3 id="TC_Tier_Runtime_Structures_Log_EntryLog__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Log_EntryLogSettings_TC_Tier_Runtime_Structures_Log_Contracts_ICommitPolicy_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Log_LogRecoveryHints__TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_TC_Tier_Runtime_Structures_Log_Contracts_ILogCursor__TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaHeader_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Log.EntryLogSettings,TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Log.LogRecoveryHints},TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory{TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor},TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Log.Contracts.LogMetaHeader,TC.Tier.Runtime.Structures.Log.Contracts.LogMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport)">
-  EntryLog(IFileSystem, EntryLogSettings, ICommitPolicy?, IRecovery&lt;LogRecoveryHints&gt;?, LogCursorFactory&lt;ILogCursor&gt;?, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;?, IMetaTransport?)
+  <h3 id="TC_Tier_Runtime_Structures_Log_EntryLog__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_Log_EntryLogSettings_TC_Tier_Runtime_Structures_Log_Contracts_ICommitPolicy_TC_Tier_Contracts_Lifecycle_IRecovery_TC_Tier_Runtime_Structures_Log_LogRecoveryHints__TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_TC_Tier_Runtime_Structures_Log_Contracts_ILogCursor__TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaHeader_TC_Tier_Runtime_Structures_Log_Contracts_LogMetaPayload__TC_Tier_Contracts_Meta_IMetaTransport_System_TimeProvider_" data-uid="TC.Tier.Runtime.Structures.Log.EntryLog.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.Log.EntryLogSettings,TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy,TC.Tier.Contracts.Lifecycle.IRecovery{TC.Tier.Runtime.Structures.Log.LogRecoveryHints},TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory{TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor},TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Log.Contracts.LogMetaHeader,TC.Tier.Runtime.Structures.Log.Contracts.LogMetaPayload},TC.Tier.Contracts.Meta.IMetaTransport,System.TimeProvider)">
+  EntryLog(IFileSystem, EntryLogSettings, ICommitPolicy?, IRecovery&lt;LogRecoveryHints&gt;?, LogCursorFactory&lt;ILogCursor&gt;?, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;?, IMetaTransport?, TimeProvider?)
   
   </h3>
 
@@ -288,7 +280,7 @@ Class EntryLog
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public EntryLog(IFileSystem fileSystem, EntryLogSettings settings, ICommitPolicy? commitPolicy = null, IRecovery&lt;LogRecoveryHints&gt;? recovery = null, LogCursorFactory&lt;ILogCursor&gt;? cursorFactory = null, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;? metaPolicyFactory = null, IMetaTransport? metaTransport = null)</code></pre>
+    <pre><code class="lang-csharp hljs">public EntryLog(IFileSystem fileSystem, EntryLogSettings settings, ICommitPolicy? commitPolicy = null, IRecovery&lt;LogRecoveryHints&gt;? recovery = null, LogCursorFactory&lt;ILogCursor&gt;? cursorFactory = null, MetaPolicyFactory&lt;LogMetaHeader, LogMetaPayload&gt;? metaPolicyFactory = null, IMetaTransport? metaTransport = null, TimeProvider? clock = null)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
@@ -313,6 +305,9 @@ Class EntryLog
 </dd>
     <dt><code>metaTransport</code> <a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></dt>
     <dd><p>Transport 模式的外部 meta 传输（Managed/Disabled 不用）。</p>
+</dd>
+    <dt><code>clock</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd><p>时间供给源（时间戳/超时度量；null = 系统时钟）。</p>
 </dd>
   </dl>
 
@@ -445,8 +440,7 @@ Class EntryLog
   
   </h3>
 
-  <div class="markdown level1 summary"><p>★ 恢复算法工厂——默认 DefaultLogRecovery。在 Initialize 的 CAS 闸门内被调一次
-（基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</p>
+  <div class="markdown level1 summary"><p>创建默认恢复器（EntryLogRecovery——Initialize 的 CAS 闸门内创建一次；注入实例经构造函数直接赋 _recovery）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -458,7 +452,8 @@ Class EntryLog
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogRecoveryHints.html">LogRecoveryHints</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>EntryLog 专属恢复器；恢复完成后设 CommittedOffset = TailAddress 并启动提前提交循环。</p>
+</dd>
   </dl>
 
 
@@ -562,11 +557,14 @@ Class EntryLog
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>entryAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd></dd>
+    <dd><p>本条 entry 的起始地址（含）。</p>
+</dd>
     <dt><code>payloadLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>entry payload 字节数（不含 header/padding）。</p>
+</dd>
     <dt><code>isMeta</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = meta entry（直接忽略——防提交链无限递归）；false = 业务 entry（参与提前提交判定）。</p>
+</dd>
   </dl>
 
 
@@ -643,7 +641,8 @@ Class EntryLog
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
-    <dd></dd>
+    <dd><p>表示异步提交链（CommitCoreAsync）完成的任务；重入/Dispose 守卫命中时同步完成。</p>
+</dd>
   </dl>
 
 
@@ -946,7 +945,7 @@ Segment not found）。OnAborted 只覆盖 2PC Abort 路径，此处补全普通
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

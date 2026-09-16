@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Core 故障注入面使用指南——IO 缝（FaultInjectingFileSystem）与时钟缝（FakeTimeProvider） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Core 故障注入面使用指南——IO 缝（FaultInjectingFileSystem）与时钟缝（FakeTimeProvider） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/fault-injection.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="core-故障注入面使用指南io-缝faultinjectingfilesystem与时钟缝faketimeprovider">Core 故障注入面使用指南——IO 缝（FaultInjectingFileSystem）与时钟缝（FakeTimeProvider）</h1>
+
+<blockquote>
+<p>对应设计：<code>docs/design/fault-injection-surface-design.md</code>（件一时钟缝 / 件三 IO 缝扩展）。
+哲学锚：注入脸只建在<strong>真实失败边界</strong>上，且是<strong>常设面非测试代码泄漏</strong>（spec-12 §9.2 传输面先例）。</p>
+</blockquote>
+<h2 id="0-快速开始30-秒上手">0. 快速开始（30 秒上手）</h2>
+<pre><code class="lang-csharp">// IO 缝——错误/腐败/慢/挂/乱序六族规则，装饰任意 IFileSystem
+using var fi = new FaultInjectingFileSystem(TierFs.New(&quot;memory:&quot;));
+fi.AddRule(&quot;*&quot;, &quot;Write&quot;, IOError.DiskFull, failAtCallIndex: 1);        // 第 1 次写 DiskFull
+fi.AddCorruptRule(&quot;data&quot;, &quot;Write&quot;, offset: 8, mask: new byte[] { 0xFF }); // 静默腐败
+using var dev = new StorageEngineOptions(&quot;eng&quot;).Builder(fi).Start();   // 注入引擎根 fs
+
+// 时钟缝——假钟快进驱动一切 provider 时间语义
+var clock = new FakeTimeProvider();
+var kv = await TierKvOfLongLong.CreateAsync(fs, TierKvOptions.Default.WithKvName(&quot;kv&quot;).WithClock(clock));
+clock.Advance(TimeSpan.FromSeconds(61));   // TTL 过期判定即刻生效——零真实睡等
+</code></pre>
+<h2 id="1-io-缝faultinjectingfilesystemtctiercoreiotestinginternal测试经-ivt-可见">1. IO 缝：FaultInjectingFileSystem（<code>TC.Tier.Core.IO.Testing</code>，internal——测试经 IVT 可见）</h2>
+<p>装饰器形态：持有内层 <code>IFileSystem</code>，句柄包装为 <code>FaultInjectingFileHandle</code>。规则 = 「路径 × 操作 × 命中仲裁」三维：
+路径/操作匹配是<strong>精确名或 <code>&quot;*&quot;</code></strong>；命中仲裁 = 概率（seeded Random——可复现）或第 N 次（<code>failAtCallIndex</code>，1 起，
+两者都设时<strong>确定性优先</strong>）。每条规则暴露 <code>MatchCount</code>（命中记账，可观测）。</p>
+<h3 id="六族规则可叠加各管各的注入维度">六族规则（可叠加，各管各的注入维度）</h3>
+<table>
+<thead>
+<tr>
+<th>族</th>
+<th>API</th>
+<th>注入点</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>错误（类型化）</td>
+<td><code>AddRule(path, op, IOError, probability, failAtCallIndex, detail)</code></td>
+<td>前置</td>
+<td>抛 <code>FileIOException</code>（语义码透传）</td>
+</tr>
+<tr>
+<td>错误（自定义异常）</td>
+<td><code>AddExceptionRule(path, op, Func&lt;Exception&gt;, …)</code></td>
+<td>前置</td>
+<td>非致命异常传播边界</td>
+</tr>
+<tr>
+<td>延迟</td>
+<td><code>AddDelayRule(path, op, TimeSpan, …)</code></td>
+<td>前置</td>
+<td>同步 Thread.Sleep / 异步 <code>Task.Delay</code>（ct 可取消）——watchdog/有界等待触发器</td>
+</tr>
+<tr>
+<td>挂起</td>
+<td><code>AddHangRule(path, op, detail)</code></td>
+<td>前置</td>
+<td>操作<strong>永不到达内层</strong>；异步路径 ct 取消即出（有界等待路径）；<code>ClearRules</code>/Dispose 释放门仅供拆除</td>
+</tr>
+<tr>
+<td>乱序</td>
+<td><code>AddReorderRule(path, op, TimeSpan holdDelay, …)</code></td>
+<td>前置（<strong>仅异步写族</strong>：WriteAsync/AppendAsync/WriteVectorAsync）</td>
+<td>命中操作延后 hold 再提交——与其后并发到达操作形成受控乱序；同步操作永不命中</td>
+</tr>
+<tr>
+<td>腐败</td>
+<td><code>AddCorruptRule(path, op, long offset, ReadOnlyMemory&lt;byte&gt; mask, …)</code></td>
+<td><strong>后置</strong>（写族转发成功后）</td>
+<td>对介质 <code>[offset, offset+mask.Length)</code> 现存字节按 <code>mask[i % Length]</code> 循环 XOR（读-XOR-写回，静默不抛）——读自愈/CRC 判废/MagicLocator 恢复扫描的对抗抓手</td>
+</tr>
+</tbody>
+</table>
+<h3 id="注入链与注入点全集">注入链与注入点全集</h3>
+<ul>
+<li><strong>同步入口链</strong>：错误（抛）→ 延迟（睡）→ 挂起（阻塞）。fs 级操作（Open/Delete/CreateFile/Stat/Enumerate*/…）与
+句柄同步数据面（Write/Read/Append/Flush/PunchHole/CopyRange/…）共用同链。</li>
+<li><strong>异步入口链</strong>：错误 → 延迟（异步等）→ 挂起（<code>WaitAsync(ct)</code>）→（写族）乱序裁决 → 转发 →（写族）腐败评估。
+异步注入点：WriteAsync / ReadAsync / AppendAsync / WriteVectorAsync / ReadVectorAsync。</li>
+<li>腐败后置评估点：Write / Append / WriteVector / CopyRange / CloneRange 及其异步版。</li>
+<li><code>ClearRules()</code>：六族全清 + 释放挂起门；<code>Dispose()</code> 同样先放行挂起线程再转发内层。</li>
+</ul>
+<h3 id="反模式禁忌">反模式（禁忌）</h3>
+<ol>
+<li><strong>挂起规则不设拆除外置</strong>——挂点在故障语义下永不放行，测试必须以被测方超时/取消路径先行处置；
+依赖 <code>ClearRules</code>/Dispose 放行当&quot;正常路径&quot;= 测试假绿。</li>
+<li><strong>乱序规则打同步操作</strong>——永不命中（乱序需要异步解耦）；静默不命中是设计契约，不是缺陷。</li>
+<li><strong>腐败规则按&quot;当前写负载&quot;寻址</strong>——腐败以<strong>介质绝对偏移</strong>寻址，翻转的是落盘现存字节（可能来自更早的写）。</li>
+<li><strong>真实乱序/掉电时序拿 mem 卷当真</strong>——mem 卷保序前提下的受控乱序只服务恢复协议确定性测试；
+真盘乱序归云上形态（二者互补，见 VALIDATIONS.md 各 V 项&quot;本地注入形态/云上形态&quot;）。</li>
+</ol>
+<h2 id="2-时钟缝faketimeprovidertctiercoretestingpublic零外部依赖替身">2. 时钟缝：FakeTimeProvider（<code>TC.Tier.Core.Testing</code>，public——零外部依赖替身）</h2>
+<p>BCL <code>TimeProvider</code> 自建测试替身（不用 Microsoft.Extensions.TimeProvider.Testing）。双钟模型：</p>
+<table>
+<thead>
+<tr>
+<th>钟</th>
+<th>读数 API</th>
+<th>注入</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单调钟</td>
+<td><code>GetTimestamp()</code>（ms 域，<code>TimestampFrequency=1000</code>——与 <code>Environment.TickCount64</code> 同域）</td>
+<td><code>Advance(delta)</code> 快进</td>
+<td>停走/倒流免疫；墙钟跳变不污染</td>
+</tr>
+<tr>
+<td>墙钟</td>
+<td><code>GetUtcNow()</code></td>
+<td><code>Advance</code>（按走速）/ <code>SetWallClock</code>（跳变）/ <code>SetDrift(rate)</code>（走速）</td>
+<td>TTL/租约消费点；跳变建模 NTP 校时</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>Advance</code> 同步推进双钟并<strong>按到期序同步触发</strong>到期定时器（周期定时器在大跨度 Advance 内连发；回调异常原样
+冒泡不吞）；<code>Advance(TimeSpan.Zero)</code> = 冲刷已到期定时器；due ≤ 0 的定时器&quot;创建即到期&quot;（下次 Advance 触发）。</li>
+<li><code>CreateTimer</code> 返回完整 <code>ITimer</code>（DueTime/Period 可读写、<code>Change</code> 可重挂、Dispose 解除挂载）。</li>
+<li><strong>缺省零变化</strong>：<code>TimeProvider.System</code> 下一切落点行为逐字节同现状；单调戳经
+<code>TimeProviderExtensions.GetMsTimestamp()</code>（System 快路径直读 <code>TickCount64</code>），延迟经
+<code>TimeProviderExtensions.Delay()</code>（System 直通 <code>Task.Delay</code>）。</li>
+<li>消费侧统一供给源：组件 Options 以 <code>TimeProvider Clock { get; init; } = TimeProvider.System;</code> 形态注入
+（RaftOptions.WithClock / TierKvOptions.WithClock / TierQueueOptions.WithClock / DistributedLock 锁组状态机与客户端构造参 /
+DeadlineRegistry(clock:)）。</li>
+</ul>
+<h3 id="反模式禁忌-1">反模式（禁忌）</h3>
+<ol>
+<li><strong>假钟不配同钟节拍注册表</strong>——raft 侧注入假钟时不显式传 registry 即自动新建同钟注册表；
+自行混搭（假钟 options + Shared 注册表）= deadline 判定错乱。</li>
+<li><strong>对墙钟消费点断言&quot;倒流后复活&quot;</strong>——TTL 观测点带单调水位守卫（<code>TierKv.NowUtcTicks</code>），已判过期项不复活；
+测试应断言<strong>不复活</strong>（§1.3 矩阵倒流行）。</li>
+<li><strong>等待循环用真实 Thread.Sleep 判定假钟推进</strong>——假钟语义下用 <code>Advance</code> 驱动；raft 节拍线程为真实线程
+（同钟注册表，100ms 封顶扫描粒度），快进后到 Role 收敛允许 ≤ 数百 ms 真实延迟。</li>
+<li><strong><code>TimeSpan.FromMilliseconds(-1)</code> 当负延迟用</strong>——它是 <code>Timeout.InfiniteTimeSpan</code> 哨兵（永不完成）。</li>
+</ol>
+<h2 id="3-指路">3. 指路</h2>
+<ul>
+<li>引擎缝（<code>IStorageEngineFaultInjector</code>）：见 <code>src/TC.Tier.Runtime/docs/storage-engine.md</code> §故障注入面。</li>
+<li>本地注入形态 / 云上形态落账：<code>scripts/cloud/VALIDATIONS.md</code> 各 V 项。</li>
+<li>设计定案：<code>docs/design/fault-injection-surface-design.md</code>（内部）。</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/fault-injection.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

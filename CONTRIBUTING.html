@@ -33,7 +33,7 @@
       <script type="module" src="./public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="index.html">
-            <img id="logo" class="svg" src="logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -93,7 +93,7 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 <li>测试临时目录用 <code>TC_TEST_TMP</code> 环境变量重定向到大盘（默认系统盘）。</li>
 </ul>
 <h2 id="代码规范编译期强制">代码规范（编译期强制）</h2>
-<p><code>TC.Tier.CodeGen.Analyzers</code> 内置代码规范规则（<code>src/**</code> 下 Error 级）：</p>
+<p><code>TC.Tier.Analyzers</code> 配置化分析器包（Tier 仓经根 <code>.editorconfig</code> 声明，<code>src/**</code> 下 Error 级）：</p>
 <table>
 <thead>
 <tr>
@@ -103,12 +103,24 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 </thead>
 <tbody>
 <tr>
-<td><code>TCSG030</code></td>
+<td><code>TCSG136</code></td>
 <td>禁止运行时反射——白盒访问走 <code>InternalsVisibleTo</code>，反射破坏 AOT/裁剪/性能</td>
 </tr>
 <tr>
-<td><code>TCSG031</code></td>
+<td><code>TCSG137</code></td>
 <td>禁止同步强制等待异步（<code>.GetAwaiter().GetResult()</code> / <code>.Wait()</code>）——同步阻塞后台 Task 会死锁 + 线程池耗尽</td>
+</tr>
+<tr>
+<td><code>TCSG138</code></td>
+<td>禁止丢弃 Task/ValueTask（<code>_ =</code> fire-and-forget）——异常未观测/无背压/生命周期失控，走 <code>TaskSink</code></td>
+</tr>
+<tr>
+<td><code>TCSG130-133</code></td>
+<td>分层依赖规则族（禁引用/零内部依赖/白名单/命名空间归属——<code>tier_layer.*</code> 键配置）</td>
+</tr>
+<tr>
+<td><code>TCSG139</code></td>
+<td>分析器配置非法 fail-fast</td>
 </tr>
 </tbody>
 </table>
@@ -129,6 +141,7 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 <h2 id="文档">文档</h2>
 <ul>
 <li>使用文档与 API 参考统一在独立文档站：https://docs.mytzz.top/（DocFX 自动生成，本地 scripts/docs-deploy.sh 部署）</li>
+<li>开发指南（全库设计思想：价值取向/组合式架构/数据反腐/代码组织范式）：<a href="DEVELOPMENT.html">DEVELOPMENT.md</a>——新增结构/能力前先读 §5 代码组织范式</li>
 </ul>
 <h2 id="许可">许可</h2>
 <p>MIT License，见 <a href="https://github.com/tc-tier/TC.Tier/blob/main/LICENSE">LICENSE</a>。</p>
@@ -153,7 +166,7 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

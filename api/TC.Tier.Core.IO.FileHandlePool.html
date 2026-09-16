@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -263,15 +263,18 @@ StorageEngineBase.FileHandle，第九轮评审重立为 Acquire/Release 协议�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>目标文件路径（相对文件系统根或绝对）。</p>
+</dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></dt>
-    <dd></dd>
+    <dd><p>打开意图（Access/Mode/Sharing/Hints/PreallocateSize）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
-    <dd></dd>
+    <dd><p>池内共享句柄（使用计数 +1；调用方须以 Dispose/<a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html#TC_Tier_Core_IO_FileHandlePool_Release_TC_Tier_Core_IO_IFileHandle_System_Boolean_">Release(IFileHandle, bool)</a> 归还）。</p>
+</dd>
   </dl>
 
 
@@ -332,9 +335,11 @@ close:true = 定向关闭：底层 Dispose + 出缓存（关闭必与出缓存�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>handle</code> <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
-    <dd></dd>
+    <dd><p>须经本池 <a class="xref" href="TC.Tier.Core.IO.FileHandlePool.html#TC_Tier_Core_IO_FileHandlePool_Acquire_System_String_TC_Tier_Core_IO_FileOpenOptions_">Acquire(string, FileOpenOptions)</a> 获取的句柄；否则抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>。</p>
+</dd>
     <dt><code>close</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true=定向关闭底层并出缓存；false=仅归还使用权（默认）。</p>
+</dd>
   </dl>
 
 
@@ -366,13 +371,15 @@ close:true = 定向关闭：底层 Dispose + 出缓存（关闭必与出缓存�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pathMatch</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.predicate-1">Predicate</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>路径谓词，true 表示该路径对应的池内句柄全部关闭。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>实际关闭并移出缓存的句柄数。</p>
+</dd>
   </dl>
 
 
@@ -403,17 +410,21 @@ close:true = 定向关闭：底层 Dispose + 出缓存（关闭必与出缓存�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>目标文件路径。</p>
+</dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></dt>
-    <dd></dd>
+    <dd><p>打开意图（参与缓存 key）。</p>
+</dd>
     <dt><code>handle</code> <a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
-    <dd></dd>
+    <dd><p>命中时输出池内句柄（使用计数 +1）；未命中为 null。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true=命中并已获取使用权；false=池中无此 (path, 打开语义)。</p>
+</dd>
   </dl>
 
 
@@ -445,7 +456,7 @@ close:true = 定向关闭：底层 Dispose + 出缓存（关闭必与出缓存�
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

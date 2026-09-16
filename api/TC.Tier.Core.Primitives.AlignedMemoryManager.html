@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -515,13 +515,15 @@ Class AlignedMemoryManager
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>起始字节偏移，单位字节，调用方自行保证 offset+sizeof(T) 不超出缓冲区。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>指向 <code class="paramref">offset</code> 处的 <code class="typeparamref">T</code> 引用；越界或已释放时行为未定义。</p>
+</dd>
   </dl>
 
   <h4 class="section">Type Parameters</h4>
@@ -557,13 +559,15 @@ Class AlignedMemoryManager
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>起始字节偏移，须满足 0 &lt;= offset 且 offset+sizeof(T) &lt;= Size。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>指向 <code class="paramref">offset</code> 处的 <code class="typeparamref">T</code> 引用；已释放或越界时抛出异常。</p>
+</dd>
   </dl>
 
   <h4 class="section">Type Parameters</h4>
@@ -601,7 +605,8 @@ Hot path 用 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>覆盖全部 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.html#TC_Tier_Core_Primitives_AlignedMemoryManager_Size">Size</a> 字节的切片；管理器已释放时抛出 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>。</p>
+</dd>
   </dl>
 
 
@@ -632,13 +637,15 @@ Hot path 用 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>起始字节偏移，0 到 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.html#TC_Tier_Core_Primitives_AlignedMemoryManager_Size">Size</a>（取 Size 时返回空切片）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>从 <code class="paramref">offset</code> 到缓冲区末尾的切片，长度为 Size-offset 字节；已释放或越界时抛出异常。</p>
+</dd>
   </dl>
 
 
@@ -669,15 +676,18 @@ Hot path 用 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>起始字节偏移，须满足 0 &lt;= offset 且 offset+length &lt;= Size。</p>
+</dd>
     <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>切片长度，单位字节，非负。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>长度为 <code class="paramref">length</code> 字节的切片；已释放或 offset/length 越界时抛出异常。</p>
+</dd>
   </dl>
 
 
@@ -708,15 +718,18 @@ Hot path 用 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>offset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>起始字节偏移，单位字节，调用方自行保证 0 &lt;= offset 且 offset+length &lt;= Size。</p>
+</dd>
     <dt><code>length</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>切片长度，单位字节。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>长度为 <code class="paramref">length</code> 字节的切片；参数越界或已释放时行为未定义。</p>
+</dd>
   </dl>
 
 
@@ -859,7 +872,7 @@ Hot path 用 <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

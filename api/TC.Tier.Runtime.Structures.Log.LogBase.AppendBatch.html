@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Struct LogBase.AppendBatch | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="批量 ref struct——inline 写页缓冲，本地跟踪 _pageUsed，Dispose 时回写宿主状态。">
+      <meta name="description" content="批量 ref struct——inline 写页缓冲，本地跟踪 _pageUsed，Dispose 时回写宿主状态。 ★ 消费纪律：批（ref struct）绝不跨 await 持有（持写锁）； 背压慢路的 await 发生在宿主侧（）——返回后批把写锁交还 （孤儿认领协议），消费方的下一个批操作在当前线程重新认领，任意续体线程安全。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -98,6 +98,9 @@ Struct LogBase.AppendBatch
   </div>
 
   <div class="markdown summary"><p>批量 ref struct——inline 写页缓冲，本地跟踪 _pageUsed，Dispose 时回写宿主状态。</p>
+<p>★ 消费纪律：批（ref struct）绝不跨 await 持有（持写锁）；<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html#TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_AppendAsync_System_ReadOnlySpan_System_Byte__System_Threading_CancellationToken_">AppendAsync(ReadOnlySpan&lt;byte&gt;, CancellationToken)</a>
+背压慢路的 await 发生在宿主侧（<span class="xref">TC.Tier.Runtime.Structures.Log.LogBase.AppendBatchSlowAsync(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)</span>）——返回后批把写锁交还
+（孤儿认领协议），消费方的下一个批操作在当前线程重新认领，任意续体线程安全。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -218,7 +221,8 @@ Struct LogBase.AppendBatch
   
   </h3>
 
-  <div class="markdown level1 summary"><p>批量追加单条 entry（inline 写页缓冲，本地跟踪偏移，返回 entry 起始 LogicalAddress）。</p>
+  <div class="markdown level1 summary"><p>批量追加单条 entry（inline 写页缓冲，本地跟踪偏移，返回 entry 起始 LogicalAddress）。
+★ 页满 = 让渡轨（异步刷盘、不阻塞写线程）；双页都在途 = 背压同步等（诚实阻塞语义）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -229,13 +233,63 @@ Struct LogBase.AppendBatch
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>entry</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>entry payload 字节（不含记录头；含 header+padding 须能放进单个页）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd></dd>
+    <dd><p>本条 entry 的起始 LogicalAddress（记录头起始处）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_AppendAsync_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.AppendAsync*"></a>
+
+  <h3 id="TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_AppendAsync_System_ReadOnlySpan_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.AppendAsync(System.ReadOnlySpan{System.Byte},System.Threading.CancellationToken)">
+  AppendAsync(ReadOnlySpan&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 批内异步追加（ValueTask 三档）：</p>
+<p>页有空间 = 纯 memcpy 同步快路（ValueTask 同步完成，零分配零跳线程）；</p>
+<p>页满无背压 = 让渡（同步完成——纯数据写任务已启动，写线程不阻塞）；</p>
+<p>页满背压（双页都在途）= 唯一真异步点：宿主侧 Monitor.Exit → await 在途刷 →
+Re-Enter → 让渡 → 写入 → 写锁交还（孤儿认领协议——消费方下一个批操作在当前线程重新认领）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;LogicalAddress&gt; AppendAsync(ReadOnlySpan&lt;byte&gt; entry, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>entry</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>entry payload 字节（不含记录头；单条含 header+padding 须 ≤ 页大小，
+否则抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>——大对象须由调用方拆成多条 entry）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（进入即检查；取消抛 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>ValueTask 三档：页有空间 / 页满无背压 = 同步完成；页满背压 = 真异步（宿主侧等在途刷盘后写入）。
+完成后结果 = 本条 entry 的起始 LogicalAddress（记录头起始处）。</p>
+</dd>
   </dl>
 
 
@@ -255,7 +309,7 @@ Struct LogBase.AppendBatch
   
   </h3>
 
-  <div class="markdown level1 summary"><p>Dispose：回写宿主 _pageUsed（地址空间窗口状态由 FlushPage 维护，无需回写）+ 释放写锁。</p>
+  <div class="markdown level1 summary"><p>Dispose：回写宿主 _pageUsed（地址空间窗口状态由 FlushPage/让渡轨维护，无需回写）+ 释放写锁。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -294,7 +348,7 @@ Struct LogBase.AppendBatch
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

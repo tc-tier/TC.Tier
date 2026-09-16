@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -96,8 +96,8 @@ Classes
 </h3>
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLog.html">DeltaLog</a></dt>
-      <dd><p>DeltaLog — KV 增量 checkpoint delta 流实现类。</p>
-<p>codec 绑定 DeltaLogCodec（不可替换）。其余参数全部可注入。</p>
+      <dd><p>DeltaLog 编解码 partial——嵌套 Codec（<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCodec.html">ILogCodec</a> 实现）：记录头写入与解析。</p>
+<p>★ Header 布局见 <a class="xref" href="TC.Tier.Runtime.Structures.Log.DeltaLog.DeltaLogHeader.html">DeltaLog.DeltaLogHeader</a>；CRC 由 <a class="xref" href="TC.Tier.Runtime.Structures.RecordCodec.html">RecordCodec</a> 统一处理。</p>
 </dd>
     </dl>
     <dl class="jumplist">
@@ -112,16 +112,8 @@ Classes
     </dl>
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html">EntryLog</a></dt>
-      <dd><p>EntryLog — 通用 entry 顺序日志实现类（WAL 是其典型用途，非唯一用途）。</p>
-<p>★ EntryLog.md：通用 per-entry [16B EntryCodec header][payload+4B对齐] 纯追加顺序日志。</p>
-<p>★ 提交模型（两层，职责分离）：</p>
-<p>  1. <b>底层页提交契约（恒成立，不可配置）</b>：Append 跨页 → FlushPage 数据落盘 →
-        <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.html#TC_Tier_Runtime_Structures_Log_EntryLog_OnPageFlushed_TC_Tier_Contracts_Storage_LogicalAddress_">OnPageFlushed(LogicalAddress)</a> 同步执行 commit 链（meta.Commit + 推进 CommittedOffset）。
-        这是页模式的本质保证——前一页换出时即持久化，无需任何策略注入。最坏情况：写满一页才提交。</p>
-<p>  2. <b>可选提前提交（注入式优化，降延迟）</b>：<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ICommitPolicy.html">ICommitPolicy</a> 在页未满时提前触发提交。
-        注入 null（默认）= 仅依赖底层页契约；注入 <span class="xref">TC.Tier.Runtime.Structures.Log.GroupCommitPolicy</span> = 三维度提前提交。</p>
-<p>★ 上述两层取代旧的"fire-and-forget 后台循环 + Append 内 spawn 提交"模型——后者线程池饥饿即系统挂，
-        且错误被静默吞。新模型提交都在写线程同步完成，无并发、错误冒泡。</p>
+      <dd><p>EntryLog 编解码 partial——嵌套 Codec（<a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCodec.html">ILogCodec</a> 实现）：记录头写入与解析。</p>
+<p>★ Header 布局见 <a class="xref" href="TC.Tier.Runtime.Structures.Log.EntryLog.EntryLogHeader.html">EntryLog.EntryLogHeader</a>；CRC 由 <a class="xref" href="TC.Tier.Runtime.Structures.RecordCodec.html">RecordCodec</a> 统一处理。</p>
 </dd>
     </dl>
     <dl class="jumplist">
@@ -146,13 +138,20 @@ Classes
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.html">LogBase</a></dt>
       <dd><p>LogBase 批量追加 partial——★ 地址空间窗口 + 页攒批模型。</p>
-<p>inline 写页缓冲（本地跟踪 _pageUsed），换页时同步宿主 _pageUsed 并提交，Dispose 时回写宿主状态。</p>
+<p>inline 写页缓冲（本地跟踪 _pageUsed），页满走<b>让渡轨</b>（<span class="xref">TC.Tier.Runtime.Structures.Log.LogBase.FlushPageYield</span>：
+当前页让渡给异步刷盘管线、立即切另一页继续写——页满不阻塞写线程，唯一等待点 = 双页都在途的
+背压），Dispose 时回写宿主状态。</p>
+<p>★ 双形态：<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html#TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_Append_System_ReadOnlySpan_System_Byte__">Append(ReadOnlySpan&lt;byte&gt;)</a>（同步——页满让渡零阻塞，背压同步等=诚实语义）+
+<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html#TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_AppendAsync_System_ReadOnlySpan_System_Byte__System_Threading_CancellationToken_">AppendAsync(ReadOnlySpan&lt;byte&gt;, CancellationToken)</a>（ValueTask——快路/让渡路同步完成，仅背压真异步）。</p>
 <p>★ 消除 per-entry：EnsureNotDisposed / ComputePaddingLength / OnAppended / EnsureSpace*。</p>
+<p>★ 单写者纪律（顺序读依赖批内物理连续性）：<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html#TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_AppendAsync_System_ReadOnlySpan_System_Byte__System_Threading_CancellationToken_">AppendAsync(ReadOnlySpan&lt;byte&gt;, CancellationToken)</a> 背压慢路的
+Monitor.Exit 窗口内禁止其他写者插队 Begin——批协议的消费形态 = 单写者
+（raft 适配器 = wal 唯一追加方）。</p>
 </dd>
     </dl>
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.LogRecovery-1.html">LogBase.LogRecovery&lt;TLogBase&gt;</a></dt>
-      <dd><p>Log 恢复基类（<a class="xref" href="TC.Tier.Core.Shared.RecoveryBase-1.html">RecoveryBase&lt;THints&gt;</a> 模板派生，子类可继承后 override
+      <dd><p>Log 恢复基类（<a class="xref" href="TC.Tier.Core.Lifecycle.RecoveryBase-1.html">RecoveryBase&lt;THints&gt;</a> 模板派生，子类可继承后 override
 <a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.LogRecovery-1.html#TC_Tier_Runtime_Structures_Log_LogBase_LogRecovery_1_OnLogRecovered">OnLogRecovered()</a> 做依赖恢复结果的装配）。</p>
 </dd>
     </dl>
@@ -196,6 +195,9 @@ Structs
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html">LogBase.AppendBatch</a></dt>
       <dd><p>批量 ref struct——inline 写页缓冲，本地跟踪 _pageUsed，Dispose 时回写宿主状态。</p>
+<p>★ 消费纪律：批（ref struct）绝不跨 await 持有（持写锁）；<a class="xref" href="TC.Tier.Runtime.Structures.Log.LogBase.AppendBatch.html#TC_Tier_Runtime_Structures_Log_LogBase_AppendBatch_AppendAsync_System_ReadOnlySpan_System_Byte__System_Threading_CancellationToken_">AppendAsync(ReadOnlySpan&lt;byte&gt;, CancellationToken)</a>
+背压慢路的 await 发生在宿主侧（<span class="xref">TC.Tier.Runtime.Structures.Log.LogBase.AppendBatchSlowAsync(System.Byte[],System.Int32,System.Int32,System.Int32,System.Int32,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)</span>）——返回后批把写锁交还
+（孤儿认领协议），消费方的下一个批操作在当前线程重新认领，任意续体线程安全。</p>
 </dd>
     </dl>
     <dl class="jumplist">
@@ -224,7 +226,7 @@ Structs
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace TC.Tier.Core.Execution | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace TC.Tier.Core.Execution | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Execution">
+
+  <h1 id="TC_Tier_Core_Execution" data-uid="TC.Tier.Core.Execution" class="text-break">Namespace TC.Tier.Core.Execution</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.AsyncPump.html">AsyncPump</a></dt>
+      <dd><p>单线程异步泵（执行原语——调用线程驱动异步状态机）：work 执行期间安装专用
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.synchronizationcontext">SynchronizationContext</a>，<b>不写 <code>ConfigureAwait(false)</code></b> 的 await 续体经
+Post 回泵队列、由同一线程逐项执行——单线程亲和（work 状态机无需锁/原子，泵线程是唯一推进者），
+零额外线程、零跨线程唤醒（对照 <a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html">SyncAsyncBridge</a>：桥=独立池+等待者 park，泵=就地推进）。</p>
+<p>★ 上下文契约：泵域内续体回流是<b>功能</b>——消费方在 work 内<b>不写</b> ConfigureAwait(false)
+  （与全仓 ConfigureAwait(false) 纪律的边界：域外它是防 UI 上下文捕获的缺省姿态，域内回流即语义）。
+  第三方库内部的 ConfigureAwait(false) 段不回流（线程池执行）——泵空转等待其完成，语义安全。</p>
+<p>★ 死锁拆解：Run 内再 Run = 同线程等自己泵（自锁）——快速失败；work 内禁止阻塞等待
+  （协作式异步契约——阻塞占死唯一泵线程，域内续体无人推进）；跨 await 持有的锁需依赖单线程亲和
+  化解（这正是本原语的存在理由），跨线程进入域外等待是调用方责任。</p>
+<p>★ 空转等待：work 等待不回流的段（外部异步/第三方 ConfigureAwait(false)）时队列空——
+  park 在事件上（Post/任务完成双双唤醒），不自旋不烧 CPU。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a></dt>
+      <dd><p>通用长生命周期后台循环骨架（第一层——循环骨架，无队列）。与业务无关。</p>
+<p>★ 封装：执行器（注入 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler">TaskScheduler</a>（如 IsolatedTaskScheduler.Shared）或 null=公共池 +
+  <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_ConsumerCount">ConsumerCount</a> 多消费者扇出——消费者是协作跑在调度器线程上的循环 Task，不是线程数）+ 幂等启停 +
+  超时等待退出 + CAS 防双 Dispose + 单周期异常隔离。</p>
+<p>★ 子类实现 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>（一个工作周期）+ 信号源选择（见 worker-loop-unified-design.md §5）。</p>
+<p>★ 自身 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>——<a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a> 内建持有时，
+  Dispose 统一编排 Stop + WaitForExit（见 worker-loop-unified-design.md §4）。</p>
+<p>★ 多消费者：<a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_ConsumerCount">ConsumerCount</a> 个执行体共跑同一循环（各自 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>），
+  常用于事件驱动队列的多消费者 drain（<a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html">BackgroundWorkerLoop&lt;T&gt;</a> 内建优先级队列 + counting-semaphore
+  逐项公平唤醒，见 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a>）。默认 1 = 向后兼容。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html">BackgroundWorkerLoop&lt;T&gt;</a></dt>
+      <dd><p>事件驱动 + 队列的后台循环骨架（第二层——内建 5 档优先级队列）。</p>
+<p>★ 继承 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>（循环骨架 + 启停 Dispose + <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_ConsumerCount">多消费者</a>），追加：
+  内建 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a> + 统一 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Execution_WorkerPriority_">Enqueue(T, WorkerPriority)</a> 入队 +
+  abstract <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a> + virtual <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a>（出队分发）。</p>
+<p>★ <b>开箱即用</b>（标准后台任务模式）：子类只实现 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_ProcessItemAsync__0_System_Threading_CancellationToken_">ProcessItemAsync(T, CancellationToken)</a>，
+  基类默认 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 从队列出队分发。入队统一 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_Enqueue__0_TC_Tier_Core_Execution_WorkerPriority_">Enqueue(T, WorkerPriority)</a>。</p>
+<p>★ <b>多消费者</b>：构造传 <code>consumerCount &gt; 1</code>，N 个消费者共 drain 同一优先级队列（counting-semaphore
+  逐项公平唤醒，见 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html#TC_Tier_Core_Collections_BucketPriorityQueue_2_DequeueAsync_System_Threading_CancellationToken_">DequeueAsync(CancellationToken)</a>）。</p>
+<p>★ <b>需要重写</b>：子类 override <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop-1.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_1_RunOneCycleAsync_System_Threading_CancellationToken_">RunOneCycleAsync(CancellationToken)</a> 自定义循环逻辑
+  （如 Lifecycle 的 fire-and-forget 并发内核）。内建队列仍在。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.CpuSampler.html">CpuSampler</a></dt>
+      <dd><p>通用 CPU 利用率采样 + 限流系数计算（Core/Shared）。继承 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a>——
+PeriodicTimer 驱动采样，Start/Stop/Dispose 全由基类。</p>
+<p>★ <b>计算模型（明确，不靠概念）</b>：采样<b>本进程</b> CPU——
+  <code>raw = ΔProcess.TotalProcessorTime / (Δ实际墙钟 × ProcessorCount)</code>，归一化 0~1
+  （1.0 = 本进程跑满所有核）。是<b>进程口径</b>而非整机口径：其它进程造成的系统饱和本采样器看不见
+  （整机口径需性能计数器，跨平台不可用，故明确取进程口径）。</p>
+<p>★ 平滑：EMA——<code>ema' = α·raw + (1−α)·ema</code>，<b>首样本标志位</b>初始化（不拿 ema==0 当哨兵：
+  旧实现空闲→高载第一个样本直接跳变，无平滑——"不平稳过渡"的根因）。</p>
+<p>★ 限流系数 <a class="xref" href="TC.Tier.Core.Execution.CpuSampler.html#TC_Tier_Core_Execution_CpuSampler_ThrottleFactor">ThrottleFactor</a>：分段线性——CPU ≤ lowCutoff → 0（不限流）；
+  lowCutoff~highCutoff → 线性 0→1（软降速）；≥ highCutoff → 1（强阻塞）。
+  系数计算是纯函数（<span class="xref">TC.Tier.Core.Execution.CpuSampler.MapThrottleFactor(System.Double,System.Double,System.Double)</span>，internal 可测）。</p>
+<p>★ Hub 折叠：注入 <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a> 后每采样发布
+  <code>cpu.utilization</code> / <code>cpu.throttle_factor</code> Gauge，档位切换（正常→限流→强阻塞→恢复）打日志——
+  限流判断进可观测视图，不再隐形。</p>
+<p>★ 热路径零开销：读 <a class="xref" href="TC.Tier.Core.Execution.CpuSampler.html#TC_Tier_Core_Execution_CpuSampler_CpuUtilization">CpuUtilization</a> / <a class="xref" href="TC.Tier.Core.Execution.CpuSampler.html#TC_Tier_Core_Execution_CpuSampler_ThrottleFactor">ThrottleFactor</a> 走 Volatile.Read；
+  Hub 未注入（默认 Disabled）时指标短路零开销。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html">DeadlineRegistry</a></dt>
+      <dd><p>时间驱动唤醒注册表（零 TimerQueue 依赖原语——拉取模型，设计稿
+docs/design/tc-tier-net-timerqueue-free-tick-pacer-design.md）。</p>
+<p>★ 背景判例：.NET 8 TimerQueue 在高频触发窗口把 PeriodicTimer 从定时器链表弄丢
+  （堆转储实锤：TimerQueueTimer _next=0,_prev=0 孤儿）——tick 永不再来 → 共识循环冻结。
+  本原语用<b>专用线程 + WaitHandle.WaitOne 同步等待</b>（futex 实现）取代一切定时器依赖。</p>
+<p>★ 拉取模型：条目不存 deadline 值——持 <code>Func&lt;long&gt;</code>（deadline 计算委托，
+  owner 侧读自己的 Interlocked 字段，TickCount64 单位）+ <code>Action</code>（唤醒回调）。节拍线程
+  每轮醒来重扫全部条目：到期者回调、未到期者取最早值睡眠。零更新竞态、无堆、无重排协议；
+  deadline 早移由封顶（<span class="xref">TC.Tier.Core.Execution.DeadlineRegistry.DefaultCapMilliseconds</span>=100ms）保证有界晚醒。</p>
+<p>★ 分片：<a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html">DeadlineRegistry</a>——每 shard 独立条目表 + 独立
+  节拍线程（懒启：首个订阅才起、起后常驻）；订阅按 round-robin 稳定分配，条目终身不动
+  （句柄持 shard 引用——退订零查找）。扫描成本 = 条目数 × 唤醒率：单分片到 10⁴ 级无感，
+  万级 → shard=2、10⁶ 级 → 4（升级触发器见设计稿 §3.2）。</p>
+<p>★ 生命周期：<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a>/<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a>——CAS 防双释放 +
+  有界等节拍线程退出（对齐 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html">BackgroundWorkerLoop</a> 样板）。<a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html#TC_Tier_Core_Execution_DeadlineRegistry_Shared">Shared</a>
+  进程级懒加载单例（IsolatedTaskScheduler.Shared 同款先例）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.IsolatedSchedulerOptions.html">IsolatedSchedulerOptions</a></dt>
+      <dd><p><a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a> 的构造选项（集中所有旋钮）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Shared">Shared</a> 用全默认；<a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Create_TC_Tier_Core_Execution_IsolatedSchedulerOptions_">Create(IsolatedSchedulerOptions?)</a> 传自定义。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></dt>
+      <dd><p>隔离线程 TaskScheduler——在 M 个<b>私有</b>线程上执行任务，与公共线程池（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.taskscheduler.default">Default</a>）完全隔离。</p>
+<p>★ 用途：高频 / 关键路径的 worker（如引擎建段 worker）需要线程隔离——其异步 continuation 不与公共池上的
+  其它任务（写者、其它池工作）争抢池线程，避免饥饿/抖动。</p>
+<p>★ <b>真·异步友好</b>：任务在私有线程上执行时 <code>TaskScheduler.Current</code> = 本调度器，任务内 <code>await</code> 的
+  continuation 自动回到本调度器的私有线程（不经公共池）——既得「专用线程」隔离，又无 <code>GetAwaiter().GetResult()</code>
+  sync-over-async（高频路径禁区）。</p>
+<p>★ <b>阻塞等待模型</b>：私有线程在 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1">BlockingCollection&lt;T&gt;</a> 上阻塞等任务（空闲不占 CPU）。</p>
+<p>★ <b>稀缺资源·受控创建</b>：每实例开 M 个真实 OS 线程（栈 ~1MB/线程）。<b>禁止</b>直接 <code>new</code>——ctor 为
+  <code>internal</code>，经 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Shared">Shared</a>（进程级全局单例）或 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Create_TC_Tier_Core_Execution_IsolatedSchedulerOptions_">Create(IsolatedSchedulerOptions?)</a>（工厂 + 防扩散护栏）获取，
+  使用指南见 §2（使用指南：docs/dedicated-task-scheduler.md，文档站）（选型/旋钮/注意事项/故障排查）。</p>
+<p>★ 释放：调用方须在所有任务结束后（worker 的 WaitForExit 之后）调 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Dispose">Dispose()</a>——
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.concurrent.blockingcollection-1.completeadding">CompleteAdding()</a> + Join 线程。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html">SyncAsyncBridge</a></dt>
+      <dd><p>同步-异步桥（docs/sync-async-bridge.md §6）——&quot;写路径必须同步转异步&quot;的统一出口。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html#TC_Tier_Core_Execution_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Execution_SyncBridgeOptions_System_Threading_CancellationToken_">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>：在独立池上发起异步工作，<b>立即</b>返回 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperation.html">AsyncOperation</a> 状态句柄
+  （返回时状态已同步置 Running——可见性原则）。调用方继续本地逻辑，最后时刻才 <code>Wait</code>（"Start 早、Wait 晚"）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html#TC_Tier_Core_Execution_SyncAsyncBridge_Run_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Execution_SyncBridgeOptions_System_Threading_CancellationToken_">Run(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html#TC_Tier_Core_Execution_SyncAsyncBridge_Run__1_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask___0___TC_Tier_Core_Execution_SyncBridgeOptions_System_Threading_CancellationToken_">Run&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;, SyncBridgeOptions?, CancellationToken)</a>：一次性便捷入口（Start + 有界 Wait + 失败重抛）——
+  同步 API 桥接的常规形态，替代裸 <code>GetAwaiter().GetResult()</code>。</p>
+<p>★ 死锁拆解：异步工作跑 <a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html#TC_Tier_Core_Execution_SyncAsyncBridge_DefaultScheduler">DefaultScheduler</a>（IsolatedTaskScheduler 私有线程，
+  continuation 回流私有线程）——推进<b>不依赖公共池可用性</b>；同步等待者 park 在事件上（非 Task.Wait），
+  无同步上下文回流、无完成边缘内联续体语义模糊。</p>
+<p>★ 再入防护：桥 work 体内再经<b>同一池</b>同步等待 = 池自锁（M 线程全 park 等嵌套 work）→
+  <a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html#TC_Tier_Core_Execution_SyncAsyncBridge_Start_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__TC_Tier_Core_Execution_SyncBridgeOptions_System_Threading_CancellationToken_">Start(Func&lt;CancellationToken, ValueTask&gt;, SyncBridgeOptions?, CancellationToken)</a> 快速失败（InvalidOperationException）。嵌套场景注入独立 <code>Scheduler</code> 分池豁免；
+  跨池嵌套等待必须无环（DAG，对齐 WaitForDependenciesAsync 纪律）。</p>
+<p>★ work 契约：<b>协作式异步</b>——<code>await</code> 让出、不阻塞（M 很小，阻塞任务直接饿死同池操作，
+  对齐 dedicated-task-scheduler.md §7.2 教训）。真正无法异步化的同步重 IO 由调用方注入 own 单线程实例。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.SyncBridgeOptions.html">SyncBridgeOptions</a></dt>
+      <dd><p><a class="xref" href="TC.Tier.Core.Execution.SyncAsyncBridge.html">SyncAsyncBridge</a> 的调用选项（docs/sync-async-bridge.md §6.1）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.TaskSink.html">TaskSink</a></dt>
+      <dd><p>任务沉池（fire-and-forget 派发原语——执行载体 taxonomy 终态：短频繁·可丢失自愈）。</p>
+<p>★ 契约一句话：提交即放手（void 不返回，调用方零仪式）。<b>保证</b>——异常收口不外泄
+  （计数 + 日志 + onFaulted 回调）、组生命周期（Dispose = 取消传播 +
+  有界 drain）；<b>不保证</b>——执行（已释放即拒/池拒绝/进程终）、完成通知（丢弃静默，
+  仅计数器事后可观测）、顺序（提交序 ≠ 执行序）。</p>
+<p>★ 越界即错：按身份去重/单任务取消/等待指定任务完成不是本原语的语义——协议层自持状态；
+  长稳定异步循环走专用线程 + <a class="xref" href="TC.Tier.Core.Execution.AsyncPump.html">AsyncPump</a> 泵域；时间驱动唤醒走
+  <a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html">DeadlineRegistry</a>。</p>
+<p>★ 在途跟踪 = 原子计数 + drain 信号（提交热路径零堆分配——<a class="xref" href="TC.Tier.Core.Execution.TaskSink.html#TC_Tier_Core_Execution_TaskSink_DisposeAsync">DisposeAsync()</a> 等计数归零）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.TimeProviderExtensions.html">TimeProviderExtensions</a></dt>
+      <dd><p><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a> 扩展——时钟缝（故障注入面补全设计 件一）消费侧统一供给源。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Execution.TimeProviderExtensions.html#TC_Tier_Core_Execution_TimeProviderExtensions_GetMsTimestamp_System_TimeProvider_">GetMsTimestamp(TimeProvider)</a>：毫秒单调戳——语义与存量 <code>Environment.TickCount64</code> 域逐字节对齐
+  （System 快路径直读 TickCount64；假钟按 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.timestampfrequency">TimestampFrequency</a> 换算），
+  落点改造零算术变更（deadline 字段全部保持 ms 域）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Execution.TimeProviderExtensions.html#TC_Tier_Core_Execution_TimeProviderExtensions_Delay_System_TimeProvider_System_TimeSpan_System_Threading_CancellationToken_">Delay(TimeProvider, TimeSpan, CancellationToken)</a>：provider 可注入的任务延迟——
+  假钟下由测试快进驱动（零真实睡等），System 下直通 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task.delay#system-threading-tasks-task-delay(system-timespan-system-threading-cancellationtoken)">Delay(TimeSpan, CancellationToken)</a>
+  （缺省零变化）。</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.SchedulerRestartPolicy.html">SchedulerRestartPolicy</a></dt>
+      <dd><p>专用线程死亡重启策略（§4）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Execution.WorkerPriority.html">WorkerPriority</a></dt>
+      <dd><p>后台循环的 5 档优先级（值小者先出）。内建队列固定 5 档，覆盖全部底层 worker 场景。</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

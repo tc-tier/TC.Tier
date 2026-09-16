@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -331,7 +331,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>mkdir -p（幂等，登记全部祖先组件）+ 耐久（新建目录与父目录 fsync）。</p>
+  <div class="markdown level1 summary"><p>创建目录（mkdir -p——登记全部祖先组件，幂等）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -342,7 +342,7 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>目录相对路径。</p>
 </dd>
   </dl>
 
@@ -399,6 +399,15 @@ Class MemoryFileSystem
 预分配：Reserved 真租物理块 / Sparse 逻辑长度；FileExtra 入槽字段（§3.6）。</p>
 </div>
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件已存在、路径是目录或父目录不存在。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>extra 超限或 preallocateSize 为负。</p>
+</dd>
+  </dl>
 
 
 
@@ -420,9 +429,11 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>文件相对路径。</p>
+</dd>
     <dt><code>size</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>初始逻辑长度（字节，≥0）。</p>
+</dd>
   </dl>
 
 
@@ -433,6 +444,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>size 为负。</p>
+</dd>
+  </dl>
 
 
 
@@ -443,7 +460,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>耐久删除文件（=FileNative.DeleteFileDurably 语义）。</p>
+  <div class="markdown level1 summary"><p>删除文件（幂等——不存在静默返回；数据延迟到最后观察者关闭）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -454,7 +471,7 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径。</p>
+    <dd><p>文件相对路径。</p>
 </dd>
   </dl>
 
@@ -476,9 +493,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>删除目录（POSIX rmdir：仅限空——非空抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_DirectoryNotEmpty">DirectoryNotEmpty</a>）+ 父目录 fsync。</p>
-<pre><code>        &lt;p&gt;★ 不提供递归删除（危险操作不藏糖：EnumerateFiles+Delete+DeleteDirectory 显式组合）。&lt;/p&gt;
-</code></pre>
+  <div class="markdown level1 summary"><p>删除空目录（不存在或非空即抛）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -489,7 +504,7 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>目录相对路径。</p>
 </dd>
   </dl>
 
@@ -501,6 +516,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>目录不存在（NotFound）或非空（DirectoryNotEmpty）。</p>
+</dd>
+  </dl>
 
 
 
@@ -522,7 +543,8 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>文件相对路径。</p>
+</dd>
   </dl>
 
 
@@ -554,13 +576,15 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>文件相对路径（须已存在）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html">MemoryFileSystem</a>.<a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.DetachedFile.html">DetachedFile</a></dt>
-    <dd></dd>
+    <dd><p>被摘除文件的负载（缓冲/稀疏布局所有权归调用方；在途 IO 屏障后移交）。</p>
+</dd>
   </dl>
 
 
@@ -570,6 +594,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件不存在。</p>
+</dd>
+  </dl>
 
 
 
@@ -580,7 +610,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>目录存在性（Remote：前缀下有对象或子前缀——能力位 EmptyDirectories 未置位时创建后未必可见）。</p>
+  <div class="markdown level1 summary"><p>目录是否存在。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -591,14 +621,15 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>目录相对路径。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 目录在档（或其下有内容）；false = 不存在。</p>
+</dd>
   </dl>
 
 
@@ -677,16 +708,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>进入维护态（能力位 MaintenanceGate 门控；未置位实现抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_Unsupported">Unsupported</a>）——
-采集/还原静默快照的通用前置（raw-medium-and-conversion-design §8）。</p>
-<p>★ 语义：闭门 → 阻塞等待在途<b>变异</b>归零（ct 可取消；消费者业务在途收敛是消费者契约，§8.2）
-  → 返回 IDisposable 租约（Dispose 即解除）。非重入：维护中二次 Enter 抛
-  <a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a>(<a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_UnderMaintenance">UnderMaintenance</a>)。</p>
-<p>★ scope=<a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html#TC_Tier_Core_IO_MaintenanceScope_WriteOperations">WriteOperations</a>：命名空间变更与句柄写族拒绝（读放行——备份档）；
-  scope=<a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html#TC_Tier_Core_IO_MaintenanceScope_AllOperations">AllOperations</a>：读写全拒（完全隔离档）。
-  被拒操作抛 <a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a>(<a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_UnderMaintenance">UnderMaintenance</a>)——与能力位语义
-  <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_Unsupported">Unsupported</a> 分离，调用方可映射"维护中"提示。</p>
-<p>★ Flush/FlushRoot 不拒（关闭协议的组成：进维护 → 收敛 → Flush 置 clean）。</p>
+  <div class="markdown level1 summary"><p>进入维护模式——按 scope 拒绝并发操作，返回的租约 Dispose 即退出。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -697,20 +719,20 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>reason</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>维护理由（诊断/可观测）。</p>
+    <dd><p>维护原因（诊断/日志用）。</p>
 </dd>
     <dt><code>scope</code> <a class="xref" href="TC.Tier.Core.IO.MaintenanceScope.html">MaintenanceScope</a></dt>
-    <dd><p>拒绝范围。</p>
+    <dd><p>维护范围（决定拒绝面——All 连读也拒）。</p>
 </dd>
     <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
-    <dd><p>在途收敛等待的取消令牌。</p>
+    <dd><p>取消令牌（默认 default = 不取消）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></dt>
-    <dd><p>维护租约</p>
+    <dd><p>维护租约（Dispose 即退出维护）。</p>
 </dd>
   </dl>
 
@@ -731,7 +753,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举根层子目录。</p>
+  <div class="markdown level1 summary"><p>枚举目录（从根；显式集合 ∪ 文件路径推导）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -742,17 +764,17 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>目录名通配模式（默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅一层（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>目录条目序列（Name 为相对根的路径）。</p>
 </dd>
   </dl>
 
@@ -773,7 +795,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举子目录的一层子目录（recursive=true = 全部后代目录）。</p>
+  <div class="markdown level1 summary"><p>枚举目录（从指定目录）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -784,20 +806,20 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>起始目录相对路径。</p>
 </dd>
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>目录名通配模式。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅一层（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>目录条目序列（Name 为相对起始目录的路径）。</p>
 </dd>
   </dl>
 
@@ -808,6 +830,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>目录不存在。</p>
+</dd>
+  </dl>
 
 
 
@@ -818,8 +846,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>混合枚举（文件+目录一次产出——引擎扫盘形态；Remote 单次列举同时出 Objects+CommonPrefixes）。
-契约：同参下结果 = EnumerateFiles ∪ EnumerateDirectories。</p>
+  <div class="markdown level1 summary"><p>枚举文件与目录（从根；按 Name Ordinal 排序）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -830,17 +857,17 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>名称通配模式（默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅一层（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</p>
 </dd>
   </dl>
 
@@ -861,7 +888,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>混合枚举（子目录范围）。</p>
+  <div class="markdown level1 summary"><p>枚举文件与目录（从指定目录；按 Name Ordinal 排序）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -872,20 +899,20 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>起始目录相对路径。</p>
 </dd>
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>名称通配模式。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅一层（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</p>
 </dd>
   </dl>
 
@@ -896,6 +923,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>目录不存在。</p>
+</dd>
+  </dl>
 
 
 
@@ -918,7 +951,8 @@ Class MemoryFileSystem
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>全部在档文件路径快照（锁内物化数组）。</p>
+</dd>
   </dl>
 
 
@@ -938,7 +972,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举根层文件（pattern 缺省 &quot;*&quot; 全匹配；recursive=true 全部后代）。</p>
+  <div class="markdown level1 summary"><p>枚举文件（从根；PathPattern 客户端过滤，按 Name Ordinal 排序）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -949,17 +983,17 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>文件名通配模式（最终组件名匹配，默认 &quot;*&quot;）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅一层（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件条目序列（Name 为相对根的路径）。</p>
 </dd>
   </dl>
 
@@ -970,12 +1004,6 @@ Class MemoryFileSystem
 
 
 
-  <h4 class="section">Exceptions</h4>
-  <dl class="parameters">
-    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
-    <dd><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
-</dd>
-  </dl>
 
 
 
@@ -986,7 +1014,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>枚举子目录层文件。Name = 相对所枚举目录的路径（recursive 时多组件）。</p>
+  <div class="markdown level1 summary"><p>枚举文件（从指定目录；按 Name Ordinal 排序）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -997,20 +1025,20 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目录路径。</p>
+    <dd><p>起始目录相对路径。</p>
 </dd>
     <dt><code>pattern</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</p>
+    <dd><p>文件名通配模式（最终组件名匹配）。</p>
 </dd>
     <dt><code>recursive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否递归枚举全部后代目录。</p>
+    <dd><p>true = 递归子目录；false = 仅一层（默认）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.IO.FsEntry.html">FsEntry</a>&gt;</dt>
-    <dd><p>枚举条目集合</p>
+    <dd><p>文件条目序列（Name 为相对起始目录的路径）。</p>
 </dd>
   </dl>
 
@@ -1024,7 +1052,7 @@ Class MemoryFileSystem
   <h4 class="section">Exceptions</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
-    <dd><p>IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</p>
+    <dd><p>目录不存在。</p>
 </dd>
   </dl>
 
@@ -1037,7 +1065,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>文件存在性（目录存在性见 <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html#TC_Tier_Core_IO_IFileSystem_DirectoryExists_System_String_">DirectoryExists(string)</a>）。</p>
+  <div class="markdown level1 summary"><p>文件是否存在（目录不计入）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1048,14 +1076,15 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径。</p>
+    <dd><p>文件相对路径。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 文件在档；false = 不存在（或路径是目录）。</p>
+</dd>
   </dl>
 
 
@@ -1113,9 +1142,11 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>文件相对路径（须已存在）。</p>
+</dd>
     <dt><code>newSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>目标逻辑长度（字节，≥0 且须 ≥ 当前长度——收缩走 TruncateFile）。</p>
+</dd>
   </dl>
 
 
@@ -1126,6 +1157,15 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件不存在。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>newSize 为负。</p>
+</dd>
+  </dl>
 
 
 
@@ -1147,9 +1187,11 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>目标文件相对路径（已存在则被替换——旧文件 Detached）。</p>
+</dd>
     <dt><code>file</code> <a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html">MemoryFileSystem</a>.<a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.DetachedFile.html">DetachedFile</a></dt>
-    <dd></dd>
+    <dd><p>外部负载（不可为 null；所有权转移给 fs）。</p>
+</dd>
   </dl>
 
 
@@ -1160,6 +1202,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>file 为 null。</p>
+</dd>
+  </dl>
 
 
 
@@ -1170,8 +1218,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>文件移动/换名（=MoveFileDurably 语义，内建父目录刷盘——能力位 DurableRename）。</p>
-<p>★ overwrite 必须显式：true=POSIX rename 原子覆盖；false=目标已存在抛 <a class="xref" href="TC.Tier.Core.IO.IOError.html#TC_Tier_Core_IO_IOError_AlreadyExists">AlreadyExists</a>。</p>
+  <div class="markdown level1 summary"><p>移动/重命名文件（字典项原子交换——POSIX rename 语义，已开句柄不受扰）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1182,13 +1229,13 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对源路径。</p>
+    <dd><p>源文件相对路径。</p>
 </dd>
     <dt><code>dest</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对目标路径。</p>
+    <dd><p>目标文件相对路径。</p>
 </dd>
     <dt><code>overwrite</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd><p>是否覆盖已存在的目标文件。</p>
+    <dd><p>true = 目标存在时覆盖（旧文件延迟退役）；false = 目标存在抛 AlreadyExists（默认）。</p>
 </dd>
   </dl>
 
@@ -1200,6 +1247,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>源不存在或目标已存在（未允许覆盖）。</p>
+</dd>
+  </dl>
 
 
 
@@ -1241,6 +1294,12 @@ Class MemoryFileSystem
   <div class="markdown level1 remarks"><p>mem：fs 锁内批量 re-key（路径项 + 目录集合）——原子（能力位 AtomicDirectoryMove 置位）。</p>
 </div>
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>源目录不存在或目标已存在。</p>
+</dd>
+  </dl>
 
 
 
@@ -1262,11 +1321,14 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>源文件相对路径。</p>
+</dd>
     <dt><code>dest</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>目标文件相对路径。</p>
+</dd>
     <dt><code>overwrite</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 目标存在时覆盖；false = 目标存在抛 AlreadyExists（默认）。</p>
+</dd>
   </dl>
 
 
@@ -1298,15 +1360,18 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystemOptions.html">MemoryFileSystemOptions</a></dt>
-    <dd></dd>
+    <dd><p>卷选项（PageSize/Allocation/QuotaBytes/Access/Label 等；null = 类型缺省）。</p>
+</dd>
     <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
-    <dd></dd>
+    <dd><p>日志记录器（可选）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html">MemoryFileSystem</a></dt>
-    <dd></dd>
+    <dd><p>新建的内存卷实例。</p>
+</dd>
   </dl>
 
 
@@ -1326,7 +1391,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>★ 句柄入口——按显式打开语义打开/创建文件（PreallocateSize&gt;0 时 open 即幂等预分配）。</p>
+  <div class="markdown level1 summary"><p>打开/创建文件句柄（路径→(槽, 代际) 一次解析；共享检查 + 追加预留盒挂接）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1337,17 +1402,17 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>根下相对路径（层级命名空间，经 PathValidator.ValidateRelative 校验）。</p>
+    <dd><p>文件相对路径（层级路径父目录须存在）。</p>
 </dd>
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html">FileOpenOptions</a></dt>
-    <dd><p>打开语义四要素 + 预分配。</p>
+    <dd><p>打开选项（Access/Mode/Sharing/Hints/PreallocateSize）。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.IFileHandle.html">IFileHandle</a></dt>
-    <dd><p>文件句柄</p>
+    <dd><p>新开句柄（DIO 形态由 Hints.NoBuffering 决定）。</p>
 </dd>
   </dl>
 
@@ -1358,6 +1423,12 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件不存在（OpenExisting）、已存在（CreateNew）、路径是目录、父目录缺失或共享冲突。</p>
+</dd>
+  </dl>
 
 
 
@@ -1379,15 +1450,18 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystemOptions.html">MemoryFileSystemOptions</a></dt>
-    <dd></dd>
+    <dd><p>卷选项（null = 类型缺省）。</p>
+</dd>
     <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
-    <dd></dd>
+    <dd><p>日志记录器（可选）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.Mem.MemoryFileSystem.html">MemoryFileSystem</a></dt>
-    <dd></dd>
+    <dd><p>内存卷实例（与 New 等价）。</p>
+</dd>
   </dl>
 
 
@@ -1407,7 +1481,7 @@ Class MemoryFileSystem
   
   </h3>
 
-  <div class="markdown level1 summary"><p>单条目完整信息（基本字段 + 元数据；Name 回显输入路径；文件或目录自动判别）。</p>
+  <div class="markdown level1 summary"><p>获取条目元信息（文件含长度/时间戳/FileExtra；目录不追踪时间——MinValue/null）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -1418,14 +1492,14 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd><p>相对路径。</p>
+    <dd><p>条目相对路径。</p>
 </dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.FsEntryInfo.html">FsEntryInfo</a></dt>
-    <dd><p>条目信息</p>
+    <dd><p>条目信息。</p>
 </dd>
   </dl>
 
@@ -1439,7 +1513,7 @@ Class MemoryFileSystem
   <h4 class="section">Exceptions</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
-    <dd><p>IOError.NotFound——条目不存在。</p>
+    <dd><p>条目不存在。</p>
 </dd>
   </dl>
 
@@ -1463,9 +1537,11 @@ Class MemoryFileSystem
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>文件相对路径（须已存在）。</p>
+</dd>
     <dt><code>newLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>目标逻辑长度（字节，≥0）。</p>
+</dd>
   </dl>
 
 
@@ -1476,6 +1552,15 @@ Class MemoryFileSystem
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.FileIOException.html">FileIOException</a></dt>
+    <dd><p>文件不存在。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>newLength 为负。</p>
+</dd>
+  </dl>
 
 
 
@@ -1595,7 +1680,7 @@ Class MemoryFileSystem
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

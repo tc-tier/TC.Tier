@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class BTreeIndex&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="BTreeIndex 主存储格式布局 partial——机制归基类（ 编排/ 版本链/后台循环/帧走链），本件只实现格式：32B 几何 + 物化。 ★ 帧体布局：[几何 32B]——rootAddr(16) entryCount(8) structSize(4) pad(4)。   节点本就写时持久化在自持引擎（节点变更即 WriteNodeContent，引擎副本恒完整）——   帧不写节点流，物化=设根 + 引擎读回根节点，零结构调整（无分裂/无重放重建）。 ★ 正确性（对齐 HashIndex 同构）：dump 表覆盖 [?, W] 完整折叠；&amp;gt; W 混入条目靠重放 (W, End]   幂等收敛（帧内 root 恒为 dump 时刻最新根——fuzzy 无逐槽拷贝，几何原子三字段）。">
+      <meta name="description" content="BTreeIndex 计数 partial——EntryCount（Volatile 读）与 IndexSize 估算。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,13 +97,7 @@ Class BTreeIndex&lt;TKey&gt;
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>BTreeIndex 主存储格式布局 partial——机制归基类（<span class="xref">TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.TryDump</span> 编排/
-版本链/后台循环/帧走链），本件只实现格式：32B 几何 + 物化。</p>
-<p>★ 帧体布局：[几何 32B]——rootAddr(16) entryCount(8) structSize(4) pad(4)。
-  节点本就写时持久化在自持引擎（节点变更即 WriteNodeContent，引擎副本恒完整）——
-  帧不写节点流，物化=设根 + 引擎读回根节点，零结构调整（无分裂/无重放重建）。</p>
-<p>★ 正确性（对齐 HashIndex 同构）：dump 表覆盖 [?, W] 完整折叠；&gt; W 混入条目靠重放 (W, End]
-  幂等收敛（帧内 root 恒为 dump 时刻最新根——fuzzy 无逐槽拷贝，几何原子三字段）。</p>
+  <div class="markdown summary"><p>BTreeIndex 计数 partial——EntryCount（Volatile 读）与 IndexSize 估算。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -123,7 +117,7 @@ Class BTreeIndex&lt;TKey&gt;
     <dt>Inheritance</dt>
     <dd>
       <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints.html">SortedIndexRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexRecoveryHints.html">SortedIndexRecoveryHints</a>&gt;</div>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html">SortedIndexBase</a>&lt;TKey&gt;</div>
       <div><span class="xref">BTreeIndex&lt;TKey&gt;</span></div>
     </dd>
@@ -145,6 +139,7 @@ Class BTreeIndex&lt;TKey&gt;
     <dt>Derived</dt>
     <dd>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeOfLong.html">BTreeOfLong</a></div>
+      <div><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.ByteOrderBTreeIndex-1.html">ByteOrderBTreeIndex&lt;TKey&gt;</a></div>
     </dd>
   </dl>
 
@@ -185,67 +180,73 @@ Class BTreeIndex&lt;TKey&gt;
       <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_OnInitializeComplete">SortedIndexBase&lt;TKey&gt;.OnInitializeComplete()</a>
     </div>
     <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_CheckpointFrame">SortedIndexBase&lt;TKey&gt;.CheckpointFrame()</a>
+    </div>
+    <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_ReadBodyChunk_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__System_Int32__">SortedIndexBase&lt;TKey&gt;.ReadBodyChunk(LogicalAddress, Span&lt;byte&gt;, out int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_MainStorageAppliedLastRecovery">SortedIndexBase&lt;TKey&gt;.MainStorageAppliedLastRecovery</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html#TC_Tier_Runtime_Structures_SortedIndex_SortedIndexBase_1_BeginAddress">SortedIndexBase&lt;TKey&gt;.BeginAddress</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Logger">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Logger</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Logger">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Logger</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.GetAliveInstances(string)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.GetAliveInstances(string)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReady(int)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReady(int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.CancelRecovery()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.CancelRecovery()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.EnsureReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_EnsureReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.EnsureReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Initialize(SortedIndexRecoveryHints)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Initialize(SortedIndexRecoveryHints)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Shared_BackgroundWorkerLoop_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Execution_BackgroundWorkerLoop_">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.ThrowIfDisposed()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.ThrowIfDisposed()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Dispose()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Dispose()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.DisposeAsync()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.DisposeAsync()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Resources</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Resources">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Id</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.Id</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.IsDisposed</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsDisposed">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.IsDisposed</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.IsReady</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.IsReady</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.RecoveryState</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.RecoveryState</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.HasBackgroundWorker</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.HasBackgroundWorker</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.RecoveryProgressChanged</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;SortedIndexRecoveryHints&gt;.RecoveryProgressChanged</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
@@ -281,8 +282,8 @@ Class BTreeIndex&lt;TKey&gt;
 
   <a id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1__ctor_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.#ctor*"></a>
 
-  <h3 id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_SortedIndex_BTreeIndexSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Contracts_Structures_IKeyResolver__0__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.SortedIndex.BTreeIndexSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Contracts.Structures.IKeyResolver{`0})">
-  BTreeIndex(IFileSystem, BTreeIndexSettings, LightEpoch?, IKeyResolver&lt;TKey&gt;?)
+  <h3 id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_SortedIndex_BTreeIndexSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Contracts_Structures_IKeyResolver__0__TC_Tier_Core_Primitives_IKeyComparer__0__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.SortedIndex.BTreeIndexSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Contracts.Structures.IKeyResolver{`0},TC.Tier.Core.Primitives.IKeyComparer{`0})">
+  BTreeIndex(IFileSystem, BTreeIndexSettings, LightEpoch?, IKeyResolver&lt;TKey&gt;?, IKeyComparer&lt;TKey&gt;?)
   
   </h3>
 
@@ -291,19 +292,26 @@ Class BTreeIndex&lt;TKey&gt;
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">protected BTreeIndex(IFileSystem fileSystem, BTreeIndexSettings settings, LightEpoch? epoch = null, IKeyResolver&lt;TKey&gt;? keyResolver = null)</code></pre>
+    <pre><code class="lang-csharp hljs">protected BTreeIndex(IFileSystem fileSystem, BTreeIndexSettings settings, LightEpoch? epoch = null, IKeyResolver&lt;TKey&gt;? keyResolver = null, IKeyComparer&lt;TKey&gt;? keyComparer = null)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>fileSystem</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
-    <dd></dd>
+    <dd><p>文件系统（组合根注入）。</p>
+</dd>
     <dt><code>settings</code> <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndexSettings.html">BTreeIndexSettings</a></dt>
-    <dd></dd>
+    <dd><p>BTreeIndexSettings（NodeSize/MinFillPercent/节点缓存容量等）。</p>
+</dd>
     <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
-    <dd></dd>
+    <dd><p>epoch 保护（null = 自建 LightEpoch）。默认 null。</p>
+</dd>
     <dt><code>keyResolver</code> <a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver</a>&lt;TKey&gt;</dt>
-    <dd></dd>
+    <dd><p>恢复重放数据面（null = 默认，重放窗口期需要——缺失时恢复 fail-fast）。默认 null。</p>
+</dd>
+    <dt><code>keyComparer</code> <a class="xref" href="TC.Tier.Core.Primitives.IKeyComparer-1.html">IKeyComparer</a>&lt;TKey&gt;</dt>
+    <dd><p>key 比较器（null = 默认 <code>KeyComparer&lt;TKey&gt;</code>）。默认 null。</p>
+</dd>
   </dl>
 
 
@@ -392,7 +400,7 @@ Class BTreeIndex&lt;TKey&gt;
   
   </h3>
 
-  <div class="markdown level1 summary"><p>索引内存占用估算（字节——节点容量 × 1024 常数估算）。</p>
+  <div class="markdown level1 summary"><p>索引内存占用估算（驻留节点数 × 节点尺寸——真实计数，无上限驻留缓存下即全量节点）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -461,7 +469,10 @@ Class BTreeIndex&lt;TKey&gt;
   
   </h3>
 
-  <div class="markdown level1 summary"><p>有序遍历游标（最左叶子起叶链 Next 扫描——range scan 比较族独有能力）。</p>
+  <div class="markdown level1 summary"><p>有序遍历游标（最左叶子起叶链 Next 前向扫描——range scan 比较族独有能力）。</p>
+<p>★ 方向契约（诚实化）：仅 Forward——叶链无 Prev 指针，Backward 显式抛
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a>（旧形接受参数但恒前向产出=谎报契约）。倒序/末位需求经
+<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex-1.html#TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryGetMax__0__TC_Tier_Contracts_Storage_LogicalAddress__">TryGetMax(out TKey, out LogicalAddress)</a>/<a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex-1.html#TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryGetFloor__0__0__TC_Tier_Contracts_Storage_LogicalAddress__">TryGetFloor(TKey, out TKey, out LogicalAddress)</a> 组合表达；真倒序遍历待 Prev 指针格式演进。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -472,7 +483,7 @@ Class BTreeIndex&lt;TKey&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>direction</code> <a class="xref" href="TC.Tier.Contracts.Storage.ReadDirection.html">ReadDirection</a></dt>
-    <dd><p>遍历方向（扫描沿叶链前向产出条目——direction 由游标 Direction 原样暴露）。</p>
+    <dd><p>遍历方向（仅 Forward）。</p>
 </dd>
   </dl>
 
@@ -539,7 +550,7 @@ Class BTreeIndex&lt;TKey&gt;
   
   </h3>
 
-  <div class="markdown level1 summary"><p>点查 key → value 逻辑地址（epoch 读保护内转发 <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex-1.html#TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_FindNoEpoch__0_">FindNoEpoch(TKey)</a>）。</p>
+  <div class="markdown level1 summary"><p>点查 key → value 逻辑地址（操作闸 + epoch 读保护内转发 <a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex-1.html#TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_FindNoEpoch__0_">FindNoEpoch(TKey)</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -593,13 +604,15 @@ Class BTreeIndex&lt;TKey&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>key</code> <span class="xref">TKey</span></dt>
-    <dd></dd>
+    <dd><p>查找键。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd></dd>
+    <dd><p>命中 = value 逻辑地址；未命中 = <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html#TC_Tier_Contracts_Storage_LogicalAddress_Empty">Empty</a>。</p>
+</dd>
   </dl>
 
 
@@ -718,6 +731,145 @@ Class BTreeIndex&lt;TKey&gt;
 
 
 
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TruncatePrefix_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TruncatePrefix*"></a>
+
+  <h3 id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TruncatePrefix__0_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TruncatePrefix(`0)">
+  TruncatePrefix(TKey)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>键序前缀批量删——删除全部 key &lt; <code class="paramref">boundExclusive</code> 的条目（retention trim 专用），
+O(路径 + 覆盖叶数) 批量完成而非逐键 Delete 的 O(k·log n)。</p>
+<p>★ 算法：Find 同形下降到 bound 的归属叶（沿途记录各层节点+下降位）——归属叶内前段
+  （首个 ≥ bound 槽位之前）整段摘除；路径每层左侧完全覆盖子树（c[0..i-1]，键域全 &lt; bound）
+  逐叶清零（结构保留——与单键 Delete 同款不重平衡哲学：叶可 Count=0，查询侧空叶容忍
+  由游标/前驱算法保证）。节点空间不回收（引擎中段回收=独立课题，现状与单键删除等价）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override long TruncatePrefix(TKey boundExclusive)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>boundExclusive</code> <span class="xref">TKey</span></dt>
+    <dd><p>边界键（不含）——全部 key &lt; 此值的条目被删除。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>删除条数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryGetFloor_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TryGetFloor*"></a>
+
+  <h3 id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryGetFloor__0__0__TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TryGetFloor(`0,`0@,TC.Tier.Contracts.Storage.LogicalAddress@)">
+  TryGetFloor(TKey, out TKey, out LogicalAddress)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>键序 ≤ <code class="paramref">key</code> 的最大条目（前驱查询），O(log n)。</p>
+<p>★ 无 Prev 指针的标准 B+ 树前驱算法：下降到 key 的归属叶（沿途记录各层节点+下降位），
+  叶内有 ≤ key 的条目即得；否则自最深祖先逐层向左重试右降（c[i-1] → c[i-2] → …），
+  首个命中子树的右降末条即前驱——空叶（全删）自然跳过（左移重试），无左邻可试 = key 小于全树键。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool TryGetFloor(TKey key, out TKey floorKey, out LogicalAddress value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>查找键（含）。</p>
+</dd>
+    <dt><code>floorKey</code> <span class="xref">TKey</span></dt>
+    <dd><p>输出：命中条目的 key（≤ 查找键）。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>输出：命中条目的 value 逻辑地址。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>false = 无 ≤ key 的条目。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryGetMax_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TryGetMax*"></a>
+
+  <h3 id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryGetMax__0__TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TryGetMax(`0@,TC.Tier.Contracts.Storage.LogicalAddress@)">
+  TryGetMax(out TKey, out LogicalAddress)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>键序最大条目——右下降取末叶末条，O(log n)（正常路径）。</p>
+<p>★ 空叶容忍（删除不重平衡可留 Count=0 的叶）：最右子树全空时逐子左移重试
+  （迭代 + 显式栈回溯，最坏退化 O(节点数)，仅出现在右区大面积清空后的查询）。</p>
+<p>★ 环防御：子指针哨兵模糊（未设置槽 = Empty = 合法地址——(0,0) 处可能是锚点帧
+  字节而非节点，读出幻影 internal 可成环；实测自递归栈溢出 2026-08-27）——
+  下降深度超 <span class="xref">TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.MaxDescentPath</span> 视为坏路径返回 miss，任何环从崩溃降级为 miss。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool TryGetMax(out TKey key, out LogicalAddress value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>输出：最大条目的 key。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>输出：最大条目的 value 逻辑地址。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>false = 空索引。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryMaterializeFrame_" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TryMaterializeFrame*"></a>
 
   <h3 id="TC_Tier_Runtime_Structures_SortedIndex_BTreeIndex_1_TryMaterializeFrame_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_System_Int64__" data-uid="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex`1.TryMaterializeFrame(TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean,System.Int64@)">
@@ -809,7 +961,7 @@ Class BTreeIndex&lt;TKey&gt;
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

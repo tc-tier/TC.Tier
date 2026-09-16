@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierRaftNode 使用指南（raft &#215; TierWAL 产品节点） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierRaftNode 使用指南（raft &#215; TierWAL 产品节点） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/docs/raft-node.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierraftnode-使用指南raft--tierwal-产品节点">TierRaftNode 使用指南（raft × TierWAL 产品节点）</h1>
+
+<p><code>TierRaftNode</code> 是 <strong>raft × TierWAL 的完整产品节点</strong>装配入口：TierWAL 存储（持久化）+
+raft 共识（<code>RaftStateMachine</code>）+ 提交应用管道（<code>ApplyPipeline</code>）+ 多源快照分发与反熵
+（Swarm，可选）+ 宿主调度循环（快照压缩/发布/反熵周期）——一个装配器成节点，
+节点成集群只差传输。</p>
+<p>与 Core.Net 的关系：<code>RaftStateMachine</code> 是共识<strong>引擎</strong>（引擎与存储互不泄露布局），
+本产品层把它与 TierWAL 接成开箱节点；共识引擎语义（复制完成档/读面/成员变更）
+见 <a href="../core/net.html#6-raft-%E5%85%B1%E8%AF%86">net.md §6</a>。</p>
+<h2 id="快速上手">快速上手</h2>
+<h3 id="嵌入式同进程测试--单机进程内">嵌入式·同进程（测试 / 单机进程内）</h3>
+<pre><code class="lang-csharp">await using var hub = new InProcessTransportHub();
+var id = NodeId.NewRandom();
+var config = new ClusterConfig([new ClusterMember(id, &quot;node-1&quot;)]);
+
+var node = await TierRaftNodeBuilder.Create(id, TierFs.New(&quot;memory:&quot;), config, myMachine)
+    .WithTransport(hub.Register(id))                       // 注入现成传输
+    .StartAsync();
+
+// 写入（复制完成档三选一——见 net.md §6.1）
+await node.Raft.ReplicateAsync(command);
+</code></pre>
+<h3 id="tcp-集群真部署形态">TCP 集群（真部署形态）</h3>
+<pre><code class="lang-csharp">// 每节点各自执行：peers 表 = 全体成员（含自己）的监听地址
+var node = await TierRaftNodeBuilder.Create(id, TierFs.New(&quot;local:///data/raft&quot;), config, myMachine)
+    .WithClusterTransport(
+        listen: new IPEndPoint(IPAddress.Any, 7001),
+        peers: new Dictionary&lt;NodeId, IPEndPoint&gt;
+        {
+            [idA] = new(IPAddress.Parse(&quot;10.0.0.1&quot;), 7001),
+            [idB] = new(IPAddress.Parse(&quot;10.0.0.2&quot;), 7001),
+            [idC] = new(IPAddress.Parse(&quot;10.0.0.3&quot;), 7001),
+        },
+        tune: o =&gt; o.WithReconnect(TimeSpan.FromMilliseconds(100), 2.0, TimeSpan.FromSeconds(1)))
+    .StartAsync();
+</code></pre>
+<p>内建形态经 Core.Net 装配器（<code>ClusterBuilder</code>）组装传输——传输配置全旋钮可调
+（<code>tune</code> 管道：握手超时/重连退避/保活/请求回调/背压深度等），传输生命周期随节点。</p>
+<h2 id="传输形态怎么选">传输形态怎么选</h2>
+<table>
+<thead>
+<tr>
+<th>形态</th>
+<th>方法</th>
+<th>场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>注入现成传输</td>
+<td><code>WithTransport</code></td>
+<td>嵌入式同进程（<code>InProcessTransportHub</code>）、调用方自组装传输</td>
+</tr>
+<tr>
+<td>内建 TCP 组装</td>
+<td><code>WithClusterTransport</code></td>
+<td>真网络部署——listen + peers 表 + 配置管道一行组装</td>
+</tr>
+</tbody>
+</table>
+<p>二选一，双供给/零供给均 fail-fast（不偷偷选形态）。多节点同进程测试拓扑：
+每节点一个 <code>hub.Register(id)</code> 注入即可。</p>
+<h2 id="配置链tierraftnodeoptions">配置链（TierRaftNodeOptions）</h2>
+<table>
+<thead>
+<tr>
+<th>With</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithWal</code></td>
+<td>TierWalOptions.Default</td>
+<td>存储参数（提交间隔/载体写穿档等——TierWAL 文档）</td>
+</tr>
+<tr>
+<td><code>WithRaft</code></td>
+<td>RaftOptions.Default</td>
+<td>选举窗/复制并发等（raft 引擎参数）</td>
+</tr>
+<tr>
+<td><code>WithApply</code></td>
+<td>ApplyPipelineOptions.Default</td>
+<td>应用管道参数</td>
+</tr>
+<tr>
+<td><code>WithSwarm</code></td>
+<td>null（不装配）</td>
+<td>SwarmOptions——多源快照分发；不装配 = 快照安装禁用</td>
+</tr>
+<tr>
+<td><code>WithAntiEntropyInterval</code></td>
+<td>TimeSpan.Zero（关）</td>
+<td>反熵对账周期（仅 leader 发起）</td>
+</tr>
+<tr>
+<td><code>WithSnapshotGrowthThresholdEntries</code></td>
+<td>0（关）</td>
+<td>日志增长达阈值触发一体快照压缩（宿主调度）</td>
+</tr>
+<tr>
+<td><code>WithSnapshotBlockSize</code></td>
+<td>64KB</td>
+<td>快照内容块化粒度（Swarm 拉取/对账单元）</td>
+</tr>
+<tr>
+<td><code>WithHostLoopInterval</code></td>
+<td>30s</td>
+<td>宿主调度循环节拍</td>
+</tr>
+<tr>
+<td><code>WithHighResolutionTimer</code></td>
+<td>true</td>
+<td>Windows 提升定时器分辨率至 1ms（时序敏感路径）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="观测面">观测面</h2>
+<ul>
+<li><code>node.Raft.IsLeader</code> / <code>node.Raft.LeaderId</code> / <code>node.Raft.CommitIndex</code>——角色与进度；</li>
+<li><code>node.Wal</code>——TierWal 读面/水位（AllocatedIndex/PersistedIndex/SnapshotIndex）；</li>
+<li><code>node.Swarm</code>——多源组件（装配时非空）。</li>
+</ul>
+<h2 id="生命周期">生命周期</h2>
+<p><code>StartAsync</code> 返回即完整可用（存储恢复 → 适配 → raft 循环 → 宿主调度全就绪）；
+<code>DisposeAsync</code> 有界分段收尾：宿主循环 → raft → apply → 多源 → TierWal →（内建
+形态）传输。每段超时告警不挂死。</p>
+<h2 id="反模式">反模式</h2>
+<ul>
+<li><strong>双供给/零供给</strong>：<code>WithTransport</code> 与 <code>WithClusterTransport</code> 只能给一个；都不给直接抛。</li>
+<li><strong>peers 表缺自己</strong>：内建 TCP 形态的 peers 表应含全体成员（含本节点）——成员制
+拨号按表直连，缺表项 = 该成员不可达。</li>
+<li><strong>同步等待启动</strong>：<code>StartAsync()</code> 返回 <code>Task</code>——用 <code>await</code>，禁止
+<code>GetAwaiter().GetResult()</code>（线程池耗尽死锁风险）。</li>
+<li><strong>Swarm 未装配却期待快照追赶</strong>：<code>WithSwarm</code> 缺省 = 快照安装传输面禁用，落后
+follower 越过快照边界后无法追平——生产集群装配 Swarm。</li>
+</ul>
+<h2 id="故障注入本地验证validations-v-项的本地形态">故障注入本地验证（VALIDATIONS V 项的本地形态）</h2>
+<p>云上验证（真网络/kill -9/真时序）之外的<strong>本地确定性形态</strong>——V 项复跑与对抗场景族在任一介质等价驱动的抓手：</p>
+<ul>
+<li><strong>时钟缝</strong>：<code>nodeOptions.WithRaft(nodeOptions.Raft.WithClock(fake))</code>——选举/心跳/复制计时由假钟快进
+驱动（<code>FakeTimeProvider.Advance</code>，零真实睡等）；墙钟跳变不误触发选举（单调钟守卫）。
+注入假钟时节点自动新建同钟节拍注册表，无需手动配对。</li>
+<li><strong>传输缝</strong>：传输面 <code>ITransportFaultInjector</code>（延迟/分区/丢包/乱序，节点对级定向）——TCP/QUIC/InProcess
+三介质等价（spec-12 §9.2）。</li>
+<li><strong>引擎缝/IO 缝</strong>：见 <a href="../runtime/storage-engine.html"><code>storage-engine.md</code></a> §5.5 与
+<a href="../core/fault-injection.html"><code>fault-injection.md</code></a>。</li>
+<li>本地形态与云上形态的落账边界（哪个 V 项用哪种、判定口径）：<code>scripts/cloud/VALIDATIONS.md</code> 各 V 项
+&quot;本地注入形态 / 云上形态&quot;行。</li>
+</ul>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>共识引擎语义（复制完成档三选一/读面/成员变更/IRaftStore 需求面）：
+<a href="../core/net.html#6-raft-%E5%85%B1%E8%AF%86">Core.Net 使用指南 §6</a></li>
+<li>传输装配与配置全旋钮：<a href="../core/net.html#1-%E5%BF%AB%E9%80%9F%E4%B8%8A%E6%89%8B">Core.Net 使用指南 §1/§5</a></li>
+<li>存储介质选型：TierFs 使用指南</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/docs/raft-node.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

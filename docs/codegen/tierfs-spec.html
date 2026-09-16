@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierFs 规范分析器（TCSG120-122）——spec 实参的编译期校验 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierFs 规范分析器（TCSG120-122）——spec 实参的编译期校验 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen.Analyzers/docs/tierfs-spec.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierfs-规范分析器tcsg120-122spec-实参的编译期校验">TierFs 规范分析器（TCSG120-122）——spec 实参的编译期校验</h1>
+
+<p>对 <code>TierFs.New</code> / <code>TierFs.Open</code> 调用点的 spec 实参做<strong>编译期校验</strong>：scheme 拼写、参数名、
+参数 × 介质适用性在编译即红——与运行时校验构成纵深防御（错误在 IDE 波浪线暴露，不等测试）。</p>
+<h2 id="三条规则">三条规则</h2>
+<table>
+<thead>
+<tr>
+<th>诊断</th>
+<th>拦截形态</th>
+<th>修法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCSG120</td>
+<td>spec scheme 非法（合法集：<code>local://</code> / <code>local:</code> / <code>memory:</code> / <code>virtual://</code> / <code>network:///</code>）</td>
+<td>改用合法 scheme</td>
+</tr>
+<tr>
+<td>TCSG121</td>
+<td>spec 参数名未知（参数字典键不在该 scheme 的参数表内）</td>
+<td>对照参数表改名</td>
+</tr>
+<tr>
+<td>TCSG122</td>
+<td>参数 × 介质违规（该参数不适用于所配介质）</td>
+<td>删参数或换介质</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">// TCSG120：scheme 拼错
+var fs = TierFs.New(&quot;locall://data&quot;);        // ✗ 编译红：scheme 'locall:' 未知
+
+// TCSG122：参数不适用于该介质（cred 仅 network——回退表真值）
+var fs = TierFs.New(&quot;memory://x&quot;, cred: &quot;xxx&quot;);  // ✗ 编译红：cred 不适用 memory
+</code></pre>
+<h2 id="机制">机制</h2>
+<ul>
+<li>注册 <code>InvocationExpression</code> 语法节点回调——<strong>生成代码不分析</strong>，启用并发执行；</li>
+<li>参数 → 适用介质的回退表内置（编译内可见 <code>[SpecParam]</code> 符号时从符号派生——单一事实源）；</li>
+<li>真值表/规则同源性由 Core 契约测试钉死（漂移即红）。</li>
+</ul>
+<h2 id="注入与豁免">注入与豁免</h2>
+<ul>
+<li>随 <code>TC.Tier.CodeGen</code> 的 Analyzer 引用自动注入（<code>Directory.Build.props</code> 全局挂载），无需手工
+安装；</li>
+<li>豁免遵循标准 <code>.editorconfig</code> 严重级配置（<code>dotnet_diagnostic.TCSG120.severity = ...</code>）；</li>
+<li>规则段取 1xx（与生成器 RingKey 的 TCSG020 隔离）。</li>
+</ul>
+<h2 id="反模式">反模式</h2>
+<ol>
+<li><strong>靠运行时 try-catch 兜 scheme 拼写</strong>——编译期已经拦了，运行时校验只服务动态拼出的
+spec 字符串；</li>
+<li><strong>为绕过 TCSG122 把参数硬塞进别的 scheme</strong>——参数表按介质真实能力声明，绕过 = 运行期
+行为未定义。</li>
+</ol>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>通用纪律族（分层依赖/禁用模式，TCSG130-139）：<a href="../TC.Tier.Analyzers/docs/tier-analyzers.md">Tier 分析器</a></li>
+<li>TierFs 入口契约：<code>src/TC.Tier.Core/docs/io.md</code></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen.Analyzers/docs/tierfs-spec.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

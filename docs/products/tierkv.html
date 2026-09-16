@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierKv 使用指南 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierKv 使用指南 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierkv.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierkv-使用指南">TierKv 使用指南</h1>
+
+<blockquote>
+<p>TierKv = 本地持久 KV 存储产品：Ring（数据唯一真源，append-only）× 主索引三族（Hash 缺省 /
+BTree / SkipList）× 会话（三档读一致性 + 多 key 原子批）× Functions（RMW 读-改-写）×
+检查点快速恢复 × 日志回收。泛型产品类 <code>TierKv&lt;TKey, TValue&gt;</code>，消费面经 <code>[KvStore]</code> 源生成器
+封闭（推荐）或 <code>TierKvBuilder</code> 显式装配。</p>
+</blockquote>
+<h2 id="快速上手">快速上手</h2>
+<p>一行特性声明 + 一个工厂调用，formatter 零代码（byte / byte[] / ReadOnlyMemory&lt;byte&gt; /
+unmanaged 结构体自动发射）：</p>
+<pre><code class="lang-csharp">// AssemblyInfo.cs（或任意源文件顶层）——程序集级声明一次
+[assembly: KvStore(typeof(long), typeof(MyPayload))]
+</code></pre>
+<pre><code class="lang-csharp">// 与 TierKv 同卷创建并使用（异步优先）
+await using var kv = await TierKvOfLongMyPayload.CreateAsync(fs, TierKvOptions.Default.WithKvName(&quot;users&quot;));
+
+await kv.PutFormattedAsync(42, new MyPayload { Qty = 7 });   // 写（Upsert，同 key 覆写；缺省内存档）
+var (found, payload) = await kv.TryGetFormattedAsync(42);    // 读（未命中 found=false）
+await kv.DeleteAsync(42);                                    // 删（墓碑，恢复重放不复活）
+
+kv.TryGetFormatted(42, out var v);                           // 同步快路径（内存档直读——延迟敏感热路径）
+</code></pre>
+<p>TKey 要求 <code>unmanaged + IEquatable&lt;TKey&gt;</code>（结构体 key 表达，如 <code>readonly record struct TestKey(long Id, int Tag)</code>）。
+TValue 无约束——内建覆盖面之外的类型（如 string）实现 <code>IValueFormatter&lt;TValue&gt;</code> 后经
+<code>Formatter = typeof(...)</code> 显式声明，生成器编译期校验（缺失/未实现接口 = 编译期报错 TCSG022/023）。</p>
+<h2 id="装配怎么选">装配怎么选</h2>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>适用</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>[KvStore]</code> 生成封闭形态（推荐）</td>
+<td>绝大多数场景</td>
+<td>一行声明 → <code>TierKvOfXxx</code> 具名类型 + CreateAsync 默认装配（Ring/索引/formatter 全自动）</td>
+</tr>
+<tr>
+<td><code>TierKvBuilder</code> 显式装配</td>
+<td>需要替换 Ring/索引实现或自定义装配</td>
+<td><code>WithRingFactory</code> / <code>WithIndexFactory</code> / <code>WithKeyComparer</code> / <code>WithKeyResolver</code>（必须成对注入工厂）</td>
+</tr>
+</tbody>
+</table>
+<p>主索引选择（<code>TierKvOptions.WithIndexKind</code> / 特性 <code>IndexKind = (int)KvIndexKind.Xxx</code> 编译期缺省）：</p>
+<table>
+<thead>
+<tr>
+<th>主索引</th>
+<th>点查</th>
+<th>范围扫描</th>
+<th>并发写</th>
+<th>适配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Hash（缺省）</td>
+<td>O(1) 最优</td>
+<td>无（W7 补辅助有序索引）</td>
+<td>CAS</td>
+<td>点查写密集</td>
+</tr>
+<tr>
+<td>BTree</td>
+<td>O(logN)</td>
+<td>原生 key 序</td>
+<td>操作闸（单写多读）</td>
+<td>需范围/有序</td>
+</tr>
+<tr>
+<td>SkipList</td>
+<td>O(logN)</td>
+<td>原生 key 序</td>
+<td>CAS 无锁</td>
+<td>高并发写 + 有序</td>
+</tr>
+</tbody>
+</table>
+<p>切换索引不丢数据（Ring 唯一真源，索引可重建）；跨索引类型重开走全量重放，同索引重开走
+帧物化加速（见<a href="#%E6%A3%80%E6%9F%A5%E7%82%B9%E4%B8%8E%E6%81%A2%E5%A4%8D">检查点</a>）。</p>
+<p><code>TierKvBuilder</code> 显式装配（工厂必须成对注入，Settings 经 <code>TierKvAssembly</code> 取默认几何）：</p>
+<pre><code class="lang-csharp">var kv = await new TierKvBuilder&lt;long, long&gt;(fs, TierKvOptions.Default
+        .WithKvName(&quot;metrics&quot;).WithIndexKind(KvIndexKind.SkipList))
+    .WithRingFactory((fso, o) =&gt; new RingOfLong(TierKvAssembly.RingSettings(fso, o), fso))
+    .WithIndexFactory((fso, o, ring) =&gt; new SkipListOfLong(fso, TierKvAssembly.SkipListSettings(fso, o), keyResolver: ring))
+    .StartAsync();
+</code></pre>
+<h2 id="会话读一致性--原子批">会话（读一致性 + 原子批）</h2>
+<p>会话为单线程对象（每会话一实例，内部零锁）：</p>
+<pre><code class="lang-csharp">using var session = kv.CreateSession();                     // 缺省 ReadMyWrites（D3）
+await session.PutFormattedAsync(1, 100L);                   // 写立即应用 + 登记写集
+
+// ReadMyWrites：本会话最后一次写胜出他人并发覆盖
+await otherSession.PutFormattedAsync(1, 999L);              // 他人覆盖
+var (hit, v) = await session.TryGetFormattedAsync(1);       // 本会话仍读己之写（v = 100，不受影响）
+
+// 三档：None（读恒最新）/ ReadMyWrites（缺省）/ Serializable（RMW + 写临界区版本保护）
+using var serial = kv.CreateSession(KvSessionConditions.Serializable);
+</code></pre>
+<h3 id="多-key-原子批全或无">多 key 原子批（全或无）</h3>
+<pre><code class="lang-csharp">session.BeginAtomicBatch();
+await session.PutFormattedAsync(10, 111L);                  // 暂存：本会话读可见（stage 隔离）
+await session.PutFormattedAsync(11, 222L);                  // 他人与索引不可见
+await session.CommitBatchAsync();                           // 全应用（Ring 2PC 提交点语义）
+// 或 session.AbortBatch();                                 // 全丢弃，零污染
+</code></pre>
+<p>批内写视为已持久化（提交点即落盘）；崩溃任一窗口全或无。</p>
+<h3 id="pending-收口完成语义三档">pending 收口（完成语义三档）</h3>
+<pre><code class="lang-csharp">await session.PutFormattedAsync(1, 1L, KvCommitPolicy.FireAndForget);  // 不即时刷（会话缺省档）
+await session.CompletePendingAsync();                       // 一次刷盘至本会话高水位
+// 三档：FireAndForget（缺省，内存档零 IO）/ WaitForPending（登记待收口，同 F&amp;F 路径）/
+//       Committed = 逐写等待持久化提交（组提交摊薄 fsync——写级不丢的显式旋钮）
+// 注意：kv 直连的 PutAsync(key, value, ct) 两参便捷重载缺省 = Committed；带 policy 参数的
+//       重载（kv.PutFormattedAsync / 会话全族）缺省 = FireAndForget（FASTER 形态——
+//       持久化由 checkpoint 泵/显式 CheckpointAsync 承担）
+</code></pre>
+<h2 id="functionsrmw-读-改-写">Functions（RMW 读-改-写）</h2>
+<p>实现 <code>IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt;</code>（或继承 <code>KvFunctionsBase</code> 只填
+三个折叠钩子），引擎统一走「读折叠 → Format → 追加 → 索引 CAS 换绑」：</p>
+<pre><code class="lang-csharp">sealed class Counter : KvFunctionsBase&lt;long, long, long, long, string?&gt;
+{
+    public override bool InitialUpdater(ref long k, ref long input, ref long v, ref long o, ref string? c)
+    { v = input; o = v; return true; }                         // 无值造值
+    public override bool InPlaceUpdater(ref long k, ref long input, ref long v, ref long o, ref string? c)
+    { v += input; o = v; return true; }                        // 追加前最后折叠（false 回落 Copy 流）
+    public override bool CopyUpdater(ref long k, ref long input, ref long old, ref long newV, ref long o, ref string? c)
+    { newV = old + input; o = newV; return true; }             // 不可变记录折叠（旧版本保留）
+}
+
+var status = await kv.RmwAsync(1, input: 5, new Counter(), context: &quot;ctx&quot;);
+// KvStatus.Ok / Error（折叠返回 false = Error 零写入）；旧记录恒保留（版本历史）
+</code></pre>
+<p>读钩子按档位派发：<code>ReadAsync</code> 在 kv 直连走 ConcurrentReader、Serializable 会话走 SingleReader；
+写钩子 <code>SingleWriter</code> / <code>ConcurrentWriter</code> 为校验面（返回 false = 拒绝该写入，Error 零写入）。</p>
+<h2 id="范围扫描scan">范围扫描（Scan）</h2>
+<p>需要 <code>EnableRangeIndex</code>（key 字节序 BTree 辅助索引，与主索引并存双写；代价 = 写放大 + 恢复多一帧）。
+扫描按 <strong>key 字节序</strong>（字节字典序——构造前缀/区间值时按字节语义，非数值语义）：</p>
+<pre><code class="lang-csharp">await foreach (var e in kv.ScanByPrefixAsync(prefix, prefixByteLength: 4))
+    /* e.Key / e.Value */;
+
+await foreach (var e in kv.ScanByRangeAsync(startKey, endKey))
+    /* [start, end) 区间——最新值，已删 key 不产出 */;
+</code></pre>
+<h2 id="ttl过期删除">TTL（过期删除）</h2>
+<p><code>PutAsync</code> / <code>PutFormattedAsync</code> / 会话写带可选 <code>timeToLive</code>——过期 = <strong>惰性读删</strong>（点查过期
+即未命中；<code>TimeSpan.Zero</code> = 立即过期），回收期强删。RMW 写回会重置 TTL。</p>
+<pre><code class="lang-csharp">await kv.PutFormattedAsync(42, payload, timeToLive: TimeSpan.FromMinutes(30));
+(await kv.TryGetFormattedAsync(42)).Found   // 过期后 = false
+</code></pre>
+<h2 id="条件写cas">条件写（CAS）</h2>
+<p><code>CompareAndSwapAsync</code> = 「比较 + 写入 + 换绑」单一原子单元（并发 CAS 恰一成功）。地址版以
+绑定地址为期望（<strong>地址即版本</strong>——<code>NewAddress</code> 即 fencing token，续约/释放以它为期望地址再 CAS）；
+值版比较字节（<code>expectedValue = null</code> = 预期不存在——NX 抢占）。</p>
+<pre><code class="lang-csharp">// 获取即租约：NX + TTL——回执 NewAddress = 锁 token
+var acquire = await kv.CompareAndSwapAsync(1, null, value, timeToLive: TimeSpan.FromSeconds(30));
+// 持有者续约：以当前 token 为期望换新值 + 续 TTL——token 换新（地址即版本）
+var renew = await kv.CompareAndSwapAsync(1, acquire.NewAddress, newValue, timeToLive: TimeSpan.FromSeconds(30));
+// 他人持旧 token → 确定性拒绝（Swapped=false + CurrentAddress 携当前绑定）
+</code></pre>
+<p>TTL 过期语义与 Put 一致（惰性读删）；<code>timeToLive = null</code> = 无过期。会话面同参透传，
+写集过期语义与盘上帧一致（ReadMyWrites 自见过期）。</p>
+<h2 id="检查点与恢复">检查点与恢复</h2>
+<pre><code class="lang-csharp">var cp = await kv.CheckpointAsync();   // Ring 全量落盘 → 索引帧落盘 → 版本图原子入盘
+</code></pre>
+<ul>
+<li>崩溃后重开（同卷同名 <code>TierKvOptions</code> 重建实例）：索引帧物化（O(索引)）+ 增量重放
+<code>(帧水位, 尾]</code>——非全量重放；帧缺失/损坏自动回退全量重放（数据等价）。</li>
+<li>版本代际：会话版本自单调分配器取值，检查点消费一个版本作代际标签，高水位随提交原子持久化，
+恢复后续接（新会话版本恒大于历史）。</li>
+<li>恢复到<strong>最近</strong>检查点版本已内建；恢复到<strong>指定历史版本</strong>（回滚式 PITR）需要检查点清单记录化，
+排期 W6.1+。</li>
+</ul>
+<h2 id="日志回收">日志回收</h2>
+<pre><code class="lang-csharp">var result = await kv.ReclaimAsync();   // result.NewBeginAddress / result.SupersededCount
+</code></pre>
+<p>低频全表扫判定存活记录（索引最新指针即本记录），安全下界以下前缀逻辑回收。回收后读安全
+（存活记录全数可读）；建议在检查点之后回收（帧水位随之收敛）。物理段回收（truncateDevice
+语义）与自动回收策略为后续波次。</p>
+<h2 id="watch-变更流">Watch 变更流</h2>
+<pre><code class="lang-csharp">// 从头订阅（历史补扫 + 实时直通），带 1 字节前缀过滤
+await foreach (var ev in kv.WatchAsync(LogicalAddress.Empty, prefix, prefixByteLength: 1))
+{
+    switch (ev.Kind)
+    {
+        case KvWatchEventKind.Put:    /* ev.Key 新值 */ break;
+        case KvWatchEventKind.Delete: /* ev.Key 已删 */ break;
+    }
+    lastCursor = ev.Address;   // 事件地址 = 续传游标
+}
+
+// 断开后重订阅续传（无丢无重——历史从 Ring 真源补齐）
+await foreach (var ev in kv.WatchAsync(lastCursor)) { ... }
+
+// 检查点时点的规范续传游标（重启后从此续传）
+var cp = await kv.CheckpointAsync();
+var watchCursor = cp.WatchCursor;
+</code></pre>
+<ul>
+<li><strong>事件即提交事实</strong>：Put/Delete 事件在提交点后发布（原子批逐条、批内序）；单写
+FireAndForget 档的事件持久性跟随写入提交档（未刷盘记录崩溃后消失）。</li>
+<li><strong>续传游标</strong>：事件地址（Ring 追加序，全局单调，跨恢复稳定）；开区间 <code>(from, ...]</code>。
+规范形态 = 已见最大事件地址或 <code>cp.WatchCursor</code>；<code>LogicalAddress.Empty</code> = 从头订阅。
+裸 <code>TailAddress</code> 是「下一写入位」形态，不作游标。</li>
+<li><strong>断连</strong>：每订阅者有界通道（<code>WithWatchChannelCapacity</code>，缺省 8192），慢订阅者写满即断连
+——流干净结束 = 断连信号，凭游标重订阅续传；写路径永不被反压。</li>
+<li><strong>回收联动</strong>：续传点早于回收线（<code>BeginAddress</code>）直接抛 <code>InvalidOperationException</code>
+（etcd compacted 同义）——检查点之后保留游标，勿长期滞留旧游标。</li>
+<li><strong>TTL</strong>：过期与回收强删不发事件（惰性读删无确定时刻；读侧表现为未命中）。</li>
+</ul>
+<h2 id="索引热切换">索引热切换</h2>
+<pre><code class="lang-csharp">// 运行中把主索引从 Hash 切到 BTree（Ring 真源不变，数据不丢）
+var result = await kv.SwitchIndexAsync((o, ring) =&gt;
+    new ByteOrderBTreeIndex&lt;long&gt;(fs, TierKvAssembly.BTreeSettings(fs, o), keyResolver: ring));
+// result.SwitchStartAddress = 切换起点（Ring 尾）；新索引即刻承载全部点查
+</code></pre>
+<ul>
+<li><strong>三步协议</strong>：①构建（工厂建新索引+启动 Ring 窗口重放）→②追平（等待重放完成，
+服务全程不中断）→③补扫+发布（版本推进排水：增量补扫切换期间的新写入→新索引
+单引用原子发布）→旧索引排水后释放。</li>
+<li><strong>数据不丢</strong>：Ring 唯一真源；新索引=窗口重放+增量补扫的完整快照，发布后写入直达
+新索引——写路径零切换感知。</li>
+<li><strong>阻塞面</strong>：步骤③持提交门并排水（原子批/检查点/回收短暂排队）；点查/单写/Watch/
+范围扫描全程不受阻。并发切换会被拒绝（等待当前切换完成）。</li>
+<li><strong>重启语义</strong>：热切换是运行时视图操作——重启恢复 <code>Options.IndexKind</code> 装配的原族
+（跨索引重启走重放全量重建，数据不丢）；需保持切换后族请同步调整装配配置。
+切换后检查点落新索引帧，重启按旧族装配时帧族不匹配走 fail-safe 全量重放（数据等价）。</li>
+<li><strong>范围索引独立</strong>：<code>EnableRangeIndex</code> 的辅助 BTree 不参与热切换（主索引切换后范围
+扫描照常走辅助索引）。</li>
+</ul>
+<h2 id="配置参考tierkvoptions">配置参考（TierKvOptions）</h2>
+<p>不可变 record + With 链（<code>TierKvOptions.Default.WithXxx(...)</code>）；完整调优矩阵见
+<a href="perf/tierkv.html"><code>perf/tierkv.md</code></a> 组合调优面。</p>
+<table>
+<thead>
+<tr>
+<th>参数（With 链）</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithKvName</code></td>
+<td><code>&quot;tier-kv&quot;</code></td>
+<td>引擎子目录名（同卷同名重开 = 恢复）</td>
+</tr>
+<tr>
+<td><code>WithIndexKind</code></td>
+<td><code>Hash</code></td>
+<td>主索引（Hash/BTree/SkipList，见<a href="#%E8%A3%85%E9%85%8D%E6%80%8E%E4%B9%88%E9%80%89">装配怎么选</a>）</td>
+</tr>
+<tr>
+<td><code>WithHashTableCapacity</code></td>
+<td>64K 槽</td>
+<td>哈希表初始容量（2 的幂；百万级 key 免启动期扩容）</td>
+</tr>
+<tr>
+<td><code>WithRingPageSize</code></td>
+<td>256KB</td>
+<td>页池页大小（写穿粒度=整页；大页致 Committed 档 ms 级退化）</td>
+</tr>
+<tr>
+<td><code>WithRingMemorySize</code></td>
+<td>64MB</td>
+<td>页池总容量（mem 卷实占——测试勿抄大缺省）</td>
+</tr>
+<tr>
+<td><code>WithRingColdReadRatio</code></td>
+<td>0.25</td>
+<td>冷读缓存占比（大冷读工作集建议 1.0）</td>
+</tr>
+<tr>
+<td><code>WithRingMutableFraction</code> / <code>WithRingMaxPageCount</code></td>
+<td>0.9 / 8192</td>
+<td>mutable 区占比 / 页槽数上界</td>
+</tr>
+<tr>
+<td><code>WithRingOverflowPolicy(policy, minSize)</code></td>
+<td>Disabled</td>
+<td>WiscKey 式 KV 分离（大 value 写放大/页池占用调优）</td>
+</tr>
+<tr>
+<td><code>WithCheckpointInterval</code></td>
+<td>Infinite</td>
+<td>checkpoint 周期泵（开 = RPO ≈ 间隔；关 = 显式/逐写 Committed 承担）</td>
+</tr>
+<tr>
+<td><code>WithRangeIndex</code></td>
+<td>关</td>
+<td>范围索引 + Scan API（见<a href="#%E8%8C%83%E5%9B%B4%E6%89%AB%E6%8F%8Fscan">范围扫描</a>）</td>
+</tr>
+<tr>
+<td><code>WithWatchChannelCapacity</code></td>
+<td>8192</td>
+<td>每订阅者事件通道（写满断连不反压写路径）</td>
+</tr>
+<tr>
+<td><code>WithScanBatchSize</code> / <code>WithScanSpanPageThreshold</code></td>
+<td>512 / 8 页</td>
+<td>预扫批粒度 / 顺序模式地址跨度阈值</td>
+</tr>
+<tr>
+<td><code>WithHints</code></td>
+<td>DIO</td>
+<td>IO hints（磁盘建议叠加 WriteThrough——TierWal 实测全介质最优；mem 零差异）</td>
+</tr>
+<tr>
+<td><code>WithSegmentGrowthLimit</code></td>
+<td>256MB</td>
+<td>Ring 段生长上限</td>
+</tr>
+<tr>
+<td><code>WithMetaPolicyKind</code> / <code>WithMetaTupleFlushInterval</code></td>
+<td>Managed / 200ms</td>
+<td>meta 策略 / 元组回扫泵周期（窗口内变更合并落盘）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="反模式">反模式</h2>
+<ul>
+<li><strong>会话跨逻辑线程共享</strong>——会话是单线程对象，并发请每线程/每任务各开会话。</li>
+<li><strong>会话存活期长于 KV</strong>——会话必须先于 KV 释放（Dispose/DisposeAsync 有断言）。</li>
+<li><strong>慢消费者无重订阅机制</strong>——Watch 断连后必须凭游标重订阅续传；丢弃游标的消费者断连即丢事件。</li>
+<li><strong>string 等 managed TValue 不声明 Formatter</strong>——编译期 TCSG022 直接报错，无运行时回退。</li>
+<li><strong>跳过检查点长期只写</strong>——快速恢复依赖检查点帧；无帧回退全量重放（正确但慢）。</li>
+<li><strong>网络介质挂载</strong>——TierKv 无 fsync 语义保障（raft 面另管）， durability 契约不成立。</li>
+</ul>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>设计文档：<code>docs/design/tierkv-design.md</code>（内部仓）</li>
+<li>性能数据：<code>docs/perf/</code>（随包发布）</li>
+<li>结构层积木：Ring / HashIndex / BTreeIndex / SkipListIndex 使用指南（TC.Tier.Runtime 包）</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierkv.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

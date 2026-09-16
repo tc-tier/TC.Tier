@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class StreamSnapshot.StreamFrameWriter | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="流式帧写入器。[Header 14B][Data][Footer 28B（Magic+TotalLength+EntryCount+Crc64）]。 CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积，Complete 收官）。 多帧：Complete 后 ResetFrame，可再开新帧。">
+      <meta name="description" content="流式帧写入器。[Header 14B][Data][Footer 28B（Magic+TotalLength+EntryCount+UnifiedCrc64）]。 CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积，Complete 收官）。 多帧：Complete 后 ResetFrame，可再开新帧。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,7 +97,7 @@ Class StreamSnapshot.StreamFrameWriter
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>流式帧写入器。[Header 14B][Data][Footer 28B（Magic+TotalLength+EntryCount+Crc64）]。
+  <div class="markdown summary"><p>流式帧写入器。[Header 14B][Data][Footer 28B（Magic+TotalLength+EntryCount+UnifiedCrc64）]。
 CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积，Complete 收官）。
 多帧：Complete 后 ResetFrame，可再开新帧。</p>
 </div>
@@ -271,13 +271,15 @@ CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
-    <dd></dd>
+    <dd><p>取消令牌。默认 default。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
-    <dd></dd>
+    <dd><p>表示帧完成（Footer 已写 + 数据已 flush）的任务；帧计数器已重置。</p>
+</dd>
   </dl>
 
 
@@ -309,7 +311,8 @@ CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积�
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
-    <dd></dd>
+    <dd><p>表示释放完成的任务；未完成帧已 Complete 闭环，底层写会话已释放。</p>
+</dd>
   </dl>
 
 
@@ -340,7 +343,8 @@ CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>entry 数据字节（首次写自动加帧头）。</p>
+</dd>
   </dl>
 
 
@@ -372,15 +376,18 @@ CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积�
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>entry 数据字节（首次写自动加帧头）。</p>
+</dd>
     <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
-    <dd></dd>
+    <dd><p>取消令牌。默认 default。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
-    <dd></dd>
+    <dd><p>表示写入完成的任务（写入会话快速路径同步完成）。</p>
+</dd>
   </dl>
 
 
@@ -412,7 +419,7 @@ CRC64 incremental 覆盖 Header + Data + Footer 前 20B（流式边写边累积�
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

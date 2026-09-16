@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierKv 性能基线（产品 API 口径） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierKv 性能基线（产品 API 口径） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/perf/tierkv.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierkv-性能基线产品-api-口径">TierKv 性能基线（产品 API 口径）</h1>
+
+<blockquote>
+<p>数字实测于本机（i5-12400 / .NET 8.0.31 / x64 RyuJIT AVX2 / BDN 0.13.12），文件系统=内存文件系统
+（TierKv 侧 mem 卷 ≙ FASTER 侧 NullDevice——双侧全内存同形口径，引擎 IO 噪声为零）；
+FASTER 对标为 FASTER.core 2.6.5 同进程同轮背靠背。</p>
+</blockquote>
+<h2 id="配置">配置</h2>
+<ul>
+<li>双侧同形：100k 预填 <code>long</code>→<code>long</code>（8B:8B），随机游走键热访问；TierKv 覆写口径 =
+<code>KvCommitPolicy.FireAndForget</code>（不刷盘 ≙ FASTER 内存 Upsert）</li>
+<li>TierKv 实例：<code>TierKvOfLongLong</code>（[KvStore] 生成封闭形态，缺省 Hash 主索引 + meta Managed）</li>
+<li>复现：
+<pre><code class="lang-bash">dotnet run -c Release --project benchmarks/TC.Tier.Runtime.Benchmarks -- --filter &quot;*TierKvVsFaster*&quot;
+dotnet run -c Release --project benchmarks/TC.Tier.Runtime.Benchmarks -- --filter &quot;*TierKvBenchmarks*&quot;
+</code></pre>
+</li>
+</ul>
+<h2 id="vs-faster产品-api-全链100k-热区">vs FASTER（产品 API 全链，100k 热区）</h2>
+<table>
+<thead>
+<tr>
+<th>基准</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">Allocated</th>
+<th style="text-align: right;">Ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FASTER.Read（session.Read）</td>
+<td style="text-align: right;">113.3 ns</td>
+<td style="text-align: right;">0 B</td>
+<td style="text-align: right;">1.00</td>
+</tr>
+<tr>
+<td>TierKv.TryGetFormattedAsync</td>
+<td style="text-align: right;">348.0 ns</td>
+<td style="text-align: right;">80 B</td>
+<td style="text-align: right;">3.07×</td>
+</tr>
+<tr>
+<td>FASTER.Upsert（session.Upsert）</td>
+<td style="text-align: right;">160.8 ns</td>
+<td style="text-align: right;">0 B</td>
+<td style="text-align: right;">1.42</td>
+</tr>
+<tr>
+<td>TierKv.PutFormattedAsync（F&amp;F）</td>
+<td style="text-align: right;">387.2 ns</td>
+<td style="text-align: right;">80 B</td>
+<td style="text-align: right;">3.44×</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>差距构成：FASTER 的 Read/Upsert 是裸哈希表语义（无记录帧、无 formatter、无 async 状态机）；
+TierKv 产品点查全链 = async 状态机 + 索引 Find + Ring 取值 + 值帧校验（[0xC8] 帧 +
+过期戳）+ formatter Parse，80 B/读 = 读缓冲分配（值字节副本）。</li>
+<li>延迟敏感的热路径可下探组合层直读形态（绕过产品面）：组合层批量 scope 零拷贝口径
+94.67 ns/查（0.75× vs FASTER 同形 126.96 ns），见 Runtime 包 <code>docs/perf/kv-composition.md</code>。</li>
+</ul>
+<h2 id="ring-读保护模型-v2内容自愈读read-protection-tiering2026-09-11-落地">Ring 读保护模型 v2：内容自愈读（read-protection-tiering，2026-09-11 落地）</h2>
+<p>Ring 读语义已从「epoch 协议保证（EnterReadScope 调用方编排）」重构为「内容保证（读时
+magic+CRC 校验 + 失败设备回退自愈）」——调用方零保护零感知，<code>EnterReadScope</code> 退役。</p>
+<p><strong>换来的正确性</strong>（旧形态下真实存在的缺陷）：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>旧行为</th>
+<th>自愈读行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>恢复后页池空壳（safe=dataStart）</td>
+<td>FlushedUntil 判据误判热区 → 直读空壳垃圾</td>
+<td>判冷 → 设备权威 ✓</td>
+</tr>
+<tr>
+<td>环形回绕覆盖（addr &lt; head）</td>
+<td>复用别名（同偏移同形记录校验全通过 → 假数据）</td>
+<td>head 守卫判冷 → 设备历史快照 ✓</td>
+</tr>
+<tr>
+<td>页池内容撕裂/残留</td>
+<td>静默读垃圾</td>
+<td>校验失败 → 设备回退或明确 NotFound ✓</td>
+</tr>
+</tbody>
+</table>
+<p><strong>成本（同机 A/B 实测收口 + 优化后复测，各自运行内 FASTER 基线归一）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>口径</th>
+<th style="text-align: right;">旧内核（scope 时代）</th>
+<th style="text-align: right;">自愈读内核</th>
+<th style="text-align: right;">差值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ring.GetValueSpan 零拷贝全链（112B 记录，隔离探针）</td>
+<td style="text-align: right;">12.5 ns</td>
+<td style="text-align: right;">44.6 ns</td>
+<td style="text-align: right;"><strong>+32 ns</strong></td>
+</tr>
+<tr>
+<td>Ring.GetValue 拷贝交付（同上）</td>
+<td style="text-align: right;">19.0 ns</td>
+<td style="text-align: right;">49.2 ns</td>
+<td style="text-align: right;">+30 ns</td>
+</tr>
+<tr>
+<td>其中：CRC 校验（VerifyCrc 内联段循环）</td>
+<td style="text-align: right;">—</td>
+<td style="text-align: right;">~13 ns</td>
+<td style="text-align: right;">crc32q 依赖链（3 cycle×迭代）是地板</td>
+</tr>
+<tr>
+<td>其中：header 轻量门（magic/flags/payloadLen 直读）</td>
+<td style="text-align: right;">（2 字段直读）</td>
+<td style="text-align: right;">~3 ns</td>
+<td style="text-align: right;">免全量解码</td>
+</tr>
+<tr>
+<td>Ring 读热判据</td>
+<td style="text-align: right;">FlushedUntil 比较</td>
+<td style="text-align: right;">head+safe 双水位 volatile 读</td>
+<td style="text-align: right;">+2 ns（含回绕别名守卫）</td>
+</tr>
+</tbody>
+</table>
+<p>第一版实现（跨模块三段 UnifiedCrc + 全量 header 解码）实测 +54~60ns；经 VerifyCrc 内联
+段循环 + 轻量门优化压至 +32ns。<strong>剩余地板 = crc32 指令 3 cycle 延迟的串行依赖链</strong>——
+PCLMULQDQ 折叠可再压（预期校验 ~5ns、整链 ~20ns），但折叠常数必须取自经充分验证的
+参考实现（自推常数已被差分测试证伪，差分测试组已留存为护栏），列为独立优化项。</p>
+<p><strong>消费面 API 终态</strong>：<code>GetValue/TryGetValue</code>（拷贝交付，跨 await 消费必须走拷贝形态）、
+<code>GetValueSpan</code>（零拷贝，仅同步栈内合法）、<code>GetKey/TryGetKey/GetRecords/ScanAsync</code> 同自愈
+语义；false/0/空 span = 无有效记录（未命中/墓碑/校验失败），不产生假数据。</p>
+<h2 id="tierkv-产品面基线1k-预填mem-卷含范围索引双写">TierKv 产品面基线（1k 预填，mem 卷，含范围索引双写）</h2>
+<table>
+<thead>
+<tr>
+<th>基准</th>
+<th style="text-align: right;">Mean</th>
+<th style="text-align: right;">Allocated</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Get_Hit（点查命中）</td>
+<td style="text-align: right;">217.6 ns</td>
+<td style="text-align: right;">80 B</td>
+<td>1k 工作集热区命中</td>
+</tr>
+<tr>
+<td>Get_Miss（点查未命中）</td>
+<td style="text-align: right;">70.4 ns</td>
+<td style="text-align: right;">0 B</td>
+<td>索引 miss 快路径，零分配</td>
+</tr>
+<tr>
+<td>Put_FireAndForget（新 key 插入）</td>
+<td style="text-align: right;">650.3 ns</td>
+<td style="text-align: right;">80 B</td>
+<td>Ring 追加 + 主索引换绑 + 范围索引双写（EnableRangeIndex）</td>
+</tr>
+<tr>
+<td>ScanRange_10（范围扫描 10 条）</td>
+<td style="text-align: right;">8.22 µs</td>
+<td style="text-align: right;">2,496 B</td>
+<td>字节序 BTree 游标 + 逐条 Ring 取值解帧（含迭代器/枚举分配）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>范围扫描无 FASTER 对标项：FASTER 无范围扫描能力，Scan 为 TierKv 独有。</li>
+<li>覆写已有 key 的 Put（不含范围索引）为 387.2 ns（上表 F&amp;F 口径）；本表 Put 为新 key 插入
+且开启范围索引（双索引双写）——口径不同，不与上表互比。</li>
+</ul>
+<h2 id="场景矩阵并发提交档原子批rmw规模扫描深度">场景矩阵（并发/提交档/原子批/RMW/规模/扫描深度）</h2>
+<blockquote>
+<p>同环境；ShortRun 精度（3 warmup / 5 iter）；产品 API；mem 卷；缺省 Hash 主索引。
+复现：<code>dotnet run -c Release --project benchmarks/TC.Tier.Runtime.Benchmarks -- --filter &quot;*TierKvScenario*&quot;</code></p>
+</blockquote>
+<h3 id="并发扩展100k-预填单多会话">并发扩展（100k 预填，单/多会话）</h3>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th style="text-align: right;">1 会话</th>
+<th style="text-align: right;">8 会话</th>
+<th>扩展</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>点查（每线程 64 次随机热）</td>
+<td style="text-align: right;">264 ns/op</td>
+<td style="text-align: right;">172 ns/op</td>
+<td>无锁读线性扩展</td>
+</tr>
+<tr>
+<td>覆写（F&amp;F 新 key）</td>
+<td style="text-align: right;">312 ns/op</td>
+<td style="text-align: right;">250 ns/op</td>
+<td>无锁写（CAS 换绑）扩展正常</td>
+</tr>
+</tbody>
+</table>
+<h3 id="规模-scaling点查随机热">规模 scaling（点查随机热）</h3>
+<table>
+<thead>
+<tr>
+<th>预填</th>
+<th style="text-align: right;">点查延迟</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1k（全 L2）</td>
+<td style="text-align: right;">235 ns</td>
+</tr>
+<tr>
+<td>100k（L2/L3 边界）</td>
+<td style="text-align: right;">400-441 ns</td>
+</tr>
+</tbody>
+</table>
+<p>规模退化 ~1.7-1.9×，与工作集跨 L2 的 cache miss 一致；索引哈希查找 O(1) 无规模放大。</p>
+<h3 id="扫描深度100k-预填范围索引-btree">扫描深度（100k 预填，范围索引 BTree）</h3>
+<table>
+<thead>
+<tr>
+<th>深度</th>
+<th style="text-align: right;">总耗时</th>
+<th style="text-align: right;">每条</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10 条</td>
+<td style="text-align: right;">812 µs</td>
+<td style="text-align: right;">81 µs</td>
+</tr>
+<tr>
+<td>100 条</td>
+<td style="text-align: right;">8.44 ms</td>
+<td style="text-align: right;">84 µs</td>
+</tr>
+<tr>
+<td>1000 条</td>
+<td style="text-align: right;">21.4 ms</td>
+<td style="text-align: right;">21 µs</td>
+</tr>
+</tbody>
+</table>
+<p>深度增大摊薄扫描启动成本（每条 ~21µs 稳态）。对比 1k 预填的 0.8µs/条，100k 规模下
+首段扫描有 ~100× 退化——范围索引 BTree 大规模下的节点定位/页局部性问题，优化候选。</p>
+<h2 id="组合调优面三层全量默认值是稳定兜底非最优解">组合调优面（三层全量——默认值是稳定兜底，非最优解）</h2>
+<p>TC.Tier 的核心是组合式设计：fs / 存储引擎 / 数据结构三层全部有大量配置与注入策略，
+<strong>配置组合不同性能天差地别</strong>。TierKvOptions 暴露常用轴（全量微调经
+TierKvBuilder 工厂注入任意 Settings/策略）；默认值只保证稳定运行。</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>调优轴（TierKvOptions）</th>
+<th>机制/适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Ring</td>
+<td><code>WithRingPageSize</code>（默认 256KB）</td>
+<td>写穿粒度=整页，拷贝量线性（32MB 默认曾致 ms 级）</td>
+</tr>
+<tr>
+<td>Ring</td>
+<td><code>WithRingMemorySize</code>（64MB）</td>
+<td>热数据页池容量</td>
+</tr>
+<tr>
+<td>Ring</td>
+<td><code>WithRingColdReadRatio</code>（0.25）</td>
+<td>冷页缓存占比——大冷读工作集建议 1.0</td>
+</tr>
+<tr>
+<td>Ring</td>
+<td><code>WithRingMutableFraction</code> / <code>WithRingMaxPageCount</code></td>
+<td>mutable 区比例 / 页槽数上界</td>
+</tr>
+<tr>
+<td>Ring</td>
+<td><code>WithRingOverflowPolicy(policy, minSize)</code></td>
+<td><strong>WiscKey 式 KV 分离</strong>——大 value 写放大/页池占用调优</td>
+</tr>
+<tr>
+<td>引擎</td>
+<td><code>WithMetaTupleFlushInterval</code>（200ms）</td>
+<td>meta 回扫泵周期——窗口内变更合并落盘</td>
+</tr>
+<tr>
+<td>引擎</td>
+<td><code>WithHints</code>（NoBuffering）</td>
+<td>磁盘建议叠加 WriteThrough（TierWal 实测全介质最优）；mem 零差异</td>
+</tr>
+<tr>
+<td>引擎</td>
+<td><code>WithSegmentGrowthLimit</code>（256MB）</td>
+<td>段生长上限</td>
+</tr>
+<tr>
+<td>fs</td>
+<td>mem 卷创建时 <code>TierFs.New(&quot;memory:&quot;, opts)</code>：<code>Allocation</code>（Sparse/Reserved）/<code>PageSize</code>/<code>QuotaBytes</code></td>
+<td>mem 分配模式与硬配额（fs 创建参数，非 TierKv 选项）</td>
+</tr>
+<tr>
+<td>注入</td>
+<td>Builder：<code>WithRingFactory / WithIndexFactory / WithKeyComparer / WithKeyResolver</code></td>
+<td>任意 Settings/比较器/解析器策略注入</td>
+</tr>
+</tbody>
+</table>
+<h3 id="组合调优默认值依据mem-卷-100k-预填实测矩阵">组合调优（默认值依据，mem 卷 100k 预填实测矩阵）</h3>
+<h3 id="ring-页大小--committed-覆写写穿粒度整页拷贝线性">Ring 页大小 × Committed 覆写（写穿粒度=整页，拷贝线性）</h3>
+<table>
+<thead>
+<tr>
+<th>Ring 页大小</th>
+<th style="text-align: right;">Committed 覆写 p50</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1MB</td>
+<td style="text-align: right;">43.7 µs</td>
+</tr>
+<tr>
+<td><strong>256KB（现行默认）</strong></td>
+<td style="text-align: right;"><strong>7.1 µs</strong></td>
+</tr>
+</tbody>
+</table>
+<p>较结构默认 32MB 累计 ~480×；更大顺序吞吐场景可 <code>WithRingPageSize</code> 上调。</p>
+<h3 id="冷读缓存占比coldreadratio-025-vs-10">冷读缓存占比（ColdReadRatio 0.25 vs 1.0）</h3>
+<p>点查（354 vs 361 ns）与范围扫描 100 条（8.3 ms vs 8.3 ms）<strong>均无差异</strong>——
+默认 0.25 维持；扫描退化的真因不在冷读缓存（见下 P1）。</p>
+<h3 id="其它">其它</h3>
+<ul>
+<li><strong>Hints</strong>：mem 上 DIO 模拟零开销（NB ≈ None）；磁盘部署建议 <code>NoBuffering | WriteThrough</code>
+（写即落盘，引擎 Flush 短路，TierWal 同款实测全介质最优）。</li>
+<li><strong>哈希表容量</strong>：默认 64K 槽（原 1K）——百万级 key 免启动期扩容（扩容=函数式重建）。</li>
+<li><strong>Options 化的 Ring 调优面</strong>：<code>WithRingPageSize / WithRingMemorySize / WithRingColdReadRatio / WithRingMutableFraction / WithRingMaxPageCount</code>。</li>
+</ul>
+<h2 id="已知瓶颈与修复记录">已知瓶颈与修复记录</h2>
+<h3 id="已修复持久化提交档单次-3-6-ms根因ring-巨页默认值">已修复：持久化提交档单次 ~3-6 ms（根因=Ring 巨页默认值）</h3>
+<ul>
+<li>场景：Committed 档覆写 6.3-6.7 ms、原子批 16 条 6.3 ms、RMW 6.2-6.5 ms
+（BDN 稳定 StdDev，非首次冷启动拉高）</li>
+<li>根因：Ring 页池页大小结构默认 <strong>32MB</strong>——增量 flush 的写穿粒度=整页，每次
+Committed 提交都把当前 32MB 页整页写回设备（mem Sparse=逐 4KB 分配 8192 次；
+磁盘=32MB 真实 IO），与页内增量大小无关（1 条 16B 与 64KB 增量同耗时，页数
+线性实验证实）</li>
+<li>修复：<code>TierKvOptions.WithRingPageSize/WithRingMemorySize</code>（默认 1MB/64MB），
+RingSettings 显式配置。<strong>修复后 Committed 覆写 p50=43.7 µs（144× 改善）</strong>；
+原子批/RMW 同步受益</li>
+<li>教训：逐层探针定位（F&amp;F 全链 81µs / 纯引擎 Flush 0.6µs / 设备大块写 1.9µs /
+record 写 0.1µs 全部正常 → 成本专属于页写穿粒度）→ 结构默认值是日志顺序写
+形态的调优，KV 高频增量 flush 场景必须显式配小页</li>
+</ul>
+<h3 id="p1扫描性能重估历史退化结论撤回">P1：扫描性能重估（历史「退化」结论撤回）</h3>
+<ul>
+<li>早期「100k 扫描 83µs/条（退化 100×）」系<strong>测试键语义错误</strong>：范围扫描按
+<strong>key 字节序</strong>（Ring/范围索引的字节序模型），<code>ScanByRangeAsync(1, 101)</code> 的字节序
+区间实际包含全部 byte0∈[0x01,0x64] 的 key（约 3.9 万条）——总时长 6.5ms ÷ 3.9 万条
+= <strong>166ns/条，扫描性能正常</strong></li>
+<li><strong>教训：范围/前缀的「值」必须按字节序语义构造</strong>（参见 W7 测试键的字节模式构造法）</li>
+<li><strong>三模式选择器（已实现）价值重估</strong>：模式 A（Ring 区间扫）实测 5-6µs/100 条
+（~60ns/条），对聚集负载（addr 跨度窄）仍有 ~3× 收益；保留为聚集负载优化</li>
+</ul>
+<h2 id="p7-定位磁盘并发-committed-的引擎-extent-公平门闩瓶颈dotnet-trace-实证">P7 定位：磁盘并发 Committed 的引擎 extent 公平门闩瓶颈（dotnet-trace 实证）</h2>
+<p>实测（local 卷 DIO+WT，100k 预填）：W1=526µs/条 ✓；W2=22µs/条（组提交正常）；
+<strong>W8=64 条 27s（425µs/条，75 倍退化）</strong>。dotnet-trace CPU 采样（SampleProfiler）：
+**Monitor.Wait 42.6% + LowLevelLifoSemaphore 16.5% + WaitOne 12.2% + Thread.Sleep 3%</p>
+<ul>
+<li>AcquireExtent 16.6%（inclusive）+ Segment.CompleteAndMerge 3%**——75% 时间在
+引擎地址空间的 extent 获取/合并等待。</li>
+</ul>
+<ul>
+<li>根因：并发写穿高频触发引擎 <code>AcquireExtent</code>（写租约占地址区间），竞争经
+<strong>FairGate park（ParkTimeoutMs=50ms 兜底轮询）</strong>——唤醒失效/竞争时退化为
+50ms 一轮的重试，单条延迟被 park 周期支配</li>
+<li>同源已知现象：「同地址双写者 WriteThrough 下每写 ~150ms 公平税（FairGate
+50ms park 周期）」</li>
+<li>修复方向（引擎层专项）：①FairGate 唤醒语义核查（唤醒丢失则修 Wake 路径）；
+②extent 预分配深度（写窗口前移，减少运行期 AcquireExtent 竞争）；③FairGate
+park 周期参数化。<strong>影响面：所有磁盘+并发+持久化写路径</strong>（F&amp;F/点查/读不受影响）</li>
+<li>mem 介质不受影响（无设备 extent 语义）</li>
+</ul>
+<h2 id="优化路线图剖析实测排序">优化路线图（剖析实测排序）</h2>
+<p>当前最优配置分层剖析（mem，100k）：点查全链 ~1104ns = index.Find 133 + ring.GetAsync
+两跳 590 + 解帧/Parse/async 状态机 ~380；扫描 KV 层 = Ring 直扫的 12×。</p>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>项</th>
+<th>预期收益</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>P1</td>
+<td>扫描模式选择器（三模式成本模型）</td>
+<td>聚集负载 ~3×（166→60ns/条）</td>
+<td><strong>已实现</strong></td>
+</tr>
+<tr>
+<td>P2</td>
+<td>点查热路径：<strong>已定稿一跳直读</strong> <code>TryGet/TryGetFormatted</code>（GetValueSpan 单次页定位+零拷贝+时钟缓存）——BDN 实测 454→<strong>167.7ns 零分配</strong>（2.7×，vs FASTER 1.40×）</td>
+<td><strong>完成</strong>（剩余 epoch scope=必要保护，session 常驻化为独立大件）</td>
+<td><strong>完成</strong></td>
+</tr>
+<tr>
+<td>P3</td>
+<td>Ring async 读薄化（GetKey/GetValue 同步快路径，Runtime 面）</td>
+<td>两跳 590→~250ns，收益面广（扫描/批/RMW）</td>
+<td>待设计</td>
+</tr>
+<tr>
+<td>P4</td>
+<td>磁盘介质性能基线（DIO+WT 真实持久化数字）</td>
+<td>生产部署依据</td>
+<td>未测</td>
+</tr>
+<tr>
+<td>P5</td>
+<td>恢复时长基线（索引帧物化+增量重放 vs 全量重放）</td>
+<td>检查点价值量化</td>
+<td>未测</td>
+</tr>
+<tr>
+<td>P6</td>
+<td>并发扩展上限（16/32 线程）与 WiscKey 溢出分离基线</td>
+<td>多核/大 value 场景</td>
+<td><strong>溢出基线已测</strong>（2026-09-13，<a href="../../docs/benchmarks/ring-overflow-chunked-report.md">ring-overflow-chunked-report</a>：值 128KB~1GB × 并发 1/8/32 双介质对照，1GB 档整帧租赁崩溃 → 分块化后 mem 1.3GB/s / local 608MB/s）；并发扩展上限仍待测</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/perf/tierkv.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace TC.Tier.CodeGen | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace TC.Tier.CodeGen | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.CodeGen">
+
+  <h1 id="TC_Tier_CodeGen" data-uid="TC.Tier.CodeGen" class="text-break">Namespace TC.Tier.CodeGen</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.BinaryLayoutAttribute.html">BinaryLayoutAttribute</a></dt>
+      <dd><p>标记 struct 由 BinaryLayoutGenerator 生成 XxxCodec。</p>
+<p>★ 要求 struct 用 [StructLayout(LayoutKind.Explicit, Size = XxxSize)] + [FieldOffset]。</p>
+<p>★ 总字节数从 [StructLayout].Size 取值（源生成器交叉校验 Size vs 字段偏移和，不一致报 TCSG001）。</p>
+<p>★ OrFlags/IsEmpty/Features 控制额外生成能力（替代 [GenerateOrFlags]/[GenerateIsEmpty]）。</p>
+<p>★ 字段类型支持：基元（uint/ushort/ulong/long/int/byte）+ 同底层类型的 enum + <b>嵌套 [BinaryLayout] struct</b>。</p>
+<p>★ 嵌套 struct（如 SegmentAddress）：字段类型必须是标了 [BinaryLayout] 的 struct——源生成器
+  靠收集表查其大小（标记驱动：只有收集表里的 struct 才支持嵌套）。未标记的 struct 作嵌套字段报 TCSG002。</p>
+<p>★ readonly struct：Read 方法用 MemoryMarshal.Read 整体反序列化（object initializer 不能赋值 readonly 字段）。</p>
+<p>★ 字段校验特性 [ValidEquals]/[ValidRange]/[ValidHasFlags]/[ValidNonDefault] 保留在字段上独立声明。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.BinaryLayoutGenerator.html">BinaryLayoutGenerator</a></dt>
+      <dd><p>[BinaryLayout] 源生成器——为每个标注的 struct 生成静态 Codec 类（StructSize / 字段常量 /
+单字段读写 / 整体 Write/Read / Validate），全部 BinaryPrimitives 小端收口。</p>
+<p>★ 两阶段管道：收集阶段（ParseLayout）只产出各 struct 自身元数据并报编译期诊断，
+  Collect() 后全部 struct 在表里，生成阶段（EmitCodec）才查表解析嵌套引用——前向引用安全。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandArgAttribute.html">CommandArgAttribute</a></dt>
+      <dd><p>位置参数标注——CLI 有序、HTTP 取自路由段（#435 命令源生成）。</p>
+<p>类型集 = string/bool/int/uint/long/ulong/double/decimal/Guid/DateTimeOffset/任意枚举
+  及其 Nullable&lt;T&gt; 形态（编译期 TryParse 直调零反射）；有 C# 默认值 = 可选，无 = 必选。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandAttribute.html">CommandAttribute</a></dt>
+      <dd><p>叶子命令标注——命令组内的一条子命令（#435 命令源生成）。</p>
+<p>方法签名契约：返回 ValueTask&lt;T&gt;/Task&lt;T&gt;/ValueTask/Task/T/void 全支持；
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a> 参数框架注入不参与绑定；其余业务参数必须标注
+  <a class="xref" href="TC.Tier.CodeGen.CommandArgAttribute.html">CommandArgAttribute</a> / <a class="xref" href="TC.Tier.CodeGen.CommandOptionAttribute.html">CommandOptionAttribute</a> / <a class="xref" href="TC.Tier.CodeGen.CommandBodyAttribute.html">CommandBodyAttribute</a> 之一。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandBodyAttribute.html">CommandBodyAttribute</a></dt>
+      <dd><p>请求体标注——复杂类型参数 = HTTP body JSON 反序列化、CLI 读 stdin 全量字节（#435 命令源生成）。</p>
+<p>★ 一个命令最多一个 body 参数（多个 = TCSG059）；GET 命令禁 body（TCSG058）。</p>
+<p>★ AOT 契约：消费方以标准 <code>[JsonSerializable]</code> partial context 声明复杂类型清单，
+  生成的 CLI/HTTP 入口接收 <code>JsonSerializerContext</code>——生成代码 <code>GetTypeInfo(typeof(T))</code>
+  查表非反射（生成器间不互喂，context 由消费方手写一次收口）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandErrorAttribute.html">CommandErrorAttribute</a></dt>
+      <dd><p>业务异常 → HTTP 状态码映射（#435 命令源生成）。</p>
+<p>组级声明全组适用、方法级就近覆写。生成器按继承深度排序生成 catch 链（最派生优先）；
+  未声明的异常 → 500 兜底。消费方经 <a class="xref" href="TC.Tier.CodeGen.ICommandResults.html#TC_Tier_CodeGen_ICommandResults_WriteError_System_Int32_System_Exception_">WriteError(int, Exception)</a>
+  模式匹配自家异常提取错误码——零反射。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandGenerator.html">CommandGenerator</a></dt>
+      <dd><p>CLI 解析器发射（<a class="xref" href="TC.Tier.CodeGen.CommandGenerator.html">CommandGenerator</a> 产物一）：
+Run/RunAsync 逐级组路径匹配 → 绑定 → 直调；WriteHelp/CompleteNext/CommandPaths 数据面。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandGroupAttribute.html">CommandGroupAttribute</a></dt>
+      <dd><p>命令组标注——组嵌套子命令的组节点（#435 命令源生成）。</p>
+<p>★ 根不根由结构位置判定：声明在别的 <code>[CommandGroup]</code> 类内 = 嵌套组（内节点），
+  最外层 = 根组。根组 <a class="xref" href="TC.Tier.CodeGen.CommandGroupAttribute.html#TC_Tier_CodeGen_CommandGroupAttribute_Name">Name</a> = 宿主 CLI 分发 token 与 HTTP 路由首段，
+  <b>不作为 CLI 参数匹配</b>（git/docker 形态——用户输入从根子级开始）；嵌套组 Name = CLI/HTTP 路径段。</p>
+<p>任意深度嵌套；命令方法 = <code>[Command]</code> 标注的方法。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandOptionAttribute.html">CommandOptionAttribute</a></dt>
+      <dd><p>具名选项标注——CLI <code>--name value</code> / <code>-x value</code>、HTTP 取自 query（#435 命令源生成）。</p>
+<p>类型集同位置参数；解析即按长名归一，短名仅作输入别名。布尔选项支持 <code>--flag</code> 裸形态。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ConstantRegistryAttribute.html">ConstantRegistryAttribute</a></dt>
+      <dd><p>标记常量类为常量注册表——ConstantRegistryGenerator 编译期防冲突 + 区间助手生成（spec-12 §10 E3）。</p>
+<p>★ 重复值检测（恒生效）：类内全部整型 <code>const</code> 字段的<b>数值</b>两两相异——
+  重复即 TCSG040 Error（FrameKind/ProtocolId/Channel/特性位常量防冲突，声明即锁死）。</p>
+<p>★ 区间助手（可选，<a class="xref" href="TC.Tier.CodeGen.ConstantRegistryAttribute.html#TC_Tier_CodeGen_ConstantRegistryAttribute_Zones">Zones</a> 声明）：生成 <code>static bool 谓词(value)</code>
+  注入本类（类必须声明 <code>partial</code>）——谓词参数类型 = 类内整型 const 的统一类型
+  （混合整型类型报 TCSG044）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ConstantRegistryGenerator.html">ConstantRegistryGenerator</a></dt>
+      <dd><p>[ConstantRegistry] 源生成器（spec-12 §10 E3）——常量注册表编译期防冲突 + 区间助手。</p>
+<p>★ 重复值检测（恒生效）：类内整型 const 字段数值两两相异，重复报 TCSG040
+  （FrameKind/ProtocolId/Channel/特性位常量表手写漂移的编译期锁死）。</p>
+<p>★ 区间助手（Zones 声明）：谓词注入本类 partial（与 TierFs 生成 partial TierFs 同构）；
+  声明格式/区间值域/类声明形态/值域可判性违规分别报 TCSG041-044——拼错即炸，fail-fast。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.KvStoreAttribute.html">KvStoreAttribute</a></dt>
+      <dd><p>TierKv 封闭注册标注（tierkv-design.md §0.1/§4 W1——开放泛型产品类的封闭消费面，[RingKey] 同款先例）。</p>
+<p>★ 消费方一行声明 <code>[assembly: KvStore(typeof(OrderKey), typeof(Position))]</code> → 生成器产出
+  封闭形态 <code>TierKvOfOrderKeyPosition : TierKv&lt;OrderKey, Position&gt;</code>：ctor 转发 + CreateAsync
+  工厂（默认装配 + 生命周期一步到位）+ 内嵌派生 Ring/索引实现（派生肢获得构造权，开放泛型零构造）；
+  formatter 按 TValue 自动发射（byte/byte[]/ROM&lt;byte&gt;/unmanaged 零代码，D6/D7 裁定）——
+  其余 TValue 必须显式 <a class="xref" href="TC.Tier.CodeGen.KvStoreAttribute.html#TC_Tier_CodeGen_KvStoreAttribute_Formatter">Formatter</a>（编译期校验，缺失 = 编译期报错非运行时炸）。</p>
+<p>★ 主索引两层并存（§0.1）：<a class="xref" href="TC.Tier.CodeGen.KvStoreAttribute.html#TC_Tier_CodeGen_KvStoreAttribute_IndexKind">IndexKind</a> = 编译期缺省声明（生成器发射 DefaultOptions）；
+  运行经 TierKvOptions.IndexKind 覆盖（显式胜出）——CreateAsync 全三族索引实现齐备可路由。</p>
+<p>★ TKey 约束校验：不满足 unmanaged → 生成器编译期报错；IEquatable&lt;TKey&gt; 缺失由生成物
+  CS0314 兜底（[RingKey] 同款）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.KvStoreGenerator.html">KvStoreGenerator</a></dt>
+      <dd><p>[KvStore] 生成器（tierkv-design.md §0.1/§4 W1——开放泛型产品类的封闭消费面，[RingKey] 同款先例）。</p>
+<p>★ <code>[assembly: KvStore(typeof(TKey), typeof(TValue))]</code> → 一行声明产出封闭形态：
+  TierKvOfKeyLeafValueLeaf : TierKv&lt;TKey,TValue&gt;（ctor 转发 + CreateAsync 工厂一步生命周期 +
+  内嵌派生 Ring/索引实现——派生肢获得 protected internal 构造权，开放泛型零构造）。
+  formatter 按 TValue 自动发射（byte/byte[]/ROM&lt;byte&gt;/unmanaged 零代码，D6/D7 裁定）；
+  IndexKind 标注缺省发射 DefaultOptions（运行 Options.IndexKind 覆盖——显式胜出）。</p>
+<p>★ 编译期校验：Key 不满足 unmanaged → TCSG021；TValue 无可用 formatter（非内建覆盖面且未声明
+  Formatter）→ TCSG022；Formatter 未实现 IValueFormatter&lt;TValue&gt; → TCSG023
+  （消费方未引用 Products 时接口符号不可解析——跳过该校验由生成物编译错误兜底，IEquatable 缺失同款 CS0314）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.MediumOptionsAttribute.html">MediumOptionsAttribute</a></dt>
+      <dd><p>介质 options 注册标注（spec-typed-frontend-and-generator-design §3）——贴在 options 子类上，
+重载生成器据此发射 <code>TierFs.New/Open(spec, TOptions, logger)</code> 类型化重载族。</p>
+<p>★ string 形态（硬约束：Core 引用本程序集，标注不可反引 Core 的 StorageNature 枚举）——
+  生成器对未知值<b>编译期报错</b>（拼错即炸，fail-fast）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.NetworkProtocolAttribute.html">NetworkProtocolAttribute</a></dt>
+      <dd><p>network 协议注册标注（§3）——贴在协议构建器上，生成器发射 ModuleInitializer 注册代码
+（替代手写 TierFsS3ModuleInitializer——形态相同但自维护；加协议 = 实现接口 + 标注）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.RingKeyAttribute.html">RingKeyAttribute</a></dt>
+      <dd><p>KV Key 特化封闭注册标注（ring-generic-key-and-index-split 设计稿 §2）。</p>
+<p>★ 消费方一行声明 <code>[assembly: RingKey(typeof(OrderId))]</code> → 生成器产出<b>全套</b>封闭薄类：
+  RingOfOrderId : BlittableRing&lt;OrderId&gt; + HashOfOrderId : HashIndex&lt;OrderId&gt; +
+  BTreeOfOrderId/SkipListOfOrderId（ctor 转发 + Create 工厂一步生命周期）。
+  开放泛型内核手写一次，封闭形态生成器产出——开放泛型不落消费面，无反射 MakeGenericType（AOT 干净）。</p>
+<p>★ Type 形态（CodeGen.Abstractions 标注先例）；Key 不满足 unmanaged 约束生成器<b>编译期报错</b>
+  （非运行时炸）；IEquatable&lt;TKey&gt; 缺失由生成物的 CS0314 兜底。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.RingKeyGenerator.html">RingKeyGenerator</a></dt>
+      <dd><p>[RingKey] 生成器（ring-generic-key-and-index-split 设计稿 §2——开放泛型的封闭注册，TierFs P-c 同款先例）。</p>
+<p>★ <code>[assembly: RingKey(typeof(T))]</code> → 一行声明产出<b>全套</b>封闭形态：
+  RingOfT : BlittableRing&lt;T&gt; + HashOfT : HashIndex&lt;T&gt; + BTreeOfT/SkipListOfT（ctor 转发 + Create 工厂
+  一步生命周期）。每个具体 Key 只声明不开发；开放泛型不落消费面（三索引 ctor 已收 protected internal 同闸门）。</p>
+<p>★ 编译期约束校验：Key 不满足 unmanaged → TCSG020 报错；IEquatable 缺失由生成类 CS0314 兜底。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.SpecParamAttribute.html">SpecParamAttribute</a></dt>
+      <dd><p>spec 参数标注（§3）——贴在 TierSpec 的参数属性上，DSL 生成器据此派生 builder 方法集
+（方法集 = 参数表——单一事实源的机械执行；参数 × 介质归属与可重复性在此声明）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.TierFsGenerator.html">TierFsGenerator</a></dt>
+      <dd><p>TierFs 构造面生成器（spec-typed-frontend-and-generator-design）：</p>
+<p>★ P-a 重载族：<code>[MediumOptions]</code> 标注 → <code>TierFsTypedOverloads.g.cs</code>——
+  每（options 类型 × 动词）发射类型化重载（人不再手写重载族——漂移源消灭）。</p>
+<p>★ P-c 协议注册：<code>[NetworkProtocol]</code> 标注 → ModuleInitializer 注册代码
+  （替代手写 TierFsS3ModuleInitializer——加协议 = 实现接口 + 标注，注册自动）。</p>
+<p>★ 标注一律 string 形态（Core→Abstractions 既有方向，不可反引 Core 类型）；
+  未知本性/动词编译期报错（TCSG0xx——拼错即炸）。</p>
+<p>★ ★ 外部协议导出配方（设计决策定稿——Tier 通用导出协议机制）：
+  第三方协议程序集（任意命名，如 Contoso.Storage.S3）三步行接入，全部在项目配置内：
+  <ol><li>csproj 声明导出意图（与 AssemblyInfo.cs 等价——编译时合成程序集特性）：
+    <code>&lt;AssemblyAttribute Include="TC.Tier.CodeGen.TierProtocolExportedAttribute" /&gt;</code></li><li>实现类标注协议身份：<code>[NetworkProtocol("myproto")] class MyBuilder : ITierProtocolBuilder</code>
+    （引用 CodeGen.Abstractions 特性定义 + TC.Tier.Core 接口）</li><li>直接编译——本生成器在<b>消费方编译</b>里扫描带
+    <code>TierProtocolExported</code> 标记的引用程序集（<code>asm.GetAttributes()</code>——零误扫非协议程序集），
+    生成 <code>TierFsExternalProtocolRegistration</code>（ModuleInitializer——消费方加载即注册）。
+    消费方 <code>TierFs.Open("network:///myproto/…")</code> 直接可用，零反射、NativeAOT 安全。</li></ol>
+<p>关注点分离：类型级 <code>[NetworkProtocol]</code> 标注协议<b>身份</b>（本地 ModuleInitializer 注册）；
+程序集级 <code>TierProtocolExported</code> 声明导出<b>意图</b>（外部桥精确扫描）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.TierProtocolExportedAttribute.html">TierProtocolExportedAttribute</a></dt>
+      <dd><p>★ 程序集级协议导出标记（设计决策——Tier 通用协议导出机制）：
+协议程序集（TC.Tier.Core.IO.S3 或外部第三方）在<b>程序集</b>上标注本特性 = 声明
+&quot;本程序集导出网络协议&quot;——TierFsGenerator 在<b>消费方编译</b>里只深入<b>带此标记</b>的
+引用程序集找 <a class="xref" href="TC.Tier.CodeGen.NetworkProtocolAttribute.html">NetworkProtocolAttribute</a> 类型，生成注册桥。</p>
+<p>★ 关注点分离：类型级 <a class="xref" href="TC.Tier.CodeGen.NetworkProtocolAttribute.html">NetworkProtocolAttribute</a> 标注协议<b>身份</b>
+  （协议键 + 实现类——协议程序集自身编译时本地 ModuleInitializer 注册）；
+  程序集级本特性声明导出<b>意图</b>（供外部桥精确扫描——零误扫非协议程序集）。</p>
+<p>★ 无参标记——语义即"本程序集含 [NetworkProtocol] 导出"。第三方协议程序集加一行
+  <code>[assembly: TierProtocolExported]</code> 即被消费方自动发现（零反射，NativeAOT 安全）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ValidEqualsAttribute.html">ValidEqualsAttribute</a></dt>
+      <dd><p>字段必须 == 指定常量。用于规范字段（MagicValue/Version/Flags 等）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ValidHasFlagsAttribute.html">ValidHasFlagsAttribute</a></dt>
+      <dd><p>位掩码包含校验：字段必须包含 mask 的所有位（(field &amp; mask) == mask）。
+用于 Flags 这种&quot;基线位必含 + 运行时可叠加动态位&quot;的字段（如 entry meta 标记、末页标记）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ValidNonDefaultAttribute.html">ValidNonDefaultAttribute</a></dt>
+      <dd><p>字段必须非默认零值。用于&quot;必填任意非零值&quot;语义。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ValidRangeAttribute.html">ValidRangeAttribute</a></dt>
+      <dd><p>字段必须在 [min, max] 范围内。用于有界数值字段（PayloadLength/Length 等）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.WireArrayAttribute.html">WireArrayAttribute</a></dt>
+      <dd><p>标记 struct 为变长集合线编码（spec-12 §10 E1——<code>[Count 4B][item×N]</code>：
+基元整型 / 标注 [BinaryLayout] struct 项 / byte[] 字节块）。</p>
+<p>★ 布局 = 字段声明序：非数组字段构成定长前缀（声明顺序即线顺序——加字段 = 加一行声明，
+  位置由生成物累积，零偏移知识）；恰一个数组字段承载变长区，永远在前缀之后。
+  构造函数参数序 = （前缀字段声明序 + 数组字段）。</p>
+<p>★ 生成 <code>XxxCodec.Encode(Span&lt;byte&gt;, in T) → int</code>（返回写入长度）与
+  <code>TryDecode(ReadOnlySpan&lt;byte&gt;, out T) → bool</code>——计数、位置、字节序全部生成物，
+  消费层零手写字节序与偏移。</p>
+<p>★ 嵌套项（标注 [BinaryLayout] struct）的项大小经其生成的 <code>StructSize</code> 获得——
+  嵌套元素布局须开 <a class="xref" href="TC.Tier.CodeGen.BinaryLayoutFeatures.html#TC_Tier_CodeGen_BinaryLayoutFeatures_StructSize">StructSize</a>。</p>
+<p>★ 防御上限显式声明：Count &gt; <a class="xref" href="TC.Tier.CodeGen.WireArrayAttribute.html#TC_Tier_CodeGen_WireArrayAttribute_MaxCount">MaxCount</a> = TryDecode false（畸形报文拦截）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.WireArrayGenerator.html">WireArrayGenerator</a></dt>
+      <dd><p>[WireArray] 源生成器（spec-12 §10 E1）——变长集合线编码：<code>[定长前缀字段…][Count 4B][item×N]</code>。</p>
+<p>★ 布局 = 声明序：非数组字段按声明顺序构成定长前缀（cursor 累积，零偏移知识——
+  字段顺序即线顺序），数组字段承载变长区（byte[] = 字节块；T[] = 项数组，T 为基元整型或
+  标注 [BinaryLayout] 的 struct——项大小经其生成的 <code>StructSize</code> 表达式获得，
+  本生成器不重算别家布局）。</p>
+<p>★ 生成 <code>XxxCodec.Encode(Span&lt;byte&gt;, in T) → int</code> / <code>TryDecode(ReadOnlySpan&lt;byte&gt;, out T) → bool</code>——
+  计数、位置、字节序全部生成物，消费层零手写。</p>
+<p>★ 防御上限（MaxCount）显式声明：Count 超限 = TryDecode false——畸形报文拦截。</p>
+<p>★ 诊断 TCSG045-048（数组字段数/元素类型/上限/构造函数形态）——拼错即炸。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.WireMemberAttribute.html">WireMemberAttribute</a></dt>
+      <dd><p>变长成员的防御上限显式声明（缺此标注的变长成员报 TCSG052）。
+两种实参形态等价：<code>[WireMember(8)]</code>（位置）/ <code>[WireMember(MaxCount = 8)]</code>（命名——等号只绑可写属性）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.WireMessageAttribute.html">WireMessageAttribute</a></dt>
+      <dd><p>标记抽象基类为线消息族根（spec-12 §10 E2——消息族编码：<code>[Tag 1B][根字段声明序][子类字段声明序]</code>）。</p>
+<p>★ 族根声明公共前缀字段（全体子类共享）；直接派生子类各标 <a class="xref" href="TC.Tier.CodeGen.WireMessageTagAttribute.html">WireMessageTagAttribute</a>
+  携带 tag。生成 <code>XxxCodec.Encode(msg) → byte[]</code> / <code>TryDecode(ReadOnlySpan&lt;byte&gt;, out msg) → bool</code>
+  与 tag 常量（<code>Tag子类名</code>）——tag 判别、公共前缀、字段序、字节序全部生成物。</p>
+<p>★ 成员支持：bool/基元整型（小端）、标注 [BinaryLayout] struct（嵌套件）、
+  byte[]/ReadOnlyMemory&lt;byte&gt;（blob：<code>[Len 4B][bytes]</code>）、数组/列表 of 上述与
+  ReadOnlyMemory&lt;byte&gt;（<code>[Count 4B][item×N]</code>，blob 项为 <code>[Len 4B][bytes]</code>）。</p>
+<p>★ 未知 tag / 截断 / Count 超上限 = TryDecode false（畸形报文拦截；变长成员上限经
+  <a class="xref" href="TC.Tier.CodeGen.WireMemberAttribute.html">WireMemberAttribute</a> 显式声明）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.WireMessageGenerator.html">WireMessageGenerator</a></dt>
+      <dd><p>[WireMessage] 源生成器（spec-12 §10 E2）——消息族线编码：
+<code>[Tag 1B][根字段声明序][子类字段声明序]</code>。</p>
+<p>★ 族根（[WireMessage] 抽象类）声明公共前缀字段；直接派生子类各标 [WireMessageTag]。
+  生成 <code>XxxCodec</code>：Encode（tag 判别 + 全字段编码）/ TryDecode（未知 tag/截断/超上限 = false）/
+  tag 常量（<code>Tag子类名</code> 同源）。</p>
+<p>★ 成员类型支持集：bool/基元整型（小端）、标注 [BinaryLayout] struct（嵌套件——
+  项大小经其生成 StructSize）、byte[]/ReadOnlyMemory&lt;byte&gt; blob（[Len 4B][bytes]）、
+  数组/列表 of 上述与 ReadOnlyMemory&lt;byte&gt;（[Count 4B][item×N]，blob 项 [Len 4B][bytes]）。
+  变长成员必须 [WireMember(MaxCount)] 显式声明防御上限。</p>
+<p>★ 诊断 TCSG050-053（tag 重复/成员类型不支持/变长成员缺上限/孤立 tag）——拼错即炸。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.WireMessageTagAttribute.html">WireMessageTagAttribute</a></dt>
+      <dd><p>消息族子类的 tag 标注（族内唯一——重复值编译期 TCSG050 Error）。</p>
+</dd>
+    </dl>
+    <h3 id="structs">
+Structs
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandHttpRequest.html">CommandHttpRequest</a></dt>
+      <dd><p>传输中立的命令 HTTP 请求（#435 HttpApi 执行代理入口契约）——宿主适配归消费方
+（Core.Net 无 HTTP 服务面；挂载 = 宿主把自有监听面翻译为本契约）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.CommandHttpResponse.html">CommandHttpResponse</a></dt>
+      <dd><p>传输中立的命令 HTTP 应答。</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.ICommandResults.html">ICommandResults</a></dt>
+      <dd><p>结果渲染口——CLI/HTTP 两端对偶（宿主实现；推荐 System.Text.Json 泛型 source-gen 零反射）。</p>
+<p>★ HTTP 成功载荷走 <a class="xref" href="TC.Tier.CodeGen.ICommandResults.html#TC_Tier_CodeGen_ICommandResults_WriteAsync__1___0_">WriteAsync&lt;T&gt;(T)</a>；用法/绑定错误走
+  <a class="xref" href="TC.Tier.CodeGen.ICommandResults.html#TC_Tier_CodeGen_ICommandResults_WriteError_System_Int32_System_String_">WriteError(int, string)</a>；已声明业务异常走 <a class="xref" href="TC.Tier.CodeGen.ICommandResults.html#TC_Tier_CodeGen_ICommandResults_WriteError_System_Int32_System_Exception_">WriteError(int, Exception)</a>
+  （消费方模式匹配自家异常类型提取错误码——零反射）。</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.CodeGen.BinaryLayoutFeatures.html">BinaryLayoutFeatures</a></dt>
+      <dd><p>[BinaryLayout] 生成能力组合标志。</p>
+<p>默认 None：仅生成 Write/Read/Validate。
+按需组合 StructSize、FieldConstants、FieldReaders、FieldWriters。</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

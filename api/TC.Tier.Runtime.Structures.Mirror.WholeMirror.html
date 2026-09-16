@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class WholeMirror | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="WholeMirror——整体单链 checkpoint 镜像（统一帧格式，Single 链）。 ★ 子类实现面（COORDINATION &#167;4 铁律 10）：codec（WMHD/WMFT、CRC64）+ 会话门面   （三拍直通基类帧原语）+ 单链钩子（链头推进/保留窗口）。机制（帧写入/走链/尾锚/嵌入 meta/   N=2/2PC）全部在 。 ★ 写会话真流式：BeginSession → AppendChunk &#215; N → EndSession——不知尺寸、零缓冲、   CRC64 边写边累积收官落尾（全程不需要知道总长）。 ★ 生命周期：new + Initialize()（后台恢复）+ WaitForReady()。详见 src/TC.Tier.Core/docs/lifecycle.md。">
+      <meta name="description" content="WholeMirror 编解码 partial——嵌套 Codec（ 实现）：统一帧 header/footer 读写 + magic/CRC 模式校验。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,13 +97,7 @@ Class WholeMirror
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>WholeMirror——整体单链 checkpoint 镜像（统一帧格式，Single 链）。</p>
-<p>★ 子类实现面（COORDINATION §4 铁律 10）：codec（WMHD/WMFT、CRC64）+ 会话门面
-  （三拍直通基类帧原语）+ 单链钩子（链头推进/保留窗口）。机制（帧写入/走链/尾锚/嵌入 meta/
-  N=2/2PC）全部在 <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html">MirrorBase</a>。</p>
-<p>★ 写会话真流式：BeginSession → AppendChunk × N → EndSession——不知尺寸、零缓冲、
-  CRC64 边写边累积收官落尾（全程不需要知道总长）。</p>
-<p>★ 生命周期：new + Initialize()（后台恢复）+ WaitForReady()。详见 src/TC.Tier.Core/docs/lifecycle.md。</p>
+  <div class="markdown summary"><p>WholeMirror 编解码 partial——嵌套 Codec（<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.IMirrorCodec.html">IMirrorCodec</a> 实现）：统一帧 header/footer 读写 + magic/CRC 模式校验。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -118,7 +112,7 @@ Class WholeMirror
     <dt>Inheritance</dt>
     <dd>
       <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorRecoveryHints.html">MirrorRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Mirror.Contracts.MirrorRecoveryHints.html">MirrorRecoveryHints</a>&gt;</div>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html">MirrorBase</a></div>
       <div><span class="xref">WholeMirror</span></div>
     </dd>
@@ -178,40 +172,40 @@ Class WholeMirror
       <a class="xref" href="TC.Tier.Runtime.Structures.Mirror.MirrorBase.html#TC_Tier_Runtime_Structures_Mirror_MirrorBase_CurrentVersion">MirrorBase.CurrentVersion</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;MirrorRecoveryHints&gt;.GetAliveInstances(string)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;MirrorRecoveryHints&gt;.GetAliveInstances(string)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReady(int)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReady(int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;MirrorRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;MirrorRecoveryHints&gt;.CancelRecovery()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;MirrorRecoveryHints&gt;.CancelRecovery()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;MirrorRecoveryHints&gt;.Initialize(MirrorRecoveryHints)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;MirrorRecoveryHints&gt;.Initialize(MirrorRecoveryHints)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;MirrorRecoveryHints&gt;.Dispose()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;MirrorRecoveryHints&gt;.Dispose()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;MirrorRecoveryHints&gt;.DisposeAsync()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;MirrorRecoveryHints&gt;.DisposeAsync()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;MirrorRecoveryHints&gt;.Id</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;MirrorRecoveryHints&gt;.Id</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;MirrorRecoveryHints&gt;.IsReady</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;MirrorRecoveryHints&gt;.IsReady</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;MirrorRecoveryHints&gt;.RecoveryState</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;MirrorRecoveryHints&gt;.RecoveryState</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;MirrorRecoveryHints&gt;.RecoveryProgressChanged</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;MirrorRecoveryHints&gt;.RecoveryProgressChanged</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
@@ -447,13 +441,15 @@ Class WholeMirror
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>frameHead</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd></dd>
+    <dd><p>帧头地址。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>payload 字节数（= 帧尾地址 − 帧头 − HeaderSize）；无有效帧时为 0。</p>
+</dd>
   </dl>
 
 
@@ -529,13 +525,15 @@ Class WholeMirror
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>frameHead</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd></dd>
+    <dd><p>帧头地址。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 帧存在且 CRC 校验一致；false = 帧无效或 CRC 不符。</p>
+</dd>
   </dl>
 
 
@@ -567,7 +565,7 @@ Class WholeMirror
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

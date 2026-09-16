@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class KvStoreGenerator | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class KvStoreGenerator | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="[KvStore] 生成器（tierkv-design.md &#167;0.1/&#167;4 W1——开放泛型产品类的封闭消费面，[RingKey] 同款先例）。 ★ [assembly: KvStore(typeof(TKey), typeof(TValue))] → 一行声明产出封闭形态：   TierKvOfKeyLeafValueLeaf : TierKv&amp;lt;TKey,TValue&amp;gt;（ctor 转发 + CreateAsync 工厂一步生命周期 +   内嵌派生 Ring/索引实现——派生肢获得 protected internal 构造权，开放泛型零构造）。   formatter 按 TValue 自动发射（byte/byte[]/ROM&amp;lt;byte&amp;gt;/unmanaged 零代码，D6/D7 裁定）；   IndexKind 标注缺省发射 DefaultOptions（运行 Options.IndexKind 覆盖——显式胜出）。 ★ 编译期校验：Key 不满足 unmanaged → TCSG021；TValue 无可用 formatter（非内建覆盖面且未声明   Formatter）→ TCSG022；Formatter 未实现 IValueFormatter&amp;lt;TValue&amp;gt; → TCSG023   （消费方未引用 Products 时接口符号不可解析——跳过该校验由生成物编译错误兜底，IEquatable 缺失同款 CS0314）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.CodeGen.KvStoreGenerator">
+
+
+
+  <h1 id="TC_Tier_CodeGen_KvStoreGenerator" data-uid="TC.Tier.CodeGen.KvStoreGenerator" class="text-break">
+Class KvStoreGenerator  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.CodeGen.html">CodeGen</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.CodeGen.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>[KvStore] 生成器（tierkv-design.md §0.1/§4 W1——开放泛型产品类的封闭消费面，[RingKey] 同款先例）。</p>
+<p>★ <code>[assembly: KvStore(typeof(TKey), typeof(TValue))]</code> → 一行声明产出封闭形态：
+  TierKvOfKeyLeafValueLeaf : TierKv&lt;TKey,TValue&gt;（ctor 转发 + CreateAsync 工厂一步生命周期 +
+  内嵌派生 Ring/索引实现——派生肢获得 protected internal 构造权，开放泛型零构造）。
+  formatter 按 TValue 自动发射（byte/byte[]/ROM&lt;byte&gt;/unmanaged 零代码，D6/D7 裁定）；
+  IndexKind 标注缺省发射 DefaultOptions（运行 Options.IndexKind 覆盖——显式胜出）。</p>
+<p>★ 编译期校验：Key 不满足 unmanaged → TCSG021；TValue 无可用 formatter（非内建覆盖面且未声明
+  Formatter）→ TCSG022；Formatter 未实现 IValueFormatter&lt;TValue&gt; → TCSG023
+  （消费方未引用 Products 时接口符号不可解析——跳过该校验由生成物编译错误兜底，IEquatable 缺失同款 CS0314）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class KvStoreGenerator : IIncrementalGenerator</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">KvStoreGenerator</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><span class="xref">IIncrementalGenerator</span></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_CodeGen_KvStoreGenerator__ctor_" data-uid="TC.Tier.CodeGen.KvStoreGenerator.#ctor*"></a>
+
+  <h3 id="TC_Tier_CodeGen_KvStoreGenerator__ctor" data-uid="TC.Tier.CodeGen.KvStoreGenerator.#ctor">
+  KvStoreGenerator()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public KvStoreGenerator()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_CodeGen_KvStoreGenerator_Initialize_" data-uid="TC.Tier.CodeGen.KvStoreGenerator.Initialize*"></a>
+
+  <h3 id="TC_Tier_CodeGen_KvStoreGenerator_Initialize_Microsoft_CodeAnalysis_IncrementalGeneratorInitializationContext_" data-uid="TC.Tier.CodeGen.KvStoreGenerator.Initialize(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext)">
+  Initialize(IncrementalGeneratorInitializationContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注册生成管道：扫描程序集级 <code>[KvStore]</code> 标注（一次编译单元可挂多条）→ Collect →
+为每对 (TKey,TValue) 生成封闭形态 + 校验诊断上报。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Initialize(IncrementalGeneratorInitializationContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>context</code> <span class="xref">IncrementalGeneratorInitializationContext</span></dt>
+    <dd><p>增量生成器初始化上下文。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -130,6 +130,13 @@ public enum FileSystemCapabilities</code></pre>
   
   <dd><p>目录移动原子（MoveDirectory 介质语义判别）——Disk ✓（同根内必同卷 rename）/ Mem ✓（锁内批量交换）；
 Remote 不置位（回退 = 逐对象 Copy+Delete，非原子，部分失败有残留）。</p>
+</dd>
+    <dt id="TC_Tier_Core_IO_FileSystemCapabilities_CarrierWriteThrough"><code>CarrierWriteThrough = 262144</code></dt>
+  
+  <dd><p>载体句柄级写穿挂载（virtual 介质 CarrierWriteThrough 挂载档——IS-03）：journal 提交免独立 fsync
+（写穿完成即单屏障）。仅 TierVolumeFs 在挂载选项 CarrierWriteThrough=true 时置位；其余介质恒不置。</p>
+<p>★ TierWAL 契约①（选举窗口）的介质前提：virtual 介质未置位 = 元数据持久化基线档实测
+  p99.9 ≥150ms 不达标（perf/tierwal-contracts.md）——TierWalBuilder.StartAsync 据此 fail-fast。</p>
 </dd>
     <dt id="TC_Tier_Core_IO_FileSystemCapabilities_ContiguousCapture"><code>ContiguousCapture = 65536</code></dt>
   
@@ -225,7 +232,7 @@ Remote 不置位（打开已有文件随机覆写触发按需拉取全量——�
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

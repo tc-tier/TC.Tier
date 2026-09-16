@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -194,6 +194,40 @@ Class StorageEngineOptions
 </h2>
 
 
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_Clock_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Clock*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_Clock" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Clock">
+  Clock
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>时钟供给源（故障注入面 件一——时钟缝 P1 落点；缺省 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.system">System</a> 行为逐字节零变化）。</p>
+<pre><code>        &lt;p&gt;节流自旋窗/元组耐久化泵周期经本源驱动——假钟下由快进确定性触发。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeProvider Clock { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_Default_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Default*"></a>
 
   <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_Default" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Default">
@@ -239,6 +273,39 @@ Class StorageEngineOptions
 
   <div class="codewrapper">
     <pre><code class="lang-csharp hljs">public bool DeleteOnClose { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_EnableFaultInjection_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.EnableFaultInjection*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_EnableFaultInjection" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.EnableFaultInjection">
+  EnableFaultInjection
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>是否开启引擎故障注入面（默认 false——<a class="xref" href="TC.Tier.Runtime.Storage.IStorageEngineFaultInjector.html">IStorageEngineFaultInjector</a> 缺省关闭零开销，
+引擎 op 入口一次空引用短路）。开启后经引擎 <code>Faults</code> 属性取得注入面。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool EnableFaultInjection { get; init; }</code></pre>
   </div>
 
 
@@ -347,6 +414,45 @@ Class StorageEngineOptions
   <h4 class="section">Property Value</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html">FileOpenHints</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_MetaTupleFlushInterval_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.MetaTupleFlushInterval*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_MetaTupleFlushInterval" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.MetaTupleFlushInterval">
+  MetaTupleFlushInterval
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>段元组耐久化泵周期——生命周期元组（建段初始/段满）记脏后由后台泵按此周期批量落盘。</p>
+<p>★ <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.timeout.infinitetimespan">InfiniteTimeSpan</a> = 耐久化仅锚定 Dispose 补写；
+  <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan.zero">Zero</a> = 逐写同步直写（每生命周期点 fsync——小段高频场景的延迟瓶颈形态）。
+  默认 200ms 批量。</p>
+<p>★ 依据（2026-09-08 磁盘销案）：机械盘每 meta fsync ~15-30ms × 小段压测几何
+  （4KB 段 × 600 创建+段满 ≈ 1200 次串行 fsync ≈ 数十秒）把建段路径拖过测试预算；
+  泵化后生命周期操作零 fsync 等待。崩溃窗口 ≤ 周期——恢复设计本可容忍 stale 元组
+  （fileSize 权威回退）；进程存活期缓存读己写恒成立。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan MetaTupleFlushInterval { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
     <dd></dd>
   </dl>
 
@@ -530,7 +636,8 @@ Class StorageEngineOptions
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineBuilder.html">StorageEngineBuilder</a></dt>
-    <dd></dd>
+    <dd><p>绑定本选项的 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineBuilder.html">StorageEngineBuilder</a>（可 <code>Start/StartAsync</code> 启动）。</p>
+</dd>
   </dl>
 
 
@@ -665,7 +772,8 @@ Class StorageEngineOptions
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.AddressSpace.SegmentTableSettings.html">SegmentTableSettings</a></dt>
-    <dd></dd>
+    <dd><p>由本选项派生的 <a class="xref" href="TC.Tier.Runtime.AddressSpace.SegmentTableSettings.html">SegmentTableSettings</a>（MinSegId/IndexCapacity/SpinMilliseconds 等逐项映射）。</p>
+</dd>
   </dl>
 
 
@@ -709,6 +817,45 @@ Class StorageEngineOptions
 
 
 
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithClock_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithClock*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithClock_System_TimeProvider_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithClock(System.TimeProvider)">
+  WithClock(TimeProvider)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——时钟供给源（节流自旋/元组泵周期注入）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StorageEngineOptions WithClock(TimeProvider clock)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clock</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd><p>时钟供给源（非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
+    <dd><p>替换 Clock 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithDeleteOnClose_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithDeleteOnClose*"></a>
 
   <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithDeleteOnClose_System_Boolean_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithDeleteOnClose(System.Boolean)">
@@ -727,13 +874,49 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>enable</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = Dispose 时删除引擎子目录下全部产物；false = 保留。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>替换 DeleteOnClose 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithFaults_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithFaults*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithFaults" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithFaults">
+  WithFaults()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>开启引擎故障注入面（返回新实例；缺省关闭零开销——显式开启面，非测试代码泄漏）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StorageEngineOptions WithFaults()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
+    <dd><p>EnableFaultInjection = true 的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例
+（引擎 <code>Faults</code> 属性可得 <a class="xref" href="TC.Tier.Runtime.Storage.IStorageEngineFaultInjector.html">IStorageEngineFaultInjector</a>）。</p>
+</dd>
   </dl>
 
 
@@ -764,13 +947,55 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>hints</code> <a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html">FileOpenHints</a></dt>
-    <dd></dd>
+    <dd><p>Core IO 打开提示（如 <a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html#TC_Tier_Core_IO_FileOpenHints_NoBuffering">NoBuffering</a>/<a class="xref" href="TC.Tier.Core.IO.FileOpenHints.html#TC_Tier_Core_IO_FileOpenHints_WriteThrough">WriteThrough</a>）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>替换 Hints 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithMetaTupleFlushInterval_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithMetaTupleFlushInterval*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithMetaTupleFlushInterval_System_TimeSpan_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithMetaTupleFlushInterval(System.TimeSpan)">
+  WithMetaTupleFlushInterval(TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>设置段元组耐久化泵周期（返回新实例；负值归一为 Infinite——仅 Dispose 锚定）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StorageEngineOptions WithMetaTupleFlushInterval(TimeSpan interval)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>interval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>泵周期（正值 = 批量落盘周期；<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.timeout.infinitetimespan">InfiniteTimeSpan</a> = 仅 Dispose 锚定；
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan.zero">Zero</a> = 逐写同步直写；负值归一为 Infinite）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
+    <dd><p>替换 MetaTupleFlushInterval 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
   </dl>
 
 
@@ -801,13 +1026,15 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>minSegId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
-    <dd></dd>
+    <dd><p>最小有效段号（非负，默认 0）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>替换 MinSegId 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
   </dl>
 
 
@@ -838,13 +1065,15 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>optimization</code> <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptimization.html">StorageEngineOptimization</a></dt>
-    <dd></dd>
+    <dd><p>新的优化参数对象，非空。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>替换 Optimization 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
   </dl>
 
 
@@ -875,13 +1104,15 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>enable</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 每段按段大小预留；false = 稀疏按需增长。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>替换 PreallocateFile 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
   </dl>
 
 
@@ -912,15 +1143,18 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>limit</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>段增长上限（字节）；≤ 0 回落引擎默认（256MB）。</p>
+</dd>
     <dt><code>enableSegmentation</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>是否启用段分段，默认 true。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>替换 SegmentGrowthLimit/EnableSegmentation 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
   </dl>
 
 
@@ -993,13 +1227,15 @@ Class StorageEngineOptions
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>engineName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>引擎名（构造引擎子目录用）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
-    <dd></dd>
+    <dd><p>以 <code class="paramref">engineName</code> 构造的 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a>（其余取默认值）。</p>
+</dd>
   </dl>
 
 
@@ -1069,7 +1305,7 @@ Class StorageEngineOptions
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

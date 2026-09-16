@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>任务沉池使用指南（TaskSink——SubmitFast / Submit） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="任务沉池使用指南（TaskSink——SubmitFast / Submit） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/task-sink.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="任务沉池使用指南tasksinksubmitfast--submit">任务沉池使用指南（TaskSink——SubmitFast / Submit）</h1>
+
+<blockquote>
+<p>定位：本仓库<strong>唯一</strong>合法的 fire-and-forget 任务积木。任何「发完即忘的高频轻量任务」
+（RPC 发送/通知/即发即忘清理）都基于任务沉池构建——裸 <code>_ = SomeAsync()</code> 是被禁止的形态
+（unobserved exception 诊断黑洞 + Task 洪水打满公共池）。本文覆盖：两形态选型、API 全貌、
+契约与硬性要求、仓库真实范例。长驻循环/队列消费见 <a href="worker-loop.html"><code>worker-loop.md</code></a>；
+要进度/结果句柄的长操作用 AsyncOperation 体系（Runtime 侧）。</p>
+</blockquote>
+<hr>
+<h2 id="0-铁律禁止裸-_--someasync">0. 铁律：禁止裸 <code>_ = SomeAsync()</code></h2>
+<p>裸丢弃的两个雷：</p>
+<ol>
+<li><strong>异常不可观测</strong>：任务挂了没有栈、没有日志，什么都没有（unobserved——楔死取证时
+找不到失败记录）。</li>
+<li><strong>Task 洪水</strong>：瞬间大量任务丢弃打满公共任务池——卡死、GC 停止。</li>
+</ol>
+<p>任务沉池在提交点把两个雷都堵死：异常集中兜底（日志 + <code>onFaulted</code> + 故障计数）+
+在途可观测（<code>InFlightCount</code>）+ Dispose 有界收尾（不悬挂半途任务）。</p>
+<hr>
+<h2 id="1-两形态选型">1. 两形态选型</h2>
+<table>
+<thead>
+<tr>
+<th></th>
+<th><code>SubmitFast</code>（高性能路径）</th>
+<th><code>Submit</code>（安全通用路径）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>启动</td>
+<td>内联——任务体第一段（到第一个 await）在<strong>提交线程</strong>同步执行</td>
+<td>池上——<code>Task.Run</code> 全程（含第一段），提交线程零占用</td>
+</tr>
+<tr>
+<td>快路径</td>
+<td>同步完成的任务 ≈ 0 开销（0 分配）</td>
+<td>无（每次固定 ~400ns 调度+包装）</td>
+</tr>
+<tr>
+<td>契约</td>
+<td><strong>第一段必须轻量非阻塞</strong>（阻塞拖住提交方）</td>
+<td>第一段任意（未知/第三方回调）</td>
+</tr>
+</tbody>
+</table>
+<p>选择树：<strong>要队列/限流/优先级 → WorkerLoop；要进度句柄 → AsyncOperation；
+第一段轻量可控（自有代码）→ <code>SubmitFast</code>；第一段不可控 → <code>Submit</code>；
+要身份/单任务取消/等待完成 → 不是本原语的语义</strong>（协议层自持状态；长稳定循环走
+专用线程 + <code>AsyncPump</code> 泵域，时间驱动唤醒走 <code>DeadlineRegistry</code>——任务沉池只收
+轻量高频即发即忘）。</p>
+<h2 id="2-快速上手">2. 快速上手</h2>
+<pre><code class="lang-csharp">// 装配（字段持有——Dispose 编排收尾）
+private readonly TaskSink _sends = new(name: &quot;raft-sends&quot;, logger: logger);
+
+// 提交（fire-and-forget——void，零仪式；同步/异步上下文都可直接调）
+_sends.SubmitFast(ct =&gt; _transport.SendAsync(peer, rpc, ct));
+
+// 收尾（宿主 DisposeAsync 里编排——取消传播 + 有界等待在途）
+await _sends.DisposeAsync();
+</code></pre>
+<p>构造参数（两形态同签名）：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>string? name</code></td>
+<td>类名</td>
+<td>诊断标识（日志区分多实例）</td>
+</tr>
+<tr>
+<td><code>ILogger? logger</code></td>
+<td>null</td>
+<td>未捕获异常兜底记录（null = 静默）</td>
+</tr>
+<tr>
+<td><code>Action&lt;Exception&gt;? onFaulted</code></td>
+<td>null</td>
+<td>未捕获异常回调（logger 之后调用——测试断言/高级消费方）</td>
+</tr>
+<tr>
+<td><code>TimeSpan? drainTimeout</code></td>
+<td>5s</td>
+<td>Dispose 等在途完成的超时（超时 LogWarning <strong>不抛</strong>——尽力而为）</td>
+</tr>
+</tbody>
+</table>
+<p>诊断属性：<code>InFlightCount</code>（在途数）/ <code>SubmittedCount</code>（累计提交）/ <code>FaultedCount</code>
+（累计故障——洪水率与黑洞率可量化：<code>Faulted/Submitted</code>）。</p>
+<h2 id="3-契约">3. 契约</h2>
+<p>一句话：<strong>提交即放手</strong>。</p>
+<p><strong>保证的</strong>：</p>
+<ul>
+<li><strong>异常收口不外泄</strong>：任务体漏 catch 由池兜底——<code>LogWarning</code> + <code>onFaulted</code> +
+<code>FaultedCount</code>，不悬挂 unobserved。</li>
+<li><strong>组生命周期</strong>：Dispose = 取消传播（组级 ct）+ 有界 drain（等在途归零，超时告警不抛）。</li>
+<li><strong>void 零仪式</strong>：提交无返回值、无句柄、无等待。</li>
+</ul>
+<p><strong>不保证的</strong>（fire-and-forget 的本义）：</p>
+<ul>
+<li><strong>执行</strong>：已释放即拒（<code>ObjectDisposedException</code> fail-fast）、池拒绝、进程终——
+提交成功 ≠ 必然执行。</li>
+<li><strong>完成通知</strong>：丢弃静默，没有逐任务回调/句柄——只能事后从计数器观测
+（<code>InFlightCount</code> 归零 / <code>FaultedCount</code> 增量）。</li>
+<li><strong>顺序</strong>：提交序 ≠ 执行序（池上路径并发跑；内联路径第一段先行但续段回池）。</li>
+</ul>
+<p>取消归一：所有 <code>OperationCanceledException</code>（组取消 Dispose 收尾/任务体业务取消）
+归正常完成，不进故障计数。</p>
+<h2 id="4-硬性要求">4. 硬性要求</h2>
+<ol>
+<li><strong>禁止裸 <code>_ = SomeAsync()</code></strong>——一律经任务沉池（本文件 §0）。</li>
+<li><strong><code>SubmitFast</code> 的第一段契约</strong>——提交线程执行，必须轻量非阻塞；做不到换
+<code>Submit</code> 或 WorkerLoop。</li>
+<li><strong>宿主 Dispose 必须编排池收尾</strong>（<code>DisposeAsync</code> 传递）——不收尾则进程退出前在途
+任务不可观测。</li>
+<li>不做限流/排队（要排队语义用 WorkerLoop）——消费方井喷需自限；提交速率天然有界
+的场景（单事件循环串行产生）无需处理。</li>
+</ol>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/task-sink.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

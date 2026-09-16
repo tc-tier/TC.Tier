@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Log（EntryLog）性能基线 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Log（EntryLog）性能基线 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/perf/log-perf-baseline.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="logentrylog性能基线">Log（EntryLog）性能基线</h1>
+
+<blockquote>
+<p>现行版 Log 独有压测报表（首建——旧架构基准套件 §4 Log 数字出自旧 Structures/{Index,Log,Ring}
+40 文件套件（旧 API 形态），随缺口收尾清理，已过时。注：Log 非泛型——entry 为原始字节流，
+无 key 类型参数）。数字实测于本机
+（i5-12400 / .NET 8.0.30 / x64 RyuJit AVX2），文件系统=内存文件系统（写路径纯 CPU 口径，引擎 IO 噪声为零；
+本地文件系统另行对照）。</p>
+</blockquote>
+<h2 id="配置">配置</h2>
+<ul>
+<li>EntryLog（PageSize=8K / Managed meta / 组提交默认策略——字节量/条数/时间间隔三维阈值自动落盘）</li>
+<li>entry 64B；count 50 万；批变体 512/批</li>
+<li>运行：
+<pre><code class="lang-bash">dotnet run -c Release --project benchmarks/TC.Tier.Runtime.Benchmarks -- --log-write-probe 500000 64
+</code></pre>
+</li>
+</ul>
+<h2 id="数字">数字</h2>
+<table>
+<thead>
+<tr>
+<th>变体</th>
+<th style="text-align: right;">吞吐</th>
+<th>备注</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>single（单条 Append）</td>
+<td style="text-align: right;"><strong>1.34M op/s（~745ns/op）</strong></td>
+<td>并发安全化（写路径粗锁）：相对旧无锁版 1.38M <strong>-3%</strong>（Monitor 快速路径 ~20ns/entry）——单写者语义完全保持（水位零改动）</td>
+</tr>
+<tr>
+<td>batch（BeginAppendBatch 512）</td>
+<td style="text-align: right;"><strong>5.49M op/s（~182ns/op）</strong></td>
+<td>批持锁（Begin/Dispose 各一次）——批内本地游标零锁——与旧版 5.4M <strong>持平</strong></td>
+</tr>
+<tr>
+<td>concurrent（8 写者并发 Append）</td>
+<td style="text-align: right;"><strong>~2.1M op/s</strong></td>
+<td>锁竞争下吞吐（正确性确定——串行语义）；并发价值 = API 契约安全（public Append 多线程调用不损坏），非吞吐扩展</td>
+</tr>
+<tr>
+<td>recovery（50 万条重开）</td>
+<td style="text-align: right;"><strong>9 ms</strong></td>
+<td>页帧扫盘 + meta 水位恢复</td>
+</tr>
+</tbody>
+</table>
+<h2 id="对照同机同形mem">对照（同机同形，mem）</h2>
+<table>
+<thead>
+<tr>
+<th>项</th>
+<th style="text-align: right;">Log</th>
+<th style="text-align: right;">Ring</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>单条写</td>
+<td style="text-align: right;">720ns</td>
+<td style="text-align: right;">906ns（lock 分配）</td>
+<td>Log 略快（单写者无锁）</td>
+</tr>
+<tr>
+<td>批量写</td>
+<td style="text-align: right;">5.40M op/s</td>
+<td style="text-align: right;">6.07M op/s（8 写者批窗口）</td>
+<td>同量级</td>
+</tr>
+<tr>
+<td>恢复</td>
+<td style="text-align: right;">9ms/50 万</td>
+<td style="text-align: right;">45-60ms 底盘</td>
+<td>Log 快一个量级（无索引重建）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="结论">结论</h2>
+<ul>
+<li><strong>并发安全已交付（终案——写路径粗锁）</strong>：public Append/Flush/TruncateSuffix 多线程并发调用
+安全（串行化——不损坏）；API 契约对齐 Ring。代价 = 单写者 -3%（Monitor 快速路径）、批持平
+（批持锁摊薄）——<strong>最小损失方案</strong>。</li>
+<li><strong>模型选型（最终方案）</strong>：窗口模型（双页 ping-pong 强套并发——页状态机/原子段分配/
+换页仲裁）存在未定位的偶发失败且负优化（-29%/-64%），未采用；每写者页缓冲（写者零共享）适配面大（水位/
+TailAddress/TruncateSuffix 是单写者语义深度耦合——并发化需全面语义改造），未采用；粗锁（单写者语义保持、
+水位零改动、零新竞态面）为最终方案——<strong>并发安全以正确性确定为前提，不以吞吐扩展为目标</strong>。</li>
+<li>全量 855 绿 ×6 连过。</li>
+</ul>
+<h2 id="维护">维护</h2>
+<ul>
+<li>改动 Log 写路径（Append/页缓冲/flush/组提交）后必须重跑本探针并更新数字（性能论断须实测）。</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/perf/log-perf-baseline.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

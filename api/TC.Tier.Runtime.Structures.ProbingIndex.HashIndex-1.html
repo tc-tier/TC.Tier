@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class HashIndex&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="★ 诊断专用 partial：bucket 访问的 ref 对照,用于验证&amp;quot;128B bucket 隐式栈拷贝&amp;quot;假设(已实测推翻)。 ★ 仅供 benchmark 使用（InternalsVisibleTo(&quot;TC.Tier.Benchmarks&quot;)）。生产路径请用 。">
+      <meta name="description" content="HashIndex 主 partial——开放寻址哈希内核（槽位状态位域 HashEntry、128B 桶 HashBucket、 表+溢出池同代原子对 InternalHashTable、条带写锁与构造装配）。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,8 +97,8 @@ Class HashIndex&lt;TKey&gt;
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>★ 诊断专用 partial：bucket 访问的 ref 对照,用于验证&quot;128B bucket 隐式栈拷贝&quot;假设(已实测推翻)。</p>
-<p>★ 仅供 benchmark 使用（InternalsVisibleTo("TC.Tier.Benchmarks")）。生产路径请用 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex-1.html#TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Find__0_">Find(TKey)</a>。</p>
+  <div class="markdown summary"><p>HashIndex 主 partial——开放寻址哈希内核（槽位状态位域 <code>HashEntry</code>、128B 桶 <code>HashBucket</code>、
+表+溢出池同代原子对 <code>InternalHashTable</code>、条带写锁与构造装配）。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -118,7 +118,7 @@ Class HashIndex&lt;TKey&gt;
     <dt>Inheritance</dt>
     <dd>
       <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexRecoveryHints.html">ProbingIndexRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexRecoveryHints.html">ProbingIndexRecoveryHints</a>&gt;</div>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html">ProbingIndexBase</a>&lt;TKey&gt;</div>
       <div><span class="xref">HashIndex&lt;TKey&gt;</span></div>
     </dd>
@@ -180,67 +180,73 @@ Class HashIndex&lt;TKey&gt;
       <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_OnInitializeComplete">ProbingIndexBase&lt;TKey&gt;.OnInitializeComplete()</a>
     </div>
     <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_CheckpointFrame">ProbingIndexBase&lt;TKey&gt;.CheckpointFrame()</a>
+    </div>
+    <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_ReadBodyChunk_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__System_Int32__">ProbingIndexBase&lt;TKey&gt;.ReadBodyChunk(LogicalAddress, Span&lt;byte&gt;, out int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_MainStorageAppliedLastRecovery">ProbingIndexBase&lt;TKey&gt;.MainStorageAppliedLastRecovery</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_BeginAddress">ProbingIndexBase&lt;TKey&gt;.BeginAddress</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Logger">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Logger</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Logger">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Logger</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.GetAliveInstances(string)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.GetAliveInstances(string)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.WaitForReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.WaitForReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.WaitForReady(int)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.WaitForReady(int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.CancelRecovery()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.CancelRecovery()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.EnsureReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_EnsureReady">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.EnsureReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Initialize(ProbingIndexRecoveryHints)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Initialize(ProbingIndexRecoveryHints)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Shared_BackgroundWorkerLoop_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Execution_BackgroundWorkerLoop_">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.ThrowIfDisposed()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.ThrowIfDisposed()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Dispose()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Dispose()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.DisposeAsync()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.DisposeAsync()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Resources</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Resources">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Id</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.Id</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.IsDisposed</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsDisposed">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.IsDisposed</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.IsReady</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.IsReady</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.RecoveryState</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.RecoveryState</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.HasBackgroundWorker</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.HasBackgroundWorker</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.RecoveryProgressChanged</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;ProbingIndexRecoveryHints&gt;.RecoveryProgressChanged</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
@@ -276,30 +282,40 @@ Class HashIndex&lt;TKey&gt;
 
   <a id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1__ctor_" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.#ctor*"></a>
 
-  <h3 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_ProbingIndex_HashIndexSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Contracts_Structures_IKeyResolver__0__" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Contracts.Structures.IKeyResolver{`0})">
-  HashIndex(IFileSystem, HashIndexSettings, LightEpoch?, IKeyResolver&lt;TKey&gt;?)
+  <h3 id="TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Structures_ProbingIndex_HashIndexSettings_TC_Tier_Core_Epochs_LightEpoch_TC_Tier_Contracts_Structures_IKeyResolver__0__TC_Tier_Core_Primitives_IKeyComparer__0__" data-uid="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings,TC.Tier.Core.Epochs.LightEpoch,TC.Tier.Contracts.Structures.IKeyResolver{`0},TC.Tier.Core.Primitives.IKeyComparer{`0})">
+  HashIndex(IFileSystem, HashIndexSettings, LightEpoch?, IKeyResolver&lt;TKey&gt;?, IKeyComparer&lt;TKey&gt;?)
   
   </h3>
 
   <div class="markdown level1 summary"><p>ctor 收 <code>protected internal</code>——开放泛型不落消费面闸门（同 BlittableRing）：
 外部直接 new 即 CS0122，用 [RingKey] 生成封闭类型（HashOfT 经 protected 肢）；内核测试经 IVT。</p>
+<p>★ <code class="paramref">keyComparer</code> 可选注入（默认 <code>KeyComparer&lt;TKey&gt;</code> 全字段判等）；
+  点查 latest 版本语义（如 TierKV 同 key 多版本——HashIndex 只关心 latest 地址）可注入
+  版本无关比较器（仅 HashCode 判等/哈希）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">protected HashIndex(IFileSystem fileSystem, HashIndexSettings settings, LightEpoch? epoch = null, IKeyResolver&lt;TKey&gt;? keyResolver = null)</code></pre>
+    <pre><code class="lang-csharp hljs">protected HashIndex(IFileSystem fileSystem, HashIndexSettings settings, LightEpoch? epoch = null, IKeyResolver&lt;TKey&gt;? keyResolver = null, IKeyComparer&lt;TKey&gt;? keyComparer = null)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>fileSystem</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
-    <dd></dd>
+    <dd><p>文件系统抽象（主存储引擎底层 IO 面）。</p>
+</dd>
     <dt><code>settings</code> <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings.html">HashIndexSettings</a></dt>
-    <dd></dd>
+    <dd><p>配置（表初始桶数/溢出池桶数/持久化机制/引擎选项）。</p>
+</dd>
     <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
-    <dd></dd>
+    <dd><p>共享 epoch 实例（null=索引自建并持有）。</p>
+</dd>
     <dt><code>keyResolver</code> <a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver</a>&lt;TKey&gt;</dt>
-    <dd></dd>
+    <dd><p>判等闭环数据面（tag 命中后回读真 key 校验 + 恢复拉流）——必填，null 抛 ArgumentNullException。</p>
+</dd>
+    <dt><code>keyComparer</code> <a class="xref" href="TC.Tier.Core.Primitives.IKeyComparer-1.html">IKeyComparer</a>&lt;TKey&gt;</dt>
+    <dd><p>键比较器（null=默认 KeyComparer&lt;TKey&gt; 全字段判等）。</p>
+</dd>
   </dl>
 
 
@@ -356,7 +372,7 @@ Class HashIndex&lt;TKey&gt;
   
   </h3>
 
-  <div class="markdown level1 summary"><p>条目数（写者维护的 O(1) 计数——旧形全表扫描）。</p>
+  <div class="markdown level1 summary"><p>条目数（写者维护的 O(1) 计数）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -458,7 +474,9 @@ Class HashIndex&lt;TKey&gt;
   </h3>
 
   <div class="markdown level1 summary"><p>删除条目：tag 命中后经 KeyResolver 读回真 key 判等确认（避免误删同 tag 异 key 条目），
-CAS 清槽 + 条目计数递减。epoch 读保护内完成。</p>
+CAS 清槽 + 条目计数递减。条带锁内执行（与插入/覆写全序化——同 key 删插竞争干净收敛）。</p>
+<p>★ CAS 失败=条目正被并发改写——<b>重扫重试</b>直到删掉或确认消失；
+  契约：true=真删到，false=不存在。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -538,7 +556,9 @@ CAS 清槽 + 条目计数递减。epoch 读保护内完成。</p>
 
   <div class="markdown level1 summary"><p>★ 不含 epoch 进出的查找——epoch 由调用方经 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_EnterScope">EnterScope()</a> /
 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexBase-1.html#TC_Tier_Runtime_Structures_ProbingIndex_ProbingIndexBase_1_FindBatch_System_ReadOnlySpan__0__System_Span_TC_Tier_Contracts_Storage_LogicalAddress__">FindBatch(ReadOnlySpan&lt;TKey&gt;, Span&lt;LogicalAddress&gt;)</a> 在外层持有。逻辑与旧 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex-1.html#TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Find__0_">Find(TKey)</a> 的 try-body 一致。</p>
-<p>★ 单引用捕获 <code>_table</code>（表+溢出池同代原子对）——并发增长期间持旧代一致探测。</p>
+<p>★ 捕获代探测 + 换代校验：单引用捕获 <code>_table</code>（表+溢出池同代原子对）并发增长期间
+  持旧代一致探测；但旧代结果可能含<b>已删除条目</b>（并发 Delete 走最新代）——换代则对新代
+  重查（结果权威），未换代（稳态）一次返回零额外开销。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -549,13 +569,15 @@ CAS 清槽 + 条目计数递减。epoch 读保护内完成。</p>
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>key</code> <span class="xref">TKey</span></dt>
-    <dd></dd>
+    <dd><p>查找键。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd></dd>
+    <dd><p>命中 = value 逻辑地址；未命中 = <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html#TC_Tier_Contracts_Storage_LogicalAddress_Empty">Empty</a>。</p>
+</dd>
   </dl>
 
 
@@ -576,11 +598,12 @@ CAS 清槽 + 条目计数递减。epoch 读保护内完成。</p>
   </h3>
 
   <div class="markdown level1 summary"><p>★ 扩容（容量自适应的活器官——装载超 <span class="xref">TC.Tier.Runtime.Structures.ProbingIndex.HashIndex`1.GrowthLoadFactor</span> 由 Insert 触发）：表翻倍。</p>
-<p>★ 纯函数式构建：新表+新溢出池全新分配（旧代零扰动），收集旧代全部 Occupied entry
-（主表 slot 0..6 + 每条 overflow 链）→ 经 KeyResolver 读回真 key 重算 hash 按新 mask 落位 →
-<code>_table</code> 单引用原子发布。并发读者持旧代引用继续一致探测（条目仍真、仅缺发布后新插，
-stale-but-valid——与 BTree 根晋升缓存全清同级容忍），旧代归 GC——<b>无需 epoch 排水</b>
-（无内存回收竞态：溢出指针只在同代内解引用）。</p>
+<p>★ <b>全条带锁静默收集</b>（W0 换代竞态终案）：按序持有全部写条带锁——并发写者
+（Insert/Delete）全部阻塞在条带锁上，收集窗内零落位 → <b>零漏收</b>（代门闩协议的
+漏收窗在此结构性消除）；收集+单引用发布后放锁，写者重读新代继续。
+写者最坏等待 = 收集时长 O(表)——增长为翻倍序列低频事件，可接受。</p>
+<p>★ 纯函数式构建：新表+新溢出池全新分配（旧代零扰动）；并发读者持旧代引用继续
+一致探测（<a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex-1.html#TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_Find__0_">Find(TKey)</a> 的换代校验保证删除可见性）——无需 epoch 排水。</p>
 <p>★ rehash 逐条 TryGetKey（tag 14 位不足以重建 64 位 hash）——重放/增长期地址序近邻，
 Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（翻倍序列总 rehash ≤ 2×条目数）。</p>
 </div>
@@ -640,6 +663,12 @@ Ring 冷页缓存（≥数据页数时全热）承接；均摊成本 O(1)/插（
 epoch 读保护内完成。</p>
 <p>★ 增长在<b>本次插入之前</b>触发（装载超阈值）——此刻全部既有条目已返回调用方且注册完成，
   rehash 逐条 TryGetKey 必可解析；若在插入后触发，刚落位条目可能尚未注册而被 rehash 静默丢弃。</p>
+<p>★ 并发协议（W0 收口——审计 #173/#237/#268/#240/#274 家族）：
+  <b>条带锁写互斥</b>（同 key 同 hash → 同条带锁——判等扫描与落位/覆写/删除在锁内全序化，
+  同 key 单实体可证、无活锁；读路径 Find/Grow 不持锁，稳定读防撕裂）+
+  <b>单步 CAS 落位</b>（废 Tentative 两阶段——旧协议第二跳 CAS 失败被丢弃，条目"插入成功但永远查不到"；
+  CAS expected=完整 16B 槽值，写入即 Occupied，无中间态，ABA 随全等判等收口）+
+  <b>落位校验重试</b>（收集门闩 + 换代校验——堵 GrowIndex 收集漏收窗，见 <a class="xref" href="TC.Tier.Runtime.Structures.ProbingIndex.HashIndex-1.html#TC_Tier_Runtime_Structures_ProbingIndex_HashIndex_1_GrowIndex">GrowIndex()</a>）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
@@ -800,7 +829,7 @@ Tentative/Empty 槽写零、Occupied/链指针原样收），分片经 <a class=
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class Atomic128&lt;T&gt; | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="标准 128 位 CAS 单槽封装——16B 对齐背板 + 能力探测降级 + 裸读不撕裂。 ★ 消除各处（TailWatermarkSlot/IndexBase/AsyncPriorityQueue）重写的   128 CAS 样板：16B 对齐分配 + Unsafe.As&amp;lt;T,Int128&amp;gt; reinterpret +    + 能力探测 + lock 降级。 ★ 统一对齐保证：托管数组（T[]）只保证 8B 对齐，无 16B 对齐保证——   lock cmpxchg16b 要求 16B 对齐，未对齐会 #GP（硬件异常）。本封装用   （64B 对齐 ⊃ 16B，且独占缓存行避 false sharing）做背板，   从根上消除&quot;碰巧 GC 分配对齐&quot;的定时炸弹。 ★ 标准用法（参考 TailWatermarkSlot）：CAS 循环 =  裸读当前 →   业务条件检查 → 算新值（含 ABA version）→  →   失败 SpinWait.SpinOnce() 重试。 ★ 能力探测 + 降级：native 128-bit CAS 不可用时（生产永不触发）退化到 lock，   行为与 native 路径完全一致（位精确）。测试钩子 _casEnabledForTesting 反射改写触发降级分支   （沿用 TailWatermarkSlot 旧约定）。">
+      <meta name="description" content="标准 128 位 CAS 单槽封装——16B 对齐背板 + 能力探测降级 + 裸读不撕裂。 ★ 消除各处（TailWatermarkSlot/IndexBase/AsyncPriorityQueue）重写的   128 CAS 样板：16B 对齐分配 + Unsafe.As&amp;lt;T,UInt128Pair&amp;gt; reinterpret +    + 能力探测 + lock 降级。 ★ 统一对齐保证：托管数组（T[]）只保证 8B 对齐，无 16B 对齐保证——   lock cmpxchg16b 要求 16B 对齐，未对齐会 #GP（硬件异常）。本封装用   （64B 对齐 ⊃ 16B，且独占缓存行避 false sharing）做背板，   从根上消除&quot;碰巧 GC 分配对齐&quot;的定时炸弹。 ★ 标准用法（参考 TailWatermarkSlot）：CAS 循环 =  裸读当前 →   业务条件检查 → 算新值（含 ABA version）→  →   失败 SpinWait.SpinOnce() 重试。 ★ 能力探测 + 降级：native 128-bit CAS 不可用时（生产永不触发）退化到 lock，   行为与 native 路径完全一致（位精确）。测试钩子 _casEnabledForTesting 反射改写触发降级分支   （沿用 TailWatermarkSlot 旧约定）。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -99,8 +99,8 @@ Class Atomic128&lt;T&gt;
 
   <div class="markdown summary"><p>标准 128 位 CAS 单槽封装——16B 对齐背板 + 能力探测降级 + 裸读不撕裂。</p>
 <p>★ 消除各处（<code>TailWatermarkSlot</code>/<code>IndexBase</code>/<code>AsyncPriorityQueue</code>）重写的
-  128 CAS 样板：16B 对齐分配 + <code>Unsafe.As&lt;T,Int128&gt;</code> reinterpret +
-  <a class="xref" href="TC.Tier.Core.NativeInterop.NativeAtomic128.html#TC_Tier_Core_NativeInterop_NativeAtomic128_CompareExchange_TC_Tier_Core_NativeInterop_Int128__TC_Tier_Core_NativeInterop_Int128_TC_Tier_Core_NativeInterop_Int128_">CompareExchange(ref Int128, Int128, Int128)</a> + 能力探测 + lock 降级。</p>
+  128 CAS 样板：16B 对齐分配 + <code>Unsafe.As&lt;T,UInt128Pair&gt;</code> reinterpret +
+  <a class="xref" href="TC.Tier.Core.NativeInterop.NativeAtomic128.html#TC_Tier_Core_NativeInterop_NativeAtomic128_CompareExchange_TC_Tier_Core_NativeInterop_UInt128Pair__TC_Tier_Core_NativeInterop_UInt128Pair_TC_Tier_Core_NativeInterop_UInt128Pair_">CompareExchange(ref UInt128Pair, UInt128Pair, UInt128Pair)</a> + 能力探测 + lock 降级。</p>
 <p>★ 统一对齐保证：托管数组（<code>T[]</code>）只保证 8B 对齐，<b>无 16B 对齐保证</b>——
   <code>lock cmpxchg16b</code> 要求 16B 对齐，未对齐会 #GP（硬件异常）。本封装用
   <a class="xref" href="TC.Tier.Core.Primitives.AlignedMemoryManager.html">AlignedMemoryManager</a>（64B 对齐 ⊃ 16B，且独占缓存行避 false sharing）做背板，
@@ -324,7 +324,8 @@ Class Atomic128&lt;T&gt;
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>当前 128 位值的快照；已 <a class="xref" href="TC.Tier.Core.Primitives.Atomic128-1.html#TC_Tier_Core_Primitives_Atomic128_1_Dispose">Dispose()</a> 后 native 路径返回 <code>default(T)</code>，lock 路径返回最后写入值。</p>
+</dd>
   </dl>
 
 
@@ -357,7 +358,8 @@ Class Atomic128&lt;T&gt;
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>当前 128 位值的快照（零检查）。</p>
+</dd>
   </dl>
 
 
@@ -389,7 +391,8 @@ Class Atomic128&lt;T&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>value</code> <span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>要写入的 128 位值；已释放时 native 路径静默丢弃。</p>
+</dd>
   </dl>
 
 
@@ -415,7 +418,7 @@ Class Atomic128&lt;T&gt;
   失败 = location!=expected，值不变返回 false。</p>
 <p>⚠️ <b>位精确</b>：与 <code>LogicalAddress.Equals</code>（只比 SegId+Offset）不同——CAS 含
   Extension(version) 全部 16 字节。调用方做 ABA 防护时须在 expected/newValue 里携带正确 version。</p>
-<p>★ 失败<b>不</b>回写观察值（与 <a class="xref" href="TC.Tier.Core.NativeInterop.NativeAtomic128.html#TC_Tier_Core_NativeInterop_NativeAtomic128_CompareExchange_TC_Tier_Core_NativeInterop_Int128__TC_Tier_Core_NativeInterop_Int128_TC_Tier_Core_NativeInterop_Int128_">CompareExchange(ref Int128, Int128, Int128)</a> 公开语义一致）——
+<p>★ 失败<b>不</b>回写观察值（与 <a class="xref" href="TC.Tier.Core.NativeInterop.NativeAtomic128.html#TC_Tier_Core_NativeInterop_NativeAtomic128_CompareExchange_TC_Tier_Core_NativeInterop_UInt128Pair__TC_Tier_Core_NativeInterop_UInt128Pair_TC_Tier_Core_NativeInterop_UInt128Pair_">CompareExchange(ref UInt128Pair, UInt128Pair, UInt128Pair)</a> 公开语义一致）——
   调用方在 CAS 循环里自己 <a class="xref" href="TC.Tier.Core.Primitives.Atomic128-1.html#TC_Tier_Core_Primitives_Atomic128_1_Read">Read()</a> 重读。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
@@ -427,15 +430,18 @@ Class Atomic128&lt;T&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>expected</code> <span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>期望的当前值（位精确比较，含 ABA version 等全部 16 字节）。</p>
+</dd>
     <dt><code>value</code> <span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>CAS 成功时写入的新值。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 当前值与 <code class="paramref">expected</code> 位精确相等且已写入 <code class="paramref">value</code>；false = 不等或已释放，槽位值不变（不回写观察值）。</p>
+</dd>
   </dl>
 
 
@@ -472,15 +478,18 @@ Class Atomic128&lt;T&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>expected</code> <span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>期望的当前值（位精确比较，含全部 16 字节）。</p>
+</dd>
     <dt><code>value</code> <span class="xref">T</span></dt>
-    <dd></dd>
+    <dd><p>CAS 成功时写入的新值。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 当前值与 <code class="paramref">expected</code> 位精确相等且已写入 <code class="paramref">value</code>；false = 不等（槽位值不变）。</p>
+</dd>
   </dl>
 
 
@@ -512,7 +521,7 @@ Class Atomic128&lt;T&gt;
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

@@ -33,7 +33,7 @@
       <script type="module" src="./public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="index.html">
-            <img id="logo" class="svg" src="logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -188,18 +188,25 @@ dotnet add package TC.Tier.Runtime --prerelease
 </table>
 <hr>
 <h2 id="architecture">Architecture</h2>
-<pre><code>Official products (planned): TierKV / TierWAL / TierBlob / TierQueue / TierTimeSeries
+<pre><code>Official products: TierKV / TierWAL / TierQueue (time series in progress)
 ────────────────────────────────────────────────
 Storage Runtime (composable kernel)
-  Index (Hash/BTree/SkipList) · Ring · Log · Blob (metadata/mirror/snapshot)
+  Index (Hash/BTree/SkipList) · Ring · Log + add-ons (mirror/metadata/snapshot)
 ────────────────────────────────────────────────
 Storage Engine (Options → Builder → Start/StartAsync, 16B logical address space)
 ────────────────────────────────────────────────
 File system layer (local:// / memory: / virtual:// / network:///s3)
+────────────────────────────────────────────────
+Core.Net (distributed protocol layer)
+  raft consensus × three node-communication forms × HyParView/Swarm — unified wire framing,
+  pluggable transport (TCP/UDP/QUIC)
+Official node: TierRaftNode (turnkey raft × TierWAL node, TC.Tier.Products.Net)
 </code></pre>
-<p>Dependencies are one-way and acyclic: <code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code>. The source generator (<code>TC.Tier.CodeGen</code>) cuts across — BinaryLayout / registration bridges are generated at compile time, zero runtime reflection.</p>
+<p>Dependencies are one-way and acyclic: <code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code> (storage pillar); networking pillar <code>TC.Tier.Core</code> → <code>TC.Tier.Core.Net</code> → <code>TC.Tier.Products.Net</code>. The source generator (<code>TC.Tier.CodeGen</code>) cuts across — BinaryLayout / registration bridges are generated at compile time, zero runtime reflection.</p>
 <ul>
+<li>Development guide (architecture &amp; design philosophy, code organization): <a href="DEVELOPMENT.html">DEVELOPMENT.md</a> (Chinese)</li>
 <li>Engine guide: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">storage-engine.md</a></li>
+<li>Networking &amp; consensus guide: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Core.Net/docs/net.html">net.md</a></li>
 <li>Structures overview: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html">structures.md</a></li>
 <li>Lifecycle model: <a href="https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html">lifecycle.md</a></li>
 </ul>
@@ -210,7 +217,7 @@ File system layer (local:// / memory: / virtual:// / network:///s3)
 <li><strong>Source repository</strong>: <a href="https://github.com/tc-tier/TC.Tier">github.com/tc-tier/TC.Tier</a> — code, Issues, Discussions</li>
 </ul>
 <h2 id="contributing">Contributing</h2>
-<p>See <a href="CONTRIBUTING.html">CONTRIBUTING.md</a> — build, test conventions, code standards (enforced at compile time: no reflection TCSG030 / no sync-over-async TCSG031).</p>
+<p>See <a href="CONTRIBUTING.html">CONTRIBUTING.md</a> — build, test conventions, code standards (enforced at compile time: no reflection TCSG136 / no sync-over-async TCSG137 / no fire-and-forget TCSG138).</p>
 <h2 id="license">License</h2>
 <p>MIT — see <a href="https://github.com/tc-tier/TC.Tier/blob/main/LICENSE">LICENSE</a>.</p>
 <p>Core implementation is entirely self-built; algorithm attribution and third-party dependency notes: <a href="https://github.com/tc-tier/TC.Tier/blob/main/THIRD-PARTY-NOTICES">THIRD-PARTY-NOTICES</a>.</p>
@@ -235,7 +242,7 @@ File system layer (local:// / memory: / virtual:// / network:///s3)
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

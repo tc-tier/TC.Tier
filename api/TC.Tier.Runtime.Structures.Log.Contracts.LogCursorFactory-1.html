@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Delegate LogCursorFactory&lt;TLogCursor&gt; | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="扫描游标工厂委托签名（LogBase owner + 物理区间）。">
+      <meta name="description" content="扫描游标工厂委托签名（LogBase owner + 物理区间）。 ★ snapshotMode（spec-10 根治）：Consistent = 构造期区间段共享锁全程持有（快照隔离——恢复扫描等 单线程场景）；DirtyRead = 逐段短暂共享锁（游标锁——读写并发常态，复制读等高频路径；异步轨以 drain worker 段独占锁提供物理互斥，见 SequentialReader 头注释）。默认 Consistent（既有行为）。 ★ leasePages：页租借（零拷贝读——2026-08-29 性能：apply 读热路径 ToArray 消除）。 false（默认）= 换页即还池（CurrentPayload/CurrentPayloadMemory 禁跨 MoveNext 持有）； true = 游标持有全部已读页至 Dispose（CurrentPayloadMemory 有效至 Dispose——批量切片直用的前提）。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -98,27 +98,43 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
   </div>
 
   <div class="markdown summary"><p>扫描游标工厂委托签名（LogBase owner + 物理区间）。</p>
+<p>★ snapshotMode（spec-10 根治）：Consistent = 构造期区间段共享锁全程持有（快照隔离——恢复扫描等
+单线程场景）；DirtyRead = 逐段短暂共享锁（游标锁——读写并发常态，复制读等高频路径；异步轨以
+drain worker 段独占锁提供物理互斥，见 SequentialReader 头注释）。默认 Consistent（既有行为）。</p>
+<p>★ leasePages：页租借（零拷贝读——2026-08-29 性能：apply 读热路径 ToArray 消除）。
+false（默认）= 换页即还池（CurrentPayload/CurrentPayloadMemory 禁跨 MoveNext 持有）；
+true = 游标持有全部已读页至 Dispose（CurrentPayloadMemory 有效至 Dispose——批量切片直用的前提）。</p>
 </div>
   <div class="markdown conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public delegate TLogCursor LogCursorFactory&lt;out TLogCursor&gt;(LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc = false) where TLogCursor : ILogCursor</code></pre>
+    <pre><code class="lang-csharp hljs">public delegate TLogCursor LogCursorFactory&lt;out TLogCursor&gt;(LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc = false, SnapshotMode snapshotMode = SnapshotMode.Consistent, bool leasePages = false) where TLogCursor : ILogCursor</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>startAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd>扫描游标工厂委托签名（LogBase owner + 物理区间）。</dd>
+    <dd><p>扫描起点 LogicalAddress（default = data 区头；entry 地址则游标自动跳过其前字节）。</p>
+</dd>
     <dt><code>endAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
-    <dd>扫描游标工厂委托签名（LogBase owner + 物理区间）。</dd>
+    <dd><p>扫描终点 LogicalAddress（default = 结构自定的可靠落盘水位）。</p>
+</dd>
     <dt><code>verifyCrc</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd>扫描游标工厂委托签名（LogBase owner + 物理区间）。</dd>
+    <dd><p>true = 逐条校验记录 CRC；false = 仅整页 PageFrame CRC 校验。默认 false。</p>
+</dd>
+    <dt><code>snapshotMode</code> <a class="xref" href="TC.Tier.Contracts.Storage.SnapshotMode.html">SnapshotMode</a></dt>
+    <dd><p>一致性模式：Consistent（快照隔离）/ DirtyRead（游标锁）。默认 Consistent。</p>
+</dd>
+    <dt><code>leasePages</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 页租借（换页不还池）；false = 换页即还池。默认 false。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><span class="xref">TLogCursor</span></dt>
-    <dd>扫描游标工厂委托签名（LogBase owner + 物理区间）。</dd>
+    <dd><p>打开的扫描游标实例（类型参数约束为 <a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.ILogCursor.html">ILogCursor</a>）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Type Parameters</h4>
@@ -179,8 +195,8 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
 
   <a id="TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_1_BeginInvoke_" data-uid="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory`1.BeginInvoke*"></a>
 
-  <h3 id="TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_1_BeginInvoke_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_System_AsyncCallback_System_Object_" data-uid="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory`1.BeginInvoke(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean,System.AsyncCallback,System.Object)">
-  BeginInvoke(LogicalAddress, LogicalAddress, bool, AsyncCallback, object)
+  <h3 id="TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_1_BeginInvoke_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_TC_Tier_Contracts_Storage_SnapshotMode_System_Boolean_System_AsyncCallback_System_Object_" data-uid="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory`1.BeginInvoke(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean,TC.Tier.Contracts.Storage.SnapshotMode,System.Boolean,System.AsyncCallback,System.Object)">
+  BeginInvoke(LogicalAddress, LogicalAddress, bool, SnapshotMode, bool, AsyncCallback, object)
   
   </h3>
 
@@ -188,7 +204,7 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public virtual IAsyncResult BeginInvoke(LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc, AsyncCallback callback, object @object)</code></pre>
+    <pre><code class="lang-csharp hljs">public virtual IAsyncResult BeginInvoke(LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc, SnapshotMode snapshotMode, bool leasePages, AsyncCallback callback, object @object)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
@@ -198,6 +214,10 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
     <dt><code>endAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
     <dd></dd>
     <dt><code>verifyCrc</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+    <dt><code>snapshotMode</code> <a class="xref" href="TC.Tier.Contracts.Storage.SnapshotMode.html">SnapshotMode</a></dt>
+    <dd></dd>
+    <dt><code>leasePages</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
     <dd></dd>
     <dt><code>callback</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.asynccallback">AsyncCallback</a></dt>
     <dd></dd>
@@ -259,8 +279,8 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
 
   <a id="TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_1_Invoke_" data-uid="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory`1.Invoke*"></a>
 
-  <h3 id="TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_1_Invoke_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory`1.Invoke(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean)">
-  Invoke(LogicalAddress, LogicalAddress, bool)
+  <h3 id="TC_Tier_Runtime_Structures_Log_Contracts_LogCursorFactory_1_Invoke_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Boolean_TC_Tier_Contracts_Storage_SnapshotMode_System_Boolean_" data-uid="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory`1.Invoke(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress,System.Boolean,TC.Tier.Contracts.Storage.SnapshotMode,System.Boolean)">
+  Invoke(LogicalAddress, LogicalAddress, bool, SnapshotMode, bool)
   
   </h3>
 
@@ -268,7 +288,7 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public virtual TLogCursor Invoke(LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc = false)</code></pre>
+    <pre><code class="lang-csharp hljs">public virtual TLogCursor Invoke(LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc = false, SnapshotMode snapshotMode = SnapshotMode.Consistent, bool leasePages = false)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
@@ -278,6 +298,10 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
     <dt><code>endAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
     <dd></dd>
     <dt><code>verifyCrc</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+    <dt><code>snapshotMode</code> <a class="xref" href="TC.Tier.Contracts.Storage.SnapshotMode.html">SnapshotMode</a></dt>
+    <dd></dd>
+    <dt><code>leasePages</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
     <dd></dd>
   </dl>
 
@@ -316,7 +340,7 @@ Delegate LogCursorFactory&lt;TLogCursor&gt;
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

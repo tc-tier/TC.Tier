@@ -6,7 +6,7 @@
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <meta name="title" content="Class BlittableRing&lt;TKey&gt; | TC.Tier — .NET 可组合存储运行时 ">
       
-      <meta name="description" content="BlittableRing — Ring 实现类。 ★ 继承 RingBase，override record 字节几何插槽（override 全 sealed——JIT 去虚化保持）。 ★ 所有 K/V 读写方法在 RingBase 中实现，仅特定 override + Codec 留在此处。 ★ 公开且可继承（去类级 sealed）——生成器 [RingKey] 封闭薄类（RingOfLong 等）的派生基座   （设计稿 &#167;2：开放泛型内核手写一次，封闭形态生成器产出，消费面只见封闭类型）。">
+      <meta name="description" content="BlittableRing 的 Codec 分部——私有  实现：header 编解码、CRC 填充/校验与单字段轻量读。">
       <link rel="icon" href="../favicon.ico">
       <link rel="stylesheet" href="../public/docfx.min.css">
       <link rel="stylesheet" href="../public/main.css">
@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -97,11 +97,7 @@ Class BlittableRing&lt;TKey&gt;
   <dl><dt>Assembly</dt><dd>TC.Tier.Runtime.dll</dd></dl>
   </div>
 
-  <div class="markdown summary"><p>BlittableRing — Ring 实现类。</p>
-<p>★ 继承 RingBase，override record 字节几何插槽（override 全 sealed——JIT 去虚化保持）。</p>
-<p>★ 所有 K/V 读写方法在 RingBase 中实现，仅特定 override + Codec 留在此处。</p>
-<p>★ 公开且可继承（去类级 sealed）——生成器 [RingKey] 封闭薄类（RingOfLong 等）的派生基座
-  （设计稿 §2：开放泛型内核手写一次，封闭形态生成器产出，消费面只见封闭类型）。</p>
+  <div class="markdown summary"><p>BlittableRing 的 Codec 分部——私有 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingCodec.html">IRingCodec</a> 实现：header 编解码、CRC 填充/校验与单字段轻量读。</p>
 </div>
   <div class="markdown conceptual"></div>
 
@@ -121,7 +117,7 @@ Class BlittableRing&lt;TKey&gt;
     <dt>Inheritance</dt>
     <dd>
       <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
-      <div><a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</div>
       <div><a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;</div>
       <div><span class="xref">BlittableRing&lt;TKey&gt;</span></div>
     </dd>
@@ -150,7 +146,13 @@ Class BlittableRing&lt;TKey&gt;
     <dt>Inherited Members</dt>
     <dd>
     <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_TakeSafeSnapshotTail">RingBase&lt;TKey&gt;.TakeSafeSnapshotTail()</a>
+    </div>
+    <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetSpan_TC_Tier_Contracts_Storage_LogicalAddress_System_Int32_">RingBase&lt;TKey&gt;.GetSpan(LogicalAddress, int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetByteDistance_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.GetByteDistance(LogicalAddress, LogicalAddress)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFields_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.GetFields(LogicalAddress)</a>
@@ -177,7 +179,16 @@ Class BlittableRing&lt;TKey&gt;
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_DisposeOverrideAsync_System_Boolean_">RingBase&lt;TKey&gt;.DisposeOverrideAsync(bool)</a>
     </div>
     <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntilTail">RingBase&lt;TKey&gt;.FlushUntilTail()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntilTailAsync_System_Threading_CancellationToken_">RingBase&lt;TKey&gt;.FlushUntilTailAsync(CancellationToken)</a>
+    </div>
+    <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntil_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.FlushUntil(LogicalAddress)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteThroughUntil_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.WriteThroughUntil(LogicalAddress)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_FlushUntilAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_">RingBase&lt;TKey&gt;.FlushUntilAsync(LogicalAddress, CancellationToken)</a>
@@ -192,10 +203,10 @@ Class BlittableRing&lt;TKey&gt;
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValue_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__">RingBase&lt;TKey&gt;.GetValue(LogicalAddress, Span&lt;byte&gt;)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.GetValueSpan(LogicalAddress)</a>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_TryGetValue_TC_Tier_Contracts_Storage_LogicalAddress_System_Span_System_Byte__System_Int32__">RingBase&lt;TKey&gt;.TryGetValue(LogicalAddress, Span&lt;byte&gt;, out int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterReadScope">RingBase&lt;TKey&gt;.EnterReadScope()</a>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetValueSpan_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.GetValueSpan(LogicalAddress)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_EnterEpoch">RingBase&lt;TKey&gt;.EnterEpoch()</a>
@@ -223,6 +234,9 @@ Class BlittableRing&lt;TKey&gt;
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_GetFlushedWatermark">RingBase&lt;TKey&gt;.GetFlushedWatermark()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_SpanPages_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_">RingBase&lt;TKey&gt;.SpanPages(LogicalAddress, LogicalAddress)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_ScanAsync_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_">RingBase&lt;TKey&gt;.ScanAsync(LogicalAddress, LogicalAddress, CancellationToken)</a>
@@ -267,7 +281,16 @@ Class BlittableRing&lt;TKey&gt;
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_Write__0_System_ReadOnlySpan_System_Byte__">RingBase&lt;TKey&gt;.Write(TKey, ReadOnlySpan&lt;byte&gt;)</a>
     </div>
     <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_Write__0_System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte__">RingBase&lt;TKey&gt;.Write(TKey, scoped ReadOnlySpan&lt;byte&gt;, scoped ReadOnlySpan&lt;byte&gt;)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteTombstone__0_">RingBase&lt;TKey&gt;.WriteTombstone(TKey)</a>
+    </div>
+    <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteAsync__0_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">RingBase&lt;TKey&gt;.WriteAsync(TKey, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_WriteTombstoneAsync__0_System_Threading_CancellationToken_">RingBase&lt;TKey&gt;.WriteTombstoneAsync(TKey, CancellationToken)</a>
     </div>
     <div>
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_UpdateValue_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlySpan_System_Byte__">RingBase&lt;TKey&gt;.UpdateValue(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</a>
@@ -318,64 +341,64 @@ Class BlittableRing&lt;TKey&gt;
       <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html#TC_Tier_Runtime_Structures_Ring_RingBase_1_LastPreparedSeq">RingBase&lt;TKey&gt;.LastPreparedSeq</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Logger">LifecycleBase&lt;RingRecoveryHints&gt;.Logger</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Logger">LifecycleBase&lt;RingRecoveryHints&gt;.Logger</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;RingRecoveryHints&gt;.GetAliveInstances(string)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;RingRecoveryHints&gt;.GetAliveInstances(string)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady">LifecycleBase&lt;RingRecoveryHints&gt;.WaitForReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;RingRecoveryHints&gt;.WaitForReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;RingRecoveryHints&gt;.WaitForReady(int)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;RingRecoveryHints&gt;.WaitForReady(int)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;RingRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;RingRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;RingRecoveryHints&gt;.CancelRecovery()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;RingRecoveryHints&gt;.CancelRecovery()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_EnsureReady">LifecycleBase&lt;RingRecoveryHints&gt;.EnsureReady()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_EnsureReady">LifecycleBase&lt;RingRecoveryHints&gt;.EnsureReady()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;RingRecoveryHints&gt;.Initialize(RingRecoveryHints)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;RingRecoveryHints&gt;.Initialize(RingRecoveryHints)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_OnInitializeComplete">LifecycleBase&lt;RingRecoveryHints&gt;.OnInitializeComplete()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_OnInitializeComplete">LifecycleBase&lt;RingRecoveryHints&gt;.OnInitializeComplete()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Shared_BackgroundWorkerLoop_">LifecycleBase&lt;RingRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_ConfigureBackgroundWorker_TC_Tier_Core_Execution_BackgroundWorkerLoop_">LifecycleBase&lt;RingRecoveryHints&gt;.ConfigureBackgroundWorker(BackgroundWorkerLoop)</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;RingRecoveryHints&gt;.ThrowIfDisposed()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_ThrowIfDisposed">LifecycleBase&lt;RingRecoveryHints&gt;.ThrowIfDisposed()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Dispose">LifecycleBase&lt;RingRecoveryHints&gt;.Dispose()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;RingRecoveryHints&gt;.Dispose()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;RingRecoveryHints&gt;.DisposeAsync()</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;RingRecoveryHints&gt;.DisposeAsync()</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Resources">LifecycleBase&lt;RingRecoveryHints&gt;.Resources</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Resources">LifecycleBase&lt;RingRecoveryHints&gt;.Resources</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_Id">LifecycleBase&lt;RingRecoveryHints&gt;.Id</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;RingRecoveryHints&gt;.Id</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsDisposed">LifecycleBase&lt;RingRecoveryHints&gt;.IsDisposed</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsDisposed">LifecycleBase&lt;RingRecoveryHints&gt;.IsDisposed</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_IsReady">LifecycleBase&lt;RingRecoveryHints&gt;.IsReady</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;RingRecoveryHints&gt;.IsReady</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryState">LifecycleBase&lt;RingRecoveryHints&gt;.RecoveryState</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;RingRecoveryHints&gt;.RecoveryState</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;RingRecoveryHints&gt;.HasBackgroundWorker</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_HasBackgroundWorker">LifecycleBase&lt;RingRecoveryHints&gt;.HasBackgroundWorker</a>
     </div>
     <div>
-      <a class="xref" href="TC.Tier.Core.Shared.LifecycleBase-1.html#TC_Tier_Core_Shared_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;RingRecoveryHints&gt;.RecoveryProgressChanged</a>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;RingRecoveryHints&gt;.RecoveryProgressChanged</a>
     </div>
     <div>
       <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
@@ -429,23 +452,32 @@ Class BlittableRing&lt;TKey&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>settings</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.BlittableRingSettings.html">BlittableRingSettings</a></dt>
-    <dd></dd>
+    <dd><p>BlittableRingSettings（页几何/水位/溢出配置，构造时全量校验 fail-fast）。</p>
+</dd>
     <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
-    <dd></dd>
+    <dd><p>文件系统（组合根注入）。</p>
+</dd>
     <dt><code>recovery</code> <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>恢复策略（null = 默认 DefaultRingRecovery）。默认 null。</p>
+</dd>
     <dt><code>cursorFactory</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory-1.html">RingCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>扫描游标工厂（null = 默认实现）。默认 null。</p>
+</dd>
     <dt><code>ringSnapshot</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot.html">IRingSnapshot</a></dt>
-    <dd></dd>
+    <dd><p>快照实现（null = 默认 RingSnapshot）。默认 null。</p>
+</dd>
     <dt><code>metaPolicyFactory</code> <a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。默认 null。</p>
+</dd>
     <dt><code>metaTransport</code> <a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></dt>
-    <dd></dd>
+    <dd><p>Transport 模式的外部 meta 传输（null = 非 Transport 模式或由 settings 决定）。默认 null。</p>
+</dd>
     <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
-    <dd></dd>
+    <dd><p>epoch 保护（null = 自建 LightEpoch）。默认 null。</p>
+</dd>
     <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
-    <dd></dd>
+    <dd><p>日志记录器（可选）。默认 null。</p>
+</dd>
   </dl>
 
 
@@ -551,27 +583,36 @@ Class BlittableRing&lt;TKey&gt;
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>settings</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.BlittableRingSettings.html">BlittableRingSettings</a></dt>
-    <dd></dd>
+    <dd><p>BlittableRingSettings（页几何/水位/溢出配置，构造时全量校验 fail-fast）。</p>
+</dd>
     <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
-    <dd></dd>
+    <dd><p>文件系统（组合根注入）。</p>
+</dd>
     <dt><code>recovery</code> <a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingRecoveryHints.html">RingRecoveryHints</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>恢复策略（null = 默认 DefaultRingRecovery）。默认 null。</p>
+</dd>
     <dt><code>cursorFactory</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingCursorFactory-1.html">RingCursorFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingScanCursor.html">IRingScanCursor</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>扫描游标工厂（null = 默认实现）。默认 null。</p>
+</dd>
     <dt><code>ringSnapshot</code> <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshot.html">IRingSnapshot</a></dt>
-    <dd></dd>
+    <dd><p>快照实现（null = 默认 RingSnapshot）。默认 null。</p>
+</dd>
     <dt><code>metaPolicyFactory</code> <a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。默认 null。</p>
+</dd>
     <dt><code>metaTransport</code> <a class="xref" href="TC.Tier.Contracts.Meta.IMetaTransport.html">IMetaTransport</a></dt>
-    <dd></dd>
+    <dd><p>Transport 模式的外部 meta 传输。默认 null。</p>
+</dd>
     <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
-    <dd></dd>
+    <dd><p>epoch 保护（null = 自建 LightEpoch）。默认 null。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.BlittableRing-1.html">BlittableRing</a>&lt;TKey&gt;</dt>
-    <dd></dd>
+    <dd><p>已完成 Initialize 与 WaitForReady 的 <a class="xref" href="TC.Tier.Runtime.Structures.Ring.BlittableRing-1.html">BlittableRing&lt;TKey&gt;</a> 实例（就绪可读写）。</p>
+</dd>
   </dl>
 
 
@@ -711,7 +752,7 @@ Class BlittableRing&lt;TKey&gt;
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

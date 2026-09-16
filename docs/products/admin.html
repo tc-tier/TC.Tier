@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Tier 管理面（healthz/readyz/状态导出/admin 协议）——二期-D1 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Tier 管理面（healthz/readyz/状态导出/admin 协议）——二期-D1 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/docs/admin.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tier-管理面healthzreadyz状态导出admin-协议二期-d1">Tier 管理面（healthz/readyz/状态导出/admin 协议）——二期-D1</h1>
+
+<h2 id="探针语义">探针语义</h2>
+<table>
+<thead>
+<tr>
+<th>探针</th>
+<th>API</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>healthz</td>
+<td><code>node.GetStateSnapshot().Healthy</code></td>
+<td>循环存活（无 LoopException）且已启动——停摆/故障 = false</td>
+</tr>
+<tr>
+<td>readyz</td>
+<td><code>node.GetStateSnapshot().Ready</code></td>
+<td>已知 leader（含自身在位）——分区/选举中 = false（不返回过期承诺）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="状态导出">状态导出</h2>
+<p><code>node.GetStateSnapshot()</code> 返回 <code>RaftStateSnapshot</code>：
+Role / Term / LeaderId / CommitIndex / AppliedIndex / LastLogIndex / SnapshotIndex /
+IsVoter / Healthy / Ready / <strong>Members（leader 视角复制进度：各成员 matchIndex + lag）</strong>。</p>
+<h2 id="远程查询admin-协议0x70-产品面">远程查询（admin 协议·0x70 产品面）</h2>
+<pre><code class="lang-csharp">// 服务端挂载（每节点一次——0x70 注册区产品自管号）
+var admin = new TierRaftAdmin(transport, () =&gt; node.GetStateSnapshot());
+
+// 远程查询（任意节点/客户端——经传输请求回调）
+var state  = await TierRaftAdmin.QueryStateAsync(transport, targetId, ct);   // 全量状态 + 成员复制进度
+var health = await TierRaftAdmin.QueryHealthAsync(transport, targetId, ct);  // 轻量 healthz/readyz
+</code></pre>
+<p>状态供给回调返回 null = 节点未就绪——探针应答 <code>Healthy=false</code>（fail-closed）。</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/docs/admin.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

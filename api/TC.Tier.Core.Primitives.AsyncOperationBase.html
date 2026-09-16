@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -449,7 +449,8 @@ Class AsyncOperationBase
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>形如 <code>op(name='...' status=... ageMs=...)</code> 的诊断文本；DEBUG 构建下追加转移历史。</p>
+</dd>
   </dl>
 
 
@@ -564,7 +565,8 @@ Class AsyncOperationBase
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>exception</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
-    <dd></dd>
+    <dd><p>取消原因的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>，非空；作为终态异常存储并在消费侧重抛。</p>
+</dd>
   </dl>
 
 
@@ -575,6 +577,12 @@ Class AsyncOperationBase
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">exception</code> 为 null。</p>
+</dd>
+  </dl>
 
 
 
@@ -596,7 +604,8 @@ Class AsyncOperationBase
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>exception</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></dt>
-    <dd></dd>
+    <dd><p>失败原因异常，作为终态异常存储并在消费侧（<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_WaitAsync_System_Threading_CancellationToken_">WaitAsync(CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_ThrowIfFailed">ThrowIfFailed()</a>）重抛；非空。</p>
+</dd>
   </dl>
 
 
@@ -607,6 +616,12 @@ Class AsyncOperationBase
 
 
 
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">exception</code> 为 null。</p>
+</dd>
+  </dl>
 
 
 
@@ -628,7 +643,8 @@ Class AsyncOperationBase
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>progress</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
-    <dd></dd>
+    <dd><p>进度值，0.0~1.0（0.0 = 刚开始，1.0 = 接近完成）。</p>
+</dd>
   </dl>
 
 
@@ -687,7 +703,8 @@ Class AsyncOperationBase
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>succeededPayload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
-    <dd></dd>
+    <dd><p>成功载荷（泛型变体的结果对象）；可为 null（等价无载荷成功）。</p>
+</dd>
   </dl>
 
 
@@ -775,7 +792,8 @@ Class AsyncOperationBase
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
-    <dd></dd>
+    <dd><p>同 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Describe">Describe()</a> 的诊断快照文本。</p>
+</dd>
   </dl>
 
 
@@ -857,13 +875,15 @@ Class AsyncOperationBase
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
-    <dd></dd>
+    <dd><p>取消令牌，默认 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken.none">None</a>；仅取消等待本身（操作取消用 <a class="xref" href="TC.Tier.Core.Primitives.AsyncOperationBase.html#TC_Tier_Core_Primitives_AsyncOperationBase_Cancel">Cancel()</a>），取消时以 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a> 完成。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
-    <dd></dd>
+    <dd><p>操作终态后完成的 ValueTask；Succeeded 正常完成，Failed/Canceled 重抛存储的原异常。</p>
+</dd>
   </dl>
 
 
@@ -1003,7 +1023,7 @@ Class AsyncOperationBase
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

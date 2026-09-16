@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierWAL 性能基线 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierWAL 性能基线 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
+      
+      <meta name="docfx:rel" content="../../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/perf/tierwal.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tierwal-性能基线">TierWAL 性能基线</h1>
+
+<blockquote>
+<p>TierWAL 三份性能契约 + 稳定性矩阵实测（Release 配置）。数字实测于本机
+（12 逻辑核 / .NET 8.0.30 / x64，2026-08-28 当轮）。盘口：C: 为 NVMe SSD、F: 为 WDC 1TB
+机械盘（WD10EZEX）——local 介质的延迟由盘的 fsync 成本主导，两盘对照即最坏/最优情形。
+探针归属 <code>benchmarks/TC.Tier.Products.Benchmarks</code>（<code>--wal-*-probe</code> 路由，同二进制绕开 BDN harness）。</p>
+</blockquote>
+<h2 id="配置">配置</h2>
+<ul>
+<li>TierWAL（EntryLog 底层：Managed meta 策略 / 16KB opaque 容器 / 锚点间隔 1024）</li>
+<li>entry 64B；组提交 = 批 1000 显式 CommitAsync 驱动；单条提交 = 三维度全 0（每写即 fsync）</li>
+<li>IO 模式 = FileOpenHints 简写参数（none/wt/dio/dio+wt；meta probe 默认 all 四模式全跑）</li>
+<li>复现（介质 = spec 参数；磁盘介质将 TMP/TEMP 重定向到目标盘）：
+<pre><code class="lang-bash">dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-meta-probe local 1000 all        # 契约①（IO 模式矩阵）
+dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-meta-probe virtual 1000 all true   # 契约①（virtual 载体写穿档）
+dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-replay-probe local 500000 64 250000 dio   # 契约②
+dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-catchup-probe local 200000 20000 64 wt    # 契约③
+dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-snapshot-store-probe local 256 4 64 none  # 快照存储选型
+dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-append-probe local 1000 5000 wt           # 稳定性矩阵（介质 × IO 模式）
+dotnet run -c Release --project benchmarks/TC.Tier.Products.Benchmarks -- --wal-append-probe virtual 1000 5000 none true   # 稳定性矩阵（virtual 载体写穿档）
+</code></pre>
+</li>
+</ul>
+<h2 id="数字">数字</h2>
+<h3 id="契约选举时间窗口--元数据持久化writemetaasync--stage--一次-fsync-应答">契约①：选举时间窗口 ↔ 元数据持久化（WriteMetaAsync = stage + 一次 fsync 应答）</h3>
+<p>1000 次 × 128B 元数据（预热 3 次后采样）。判定线 = 150ms 选举窗口下界。</p>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th>IO 模式</th>
+<th style="text-align: right;">p50</th>
+<th style="text-align: right;">p99</th>
+<th style="text-align: right;">p99.9</th>
+<th>判定</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>memory:</td>
+<td>buffered</td>
+<td style="text-align: right;">0.005ms</td>
+<td style="text-align: right;">0.009ms</td>
+<td style="text-align: right;">0.019ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td>local @ C: SSD</td>
+<td>buffered</td>
+<td style="text-align: right;">4.13ms</td>
+<td style="text-align: right;">10.95ms</td>
+<td style="text-align: right;">56.2ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td>local @ C: SSD</td>
+<td><strong>WriteThrough</strong></td>
+<td style="text-align: right;"><strong>0.086ms</strong></td>
+<td style="text-align: right;">0.573ms</td>
+<td style="text-align: right;">0.593ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td>local @ C: SSD</td>
+<td>DIO</td>
+<td style="text-align: right;">2.18ms</td>
+<td style="text-align: right;">5.23ms</td>
+<td style="text-align: right;">8.52ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td>local @ C: SSD</td>
+<td><strong>DIO+WriteThrough</strong></td>
+<td style="text-align: right;"><strong>0.051ms</strong></td>
+<td style="text-align: right;">0.505ms</td>
+<td style="text-align: right;">1.69ms</td>
+<td>达标（最快）</td>
+</tr>
+<tr>
+<td>local @ F: 机械盘</td>
+<td>buffered</td>
+<td style="text-align: right;">17.1ms</td>
+<td style="text-align: right;">59.6ms</td>
+<td style="text-align: right;">102ms</td>
+<td>达标（临界格——机械盘 fsync 方差大，跨轮可翻线）</td>
+</tr>
+<tr>
+<td>local @ F: 机械盘</td>
+<td><strong>WriteThrough</strong></td>
+<td style="text-align: right;"><strong>0.170ms</strong></td>
+<td style="text-align: right;">0.389ms</td>
+<td style="text-align: right;">16.2ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td>local @ F: 机械盘</td>
+<td>DIO</td>
+<td style="text-align: right;">20.3ms</td>
+<td style="text-align: right;">96.6ms</td>
+<td style="text-align: right;">178ms</td>
+<td><strong>不达标</strong></td>
+</tr>
+<tr>
+<td>local @ F: 机械盘</td>
+<td><strong>DIO+WriteThrough</strong></td>
+<td style="text-align: right;"><strong>0.127ms</strong></td>
+<td style="text-align: right;">0.225ms</td>
+<td style="text-align: right;">0.429ms</td>
+<td>达标（全介质最优）</td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘，句柄级）</td>
+<td>buffered</td>
+<td style="text-align: right;">16.7ms</td>
+<td style="text-align: right;">42.2ms</td>
+<td style="text-align: right;">125ms</td>
+<td>达标（临界，同上）</td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘，句柄级）</td>
+<td>WriteThrough</td>
+<td style="text-align: right;">80.1ms</td>
+<td style="text-align: right;">251ms</td>
+<td style="text-align: right;">278ms</td>
+<td><strong>不达标</strong>（逐写 journal 提交，见选型）</td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘，句柄级）</td>
+<td>DIO</td>
+<td style="text-align: right;">19.5ms</td>
+<td style="text-align: right;">51.0ms</td>
+<td style="text-align: right;">157ms</td>
+<td><strong>不达标</strong></td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘，句柄级）</td>
+<td>DIO+WriteThrough</td>
+<td style="text-align: right;">17.5ms</td>
+<td style="text-align: right;">157ms</td>
+<td style="text-align: right;">256ms</td>
+<td><strong>不达标</strong></td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td>buffered</td>
+<td style="text-align: right;">0.324ms</td>
+<td style="text-align: right;">0.504ms</td>
+<td style="text-align: right;">1.71ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td>WriteThrough</td>
+<td style="text-align: right;">0.180ms</td>
+<td style="text-align: right;">0.490ms</td>
+<td style="text-align: right;">0.869ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td>DIO</td>
+<td style="text-align: right;">0.171ms</td>
+<td style="text-align: right;">0.308ms</td>
+<td style="text-align: right;">0.990ms</td>
+<td>达标</td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td>DIO+WriteThrough</td>
+<td style="text-align: right;">0.153ms</td>
+<td style="text-align: right;">0.223ms</td>
+<td style="text-align: right;">1.08ms</td>
+<td>达标（四模式全达标，与 local WT 同量级）</td>
+</tr>
+</tbody>
+</table>
+<p>机制：<strong>WriteThrough（写透）消除 commit 的 fsync 成本</strong>——每写已同步落盘
+（FILE_FLAG_WRITE_THROUGH/O_SYNC），Flush 不再付全量刷缓存开销；buffered 每次 commit 付全量
+fsync（盘物理成本 2–20ms/次）；DIO（NoBuffering）单独是反模式——绕过页缓存但未写透，
+fsync 依旧 + 三重对齐成本；DIO+WriteThrough 叠加最优（直 IO 无缓存双拷贝 + 写透免 fsync）。</p>
+<h3 id="契约重放吞吐--rto50-万条--64b起点--count2">契约②：重放吞吐 ↔ RTO（50 万条 × 64B，起点 = count/2）</h3>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th style="text-align: right;">重放吞吐</th>
+<th style="text-align: right;">首次产出延迟（定位）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>memory:</td>
+<td style="text-align: right;">3.42M 条/s（208.5 MB/s）</td>
+<td style="text-align: right;">5.3ms</td>
+</tr>
+<tr>
+<td>local @ C: SSD</td>
+<td style="text-align: right;">2.82M 条/s（172.4 MB/s）</td>
+<td style="text-align: right;">9.9ms</td>
+</tr>
+<tr>
+<td>local @ F: 机械盘</td>
+<td style="text-align: right;">3.12M 条/s（190.2 MB/s）</td>
+<td style="text-align: right;">8.6ms</td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘）</td>
+<td style="text-align: right;">2.97M 条/s（181.5 MB/s）</td>
+<td style="text-align: right;">10.8ms</td>
+</tr>
+</tbody>
+</table>
+<p>重放是读路径，对 IO 模式不敏感（±5%）。RTO 外推：100 万条 ≈ 0.3–0.35s。
+定位 = O(1)：任意起点 = 段表二分 + 段内扫帧，固定 ~5–11ms（与起点无关、与总量无关）。</p>
+<h3 id="契约冷节点追赶--收敛时间快照-20-万条--增量-2-万条writethrough">契约③：冷节点追赶 ↔ 收敛时间（快照 20 万条 + 增量 2 万条，WriteThrough）</h3>
+<p>形态：一体快照（N₀ = PersistedIndex，镜像 12.97MB）→ 导出（经注入 IAsyncTransferPersistence）
+→ 冷节点导入 → 增量段补给（模拟网络到货）→ 增量重放 (N₀, N₀+delta]。</p>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th style="text-align: right;">快照生成</th>
+<th style="text-align: right;">快照导出</th>
+<th style="text-align: right;">冷节点导入</th>
+<th style="text-align: right;">增量重放</th>
+<th style="text-align: right;">收敛（存储侧）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>local @ F: 机械盘</td>
+<td style="text-align: right;">0.31s</td>
+<td style="text-align: right;">0.04s（339.5 MB/s）</td>
+<td style="text-align: right;">0.29s</td>
+<td style="text-align: right;">0.01s（1.51M 条/s）</td>
+<td style="text-align: right;"><strong>0.34s</strong></td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘）</td>
+<td style="text-align: right;">0.37s</td>
+<td style="text-align: right;">0.04s（354.1 MB/s）</td>
+<td style="text-align: right;">0.38s</td>
+<td style="text-align: right;">0.01s（1.34M 条/s）</td>
+<td style="text-align: right;"><strong>0.43s</strong></td>
+</tr>
+</tbody>
+</table>
+<p>三介质收敛同量级，存储侧无介质敏感瓶颈。快照传输时间不在口径内（内存传输面——
+真实网络传输由协议层承担）。</p>
+<h3 id="快照存储选型256mb-镜像--n-次快照local">快照存储选型（256MB 镜像 × N 次快照，local）</h3>
+<p>形态：方案 A（段增量——每次只写增量段）vs 方案 B（全量重写——每次重写整个镜像）；条目流 64B/条。</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th style="text-align: right;">A 写</th>
+<th style="text-align: right;">B 写</th>
+<th style="text-align: right;">A 读（拼接）</th>
+<th style="text-align: right;">B 读（单段）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>256MB × 4 快照</td>
+<td style="text-align: right;">256MB / 0.34s</td>
+<td style="text-align: right;">640MB / 0.88s（2.5× 字节差）</td>
+<td style="text-align: right;">2365MB/s</td>
+<td style="text-align: right;">2175MB/s</td>
+</tr>
+<tr>
+<td>256MB × 8 快照</td>
+<td style="text-align: right;">256MB / 0.34s</td>
+<td style="text-align: right;">1152MB / 1.68s（<strong>4.5× 字节差</strong>）</td>
+<td style="text-align: right;">3026MB/s</td>
+<td style="text-align: right;">2668MB/s</td>
+</tr>
+</tbody>
+</table>
+<p>结论（数字定案）：<strong>方案 A 胜</strong>——写侧 = 镜像总量（恒增量）vs 累计全量（Σk×delta），
+快照越频繁省得越多；读侧持平（拼接开销可忽略）；A 的段累积合并成本 = B 单次全量写
+（低频触发——raft 只需最新快照）。落地面 = <strong>IncrementalSnapshot</strong>
+（段 = 帧 + 段表 meta O(1) 恢复 + 阈值合并）。</p>
+<h3 id="稳定性矩阵介质--io-模式--两提交形态p99p999-抖动有界">稳定性矩阵：介质 × IO 模式 × 两提交形态（p99/p999 抖动有界）</h3>
+<p>组提交 = 批 100 × 1000 批（10 万条，纯缓冲——显式 CommitAsync 驱动，采样每批延迟）；
+单条 = 每写 fsync，采样每条延迟（5000 条）。每格预热 3 次后采样。</p>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th>IO 模式</th>
+<th style="text-align: right;">组提交 p50</th>
+<th style="text-align: right;">组提交吞吐</th>
+<th style="text-align: right;">组提交刺</th>
+<th style="text-align: right;">单条 p50</th>
+<th style="text-align: right;">单条吞吐</th>
+<th style="text-align: right;">单条抖动 p99/p50</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>memory:</td>
+<td>buffered</td>
+<td style="text-align: right;">0.045ms</td>
+<td style="text-align: right;">34.5 万条/s</td>
+<td style="text-align: right;">241ms</td>
+<td style="text-align: right;">0.107ms</td>
+<td style="text-align: right;">9083 条/s</td>
+<td style="text-align: right;">1.6×</td>
+</tr>
+<tr>
+<td>local @ F:</td>
+<td>buffered</td>
+<td style="text-align: right;">0.046ms</td>
+<td style="text-align: right;">60.8 万条/s</td>
+<td style="text-align: right;">95ms</td>
+<td style="text-align: right;">41.7ms</td>
+<td style="text-align: right;">22 条/s</td>
+<td style="text-align: right;">1.8×</td>
+</tr>
+<tr>
+<td>local @ F:</td>
+<td>WriteThrough</td>
+<td style="text-align: right;">0.047ms</td>
+<td style="text-align: right;">58.6 万条/s</td>
+<td style="text-align: right;">88ms</td>
+<td style="text-align: right;"><strong>0.520ms</strong></td>
+<td style="text-align: right;"><strong>1782 条/s</strong></td>
+<td style="text-align: right;">2.3×</td>
+</tr>
+<tr>
+<td>local @ F:</td>
+<td>DIO</td>
+<td style="text-align: right;">0.046ms</td>
+<td style="text-align: right;">101.7 万条/s</td>
+<td style="text-align: right;">36ms</td>
+<td style="text-align: right;">33.7ms</td>
+<td style="text-align: right;">25 条/s</td>
+<td style="text-align: right;">3.2×</td>
+</tr>
+<tr>
+<td>local @ F:</td>
+<td>DIO+WriteThrough</td>
+<td style="text-align: right;">0.045ms</td>
+<td style="text-align: right;">41.8 万条/s</td>
+<td style="text-align: right;">139ms</td>
+<td style="text-align: right;">0.638ms</td>
+<td style="text-align: right;">1305 条/s</td>
+<td style="text-align: right;">2.5×</td>
+</tr>
+<tr>
+<td>virtual（.tier，F: 盘，句柄级）</td>
+<td>buffered</td>
+<td style="text-align: right;">0.052ms</td>
+<td style="text-align: right;">19.5 万条/s</td>
+<td style="text-align: right;">369ms</td>
+<td style="text-align: right;">33.3ms</td>
+<td style="text-align: right;">29 条/s</td>
+<td style="text-align: right;">2.3×</td>
+</tr>
+<tr>
+<td><strong>virtual（载体写穿档）</strong></td>
+<td>buffered</td>
+<td style="text-align: right;">0.045ms</td>
+<td style="text-align: right;">24.3 万条/s</td>
+<td style="text-align: right;">331ms</td>
+<td style="text-align: right;"><strong>1.13ms</strong></td>
+<td style="text-align: right;"><strong>815 条/s</strong></td>
+<td style="text-align: right;">2.1×</td>
+</tr>
+</tbody>
+</table>
+<p>组提交形态（raft 主路径）p50 全介质全模式有界（0.045–0.052ms）；每格恰一次页 flush
+提交刺（36–369ms，一次性事件非持续抖动——NTFS 扩容经稀疏化标记后无即时簇分配巨刺）。
+单条提交形态 = IO 模式主导变量：WriteThrough 比 buffered 快 ~80×（0.52ms vs 41.7ms），
+同契约①机制（写透免 fsync）。</p>
+<h2 id="选型">选型</h2>
+<ul>
+<li><strong>达标变量 = 介质 × IO 模式 × 提交形态的三维组合</strong>：FileOpenHints 正交 flags 设计
+（None/NoBuffering/WriteThrough 可叠加 + 介质统一抽象 + hints 传递链路 TierWalOptions→引擎→
+文件打开）——同一套代码零介质分支，机械盘从 buffered 不达标（p99.9 178ms）翻转为
+DIO+WT 达标（0.43ms，余量 350×）。</li>
+<li><strong>raft 节点磁盘配置</strong>：WriteThrough（或 DIO+WriteThrough，全介质最优）；buffered 在
+机械盘上不可用于选举窗口场景；DIO 单独是反模式。</li>
+<li><strong>virtual 完整能力 = 挂载级载体写穿档</strong>（CarrierWriteThrough——挂载参数第 5 个旋钮）：
+四模式全达标（p50 0.15–0.32ms），与 local WriteThrough 同量级。句柄级 hints 在 virtual 上
+= 逐写 journal 提交（RM-07——每写付 fsync，p50 17–80ms），只作对照不作选型。</li>
+<li><strong>virtual 的 Flush = 真 fsync</strong>（载体在途写屏障——绕写页缓存的字节计入脏判定，
+Flush 与同盘裸 fsync 同形 ~17–21ms）。</li>
+<li><strong>三份契约全部量化达标（存储侧）</strong>：契约① 上表；契约② 重放 ~3M 条/s
+（RTO 100 万条 ≈ 0.35s）；契约③ 收敛 0.34–0.43s（20 万条快照 + 2 万增量口径）。</li>
+<li><strong>快照存储 = 段增量</strong>（IncrementalSnapshot）：写侧恒增量 vs 累计全量，快照越频繁省得越多
+（×8 快照 4.5× 字节差）；读侧拼接与单段持平。</li>
+</ul>
+<h2 id="维护">维护</h2>
+<ul>
+<li>改动 TierWAL 写路径（append/opaque/提交链）或 Log 底层 cursor/Seek 后必须重跑对应探针
+并更新数字（性能论断须实测）。</li>
+<li>探针跑法见「配置」节；介质切盘 = TMP/TEMP 重定向到目标盘根目录。</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/perf/tierwal.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

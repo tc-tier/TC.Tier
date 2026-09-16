@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -179,7 +179,7 @@ Interface IKeyResolver&lt;TKey&gt;
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address)&gt; ScanAsync(CancellationToken ct = default)</code></pre>
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address, bool IsTombstone)&gt; ScanAsync(CancellationToken ct = default)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
@@ -190,7 +190,7 @@ Interface IKeyResolver&lt;TKey&gt;
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
-    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</dt>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress,system.boolean-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress,system.boolean-.address">Address</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress,system.boolean-.istombstone">IsTombstone</a>)&gt;</dt>
     <dd></dd>
   </dl>
 
@@ -211,12 +211,13 @@ Interface IKeyResolver&lt;TKey&gt;
   
   </h3>
 
-  <div class="markdown level1 summary"><p>范围扫描——吐 (Key, Address) 对（光有 key 建不了条目）；异步迭代器流式回源。</p>
+  <div class="markdown level1 summary"><p>范围扫描——吐 (Key, Address, IsTombstone) 三元组（重放/重建需墓碑感知：墓碑记录
+须触发 Delete 而非 Insert，否则窗口内旧 put 复活已删 key）；异步迭代器流式回源。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address)&gt; ScanAsync(LogicalAddress begin, LogicalAddress end, CancellationToken ct = default)</code></pre>
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address, bool IsTombstone)&gt; ScanAsync(LogicalAddress begin, LogicalAddress end, CancellationToken ct = default)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
@@ -231,7 +232,7 @@ Interface IKeyResolver&lt;TKey&gt;
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
-    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</dt>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(TKey <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress,system.boolean-.key">Key</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress,system.boolean-.address">Address</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple--0,tc.tier.contracts.storage.logicaladdress,system.boolean-.istombstone">IsTombstone</a>)&gt;</dt>
     <dd></dd>
   </dl>
 
@@ -303,7 +304,7 @@ Interface IKeyResolver&lt;TKey&gt;
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Tier 分析器（TCSG130-139）——声明驱动的编译期纪律封堵 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Tier 分析器（TCSG130-139）——声明驱动的编译期纪律封堵 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Analyzers/docs/tier-analyzers.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tier-分析器tcsg130-139声明驱动的编译期纪律封堵">Tier 分析器（TCSG130-139）——声明驱动的编译期纪律封堵</h1>
+
+<p>把仓库工程纪律写成 <code>.editorconfig</code> 声明，编译期直接报错：分层依赖方向、禁用线程原语、
+禁反射、禁同步阻塞、禁 fire-and-forget 丢弃。<strong>零默认诊断——声明即启用</strong>：不在
+<code>.editorconfig</code> 声明规则的工程，分析器完全沉默。</p>
+<h2 id="快速上手">快速上手</h2>
+<p>三行 <code>.editorconfig</code> 声明 + 严重级配置，纪律即生效：</p>
+<pre><code class="lang-ini"># 全局节：规则声明（tier_layer.* / tier_forbidden.* 键）
+tier_forbidden.pack = reflection | sync_over_async | fire_and_forget
+tier_layer.forbidden_reference = TC.Tier.Core.Net =&gt; TC.Tier.Products
+
+# 分级：src 报错、tests 放行（按路径节覆盖）
+[src/**/*.cs]
+dotnet_diagnostic.TCSG136.severity = error
+
+[tests/**/*.cs]
+dotnet_diagnostic.TCSG130.severity = none
+</code></pre>
+<p>之后凡引用方向违规 / 裸 <code>new Thread</code> / 反射调用 / <code>.Result</code> 阻塞 / <code>_ = Task.Run(...)</code> 丢弃，
+编译直接红——不需要任何运行时检查或 code review 约定。</p>
+<h2 id="规则清单">规则清单</h2>
+<h3 id="分层依赖族tcsg130-133tier_layer-键声明">分层依赖族（TCSG130-133，<code>tier_layer.*</code> 键声明）</h3>
+<table>
+<thead>
+<tr>
+<th>诊断</th>
+<th>拦截形态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCSG130</td>
+<td>禁止引用 <code>A =&gt; B</code> 声明的目标（元数据引用与 <code>using</code> 命名空间双形态独立检测）</td>
+</tr>
+<tr>
+<td>TCSG131</td>
+<td>程序集声明零内部依赖，却引用了内部家族程序集（前缀判定）</td>
+</tr>
+<tr>
+<td>TCSG132</td>
+<td>引用了白名单外程序集</td>
+</tr>
+<tr>
+<td>TCSG133</td>
+<td>公开类型落在声明命名空间前缀之外（命名空间即归属）</td>
+</tr>
+</tbody>
+</table>
+<p>声明语法：<code>tier_layer.forbidden_reference = &lt;源命名空间&gt; =&gt; &lt;禁止目标&gt; [| 更多目标] ; 分号分隔多条</code>。</p>
+<h3 id="禁用模式族tcsg134-138tier_forbiddenpack-键声明-选择启用">禁用模式族（TCSG134-138，<code>tier_forbidden.pack</code> 键声明，<code>|</code> 选择启用）</h3>
+<table>
+<thead>
+<tr>
+<th>诊断</th>
+<th>拦截形态</th>
+<th>修法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCSG134</td>
+<td>裸线程原语（<code>new Thread</code> / <code>ThreadPool</code> 直投）</td>
+<td>后台循环一律 <code>BackgroundWorkerLoop</code>；受控后台任务一律 <code>TaskSink</code></td>
+</tr>
+<tr>
+<td>TCSG135</td>
+<td>热路径方法禁用形态（启发式——漏报可能，不承诺完备）</td>
+<td>按消息指引替换</td>
+</tr>
+<tr>
+<td>TCSG136</td>
+<td>反射调用（破坏 AOT/裁剪/性能）</td>
+<td>白盒协作走 <code>InternalsVisibleTo</code></td>
+</tr>
+<tr>
+<td>TCSG137</td>
+<td>同步阻塞后台 Task（<code>.Result</code>/<code>.Wait()</code>——死锁 + 线程池耗尽）</td>
+<td>一律 <code>await</code>（后台句柄加 <code>WaitAsync</code>）</td>
+</tr>
+<tr>
+<td>TCSG138</td>
+<td>fire-and-forget 丢弃（<code>_ = Task.Run(...)</code>——异常静默吞/无背压/生命周期失控；ValueTask 更危险）</td>
+<td><code>TaskSink.Submit</code>/<code>SubmitFast</code> 或显式观测</td>
+</tr>
+</tbody>
+</table>
+<p>声明语法：<code>tier_forbidden.pack = reflection | sync_over_async | fire_and_forget</code>（任选子集）。</p>
+<h2 id="豁免">豁免</h2>
+<ul>
+<li><strong>个别调用点</strong>：标准 <code>#pragma warning disable TCSG138</code> + 相邻理由注释（写明为何此处形态有
+意——治理内核的受控丢弃即此形态）；</li>
+<li><strong>实现组件本体</strong>（TCSG134）：源码 <code>exempt</code> 前缀声明豁免；</li>
+<li><strong>整类降级</strong>：<code>dotnet_diagnostic.TCSGxxx.severity = none</code>（按路径节精细控制——tests 目录
+常见放行）。</li>
+</ul>
+<p>豁免纪律：<strong>禁 <code>#pragma</code> 裸豁免</strong>——必须带相邻理由注释说明&quot;为什么此处形态有意&quot;；无理由的
+豁免与违规同样对待。</p>
+<h2 id="注入与豁免名单">注入与豁免名单</h2>
+<p><code>Directory.Build.props</code> 把本包作为 Analyzer 引用全局注入所有项目——以下项目自豁免（分析器
+自身与其测试需普通引用形态）：<code>TC.Tier.CodeGen</code>、<code>TC.Tier.CodeGen.Analyzers</code>、
+<code>TC.Tier.CodeGen.Abstractions</code>、<code>TC.Tier.CodeGen.Tests</code>、<code>TC.Tier.Analyzers</code>、
+<code>TC.Tier.Analyzers.Tests</code>。</p>
+<h2 id="反模式">反模式</h2>
+<ol>
+<li><strong>声明了 <code>tier_forbidden.pack</code> 却在 tests 全量放行后又全局抱怨没约束</strong>——分级是刻意的：
+纪律红线只压 <code>src</code>；</li>
+<li><strong>用 <code>#pragma</code> 藏性能问题</strong>——豁免必须带理由注释，code review 审豁免理由而不是审违规；</li>
+<li><strong>在分析器豁免名单里加业务项目</strong>——名单只容纳&quot;分析器自身与生成器基础设施&quot;，业务工程
+加进去等于自废门禁。</li>
+</ol>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>TierFs 协议规范分析器（TCSG120-122）：<a href="../TC.Tier.CodeGen.Analyzers/docs/tierfs-spec.md">TierFs 规范分析器</a></li>
+<li>生成器诊断（TCSG020/054-059 族）：<code>src/TC.Tier.CodeGen</code> 各生成器源码头注释</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Analyzers/docs/tier-analyzers.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

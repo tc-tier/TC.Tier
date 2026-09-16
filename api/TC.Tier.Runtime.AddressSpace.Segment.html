@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -832,13 +832,15 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>newOffset</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>新的最大偏移量（字节）——只允许单调前进。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>推进后的 MaxOffset（newOffset ≤ 当前值时不推进，返回当前水位）。</p>
+</dd>
   </dl>
 
 
@@ -941,11 +943,14 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>start</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>区间起始偏移（字节）。</p>
+</dd>
     <dt><code>end</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>区间结束偏移（字节，不含）。</p>
+</dd>
     <dt><code>sparse</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>是否为稀疏区间（写入 Committed 记录时携带）。</p>
+</dd>
   </dl>
 
 
@@ -984,15 +989,18 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>start</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>起始偏移（字节）。</p>
+</dd>
     <dt><code>end</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>结束偏移（字节，不含）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 含 Aborted/Wasted 终态区间或已越出可见投影（永不可读），等待方必须快速失败；false = 不含，可继续等待变为可读。</p>
+</dd>
   </dl>
 
 
@@ -1026,7 +1034,8 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.AddressSpace.Segment.html">Segment</a>.<a class="xref" href="TC.Tier.Runtime.AddressSpace.Segment.ExtentReader.html">ExtentReader</a></dt>
-    <dd></dd>
+    <dd><p>持锁零拷贝遍历器（using 释放时自动归还区间锁）。</p>
+</dd>
   </dl>
 
 
@@ -1110,15 +1119,18 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>start</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>起始偏移（字节）。</p>
+</dd>
     <dt><code>end</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>结束偏移（字节，不含）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = [start, end) 内无在途区间，所有权已全部归还；false = 存在 Leased/Punching 在途区间，需继续等待。</p>
+</dd>
   </dl>
 
 
@@ -1149,15 +1161,18 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Parameters</h4>
   <dl class="parameters">
     <dt><code>start</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>起始偏移（字节）。</p>
+</dd>
     <dt><code>end</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
-    <dd></dd>
+    <dd><p>结束偏移（字节，不含）。</p>
+</dd>
   </dl>
 
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
-    <dd></dd>
+    <dd><p>true = 区间全部可读（无越界、无在途记录）；false = 存在不可读部分，应走慢路径 <span class="xref">TC.Tier.Runtime.AddressSpace.Segment.ClampReadable(System.Int64,System.Int64)</span>。</p>
+</dd>
   </dl>
 
 
@@ -1432,7 +1447,8 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
   <h4 class="section">Returns</h4>
   <dl class="parameters">
     <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Runtime.AddressSpace.ExtentRecord.html">ExtentRecord</a>&gt;</dt>
-    <dd></dd>
+    <dd><p>当前区间记录列表的快照副本（离锁可安全访问，调用方可长期持有）。</p>
+</dd>
   </dl>
 
 
@@ -1464,7 +1480,7 @@ Empty（建段中，门关）/Broken（门永关）/Invalid（准入吊销，文
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TC.Tier.Core.Net 使用指南 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TC.Tier.Core.Net 使用指南 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/net.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tctiercorenet-使用指南">TC.Tier.Core.Net 使用指南</h1>
+
+<p>网络与共识层：<strong>介质无关的节点通信三形态</strong>（数据报/请求回调/流式）× <strong>raft 共识引擎</strong> ×
+<strong>对等机制</strong>（HyParView/Swarm），一个 <code>NodeEndpoint</code> 装配成型。</p>
+<blockquote>
+<p>包：<code>TC.Tier.Core.Net</code>（依赖 <code>TC.Tier.Core</code>——执行/日志/可观测积木）。
+深读积木拼装与反模式：<a href="../COORDINATION.md"><code>../COORDINATION.md</code></a>。
+性能基线（loopback 形态面与 raft 引擎）：<a href="perf/loopback-baseline.html"><code>perf/loopback-baseline.md</code></a>。</p>
+</blockquote>
+<hr>
+<h2 id="1-快速上手">1. 快速上手</h2>
+<h3 id="11-集群节点成员制">1.1 集群节点（成员制）</h3>
+<pre><code class="lang-csharp">using TC.Tier.Core.Net;
+using TC.Tier.Core.Net.Hosting;
+
+var nodeId = NodeId.NewRandom();   // 或 NodeId.Parse(&quot;hex32...&quot;) / 身份源（见 §7）
+await using var endpoint = await ClusterBuilder.Create(nodeId)
+    .ClusterTag(0x74696572)                 // 集群归属——错集群握手期拒绝（fail-fast）
+    .Listen(&quot;0.0.0.0&quot;, 9400)
+    .Peers(new Dictionary&lt;NodeId, IPEndPoint&gt; { [other] = new(IPAddress.Loopback, 9401) })
+    .WithLogger(logger)
+    .StartAsync(ct);
+</code></pre>
+<h3 id="12-直连客户端地址制">1.2 直连客户端（地址制）</h3>
+<pre><code class="lang-csharp">await using var client = await NetClientBuilder.Create(myId)
+    .Connect(&quot;node1.example.com&quot;, 9400)      // 身份从握手得知
+    .ClusterTag(0x74696572)                  // 拨入带标签的集群必须匹配（缺省 0）
+    .RegisterRequestHandler(MyProtocolId, new MyHandler())   // 注册可先于拨号
+    .StartAsync(ct);
+
+NodeId? remote = client.RemoteId;            // 握手学得的对端身份
+</code></pre>
+<h3 id="13-收发一条消息">1.3 收发一条消息</h3>
+<pre><code class="lang-csharp">// 数据报（尽力送达——丢失静默，协议自愈）
+await endpoint.SendDatagramAsync(target, MyProtocolId, payload, ct);
+
+// 请求回调（关联应答 + 超时）
+byte[] resp = await endpoint.SendRequestAsync(target, MyProtocolId, ask,
+    new RequestOptions { Timeout = TimeSpan.FromSeconds(2) }, ct);
+</code></pre>
+<hr>
+<h2 id="2-概念">2. 概念</h2>
+<table>
+<thead>
+<tr>
+<th>术语</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>节点身份 <code>NodeId</code></strong></td>
+<td>协议一等标识——16B 不透明字节串（<code>NewRandom</code>/<code>NewSequential</code>/<code>Parse</code>/hex32 文本；<code>Empty</code> 哨兵）</td>
+</tr>
+<tr>
+<td><strong>协议域 protocolId</strong></td>
+<td>端点多路复用的字节标识。核心区归机制面；<strong>注册区 <code>0x60-0xAF</code> 归使用方自管</strong>（<code>ProtocolIds.IsUserRegistrable</code> 校验，同号重复注册抛）</td>
+</tr>
+<tr>
+<td><strong>介质</strong></td>
+<td>消息的实际承载：InProcess（同进程直排——测试主场）/ TCP（生产跨进程）/ UDP（数据报承载，握手通告端点）/ QUIC（TLS1.3 原生，stream 直映射）。<strong>消费面零差别</strong>——机制代码不改一行换介质</td>
+</tr>
+<tr>
+<td><strong>形态</strong></td>
+<td>消息交互模型三选一：数据报（尽力）/ 请求回调（关联应答）/ 流式（可靠有序+背压）</td>
+</tr>
+<tr>
+<td><strong>集群标签 ClusterTag</strong></td>
+<td>集群归属编号——握手期核对，错集群连接拒绝（拨入方与服务端必须一致）</td>
+</tr>
+<tr>
+<td><strong>成员制 ∥ 地址制</strong></td>
+<td>寻址两制：成员制 = 成员表路由（较小 NodeId 拨号防对拨）；地址制 = 有地址者直连（身份握手得知）</td>
+</tr>
+<tr>
+<td><strong>leader ∥ follower</strong></td>
+<td>raft 角色：leader 接受写入并复制给其他节点；follower 被动跟随——leader 掉线时由存余节点重新选出</td>
+</tr>
+<tr>
+<td><strong>多数派</strong></td>
+<td>⌊N/2⌋+1（N=3 即 2 台）——一条写入拿到多数派落盘才算提交；选举同样要多数派投票</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-运行拓扑与一致性">3. 运行拓扑与一致性</h2>
+<h3 id="31-节点与集群谁包含谁">3.1 节点与集群：谁包含谁</h3>
+<p><strong>节点是唯一的运行时实体</strong>（一个 <code>NodeEndpoint</code> = 传输枢纽 + 装配的机制）；
+<strong>集群不是实体，是三个层面的共同约定</strong>：</p>
+<pre><code>集群 = ① 一致的集群标签（ClusterTag——握手期核对，防串集群）
+     + ② 一致的成员表（ClusterConfig——谁是这个集群的成员、谁是 learner）
+     + ③ 一致的日志与状态（多数派复制的产物）
+
+   ┌──────────┐          ┌──────────┐          ┌──────────┐
+   │  节点 A   │          │  节点 B   │          │  节点 C   │
+   │ (leader) │          │(follower)│          │(follower)│
+   └────┬─────┘          └────┬─────┘          └────┬─────┘
+        │      每对节点一条 TCP 长连接          │
+        └──────────────┬───────┴─────────────────────┘
+             （复制 / 选举 / 快照 / 反熵全部共用这条链路——
+               连接数 = 节点对数，不随协议数量增长）
+</code></pre>
+<ul>
+<li>链路由 <strong>NodeId 较小的一方主动拨号</strong>并负责重连（另一方只监听——防止双方同时拨导致连接
+抖动）；断线指数退避自动重连，恢复后链路自动续上。</li>
+<li>客户端（地址制）不进成员表：拨入即用，身份握手得知，断开不自动重连。</li>
+</ul>
+<h3 id="32-启动流程从-startasync-到可写入">3.2 启动流程（从 StartAsync 到可写入）</h3>
+<pre><code>TierRaftNodeBuilder / ClusterBuilder .StartAsync()
+  │
+  ├─► ① 传输起网：开始监听 + 按成员表向各对端拨号
+  │       └─ 每对节点：三步握手（协议版本 / 集群标签 / 安全档核对）
+  │          —— 任一环不匹配 = 拒连（fail-fast，绝不带病运行）
+  ├─► ② raft 选举
+  │       ├─ N=1：多数派 = 自己，直接自举为 leader（单机形态）
+  │       └─ N≥2：候选者拉票，拿多数派票者当选 leader
+  └─► ③ leader 就绪——接受写入（非 leader 收到写入 = 明确报错，客户端重路由）
+</code></pre>
+<p>全程对使用方只有一个观察点：<code>raft.IsLeader</code> / <code>raft.LeaderId</code>（§6.2）。</p>
+<h3 id="33-谁和谁通信">3.3 谁和谁通信</h3>
+<table>
+<thead>
+<tr>
+<th>通信</th>
+<th>谁发起 → 谁接收</th>
+<th>干什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>写入复制</strong></td>
+<td>leader → 各 follower</td>
+<td>你的写入（<code>ReplicateAsync</code>）由 leader 追加日志并复制，多数派落盘即提交</td>
+</tr>
+<tr>
+<td><strong>选举投票</strong></td>
+<td>全员 ↔ 全员</td>
+<td>leader 掉线（心跳超时）时存余节点互拉票选新 leader</td>
+</tr>
+<tr>
+<td><strong>心跳</strong></td>
+<td>leader → followers</td>
+<td>告知&quot;我还活着+我的日志进度&quot;；follower 持续收不到 = 发起换届</td>
+</tr>
+<tr>
+<td><strong>快照流（单源）</strong></td>
+<td>leader → 落后节点</td>
+<td>follower 日志缺口越过快照边界，增量追不上 → 整段基线流式安装</td>
+</tr>
+<tr>
+<td><strong>快照拉取（多源）</strong></td>
+<td>落后节点 ← 全体持有者</td>
+<td>装配 Swarm 后：块清单 + 并行拉块 + 坏块换源——基线带宽不再全压 leader</td>
+</tr>
+<tr>
+<td><strong>反熵比对</strong></td>
+<td>leader ↔ 各对端（轮转）</td>
+<td>按内容树逐层比对，只传差异块——持续收敛漂移</td>
+</tr>
+<tr>
+<td><strong>gossip 扇出</strong></td>
+<td>节点 → 活跃视图邻居</td>
+<td>通知/通告类消息逐跳转发，最终散布全网（P2P 模式，§8）</td>
+</tr>
+</tbody>
+</table>
+<p>客户端只和 <strong>leader</strong> 通信写入（非 leader 明确报错引导重路由）；读可与任意节点交互
+（线性读见 §3.4）。</p>
+<h3 id="34-两种一致性怎么启动代价是什么">3.4 两种一致性：怎么启动、代价是什么</h3>
+<p><strong>线性一致（缺省——不用做任何额外配置）</strong>：装配 raft 即得。写走默认完成档，
+读走 <code>ReadIndexAsync</code>。</p>
+<pre><code>写：await raft.ReplicateAsync(cmd)
+    ── 返回时：多数派落盘 + 已应用到状态机（read-your-writes）
+读：await raft.ReadIndexAsync(ct)
+    ── leader 向多数派确认身份后返回读位点（分区期拿不到多数派 = 超时，不返回过期数据）
+代价：提交要多数派在线——半数以上节点不可达时写入不可用（这是强一致的物理代价）
+</code></pre>
+<p><strong>最终一致（按需组合三件套）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>手段</th>
+<th>怎么启动</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>LeaderLocal 完成档</strong></td>
+<td>单次调用 <code>ReplicateLeaderLocalAsync</code>；或 <code>RaftOptions.WithReplicationAck(ReplicationAck.LeaderLocal)</code> 整体切换</td>
+<td>leader 本地落盘即返回（延迟最低）——换届可能丢未复制尾部，接受异步收敛（Redis 类场景）</td>
+</tr>
+<tr>
+<td><strong>多源分发 + 反熵</strong></td>
+<td>产品节点 <code>WithSwarm(...)</code> + <code>WithAntiEntropyInterval(...)</code>（见 <a href="../products/raft-node.html">raft-node.md</a>）；引擎级组件 <code>SwarmSync</code>/<code>SwarmAntiEntropy</code>（§6.3）</td>
+<td>基线内容寻址、多源并行拉取；对账只修差异——持续收敛</td>
+</tr>
+<tr>
+<td><strong>gossip 广播</strong></td>
+<td>P2P 模式 <code>WithBroadcast()</code>（§8.2）</td>
+<td>通知面：最终散布、不保序不保达</td>
+</tr>
+</tbody>
+</table>
+<p><strong>怎么选</strong>：账本/配置/元数据 → 线性一致（缺省）；高吞吐低延迟可容忍换届丢尾部 →
+LeaderLocal；大基线分发与漂移修复 → Swarm + 反熵；成员事件通知 → gossip。</p>
+<h3 id="35-节点数怎么定">3.5 节点数怎么定</h3>
+<p>多数派 = ⌊N/2⌋+1（投票节点数；learner 不计入）：</p>
+<table>
+<thead>
+<tr>
+<th>规模</th>
+<th>可运行</th>
+<th>容错</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>N=1</strong></td>
+<td>✓</td>
+<td>0 台</td>
+<td>单机形态：启动即自举 leader，本地落盘即提交——开发/单机部署</td>
+</tr>
+<tr>
+<td><strong>N=2</strong></td>
+<td>✓</td>
+<td><strong>0 台</strong></td>
+<td>多数派 = 2，任一台离线即不可写不可选——<strong>能跑但不建议</strong>（没换来容错，白付一致性成本）</td>
+</tr>
+<tr>
+<td><strong>N=3</strong></td>
+<td>✓</td>
+<td>1 台</td>
+<td>生产最小推荐</td>
+</tr>
+<tr>
+<td><strong>N=5</strong></td>
+<td>✓</td>
+<td>2 台</td>
+<td>跨机架/可用区起步</td>
+</tr>
+<tr>
+<td>N=2k+1</td>
+<td>✓</td>
+<td>k 台</td>
+<td>容错上限 = 少数派；<strong>偶数不增加容错只增加成本</strong>（N=4 与 N=3 容错相同）</td>
+</tr>
+<tr>
+<td>+learner</td>
+<td>—</td>
+<td>—</td>
+<td>附加观察副本：收日志可读、不投票不计多数派——读扩容/容灾不损写入可用性</td>
+</tr>
+</tbody>
+</table>
+<p>运行中变更：<code>Membership</code> 在线加减成员（两步提交）；learner 角色在成员表声明。</p>
+<hr>
+<h2 id="4-三形态怎么选">4. 三形态怎么选</h2>
+<table>
+<thead>
+<tr>
+<th>你的需求</th>
+<th>用</th>
+<th>关键语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>心跳/探测/通告（丢了没关系）</td>
+<td><code>SendDatagramAsync</code></td>
+<td>尽力送达——对端未连/未注册/注入丢弃全部<strong>静默</strong></td>
+</tr>
+<tr>
+<td>一问一答（RPC）</td>
+<td><code>SendRequestAsync</code></td>
+<td>CorrId 关联 + 超时；目标未连<strong>抛 <code>NetIOException</code></strong>（快速失败，不白等超时窗）</td>
+</tr>
+<tr>
+<td>要确认到达 + 可接受重发</td>
+<td>请求回调 + <code>RetryPolicy</code></td>
+<td>at-least-once——重发经传输端<strong>去重窗口缓存重放</strong>（不重复执行）</td>
+</tr>
+<tr>
+<td>大块/持续传输（快照/备份）</td>
+<td><code>OpenStreamAsync</code></td>
+<td>可靠有序 + 背压（写 await 整链传导）；<strong>GB 级 O(单帧) 内存</strong></td>
+</tr>
+</tbody>
+</table>
+<h3 id="41-请求回调">4.1 请求回调</h3>
+<pre><code class="lang-csharp">// 服务端
+public sealed class MyHandler : IRequestHandler
+{
+    // 同步回调——快进快出（重活自排队）；应答经 reply（零次调用 = 对端超时）
+    public void OnRequest(NodeId from, ReadOnlyMemory&lt;byte&gt; payload, IReplyContext reply)
+        =&gt; _ = reply.ReplyAsync(Process(payload));
+}
+endpoint.RegisterRequestHandler(MyProtocolId, new MyHandler());
+</code></pre>
+<h3 id="42-流式会话">4.2 流式会话</h3>
+<pre><code class="lang-csharp">// 发起端
+await using (var stream = await endpoint.OpenStreamAsync(target, MyProtocolId, ct))
+{
+    foreach (var chunk in chunks)
+        await stream.WriteAsync(chunk, ct);      // await = 背压（对端慢则本端等待）
+    await stream.CompleteAsync(ct);              // 正常收尾——对端枚举自然结束
+}
+
+// 接受端（OnStream 回调里起消费循环——循环任务由使用方管理，如经 Core TaskSink 受控提交）
+public sealed class MyAcceptor : IStreamAcceptor
+{
+    public void OnStream(NodeId from, IWireStream stream)
+        =&gt; ConsumeAsync(stream);             // 你的消费循环入口
+    private async Task ConsumeAsync(IWireStream s)
+    {
+        await using (s)
+            await foreach (var frame in s.ReadAllAsync())
+                Process(frame);                        // 逐帧——不要攒全量
+    }
+}
+endpoint.RegisterStreamAcceptor(MyProtocolId, new MyAcceptor());
+</code></pre>
+<p>会话<strong>不跨重连恢复</strong>——链路断即 Reset，上层重开。</p>
+<hr>
+<h2 id="5-传输配置与调参">5. 传输配置与调参</h2>
+<p>装配器方法覆盖常用项；<strong>全部运行参数</strong>经 <code>WithTransport</code> 调整，两种形态：</p>
+<pre><code class="lang-csharp">// 整份注入：自带一份配置（显式方法未触达的项以注入值为准）
+var options = TransportOptions.Default(null, peers)
+    .WithHandshakeTimeout(TimeSpan.FromSeconds(5));
+await using var a = await ClusterBuilder.Create(nodeId)
+    .WithTransport(options)
+    .Listen(&quot;0.0.0.0&quot;, 9400)                 // 显式方法仍裁决对应项
+    .StartAsync(ct);
+
+// 管道改写：在装配结果上叠加（可多次调用，链尾依次执行——最终裁决）
+await using var b = await ClusterBuilder.Create(nodeId)
+    .Listen(&quot;0.0.0.0&quot;, 9400)
+    .WithTransport(o =&gt; o.WithReconnect(
+        TimeSpan.FromMilliseconds(100), 2.0, TimeSpan.FromSeconds(1)))
+    .WithTransport(o =&gt; o.WithKeepalive(true))
+    .StartAsync(ct);
+</code></pre>
+<p><strong>裁决顺序</strong>：显式方法（<code>Listen</code>/<code>Peers</code>/<code>ClusterTag</code>/<code>WithUdp</code>）&gt; <code>WithTransport</code> 注入/管道 &gt; 缺省表。
+<code>NetClientBuilder</code> 同款（客户端拨入带标签集群记得 <code>ClusterTag</code>）。</p>
+<h3 id="51-常用调参示例">5.1 常用调参示例</h3>
+<pre><code class="lang-csharp">// 重连退避：raft 场景封顶建议 &lt; 选举窗一半——选举节奏不被重连劫持
+o =&gt; o.WithReconnect(initialDelay: TimeSpan.FromMilliseconds(100), backoffFactor: 2.0, maxDelay: TimeSpan.FromSeconds(1))
+
+// 传输级保活（NAT/防火墙长连接；双方都开才生效）
+o =&gt; o.WithKeepalive(enable: true, interval: TimeSpan.FromSeconds(10), maxUnanswered: 3)
+
+// 请求回调：高并发在途 / 大响应去重预算
+o =&gt; o.WithRequest(timeout: TimeSpan.FromSeconds(3), pendingCapacity: 8192,
+                   dedupCapacity: 4096, dedupMaxBytes: 32 &lt;&lt; 20)
+</code></pre>
+<h3 id="52-旋钮速查表">5.2 旋钮速查表</h3>
+<table>
+<thead>
+<tr>
+<th>你要调</th>
+<th>旋钮（缺省）</th>
+<th>什么时候动它</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>握手超时</td>
+<td><code>HandshakeTimeout</code>（3s）</td>
+<td>跨地域高延迟链路放宽</td>
+</tr>
+<tr>
+<td>重连节奏</td>
+<td><code>ReconnectInitialDelay</code>（100ms）/ <code>ReconnectBackoffFactor</code>（×2）/ <code>ReconnectMaxDelay</code>（2s）</td>
+<td>与选举窗/业务重试节奏对齐</td>
+</tr>
+<tr>
+<td>传输保活</td>
+<td><code>EnableKeepalive</code>（关）/ <code>KeepaliveInterval</code>（10s）/ <code>KeepaliveMaxUnanswered</code>（3）</td>
+<td>NAT/有状态防火墙环境</td>
+</tr>
+<tr>
+<td>请求超时</td>
+<td><code>RequestTimeout</code>（3s；per-call <code>RequestOptions</code> 覆盖）</td>
+<td>慢接口单独放宽走 per-call</td>
+</tr>
+<tr>
+<td>请求在途上限</td>
+<td><code>RequestPendingCapacity</code>（4096，满抛 fail-fast）</td>
+<td>高并发 RPC</td>
+</tr>
+<tr>
+<td>at-least-once 重放窗口</td>
+<td><code>RequestDedupCapacity</code>（1024）/ <code>RequestDedupMaxBytes</code>（8MiB）</td>
+<td>大响应 + 重试语义</td>
+</tr>
+<tr>
+<td>流式背压窗口</td>
+<td><code>StreamWindowFrames</code>（16 帧）</td>
+<td>大块吞吐 vs 内存占用</td>
+</tr>
+<tr>
+<td>写队列深度</td>
+<td><code>WriteQueueFrames</code>（64 帧）</td>
+<td>写突发削峰</td>
+</tr>
+<tr>
+<td>UDP 单报预算</td>
+<td><code>UdpMaxDatagramBytes</code>（1200B）</td>
+<td>适配链路 MTU</td>
+</tr>
+<tr>
+<td>慢回调观测阈值</td>
+<td><code>SlowDispatchThreshold</code>（10ms）</td>
+<td>调低抓慢 handler</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53-udp-数据报承载">5.3 UDP 数据报承载</h3>
+<pre><code class="lang-csharp">builder.WithUdp(9401);        // 端点绑定 + 握手通告对端；port 0 = 动态端口
+</code></pre>
+<ul>
+<li>数据报/请求回调可走 UDP 承载（尽力语义不变）；<strong>单报预算缺省 1200B</strong>（不做 IP 分片
+依赖）——超预算自动回落 TCP 承载，调用方无感。</li>
+<li>加密场景：KeyPair 档 UDP 报文带认证标签；mTLS 档 UDP 回落 TCP（见 §10）。</li>
+</ul>
+<h3 id="54-生效配置观测">5.4 生效配置观测</h3>
+<pre><code class="lang-csharp">endpoint.Options        // 装配自证——全部裁决后的最终值（TransportOptions）
+</code></pre>
+<p>排查&quot;配置没生效&quot;先看这里（管道链尾执行结果即它）。</p>
+<hr>
+<h2 id="6-raft-共识">6. raft 共识</h2>
+<p><code>RaftStateMachine</code>（共识引擎）+ <code>ApplyPipeline</code>（提交→应用管道）+ 你的 <code>IRaftStore</code>（持久化）</p>
+<ul>
+<li><code>IStateMachine</code>（业务状态机）成套装配：</li>
+</ul>
+<pre><code class="lang-csharp">var store = new MyRaftStore();               // 实现 IRaftStore（持久化归你——内存/文件/任意）
+await store.InitializeAsync(ct);
+var machine = new MyStateMachine();          // 实现 IStateMachine.ApplyAsync
+var pipeline = new ApplyPipeline(store, machine, ApplyPipelineOptions.Default);
+var raft = new RaftStateMachine(nodeId, store, transport, pipeline, RaftOptions.Default);
+pipeline.SetConfigCallback(raft.PostConfigChanged);
+pipeline.StartAsync();
+await raft.StartAsync(new ClusterConfig(members));
+</code></pre>
+<blockquote>
+<p>引擎直拼是自由组合面（持久化归你）。要<strong>完整产品节点</strong>（TierWAL 存储 + 快照压缩
+调度 + 多源反熵 + 传输组装收口），用产品装配器一步到位：
+<a href="../products/raft-node.html">TierRaftNodeBuilder</a>——嵌入式同进程与
+TCP 集群两种传输形态，本节引擎语义在其上原样适用。</p>
+</blockquote>
+<h3 id="61-复制完成档三选一">6.1 复制（完成档三选一）</h3>
+<pre><code class="lang-csharp">// 默认档：返回 = committed 且 applied（read-your-writes——拿到返回值即可从业务存储读到效果）
+long index = await raft.ReplicateAsync(command, ct);
+
+// committed 档：多数派提交即返（不等 apply——吞吐优先；apply 可能滞后，读效果不保证）
+long index2 = await raft.ReplicateCommittedAsync(command, ct);
+
+// LeaderLocal 档：leader 本地持久化即返（不等多数派——异步一致，延迟最低）
+// ★ 返回的 index 不保证最终在多数派日志中（leader 宕机丢未复制尾部写）
+long index3 = await raft.ReplicateLeaderLocalAsync(command, ct);
+
+// 批量：一批一次追加，批尾 applied
+long lastIndex = await raft.ReplicateBatchAsync(commands, ct);
+</code></pre>
+<ul>
+<li>非 Leader 立即抛 <code>NotLeaderException</code>——重路由新 Leader 重试：</li>
+</ul>
+<pre><code class="lang-csharp">for (; ; )
+{
+    var leader = FindLeader();               // raft.LeaderId / 集群发现
+    try { return await leader.ReplicateAsync(cmd, ct); }
+    catch (NotLeaderException) { await Task.Delay(25, ct); }
+}
+</code></pre>
+<ul>
+<li>换届在途等待者以 <code>NotLeaderException</code> 取消——重试即可，不是错误。</li>
+</ul>
+<p><strong>怎么选档</strong>：读自己的写 → 默认档；吞吐优先且接受 apply 滞后 → committed 档；
+高吞吐低延迟且业务可容忍换届丢尾部（Redis 类异步一致形态）→ LeaderLocal 档。
+三档是 per-call 语义（同一集群不同调用方各选各档）；<code>RaftOptions.WithReplicationAck(ReplicationAck.LeaderLocal)</code>
+可把默认入口整体切到 LeaderLocal（部署态弱档开关——committed/applied 档调用不受影响）。
+强一致读配合 <code>ReadIndexAsync</code>（多数派身份确认后返回 commitIndex）。</p>
+<h3 id="62-读与观测">6.2 读与观测</h3>
+<pre><code class="lang-csharp">long readIndex = await raft.ReadIndexAsync(ct);   // 线性读（多数派身份确认后；N=1 立即返回）
+long commit = raft.CommitIndex;                   // 跨线程观测
+bool isLeader = raft.IsLeader;
+bool isVoter = raft.IsVoter;                      // false = learner（引导/观察副本的就绪信号）
+raft.LeaderChanged += became =&gt; { /* 换届通知 */ };
+CancellationToken leadership = raft.LeadershipToken;   // 换届感知令牌——丢失 leadership 即取消
+</code></pre>
+<ul>
+<li><strong>租约读（opt-in）</strong>：<code>RaftOptions.WithLeaseReads(时钟漂移界)</code>——多数派确认后
+(选举窗下界 − 漂移界) 窗口内的线性读零往返返回，窗外自动回落心跳确认。
+时钟同步纪律（NTP）由运维承担；要求不满足则保持缺省关。</li>
+</ul>
+<h3 id="63-主动让位与成员变更">6.3 主动让位与成员变更</h3>
+<ul>
+<li><code>await raft.ResignAsync()</code>——<strong>主动让位</strong>（运维：节点下线/维护前先让位）：leader 立即
+降级，集群经选举窗立刻重选，不等心跳超时窗；非 leader 调用抛 <code>NotLeaderException</code>。</li>
+<li><code>Membership</code>——单成员变更提案（两步提交，在线加减成员）。</li>
+<li>follower 落后超过快照覆盖点时<strong>自动</strong>走快照安装（单源流式 ∥ 多源 swarm——块清单 +
+K 并行 + 换源重试，使用方无感）。</li>
+<li><strong>多源成立</strong>：安装完成的节点自动向 leader 上报持有（<code>SourceAnnounce</code>），leader 端持有表
+按代累积（快照换代自动清表、换届自动重报）——后续冷节点安装时 holders 含全体持有者，
+基线带宽分散到多源，不再全压 leader。<code>SwarmOptions.WithServeBlocks(false)</code> = 纯消费者
+（不服务块、不上报）；<code>WithAnnounceOnStart(false)</code> = 退出广播面（静态 holders 仍可指名拉取）。</li>
+<li><strong>反熵对账</strong>（漂移收敛）：<code>SwarmAntiEntropy.RunOnceAsync</code> 按内容与对端逐层比对
+（Merkle 根相等 = 零传输；不等 = 只传差异块修复）——把分发升级为持续收敛。
+周期与对端轮转由使用方驱动（<code>SwarmOptions.WithAntiEntropyInterval</code> 供配置承载；
+Majority 档无需开启，LeaderLocal/Swarm-only 档建议开启）。</li>
+<li><strong>learner 副本</strong>：<code>ClusterMember</code> 角色位 <code>ClusterMemberRole.Learner</code>——日志照常复制/追平可读，
+但不参与选举投票、不计入多数派（读扩容/容灾副本不占写入可用性）。</li>
+</ul>
+<h3 id="631-raft-的存储需求面">6.3.1 raft 的存储需求面</h3>
+<p><code>IRaftStore</code> 是 raft 对持久化的<strong>全部</strong>需求（term/votedFor/日志追加/截尾/双水位/快照点）——
+实现它即可接入任意存储。fsync 时机由协议层控制（<code>WaitForPersistedAsync</code> 同步点）。</p>
+<h3 id="632-standby-引导加入新节点上线">6.3.2 Standby 引导加入（新节点上线）</h3>
+<p>新节点以 learner 身份启动并向集群宣告，追平自动晋级 voter——追赶期不占多数派席位，
+不扰动既有写入可用性：</p>
+<pre><code class="lang-csharp">// 产品装配形态（TierRaftNodeBuilder）——JoinAsync 已随启动编排
+var node = await TierRaftNodeBuilder.Create(id, fs, config, machine)
+    .WithTransport(transport)        // 或 WithClusterTransport(listen, peers)
+    .WithJoin(idA, idB)              // 引导同伴（至少一个当前集群成员）
+    .StartAsync(ct);
+// 就绪信号：node.Raft.IsVoter 翻真
+
+// 引擎形态：raft.JoinAsync(bootstrapPeers 或 bootstrapEndpoints, timeout, ct)
+</code></pre>
+<p>观察副本（只收日志可读、永不晋级）走引擎面 <code>Membership.AddLearnerAsync(member)</code>。</p>
+<hr>
+<h2 id="7-身份与机制挂载">7. 身份与机制挂载</h2>
+<ul>
+<li><strong><code>IIdentitySource</code></strong>（端口——本层零 IO）：跨重启稳定身份。<code>ClusterBuilder.Create(source)</code>
+启动时解析；持久化形态（如 <code>TierFsIdentityStore</code>）在组装层实现端口。</li>
+<li><strong><code>INodeMechanism</code></strong>（机制挂载端口——零特权）：任何协议机制与内建机制同一挂载路径：</li>
+</ul>
+<pre><code class="lang-csharp">await ClusterBuilder.Create(nodeId)
+    .WithMechanism(new MyFsmMechanism())     // 你的状态机复制机制
+    .WithP2P(seed: bootstrapNode)            // 内建 HyParView（对等发现——P2P 扩展方法）
+    .StartAsync(ct);
+</code></pre>
+<p>机制生命周期随 <code>NodeEndpoint</code> 释放（<code>endpoint.Mechanisms</code> 可枚举已挂载件）。</p>
+<h3 id="71-quic-介质tls13-原生">7.1 QUIC 介质（TLS1.3 原生）</h3>
+<pre><code class="lang-csharp">var transport = new QuicTransport(nodeId, TransportOptions.Default(
+    new IPEndPoint(IPAddress.Loopback, 4433), peers));   // MsQuic 不可用 = 构造 fail-fast
+transport.Start();
+</code></pre>
+<ul>
+<li><strong>三形态映射</strong>：请求回调 = 短命双向 stream（stream 即关联）；流式会话 = 双向长命 stream
+（QUIC 流控 = 背压天然）；数据报 = 单向短命 stream（send-and-forget——.NET 8 无 QUIC
+datagram API，语义为&quot;单流失败即丢&quot;，非 UDP 级无序尽力）。</li>
+<li><strong>TLS1.3 原生</strong>：运行时自签证书（内网模式——加密+完整性免费）；身份经应用层握手交换
+（ClusterTag 校验错集群 fail-fast）；SAN nid 绑定随 mTLS 体系集成。</li>
+<li><strong>运行依赖</strong>：MsQuic（Windows 11/Server 2022+ 内置；Linux 须 libmsquic）——
+<code>QuicCertificates.IsSupported</code> 装配前探测。</li>
+<li>at-least-once（<code>RequestOptions.Retry</code>）：CorrId 贯穿 + 应答端去重窗口缓存重放。</li>
+</ul>
+<hr>
+<h2 id="8-p2p-会员与-gossip-广播">8. P2P 会员与 gossip 广播</h2>
+<p>无中心服务器的对等组网：<strong>HyParView 会员管理</strong>维护&quot;我认识谁&quot;（视图），<strong>gossip 广播</strong>
+负责&quot;通知所有人&quot;（最终一致送达）。两者独立启用——只要会员、或只要广播皆可。</p>
+<h3 id="81-会员管理hyparview">8.1 会员管理（HyParView）</h3>
+<pre><code class="lang-csharp">await using var endpoint = await ClusterBuilder.Create(nodeId)
+    .WithP2P(seed: bootstrapNode)            // null = 本节点是种子（只启动不加入）
+    .StartAsync(ct);
+
+// 观测面
+var p2p = endpoint.Mechanisms.OfType&lt;PeerMechanism&gt;().Single();
+foreach (var peer in p2p.ActiveView) { }     // 对称活跃邻居（有界 k）
+p2p.ActiveCount;
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>概念</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>活跃视图</td>
+<td>在线对称邻居（双向确认），大小有界（缺省 ≤ 4）——消息扇出/转发的目标域</td>
+</tr>
+<tr>
+<td>被动视图</td>
+<td>备用池（缺省 ≤ 20）——活跃邻居断连时自动补位</td>
+</tr>
+<tr>
+<td>JOIN</td>
+<td>新节点从种子出发随机游走入组（应答丢失不阻塞——视图收敛交给周期维护）</td>
+</tr>
+<tr>
+<td>故障检测</td>
+<td>φ accrual 基于心跳到达间隔判定（缺省阈值 8——误判率可忽略），限时检出</td>
+</tr>
+</tbody>
+</table>
+<p>常用参数（<code>PeerOptions</code> With 链）：<code>WithActiveViewSize(k)</code>、<code>WithPassiveViewSize(n)</code>、
+<code>WithHeartbeatInterval</code>、<code>WithPhiThreshold</code>、<code>WithJoinWaitTimeout</code>——缺省值适合小中型
+对等组起步。</p>
+<h3 id="82-gossip-广播最终一致性">8.2 gossip 广播（最终一致性）</h3>
+<p>一条消息<strong>最终</strong>送达全体可达成员——不保证顺序、不保证送达。适合通知/通告/拓扑事件；
+要可靠或要确认，走 raft（§6）或请求回调（§4.1）。</p>
+<pre><code class="lang-csharp">// 挂载时开启（缺省关）
+await using var endpoint = await ClusterBuilder.Create(nodeId)
+    .WithP2P(seed, PeerOptions.Default.WithBroadcast())
+    .StartAsync(ct);
+
+var broadcast = endpoint.Mechanisms.OfType&lt;PeerMechanism&gt;().Single().Broadcast!;
+
+broadcast.MessageReceived += (origin, data) =&gt; { };   // 最初广播者 + 载荷（同消息至多投递一次）
+await broadcast.BroadcastAsync(payload);               // 沿活跃视图扇出，逐跳转发
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>语义</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>去重</td>
+<td>同一消息（MsgId）全网至多投递一次——多路径副本/转发环回自动归一</td>
+</tr>
+<tr>
+<td>TTL</td>
+<td>缺省 4 跳，每转发一跳减一，减尽即停（断链拓扑下终止转发）</td>
+</tr>
+<tr>
+<td>扇出</td>
+<td>沿活跃视图转发，上限可调（<code>WithFanout</code>——缺省整个活跃视图）</td>
+</tr>
+<tr>
+<td>载荷上限</td>
+<td>缺省 60KB，超限源头即抛（数据报尽力语义，不做分片）</td>
+</tr>
+</tbody>
+</table>
+<p>参数（<code>BroadcastOptions</code> With 链）：<code>WithTtl</code>、<code>WithFanout</code>、<code>WithDedupCapacity</code>、
+<code>WithMaxPayloadBytes</code>。</p>
+<hr>
+<h2 id="9-可观测与故障注入">9. 可观测与故障注入</h2>
+<pre><code class="lang-csharp">// 故障注入（常设面——InProcess 与 TCP 语义等价，对抗场景双介质复跑）
+endpoint.Faults.SetLatency(a, b, TimeSpan.FromMilliseconds(5));
+endpoint.Faults.Partition(new[] { a }, new[] { b });   // 双向断
+endpoint.Faults.Drop(a, b, 0.1);                       // 10% 丢包
+endpoint.Faults.Reset();
+
+// 帧级指标：Core ObservabilityHub 的 Net 视图（hub.Net——帧收发采样/CRC 失败/握手失败/
+// 数据报丢弃，per-protocol tag）；Builder 经 WithObservability(hub) 接入
+</code></pre>
+<hr>
+<h2 id="10-安全档加密与认证">10. 安全档（加密与认证）</h2>
+<table>
+<thead>
+<tr>
+<th>档</th>
+<th>何时用</th>
+<th>装配</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>明文（缺省）</td>
+<td>可信域内网</td>
+<td>零配置</td>
+</tr>
+<tr>
+<td><strong>KeyPair</strong>（推荐）</td>
+<td>无证书体系的内生集群（WireGuard 式）</td>
+<td><code>.WithKeyPair(SecurityOptions.KeyPairPinned(ownKey, new PinnedTrustStore(peers, peerKeys)))</code></td>
+</tr>
+<tr>
+<td>mTLS</td>
+<td>CA/合规场景（短期证书+轮换）</td>
+<td><code>.WithMutualTls(cert, caCollection)</code>（证书 SAN 含 <code>nid:&lt;hex32&gt;</code> 条目）</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="lang-csharp">// KeyPair 档：每节点静态密钥对 + 对端公钥钉扎表（信任强度 = mTLS）
+using var own = NodeKeyPair.Generate();   // 持久化：ExportPrivateKey → 安全存储 → FromPrivateKey
+var security = SecurityOptions.KeyPairPinned(own,
+    new PinnedTrustStore([peerA, peerB], [peerAKey.PublicKey.ToArray(), peerBKey.PublicKey.ToArray()]));
+await using var endpoint = await ClusterBuilder.Create(nodeId)
+    .WithKeyPair(security)                // 此后全帧 AEAD 加密+认证（MAC-only 粒度可选）
+    /* ... */
+    .StartAsync(ct);
+</code></pre>
+<ul>
+<li><strong>防降级 fail-closed</strong>：本端安全档与对端不匹配立即断连——永不静默降级明文（含 KeyPair↔mTLS 互遇）。</li>
+<li><strong>TOFU 形态</strong>：<code>SecurityOptions.KeyPairTofu(own, trust)</code> 首连学习对端公钥（SSH known_hosts 式——首连有中间人窗口，半可信内网用）；持久化实现 <code>ITrustAnchorStore</code> 归组装层。</li>
+<li><strong>UDP 承载</strong>：KeyPair 档数据报带认证标签（会话派生——篡改丢弃）；mTLS 档 UDP 回落 TCP。</li>
+</ul>
+<hr>
+<h2 id="11-反模式">11. 反模式</h2>
+<ul>
+<li>❌ <strong>绕三形态直造 socket</strong>——丢掉同构验收/超时关联/背压/故障注入/帧协议，全部重造必漂移。
+一切收发经 <code>IProtocolTransport</code>。</li>
+<li>❌ <strong>raft <code>IStateMachine.ApplyAsync</code> 的 <code>command</code> 跨调用持有</strong>——仅调用期间有效（存储读取
+视图），保留必须 <code>ToArray()</code>。（传输 handler 载荷相反——每帧独立缓冲可持有。）</li>
+<li>❌ <strong>catch <code>NetIOException</code> 当静默成功</strong>——它是&quot;不可达快速失败&quot;，该立即重路由/上报；
+静默吞 = 白等超时窗。</li>
+<li>❌ <strong>协议号用注册区外</strong>——使用方一律 <code>0x60-0xAF</code>；核心区号经 internal 挂载口（公开口放行即抛）。</li>
+<li>❌ <strong>流式读侧攒全量</strong>——<code>ReadAllAsync</code> 逐帧交付是契约（GB 级 O(单帧)），消费方攒 List 违约。</li>
+<li>❌ <strong><code>_ = SendRequestAsync(...)</code> 丢弃任务</strong>——异常静默吞 + 无超时治理；await 它或交
+<code>TaskSink</code> 受控提交。</li>
+<li>❌ <strong>gossip 广播当可靠通道</strong>——最终一致语义（不保序不保达，TTL 到期即弃）；要可靠确认
+走 raft 复制（§6.1）或请求回调（§4.1）。</li>
+<li>❌ <strong>偶数节点当容错</strong>——N=2/N=4 的容错与 N=1/N=3 相同（多数派 = ⌊N/2⌋+1，见 §3.5）；
+偶数只是多付一台成本。</li>
+</ul>
+<hr>
+<h2 id="12-想深入">12. 想深入</h2>
+<ul>
+<li>积木拼装全景与决策树：<a href="../COORDINATION.md"><code>../COORDINATION.md</code></a></li>
+<li>性能基线（形态面 loopback RTT/吞吐、raft 引擎三节点吞吐）：<a href="perf/loopback-baseline.html"><code>perf/loopback-baseline.md</code></a></li>
+<li>raft 完整产品节点（TierWAL 存储 + 快照压缩 + 多源反熵）：
+<a href="../products/raft-node.html"><code>../../TC.Tier.Products.Net/docs/raft-node.md</code></a></li>
+<li>Core 层积木（TaskSink/日志/可观测）：<a href="COORDINATION.html"><code>../../TC.Tier.Core/COORDINATION.md</code></a></li>
+<li>线格式生成器（WireMessage/BinaryLayout）：<code>TC.Tier.CodeGen</code></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/net.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

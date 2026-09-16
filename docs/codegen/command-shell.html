@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>命令壳生成器（CommandShell）——CLI / HTTP 双执行面 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="命令壳生成器（CommandShell）——CLI / HTTP 双执行面 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen/docs/command-shell.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="命令壳生成器commandshellcli--http-双执行面">命令壳生成器（CommandShell）——CLI / HTTP 双执行面</h1>
+
+<p>从 <code>[CommandGroup]</code> 标注的命令组<strong>编译期生成</strong> CLI 命令行壳与 HTTP API 代理：参数绑定、帮助文本、
+路由分发、错误映射全部由生成物承担——<strong>零运行时反射，零手写解析</strong>。一份命令定义，两个执行面。</p>
+<h2 id="快速上手">快速上手</h2>
+<p>定义命令组（标注在普通类上——组即服务，方法即命令）：</p>
+<pre><code class="lang-csharp">[CommandGroup(&quot;traffic&quot;, Description = &quot;TierTraffic 管理根&quot;)]
+public sealed class TrafficRoot
+{
+    public bool Ping([CommandOption(LongName = &quot;verbose&quot;, ShortName = 'v')] bool verbose)
+        =&gt; verbose;
+
+    [Command(&quot;set-level&quot;, Description = &quot;设置等级&quot;)]
+    [CommandError(typeof(ArgumentException), 422)]
+    public async Task&lt;long&gt; SetLevelAsync(
+        [CommandArg(0)] Level level,                       // 位置参数（枚举）
+        [CommandOption(LongName = &quot;limit&quot;)] long limit = 10, // 具名选项（带默认值）
+        [CommandBody] RouteSpec spec,                      // 请求体（CLI=stdin / HTTP=JSON）
+        CancellationToken ct = default)                    // 框架注入，不参与绑定
+    {
+        // ...业务...
+    }
+}
+</code></pre>
+<p>编译期生成两个静态类（挂在根组类的命名空间下）：</p>
+<table>
+<thead>
+<tr>
+<th>生成类</th>
+<th>执行面</th>
+<th>关键成员</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TrafficRootCli</code></td>
+<td>命令行</td>
+<td><code>Run(args, service, stdout, results)</code>（返回退出码）、<code>WriteHelp</code>、<code>CompleteNext</code>（补全）、<code>CommandPaths</code></td>
+</tr>
+<tr>
+<td><code>TrafficRootHttp</code></td>
+<td>HTTP</td>
+<td><code>TryHandleAsync(request, service, results)</code>——单一分发入口</td>
+</tr>
+</tbody>
+</table>
+<p>CLI 接线（<code>Main</code> 里三行）：</p>
+<pre><code class="lang-csharp">int exitCode = TrafficRootCli.Run(args, new TrafficRoot(), Console.Out, results);
+return exitCode;
+</code></pre>
+<p>HTTP 接线（ASP.NET Core 路由兜底形态——不匹配返回 null，宿主续走自己的 404/静态面）：</p>
+<pre><code class="lang-csharp">app.Map(&quot;/traffic/{*path}&quot;, async ctx =&gt;
+{
+    var result = await TrafficRootHttp.TryHandleAsync(ctx.Request, new TrafficRoot(), results);
+    if (result is not null) await result.WriteToAsync(ctx.Response);
+});
+</code></pre>
+<p><code>results</code> 为消费方实现的 <code>ICommandResults</code>（成功载荷渲染 + 错误写出——模式匹配自家异常提取
+错误码，零反射）。</p>
+<h2 id="概念">概念</h2>
+<ul>
+<li><strong>组（<code>[CommandGroup]</code>）</strong>：命令命名空间。根组 = 服务本身；嵌套组实例获取沿嵌套链逐级解析——
+父组 → 祖辈 → 根上首个持有同型 public 属性/字段的宿主即命中（链式取值 <code>service.Sys.Discovery</code>），
+全链未命中回落可访问无参构造——<strong>服务注入与嵌套深度解耦</strong>，组不必提升为根级属性。
+组路径即 CLI 子命令路径（<code>traffic route add</code>）与 HTTP 路径段。</li>
+<li><strong>命令（<code>[Command(&quot;name&quot;)]</code>）</strong>：<strong>命令名必填</strong>（组内唯一——重名 = TCSG054，非法名 = TCSG055）；
+HTTP 缺省路由 = <code>/{各级组名}/{命令名}</code>（<code>[Command]</code> 的 <code>Route</code>/<code>Method</code> 可覆写）。</li>
+<li><strong>参数三角色</strong>（每个参数必须显式标注其一——未标注 = TCSG056）：
+<ul>
+<li><code>[CommandArg(position)]</code> 位置参数——CLI 按 token 位绑定；</li>
+<li><code>[CommandOption]</code> 具名选项——<code>--long</code>/<code>-s</code>；<code>LongName</code> 缺省 = 参数名 kebab-case，<code>ShortName</code>
+缺省无短名，布尔选项支持 <code>--flag</code> 裸形态；</li>
+<li><code>[CommandBody]</code> 请求体——HTTP = JSON 反序列化，CLI = stdin 读入；GET 命令带 body = TCSG058。</li>
+</ul>
+</li>
+<li><strong>可绑定类型集</strong>（编译期 TryParse 直调——零反射）：<code>string</code>/<code>bool</code>/整数族/<code>double</code>/<code>decimal</code>/
+<code>Guid</code>/<code>DateTimeOffset</code>/任意枚举（含 <code>IsDefined</code> 校验）/<code>Nullable&lt;T&gt;</code> 包裹。复杂类型走
+<code>[CommandBody]</code>。</li>
+<li><strong><code>CancellationToken</code></strong>：任意参数位框架注入，调用方取消透传，不参与绑定。</li>
+<li><strong>错误映射（<code>[CommandError(typeof(异常), 状态码)]</code>）</strong>：声明式异常→状态码/退出码映射，
+方法与组两级可标（<code>AllowMultiple</code>）；未声明的异常 → 500 兜底。</li>
+</ul>
+<h2 id="怎么选">怎么选</h2>
+<ul>
+<li>命令行工具/管理 CLI → 只接 <code>*Cli</code>；</li>
+<li>同一组命令要暴露 HTTP API → 再接 <code>*Http</code>——<strong>命令定义不改一行</strong>，双面行为由同一模型保证；</li>
+<li>退出码/状态码语义 → <code>[CommandError]</code> 声明式映射，禁止在命令方法内手写 exit code 分支。</li>
+</ul>
+<h2 id="反模式">反模式</h2>
+<ul>
+<li><strong>在命令方法里自己解析 <code>args</code></strong>——绑定是生成器的职责；手写解析 = 双份真相；</li>
+<li><strong>参数忘标角色注解</strong>——编译期 TCSG056 直接报（不存在&quot;静默落 Body&quot;的宽容形态）；</li>
+<li><strong>参数名以 <code>__tcsg_</code> 开头</strong>——生成代码自有标识符（私有处理函数形参＋局部变量）的保留命名空间，
+占用即 TCSG060 编译期报；此外生成器标识符已全面保留前缀化，用户参数名任意取不撞名；</li>
+<li><strong>嵌套组全链无同型成员且无可访问无参构造</strong>——获取表达式回退 <code>new</code>，生成物直接编译失败
+（CS7036 形态）——把组实例暴露为任一祖辈组的 public 属性/字段即可；</li>
+<li><strong>命令重名/空名</strong>——编译期诊断 TCSG054/TCSG055，不要指望运行期覆盖。</li>
+</ul>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>生成器与诊断码：<code>src/TC.Tier.CodeGen/CommandGenerator.cs</code>（TCSG054-060 族）</li>
+<li>双面行为契约的权威样例：<code>tests/TC.Tier.CodeGen.Tests/CommandSourceGenTests.cs</code></li>
+<li>关联：#435（命令源生成立项）</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen/docs/command-shell.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

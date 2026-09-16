@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -174,6 +174,12 @@ Delegates
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.Log.Contracts.LogCursorFactory-1.html">LogCursorFactory&lt;TLogCursor&gt;</a></dt>
       <dd><p>扫描游标工厂委托签名（LogBase owner + 物理区间）。</p>
+<p>★ snapshotMode（spec-10 根治）：Consistent = 构造期区间段共享锁全程持有（快照隔离——恢复扫描等
+单线程场景）；DirtyRead = 逐段短暂共享锁（游标锁——读写并发常态，复制读等高频路径；异步轨以
+drain worker 段独占锁提供物理互斥，见 SequentialReader 头注释）。默认 Consistent（既有行为）。</p>
+<p>★ leasePages：页租借（零拷贝读——2026-08-29 性能：apply 读热路径 ToArray 消除）。
+false（默认）= 换页即还池（CurrentPayload/CurrentPayloadMemory 禁跨 MoveNext 持有）；
+true = 游标持有全部已读页至 Dispose（CurrentPayloadMemory 有效至 Dispose——批量切片直用的前提）。</p>
 </dd>
     </dl>
 
@@ -196,7 +202,7 @@ Delegates
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

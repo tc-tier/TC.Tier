@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TierTimeSeries —— 时间序列产品 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TierTimeSeries —— 时间序列产品 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierseries.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tiertimeseries--时间序列产品">TierTimeSeries —— 时间序列产品</h1>
+
+<blockquote>
+<p><strong>Ring × BTree 组合的时间序列产品</strong>：一次一序列、乱序样本吸收、逻辑地址一等公民。
+组合配方 = 数据 Ring（追加 + 地址直达）× 时间索引 BTree（时间序检索）× VersionedMetadata 水位
+（恢复对账锚点）——产品层只做装配与语义收口，引擎与结构零重写。</p>
+</blockquote>
+<h2 id="快速上手">快速上手</h2>
+<pre><code class="lang-csharp">using TC.Tier.Products.TimeSeries;
+
+var fs = TierFs.New(&quot;memory:&quot;);
+
+await using var series = await new TierTimeSeriesBuilder(fs, new TimeSeriesOptions
+{
+    SeriesName = &quot;app.metrics&quot;,
+})
+.StartAsync();
+
+var ct = CancellationToken.None;
+
+// 写样本（timestamp = UTC Ticks；value = 自定义字节负载）
+var now = DateTimeOffset.UtcNow.UtcTicks;
+var append = await series.AppendAsync(now, BitConverter.GetBytes(42.5d), ct);
+
+// append.Address = 样本的逻辑地址（一等公民）——上层自缓冲地址可经组合积木（Ring 读面）
+// 直达取值，免时间索引；产品查询统一走时间索引面（见下）。
+
+// 范围查询：[from, to) 索引序交付（时间戳 / 值 / 地址）
+var from = now - TimeSpan.FromMinutes(5).Ticks;
+await foreach (var (ts, data, address) in series.RangeAsync(from, now + 1, ct))
+{
+    Console.WriteLine($&quot;{new DateTimeOffset(ts).LocalDateTime:O} = {BitConverter.ToDouble(data.Span)}&quot;);
+}
+
+// 显式落盘（返回即内存可见、持久化 = 显式 Flush）
+await series.FlushAsync(ct);
+</code></pre>
+<p>写读循环的全部入口都是异步 API——没有同步阻塞形态。</p>
+<h2 id="装配怎么选">装配怎么选</h2>
+<p><code>TierTimeSeriesBuilder(fs, options)</code> 缺省装配开箱即用；<code>With*</code> 注入 = 整机替换语义（替换件而非补丁）：</p>
+<table>
+<thead>
+<tr>
+<th>注入</th>
+<th>替换件</th>
+<th>何时需要</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WithRingFactory</code></td>
+<td>数据 Ring</td>
+<td>介质/几何调优、测试替身</td>
+</tr>
+<tr>
+<td><code>WithWatermarkMetaFactory</code></td>
+<td>水位 VersionedMetadata</td>
+<td>meta 策略定制</td>
+</tr>
+<tr>
+<td><code>WithIndexFactory</code> / <code>WithIndexComparer</code></td>
+<td>时间索引 BTree / TimeKey 比较器</td>
+<td>索引几何调优</td>
+</tr>
+<tr>
+<td><code>WithStorageOptionsFactory</code></td>
+<td>StorageEngineOptions</td>
+<td>段几何/缓存调优</td>
+</tr>
+<tr>
+<td><code>WithMetaPolicyFactory</code></td>
+<td>Ring meta 策略</td>
+<td>meta 持久化定制</td>
+</tr>
+<tr>
+<td><code>WithEpoch</code> / <code>WithLogger</code></td>
+<td>LightEpoch / 日志</td>
+<td>组合进既有宿主</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>Indexed = false</code> 是显式降档契约</strong>：纯追加形态，查询 API（<code>RangeAsync</code>/<code>LatestAsync</code>/<code>FloorAsync</code>）
+不可用，恢复 = 全扫重建。只有在&quot;只写不查 + 重放代价可接受&quot;时选择。</p>
+<h2 id="写入样本">写入样本</h2>
+<pre><code class="lang-csharp">var append = await series.AppendAsync(timestamp, value, ct);
+</code></pre>
+<ul>
+<li><strong>返回即内存可见，持久化 = 显式 <code>FlushAsync</code></strong>（trim 前置自动 flush）——可见性与持久化分离。</li>
+<li>返回 <code>SampleAppendResult.Address</code>（逻辑地址）——地址直达取值路径，免索引查找。</li>
+<li><strong>乱序吸收</strong>：交付序 ≠ 地址序；同刻多样本按写入序共存（不覆盖）。</li>
+<li>守卫 fail-fast 两态：<code>ts ≤ TrimmedUntil</code>（已回收区间）与超出 <code>MaxOutOfOrderPast</code> 乱序下界的样本直接拒绝。</li>
+<li><code>AppendBatchAsync</code> 批量追加，返回地址序列连续。</li>
+</ul>
+<h2 id="查询">查询</h2>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>RangeAsync(from, to)</code></td>
+<td><code>[from, to)</code> 索引序交付，元组 = (ts, value, address)</td>
+</tr>
+<tr>
+<td><code>LatestAsync()</code></td>
+<td>最新样本点查，O(log n)；空序列 = null</td>
+</tr>
+<tr>
+<td><code>FloorAsync(ts)</code></td>
+<td>≤ ts 的最近样本点查；空序列 = null</td>
+</tr>
+<tr>
+<td><code>GetStatsAsync()</code></td>
+<td>First/Last/SampleCount/IndexEntryCount/TrimmedUntil/Head/Tail/DurableTail</td>
+</tr>
+</tbody>
+</table>
+<h2 id="稠密多序列denseseries">稠密多序列（DenseSeries）</h2>
+<p>一个实例承载成千上万命名序列（网关每路由指标量级）——<code>DenseSeries = true</code> 开启：</p>
+<pre><code class="lang-csharp">var series = await new TierTimeSeriesBuilder(fs, new TimeSeriesOptions
+{
+    SeriesName = &quot;app.metrics&quot;,
+    DenseSeries = true,                 // 稠密多序列模式
+    SeriesCapacity = 1 &lt;&lt; 20,           // 序列数护栏（缺省 2²⁰，超限 fail-fast）
+}).StartAsync(ct);
+
+// 三参 API = 命名序列（首写惰性注册，零预注册成本）
+await series.AppendAsync(routeId, timestamp, value, ct);
+await foreach (var (ts, v, addr) in series.RangeAsync(routeId, from, to, ct)) { }
+var latest = await series.LatestAsync(routeId, ct);
+var stats  = await series.GetStatsAsync(routeId, ct);
+await series.TruncateAsync(routeId, beforeExclusive: cutoff, ct);
+
+// 两参 API = 默认序列（seriesId 0）——与命名序列同实例共存，零迁移
+await series.AppendAsync(timestamp, value, ct);
+</code></pre>
+<ul>
+<li><strong>共享面单实例</strong>：Ring 页池/索引树/水位引擎文件各一份（引擎文件数不随序列数涨）；
+每序列成本 = O(1) 侧账（~64B，序列注册表）——<strong>N 序列 ≠ N 倍</strong>。</li>
+<li><strong>键模型</strong>：<code>DenseTimeKey</code>（SeriesId 4B 领先 + Timestamp + Tiebreaker，20B）——单棵 BTree 内
+逐序列键前缀域，域内 seek/迭代出域即停；envelope（TTS2）头携 SeriesId，恢复重放按其路由重建。</li>
+<li><strong>逐序列治理</strong>：<code>TruncateAsync(sid, before)</code> 键域前缀截断；Ring 物理截断下限 = 全体序列钉住
+地址的最小值（<strong>慢序列钉住</strong>——快序列回收不越雷池）；retention TTL 轮逐序列推进。</li>
+<li><strong>观测</strong>：<code>GetStatsAsync(sid)</code> 逐序列口径；两参版 = 全实例聚合；<code>SeriesCount</code> 已注册序列数。</li>
+<li><strong>Rollup</strong>：<code>RollupAsync(..., seriesId: s)</code> 逐序列算子；<code>sourceSeriesId</code>/<code>targetSeriesId</code>
+双参形式支持跨序列落点。</li>
+<li><strong>退出</strong>：关闭 <code>DenseSeries</code> 回到单序列模式——TimeKey（16B）路径行为不变，两模式互不读对方文件。</li>
+</ul>
+<h2 id="rollup-降采样">Rollup 降采样</h2>
+<pre><code class="lang-csharp">var windows = await TimeSeriesRollup.RollupAsync(
+    rawSeries, downsampledSeries,
+    windowTicks: TimeSpan.FromMinutes(1).Ticks,
+    agg: TimeSeriesRollup.Aggregation.Avg,
+    fromTs: from, toTs: to);
+</code></pre>
+<ul>
+<li><strong>组合糖定位</strong>：<code>RollupAsync</code> 是原子算子，连续调度归业务后台任务（对齐 InfluxDB 连续查询 /
+Timescale 连续聚合的&quot;只取算子面&quot;形态）。</li>
+<li><strong>七算子</strong>：<code>Min</code> / <code>Max</code> / <code>Sum</code> / <code>Count</code> / <code>Avg</code> / <code>First</code> / <code>Last</code>；<code>Count</code> 聚合不读样本值。</li>
+<li><strong>值编码契约 = 8B double LE</strong>（<code>Count</code> 除外）——非该编码的源 = <code>InvalidOperationException</code>。</li>
+<li>窗口按 epoch 对齐；<strong>空窗不落</strong>（只有含样本的窗才写）。</li>
+<li><strong>级联降档</strong>：目标序列可再作源（组合律成立；<code>Count</code> 除外——计数再聚合语义不同）。</li>
+</ul>
+<h2 id="retention-与治理">retention 与治理</h2>
+<ul>
+<li><code>RetentionTime</code> / <code>MaxBytes</code> 后台轮（<code>RetentionScanInterval</code>，缺省 1 分钟）：
+TTL 与字节上限取更晚锚回收；水位单调不回退；空闲轮次零写入。</li>
+<li><code>TruncateAsync(beforeExclusive)</code> 显式回收，返回回收样本数。</li>
+</ul>
+<h2 id="持久化与恢复">持久化与恢复</h2>
+<p>文件布局（按序列名）：<code>{SeriesName}.ts.ring</code>（数据）/ <code>.ts.index</code>（时间索引）/ <code>.ts.water</code>（水位）。</p>
+<p>恢复对账三步：悬空索引清理 → 缺条重建 → 水位 min 校正——索引/水位全自恢复（<code>TimeSeriesRecoveryHints</code>
+为预留空形态）。<code>Indexed = false</code> 降档恢复 = 全扫重建。</p>
+<h2 id="配置参考timeseriesoptions">配置参考（TimeSeriesOptions）</h2>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>缺省</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SeriesName</code></td>
+<td><code>&quot;tc.series&quot;</code></td>
+<td>序列名（文件布局前缀）</td>
+</tr>
+<tr>
+<td><code>SegmentGrowthLimit</code></td>
+<td>64MB</td>
+<td>数据 Ring 段增长上限</td>
+</tr>
+<tr>
+<td><code>PageSize</code></td>
+<td>1MB</td>
+<td>Ring 页大小（2 的幂 [4KB, 1GB]）——样本粒度小，小页 = 更细的环绕/驱逐粒度</td>
+</tr>
+<tr>
+<td><code>MemorySize</code></td>
+<td>64MB</td>
+<td>Ring 内存容量——<strong>勿照抄 Ring 16GB 缺省</strong>（mem 卷会把跨度物化成真实内存）</td>
+</tr>
+<tr>
+<td><code>OverflowPolicy</code> / <code>MinOverflowSize</code></td>
+<td>Disabled / 0</td>
+<td>超大值分离到溢出引擎</td>
+</tr>
+<tr>
+<td><code>ColdReadRatio</code></td>
+<td>0.25</td>
+<td>冷读回源占页池比例</td>
+</tr>
+<tr>
+<td><code>MaxOutOfOrderPast</code></td>
+<td>null</td>
+<td>乱序下界保护（null = 不限）</td>
+</tr>
+<tr>
+<td><code>Indexed</code></td>
+<td>true</td>
+<td>时间索引开关（false = 显式降档，查询 API 不可用）</td>
+</tr>
+<tr>
+<td><code>IndexNodeSize</code></td>
+<td>256</td>
+<td>BTree 节点大小（字节）</td>
+</tr>
+<tr>
+<td><code>IndexPersistencePolicy</code></td>
+<td>null</td>
+<td>锚点帧持久化策略（后台 dump 间隔/增量阈值）</td>
+</tr>
+<tr>
+<td><code>RetentionTime</code></td>
+<td>7 天</td>
+<td>TTL 回收</td>
+</tr>
+<tr>
+<td><code>MaxBytes</code></td>
+<td>null</td>
+<td>字节上限回收（与 TTL 取更晚锚）</td>
+</tr>
+<tr>
+<td><code>RetentionScanInterval</code></td>
+<td>1 分钟</td>
+<td>后台回收扫描周期</td>
+</tr>
+<tr>
+<td><code>DenseSeries</code></td>
+<td>false</td>
+<td>稠密多序列模式（DenseTimeKey 20B + TTS2 + 单树键域化）</td>
+</tr>
+<tr>
+<td><code>SeriesCapacity</code></td>
+<td>2²⁰</td>
+<td>序列数护栏（dense 专用；超限 fail-fast）</td>
+</tr>
+<tr>
+<td><code>Clock</code></td>
+<td><code>TimeProvider.System</code></td>
+<td>时钟供给源（故障注入面）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="反模式">反模式</h2>
+<ol>
+<li><strong><code>PageSize</code> 照抄 Ring 缺省 16GB</strong> ——mem 卷把页跨度物化成真实内存，OOM 实锤；时间序列请用产品缺省 1MB。</li>
+<li><strong><code>Indexed = false</code> 当性能旋钮</strong>——它是显式降档契约：查询 API 不可用、恢复全扫，不是&quot;更快&quot;。</li>
+<li><strong>假设 Append 即落盘</strong>——可见性与持久化分离；崩溃窗口内的数据靠显式 <code>FlushAsync</code> / 策略化收口。</li>
+<li><strong>单序列模式（缺省）下用三参 API 写非零序列</strong>——单序列实例仅 seriesId 0 合法，非零序列
+fail-fast；多序列请启用 <code>DenseSeries</code>。</li>
+<li><strong>dense 实例上跨序列假设共享回收边界</strong>——逐序列水位独立；序列 A 的 trim 不放宽序列 B 的
+写入守卫（Ring 物理截断由慢序列钉住，自动收口）。</li>
+<li><strong>假设水位可回退 / 同刻写覆盖</strong>——均不成立（水位单调；同刻多样本写入序共存）。</li>
+</ol>
+<h2 id="想深入">想深入</h2>
+<ul>
+<li>同族产品：<a href="tierkv.html">TierKv</a>、<a href="tierqueue.html">TierQueue</a>——组合积木语义可参照。</li>
+<li>raft 组合档：<a href="../TC.Tier.Products.Net/docs/raft-node.md">Products.Net raft-node</a>。</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/tierseries.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

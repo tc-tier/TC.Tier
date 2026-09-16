@@ -33,7 +33,7 @@
       <script type="module" src="./public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="index.html">
-            <img id="logo" class="svg" src="logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -189,18 +189,24 @@ dotnet add package TC.Tier.Runtime --prerelease
 </table>
 <hr>
 <h2 id="架构">架构</h2>
-<pre><code>官方产品（规划中）：TierKV / TierWAL / TierBlob / TierQueue / TierTimeSeries
+<pre><code>官方产品：TierKV / TierWAL / TierQueue（时序等组装中）
 ────────────────────────────────────────────────
 Storage Runtime（可组合内核）
-  Index（Hash/BTree/SkipList）· Ring · Log · Blob（元数据/镜像/快照）
+  Index（Hash/BTree/SkipList）· Ring · Log ＋ 搭配件（镜像/元数据/快照）
 ────────────────────────────────────────────────
 Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地址空间）
 ────────────────────────────────────────────────
 文件系统层（local:// / memory: / virtual:// / network:///s3）
+────────────────────────────────────────────────
+Core.Net（分布式协议层）
+  raft 共识 × 节点通信三形态 × HyParView/Swarm——Wire 统一帧，传输可换（TCP/UDP/QUIC）
+官方节点：TierRaftNode（raft × TierWAL 开箱节点，TC.Tier.Products.Net）
 </code></pre>
-<p>依赖单向无环：<code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code>。源生成器（<code>TC.Tier.CodeGen</code>）横切——BinaryLayout / 注册桥编译期生成，零运行时反射。</p>
+<p>依赖单向无环：<code>TC.Tier.CodeGen.Abstractions</code> → <code>TC.Tier.Contracts</code> → <code>TC.Tier.Core</code> → <code>TC.Tier.Runtime</code> → <code>TC.Tier.Products</code>（存储支柱）；网络支柱 <code>TC.Tier.Core</code> → <code>TC.Tier.Core.Net</code> → <code>TC.Tier.Products.Net</code>。源生成器（<code>TC.Tier.CodeGen</code>）横切——BinaryLayout / 注册桥编译期生成，零运行时反射。</p>
 <ul>
+<li>开发指南（架构与设计思想、代码组织范式）：<a href="DEVELOPMENT.html">DEVELOPMENT.md</a></li>
 <li>引擎使用指南：<a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html">storage-engine.md</a></li>
+<li>网络与共识层指南：<a href="https://docs.mytzz.top/docs/src/TC.Tier.Core.Net/docs/net.html">net.md</a></li>
 <li>结构层总览：<a href="https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html">structures.md</a></li>
 <li>生命周期模型：<a href="https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html">lifecycle.md</a></li>
 </ul>
@@ -211,7 +217,7 @@ Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地
 <li><strong>代码库</strong>：<a href="https://github.com/tc-tier/TC.Tier">github.com/tc-tier/TC.Tier</a>——源码、Issues、Discussions</li>
 </ul>
 <h2 id="贡献">贡献</h2>
-<p>见 <a href="CONTRIBUTING.html">CONTRIBUTING.md</a>——构建、测试约定、代码规范（编译期强制：禁反射 TCSG030 / 禁 sync-over-async TCSG031）。</p>
+<p>见 <a href="CONTRIBUTING.html">CONTRIBUTING.md</a>——构建、测试约定、代码规范（编译期强制：禁反射 TCSG136 / 禁 sync-over-async TCSG137 / 禁 fire-and-forget TCSG138）。</p>
 <h2 id="license">License</h2>
 <p>MIT —— 详见 <a href="https://github.com/tc-tier/TC.Tier/blob/main/LICENSE">LICENSE</a>。</p>
 <p>核心实现全部自研；算法参考声明与第三方依赖说明见 <a href="https://github.com/tc-tier/TC.Tier/blob/main/THIRD-PARTY-NOTICES">THIRD-PARTY-NOTICES</a>。</p>
@@ -236,7 +242,7 @@ Storage Engine（Options → Builder → Start/StartAsync 装配，16B 逻辑地
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

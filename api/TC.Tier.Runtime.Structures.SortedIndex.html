@@ -33,7 +33,7 @@
       <script type="module" src="./../public/docfx.min.js"></script>
 
       <script>
-        const theme = localStorage.getItem('theme') || 'dark'
+        const theme = localStorage.getItem('theme') || 'auto'
         document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
       </script>
 
@@ -44,8 +44,8 @@
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
           <a class="navbar-brand" href="../index.html">
-            <img id="logo" class="svg" src="../logo.svg" alt="">
-            
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
             <i class="bi bi-three-dots"></i>
@@ -101,18 +101,21 @@ Classes
     </dl>
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeIndex-1.html">BTreeIndex&lt;TKey&gt;</a></dt>
-      <dd><p>BTreeIndex 主存储格式布局 partial——机制归基类（<span class="xref">TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.TryDump</span> 编排/
-版本链/后台循环/帧走链），本件只实现格式：32B 几何 + 物化。</p>
-<p>★ 帧体布局：[几何 32B]——rootAddr(16) entryCount(8) structSize(4) pad(4)。
-  节点本就写时持久化在自持引擎（节点变更即 WriteNodeContent，引擎副本恒完整）——
-  帧不写节点流，物化=设根 + 引擎读回根节点，零结构调整（无分裂/无重放重建）。</p>
-<p>★ 正确性（对齐 HashIndex 同构）：dump 表覆盖 [?, W] 完整折叠；&gt; W 混入条目靠重放 (W, End]
-  幂等收敛（帧内 root 恒为 dump 时刻最新根——fuzzy 无逐槽拷贝，几何原子三字段）。</p>
+      <dd><p>BTreeIndex 计数 partial——EntryCount（Volatile 读）与 IndexSize 估算。</p>
 </dd>
     </dl>
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.BTreeOfLong.html">BTreeOfLong</a></dt>
       <dd><p><code>[RingKey(typeof(...))]</code> 比较族封闭薄类——keyResolver 可选（判等不需要，恢复重放需要）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.ByteOrderBTreeIndex-1.html">ByteOrderBTreeIndex&lt;TKey&gt;</a></dt>
+      <dd><p>key 字节序 B+树封闭形态（W7 F1 范围/前缀扫描的排序底座）：BTreeIndex 的编译期封闭 +
+内置 <a class="xref" href="TC.Tier.Core.Primitives.KeyByteOrderComparer-1.html">KeyByteOrderComparer&lt;TKey&gt;</a>——字节字典序（RocksDB/LMDB 同款范围扫描通用序，
+前缀 = 字节区间，多字段结构体 key 按字段布局序排布）。</p>
+<p>★ 消费面：TierKv 范围索引挂载（EnableRangeIndex）/ 任何需要 key 字节序有序索引的组合。
+开放泛型 BTreeIndex（默认数值/结构序）不落消费面，同 BlittableRing 律。</p>
 </dd>
     </dl>
     <dl class="jumplist">
@@ -122,11 +125,7 @@ Classes
     </dl>
     <dl class="jumplist">
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SkipListIndex-1.html">SkipListIndex&lt;TKey&gt;</a></dt>
-      <dd><p>SkipListIndex 主存储格式布局 partial——机制归基类（<span class="xref">TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase`1.TryDump</span> 编排/
-版本链/后台循环/帧走链），本件只实现格式：32B 几何 + 物化。</p>
-<p>★ 帧体布局：[几何 32B]——currentLevel(4) pad(4) entryCount(8) headAddr(16)。
-  节点本就写时持久化在自持引擎（节点变更即 WriteNodeToEngine）——帧不写节点流，
-  物化=head arena 落位 + 塔顶锚点 + 计数；层 0 链节点访问经 GetNode 引擎读回自愈。</p>
+      <dd><p>SkipListIndex 计数 partial——EntryCount（Volatile 读）与 IndexSize 估算。</p>
 </dd>
     </dl>
     <dl class="jumplist">
@@ -138,10 +137,14 @@ Classes
       <dt><a class="xref" href="TC.Tier.Runtime.Structures.SortedIndex.SortedIndexBase-1.html">SortedIndexBase&lt;TKey&gt;</a></dt>
       <dd><p>比较族基类（族 A：BTreeIndex/SkipListIndex）——条目物化 (TKey, 地址)，比较即路由，支持有序遍历。</p>
 <p>★ 族器官（设计稿 §3.2，从旧 IndexBase 收编）：AllocateNode/WriteNode/ReadNode/ReclaimNode
-  （引擎节点持久化原语——BTree 叶子/跳表节点的引擎寄生形态）。</p>
+（引擎节点持久化原语——BTree 叶子/跳表节点的引擎寄生形态）。</p>
 <p>★ 不持有探测族器官（判等 tag/CAS 桶/GrowIndex）；判等在条目内完成。
-  KeyResolver 可选注入——判等不需要（key 物化条目内），恢复重放需要（设计稿 §4 两族共需接口）：
-  有重放窗口而无 resolver 者，恢复核心 fail-fast。</p>
+KeyResolver 可选注入——判等不需要（key 物化条目内），恢复重放需要（设计稿 §4 两族共需接口）：
+有重放窗口而无 resolver 者，恢复核心 fail-fast。</p>
+<p>★ 线程契约（终态）：全部公开操作（读/写/游标单步/后台 dump）经内部<b>操作闸</b>互斥——
+单操作粒度全互斥，结构自保证任意并发组合安全（撕裂/成环消除——节点结构体大拷贝的写入
+非原子，无锁读者可下降成环活锁，2026-08-27 dotnet-stack 实锤）。粒度=单操作（游标=单步推进），
+长扫描经逐步持闸与写者交错。锁自由读（不可变节点/seqlock 形）为后续优化项。</p>
 </dd>
     </dl>
     <dl class="jumplist">
@@ -198,7 +201,7 @@ Enums
     <footer class="border-top text-secondary">
       <div class="container-xxl">
         <div class="flex-fill">
-          MIT License — TC.Tier Contributors
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
         </div>
       </div>
     </footer>

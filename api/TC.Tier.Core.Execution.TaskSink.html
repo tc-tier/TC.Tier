@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TaskSink | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TaskSink | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="任务沉池（fire-and-forget 派发原语——执行载体 taxonomy 终态：短频繁&#183;可丢失自愈）。 ★ 契约一句话：提交即放手（void 不返回，调用方零仪式）。保证——异常收口不外泄   （计数 + 日志 + onFaulted 回调）、组生命周期（Dispose = 取消传播 +   有界 drain）；不保证——执行（已释放即拒/池拒绝/进程终）、完成通知（丢弃静默，   仅计数器事后可观测）、顺序（提交序 ≠ 执行序）。 ★ 越界即错：按身份去重/单任务取消/等待指定任务完成不是本原语的语义——协议层自持状态；   长稳定异步循环走专用线程 +  泵域；时间驱动唤醒走   。 ★ 在途跟踪 = 原子计数 + drain 信号（提交热路径零堆分配—— 等计数归零）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Execution.TaskSink">
+
+
+
+  <h1 id="TC_Tier_Core_Execution_TaskSink" data-uid="TC.Tier.Core.Execution.TaskSink" class="text-break">
+Class TaskSink  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Execution.html">Execution</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>任务沉池（fire-and-forget 派发原语——执行载体 taxonomy 终态：短频繁·可丢失自愈）。</p>
+<p>★ 契约一句话：提交即放手（void 不返回，调用方零仪式）。<b>保证</b>——异常收口不外泄
+  （计数 + 日志 + onFaulted 回调）、组生命周期（Dispose = 取消传播 +
+  有界 drain）；<b>不保证</b>——执行（已释放即拒/池拒绝/进程终）、完成通知（丢弃静默，
+  仅计数器事后可观测）、顺序（提交序 ≠ 执行序）。</p>
+<p>★ 越界即错：按身份去重/单任务取消/等待指定任务完成不是本原语的语义——协议层自持状态；
+  长稳定异步循环走专用线程 + <a class="xref" href="TC.Tier.Core.Execution.AsyncPump.html">AsyncPump</a> 泵域；时间驱动唤醒走
+  <a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html">DeadlineRegistry</a>。</p>
+<p>★ 在途跟踪 = 原子计数 + drain 信号（提交热路径零堆分配——<a class="xref" href="TC.Tier.Core.Execution.TaskSink.html#TC_Tier_Core_Execution_TaskSink_DisposeAsync">DisposeAsync()</a> 等计数归零）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TaskSink : IAsyncDisposable, IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TaskSink</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink__ctor_" data-uid="TC.Tier.Core.Execution.TaskSink.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink__ctor_System_String_System_Action_System_Exception__System_Nullable_System_TimeSpan__TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Execution.TaskSink.#ctor(System.String,System.Action{System.Exception},System.Nullable{System.TimeSpan},TC.Tier.Core.Logging.ILogger)">
+  TaskSink(string?, Action&lt;Exception&gt;?, TimeSpan?, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TaskSink(string? name = null, Action&lt;Exception&gt;? onFaulted = null, TimeSpan? drainTimeout = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>诊断标识（日志区分多实例）。</p>
+</dd>
+    <dt><code>onFaulted</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a>&gt;</dt>
+    <dd><p>未捕获异常回调（logger 之后调用——测试断言/高级消费方）。</p>
+</dd>
+    <dt><code>drainTimeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>Dispose 等在途完成的超时（超时 LogWarning 不抛）。默认 5s（对齐 WorkerLoop）。须 &gt; 0。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（未捕获异常兜底记录；null = 静默）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p><code class="paramref">drainTimeout</code> ≤ 0。</p>
+</dd>
+  </dl>
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_FaultedCount_" data-uid="TC.Tier.Core.Execution.TaskSink.FaultedCount*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_FaultedCount" data-uid="TC.Tier.Core.Execution.TaskSink.FaultedCount">
+  FaultedCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>累计故障数（未捕获异常兜底计数——黑洞率量化：Faulted/Submitted）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long FaultedCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_InFlightCount_" data-uid="TC.Tier.Core.Execution.TaskSink.InFlightCount*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_InFlightCount" data-uid="TC.Tier.Core.Execution.TaskSink.InFlightCount">
+  InFlightCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>在途任务数（并发下非精确快照——诊断用；O(1) 原子读）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int InFlightCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_SubmittedCount_" data-uid="TC.Tier.Core.Execution.TaskSink.SubmittedCount*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_SubmittedCount" data-uid="TC.Tier.Core.Execution.TaskSink.SubmittedCount">
+  SubmittedCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>累计提交数（洪水率量化：提交速率可观测）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long SubmittedCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_Dispose_" data-uid="TC.Tier.Core.Execution.TaskSink.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_Dispose" data-uid="TC.Tier.Core.Execution.TaskSink.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>同步释放——同 <a class="xref" href="TC.Tier.Core.Execution.TaskSink.html#TC_Tier_Core_Execution_TaskSink_DisposeAsync">DisposeAsync()</a> 但阻塞等待（同步 Dispose 契约须返回前收尾，
+对齐 <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_Dispose">Dispose()</a> 同步等待先例）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_DisposeAsync_" data-uid="TC.Tier.Core.Execution.TaskSink.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_DisposeAsync" data-uid="TC.Tier.Core.Execution.TaskSink.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>异步释放：取消传播（在途任务协作收尾）→ 有界等在途计数归零（超时 LogWarning 剩余数，不抛）
+→ 释放资源（drain 后再释放——在途任务还读 token/信号量）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>任务在取消传播、在途计数归零（或超时放弃等待）并完成资源释放后完成。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_Submit_" data-uid="TC.Tier.Core.Execution.TaskSink.Submit*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_Submit_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_Task__" data-uid="TC.Tier.Core.Execution.TaskSink.Submit(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task})">
+  Submit(Func&lt;CancellationToken, Task&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>提交后台任务（fire-and-forget——void 不返回，调用方零仪式）。全程线程池执行。</p>
+<p>★ 适用：第一段未知/不可控（第三方回调、闭包路径多）——契约无第一段假设。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Submit(Func&lt;CancellationToken, Task&gt; taskBody)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>taskBody</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a>&gt;</dt>
+    <dd><p>任务体（拿组级 ct——Dispose 取消传播）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Execution_TaskSink_Submit_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_Task___remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>池上启动：任务体全程（含第一段）在线程池执行——提交线程零占用；代价是每次提交固定一次池调度跳（无快路径）</p>
+</div>
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a></dt>
+    <dd><p>池已 Dispose（fail-fast——静默收进已释放池 = 黑洞无迹）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_SubmitFast_" data-uid="TC.Tier.Core.Execution.TaskSink.SubmitFast*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_SubmitFast_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_Task__" data-uid="TC.Tier.Core.Execution.TaskSink.SubmitFast(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.Task})">
+  SubmitFast(Func&lt;CancellationToken, Task&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>提交后台任务（Task 便捷重载）——观察者直接承载 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a> 体
+（零闭包适配），同步完成走 0 分配快路径，未同步完成续段自动在线程池执行。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SubmitFast(Func&lt;CancellationToken, Task&gt; taskBody)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>taskBody</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a>&gt;</dt>
+    <dd><p>任务体（拿组级 ct——Dispose 取消传播）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Execution_TaskSink_SubmitFast_" data-uid="TC.Tier.Core.Execution.TaskSink.SubmitFast*"></a>
+
+  <h3 id="TC_Tier_Core_Execution_TaskSink_SubmitFast_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__" data-uid="TC.Tier.Core.Execution.TaskSink.SubmitFast(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask})">
+  SubmitFast(Func&lt;CancellationToken, ValueTask&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>提交后台任务（fire-and-forget——void 不返回，调用方零仪式）。
+同步完成走 0 分配快路径；未同步完成续段自动在线程池执行。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SubmitFast(Func&lt;CancellationToken, ValueTask&gt; taskBody)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>taskBody</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</dt>
+    <dd><p>任务体（拿组级 ct——Dispose 取消传播）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a></dt>
+    <dd><p>池已 Dispose（fail-fast——静默收进已释放池 = 黑洞无迹）。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
