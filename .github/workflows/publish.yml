@@ -21,8 +21,13 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
-      - name: Build and test
+      # ★ 全量 build+test 仅正式线（v* / runtime-v*）；preview 线免门禁——预览即打包即发，
+      #   多库消费迭代不等 CI（质量门禁由 dev/main 的 CI 矩阵与正式线发布承担）
+      - name: Build and test (formal lanes only)
+        if: ${{ !startsWith(github.ref_name, 'preview-v') }}
+        shell: bash
         run: |
+          set -e
           dotnet build -c Release --nologo
           dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo
           dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj -c Release --no-build --nologo
@@ -58,23 +63,25 @@ jobs:
       # ★ preview-v* = 全家族预览（2026-09-16 扩展——TC.Traffic 消费需要全套可解析依赖；
       #   同版本号一次发齐 12 包=src 全部项目，包间 nuspec 依赖精确互指）。Runtime 同号入
       #   预览线（runtime-v* 0.0.x-beta 通道保留不变——两线均为 prerelease，互不冲突）。
+      # ★ preview 线 pack 不带 --no-build——该线无前置 build 步（免门禁），pack 自带 restore+build
       - name: Pack (preview-v* = full family preview)
         if: startsWith(github.ref_name, 'preview-v')
         shell: bash
         run: |
+          set -e
           VERSION=${GITHUB_REF_NAME#preview-v}
-          dotnet pack src/TC.Tier.Contracts/TC.Tier.Contracts.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Core/TC.Tier.Core.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.CodeGen/TC.Tier.CodeGen.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.CodeGen.Abstractions/TC.Tier.CodeGen.Abstractions.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Analyzers/TC.Tier.Analyzers.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.CodeGen.Analyzers/TC.Tier.CodeGen.Analyzers.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Core.IO.S3/TC.Tier.Core.IO.S3.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Core.IO.Net/TC.Tier.Core.IO.Net.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Core.Net/TC.Tier.Core.Net.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Products/TC.Tier.Products.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
-          dotnet pack src/TC.Tier.Products.Net/TC.Tier.Products.Net.csproj -c Release --no-build --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Contracts/TC.Tier.Contracts.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Core/TC.Tier.Core.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.CodeGen/TC.Tier.CodeGen.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.CodeGen.Abstractions/TC.Tier.CodeGen.Abstractions.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Analyzers/TC.Tier.Analyzers.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.CodeGen.Analyzers/TC.Tier.CodeGen.Analyzers.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Core.IO.S3/TC.Tier.Core.IO.S3.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Core.IO.Net/TC.Tier.Core.IO.Net.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Core.Net/TC.Tier.Core.Net.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Products/TC.Tier.Products.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
+          dotnet pack src/TC.Tier.Products.Net/TC.Tier.Products.Net.csproj -c Release --nologo -o artifacts -p:Version=$VERSION
 
       - name: Upload packages
         uses: actions/upload-artifact@v4
