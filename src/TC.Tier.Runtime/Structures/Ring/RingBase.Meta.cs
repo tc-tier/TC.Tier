@@ -52,6 +52,7 @@ public abstract partial class RingBase<TKey>
     /// <para>★ 唯一消费者形态：TierKV 组合层登记 index 镜像锚点 W（先 Set 锚点、后触发水位提交——
     ///   崩溃窗口内锚点旧于数据，重放一段兜底，绝不锚点新于提交尾）。</para>
     /// </summary>
+    /// <param name="data">opaque meta 字节（stage 进策略缓冲，随下一次水位提交原子落盘；上限受 MetaOpaqueBytes 约束）。</param>
     public void SetOpaqueMeta(ReadOnlySpan<byte> data)
     {
         if (_settings.MetaPolicyKind == MetaPolicyKind.Disabled)
@@ -62,6 +63,7 @@ public abstract partial class RingBase<TKey>
     }
 
     /// <summary>读外部 opaque meta（最近已提交块；Empty = 无数据/未开启——空即答案）。</summary>
+    /// <returns>最近一次提交的 opaque meta 字节切片（未写入/未开启 meta 持久化时为空 span）。</returns>
     public ReadOnlySpan<byte> ReadOpaqueMeta() => MetaPolicy.ReadPayload();
 
     /// <summary>
@@ -97,7 +99,7 @@ public abstract partial class RingBase<TKey>
         TailAddress = TailAddress,
         LastCommittedSeq = LastCommittedSeq,
         LastPreparedSeq = LastPreparedSeq,
-        OverflowTailAddress = _overflowTailAddress,
+        OverflowTailAddress = SnapshotOverflowTailAddress(),
         KeySize = Unsafe.SizeOf<TKey>(),
         CommittedTailAddress = _txRollbackTail,   // ★ D2 Abort 回退点（Empty = 无待回滚窗口）
     };

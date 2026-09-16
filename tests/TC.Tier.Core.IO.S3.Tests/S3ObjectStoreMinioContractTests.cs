@@ -9,7 +9,8 @@ namespace TC.Tier.Core.IO.S3.Tests;
 /// S3ObjectStore 契约平权套——真实 S3 协议端点（MinIO 容器 / 真 S3）。
 /// <para>★ 门禁纪律（§7.4）：环境变量 <c>TIER_S3_TEST_ENDPOINT</c> 未设置时整套跳过（显式 Skip——
 ///   免费层假服务器 + 黄金向量全绿是接入真端点的前置门禁；跳过项在报告中可见，非静默隐藏）。</para>
-/// <para>★ dev_su 运行：<c>scripts/run-minio-tests.sh</c>（起 MinIO 容器 → 导出环境变量 → dotnet test）。</para>
+/// <para>★ dev_su 运行：<c>scripts/run-minio-tests.sh</c>（起 MinIO 容器 → 导出环境变量 → dotnet test）；
+///   真 COS 形态：<c>scripts/run-cos-tests.sh</c>（腾讯 COS S3 兼容层直连——vhost 寻址，凭据走 TENCENTCLOUD_* env）。</para>
 /// <para>★ 独立司法鉴定意义：MinIO（Go 实现）接受我们的签名 = SigV4 互操作性的真实验证。</para>
 /// </summary>
 public sealed class S3ObjectStoreMinioContractTests : ObjectStoreContractTests
@@ -69,9 +70,10 @@ internal sealed class PrefixedObjectStore(IObjectStore inner, string prefix) : I
 
     public async ValueTask<IReadOnlyList<ObjectEntry>> ListAsync(string? innerPrefix = null, CancellationToken ct = default)
     {
-        // 返回键剥前缀——命名空间视图对称（进出同键形）
+        // 返回键剥前缀——命名空间视图对称（进出同键形）；★ LastModified 必须透传
+        // （丢弃会被 HeadAndList_ReportLastModified 契约咬住——真 COS 端点实跑暴露）
         var entries = await inner.ListAsync(innerPrefix is null ? prefix : prefix + innerPrefix, ct);
-        return entries.Select(e => new ObjectEntry(e.Key[prefix.Length..], e.Size)).ToArray();
+        return entries.Select(e => new ObjectEntry(e.Key[prefix.Length..], e.Size, e.LastModified)).ToArray();
     }
 
     public ValueTask CopyAsync(string sourceKey, string destKey, CopyMetadata? metadata = null,

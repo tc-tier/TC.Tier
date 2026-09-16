@@ -107,7 +107,9 @@ public interface IFileHandle : IDisposable, IAsyncDisposable
 
     /// <summary>
     /// 物理打洞回收区间——文件大小不变，区间归零。
-    /// <para>★ 对齐契约：offset 与 length 必须按 <c>Volume.AllocationUnit</c> 对齐，未对齐抛 <see cref="IOError.AlignmentError"/>（两介质同校验）。</para>
+    /// <para>★ 字节粒度归零契约：offset 与 length 为任意字节值——完整块内部物理回收（打洞/discard），
+    ///   非对齐边缘写零（可观测等价读零）；区间越出文件长度抛 <see cref="IOError.IOFailure"/>。
+    ///   四介质同语义（Disk=FSCTL/边缘零写 / Mem=槽清零 / TierVolume=PunchHoleEntry/边缘零写 / Remote=对象洞）。</para>
     /// </summary>
     /// <param name="offset">打洞起点</param>
     /// <param name="length">打洞长度</param>

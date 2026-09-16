@@ -28,6 +28,9 @@ public readonly struct RecordKey<TKey>(TKey key, int valueLength, ushort flags, 
     /// <summary>Value 是否溢出到溢出设备（payload 含 AddressInfo，非内联 Value）。</summary>
     public bool IsOverflow => (flags & RecordFlags.FLAG_VALUE_OVERFLOW) != 0;
 
+    /// <summary>是否 meta record（水位块等内部记录——非用户数据，扫描/重放消费方过滤）。</summary>
+    public bool IsMeta => (flags & RecordFlags.FLAG_ENTRY_IS_META) != 0;
+
     /// <summary>是否墓碑记录（删除标记）。</summary>
     public bool IsTombstone => (flags & RecordFlags.FLAG_RINGRECORD_TOMBSTONE) != 0;
 }

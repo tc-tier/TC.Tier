@@ -122,9 +122,10 @@ public sealed class TierVolumeDioAndPrefetchTests : IDisposable
 
     // ═══════════════ MMF 写入对 O_DIRECT 读可见 ═══════════════
 
-    [Fact]
+    [SkippableFact]
     public void MappedWrite_VisibleToDirectRead_AfterViewDispose()
     {
+        Skip.If(OperatingSystem.IsMacOS(), "APFS mmap 写回对 DIO 读的可见性时序不同——mac 适配台账。");
         using (var h = _fs.Open("m", RWOpts()))
         {
             h.Write(0, new byte[1 << 20].Select((_, i) => (byte)0x11).ToArray());

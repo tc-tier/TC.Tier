@@ -52,7 +52,7 @@ public sealed partial class PagedMirror : MirrorBase
     /// <param name="page">页标识（per-page 链键）。</param>
     /// <param name="startPage">会话起始页（调用方页区间语义锚点——链模型按 PageId 寻址，不参与地址计算）。</param>
     /// <param name="pageBytes">页数据（&gt; PageSize 截断；&lt; PageSize 记 FLAG_LAST_PARTIAL）。</param>
-    /// <param name="logicalAddress">源页逻辑地址（随页透传）。</param>
+    /// <param name="logicalAddress">源页逻辑地址（随页透传）。默认 0。</param>
     /// <returns>帧头地址。</returns>
     public LogicalAddress WritePage(long page, long startPage, ReadOnlySpan<byte> pageBytes, long logicalAddress = 0)
     {

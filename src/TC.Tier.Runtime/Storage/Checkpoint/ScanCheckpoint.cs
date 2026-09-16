@@ -35,10 +35,13 @@ internal sealed partial class ScanCheckpoint(
 
     public bool HasSnapshot => false;
 
+    /// <summary>释放扫盘切面持有的资源（只读切面无外部句柄，空操作）。</summary>
     public void Dispose()
     {
     }
 
+    /// <summary>异步释放扫盘切面持有的资源（只读切面无外部句柄，空操作）。</summary>
+    /// <returns>已完成的 <see cref="ValueTask"/>。</returns>
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     /// <summary>进度上报辅助（Reader 内部调）。</summary>

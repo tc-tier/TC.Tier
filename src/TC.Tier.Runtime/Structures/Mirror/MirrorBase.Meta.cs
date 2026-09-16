@@ -11,6 +11,8 @@ public abstract partial class MirrorBase
     /// <summary>★ 登记外部 opaque meta——stage 进策略缓冲，随水位线落盘原子携带（设计决策：
     /// opaque 搭水位线的车，同一块同一 CRC；无独立提交路径，需确定性持久化点走 Prepare/ConfirmCommitted）。
     /// ⚠️ 写侧拦截：Disabled 抛 InvalidOperationException（禁用即报错）；超 MetaOpaqueBytes 策略抛 ArgumentException。</summary>
+    /// <param name="data">opaque meta 字节；长度须 ≤ MetaOpaqueBytes（超限由策略抛 ArgumentException）。
+    /// stage 后随下次水位提交原子落盘，本调用本身不产生 IO。</param>
     public void SetOpaqueMeta(ReadOnlySpan<byte> data)
     {
         if (_settings.MetaPolicyKind == MetaPolicyKind.Disabled)
@@ -21,6 +23,7 @@ public abstract partial class MirrorBase
     }
 
     /// <summary>读外部 opaque meta（最近已提交块；Empty = 无数据/未开启——空即答案）。</summary>
+    /// <returns>最近已提交 meta 块内的 opaque 字节视图；无数据或 MetaPolicyKind=Disabled 时为空 Span。</returns>
     public ReadOnlySpan<byte> ReadOpaqueMeta()
         => MetaPolicy.ReadPayload();
 
@@ -56,19 +59,45 @@ public abstract partial class MirrorBase
         public ushort CurrentVersion => MirrorMetaHeader.CurrentVersion;
         public ushort DefaultFlags => MirrorMetaHeader.DefaultFlags;
 
+        /// <summary>序列化 header 到 Span（validate=true 时校验 Magic/Version）。</summary>
+        /// <param name="dst">目标缓冲（长度 ≥ HeaderSize）。</param>
+        /// <param name="header">header 值。</param>
+        /// <param name="validate">是否校验 Magic/Version。</param>
         public void WriteHeader(Span<byte> dst, in MirrorMetaHeader header, bool validate)
             => MirrorMetaHeaderCodec.Write(dst, in header, validate);
 
+        /// <summary>从 Span 反序列化 header。</summary>
+        /// <param name="src">源缓冲（长度 ≥ HeaderSize）。</param>
+        /// <returns>解析出的 MirrorMetaHeader。</returns>
         public MirrorMetaHeader ReadHeader(ReadOnlySpan<byte> src) => MirrorMetaHeaderCodec.Read(src);
 
+        /// <summary>序列化 payload 到 Span。</summary>
+        /// <param name="dst">目标缓冲（长度 ≥ PayloadSize）。</param>
+        /// <param name="payload">payload 值。</param>
         public void WritePayload(Span<byte> dst, in MirrorMetaPayload payload) =>
             MirrorMetaPayloadCodec.Write(dst, in payload);
 
+        /// <summary>从 Span 反序列化 payload。</summary>
+        /// <param name="src">源缓冲（长度 ≥ PayloadSize）。</param>
+        /// <returns>解析出的 MirrorMetaPayload。</returns>
         public MirrorMetaPayload ReadPayload(ReadOnlySpan<byte> src) => MirrorMetaPayloadCodec.Read(src);
+        /// <summary>读 header 的 MagicValue（用于校验）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <returns>MagicValue 字段值。</returns>
         public uint GetMagicValue(in MirrorMetaHeader h) => h.MagicValue;
+        /// <summary>读 header 的 Version（用于校验）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <returns>Version 字段值。</returns>
         public ushort GetVersion(in MirrorMetaHeader h) => h.Version;
+        /// <summary>读 header 的 PayloadLength（用于计算 opaque 长度）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <returns>PayloadLength 字段值。</returns>
         public ushort GetPayloadLength(in MirrorMetaHeader h) => h.PayloadLength;
 
+        /// <summary>设置 header 的 PayloadLength（WritePayload 后按实际数据长度更新）。</summary>
+        /// <param name="h">header 值。</param>
+        /// <param name="len">新的 PayloadLength（字节）。</param>
+        /// <returns>更新后的 header。</returns>
         public MirrorMetaHeader WithPayloadLength(in MirrorMetaHeader h, ushort len)
         {
             var x = h;
@@ -76,6 +105,8 @@ public abstract partial class MirrorBase
             return x;
         }
 
+        /// <summary>创建一个填好规范字段（Magic/Version/Flags）的默认 header。</summary>
+        /// <returns>默认 MirrorMetaHeader（规范字段常量填好，其余字段为零）。</returns>
         public MirrorMetaHeader CreateDefaultHeader() => MirrorMetaHeaderCodec.Create();
     }
 
@@ -142,23 +173,32 @@ public abstract partial class MirrorBase
         /// <summary>最近一次扫描结果（字段持有——ReadLastBlock 返回的视图有效至本传输下一次调用）。</summary>
         private byte[]? _lastBlock;
 
+        /// <summary>扫最后一条嵌入 meta 帧并返回其 payload（meta block）。</summary>
+        /// <returns>meta block 字节视图（视图有效至本传输下一次调用）；无 meta 帧时为空 Span。</returns>
         public ReadOnlySpan<byte> ReadLastBlock()
         {
             _lastBlock = owner.ScanLastEmbeddedMetaBlockCore();
             return _lastBlock is null ? ReadOnlySpan<byte>.Empty : _lastBlock;
         }
 
-        public async ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct)
-        {
+        /// <summary>读回最后一条 meta block（异步形态——当前实现同步扫描完成即返回）。</summary>
+        /// <param name="ct">取消令牌（当前实现不检查取消）。</param>
+        /// <returns>meta block 字节视图（视图有效至本传输下一次调用）；无 meta 帧时为空 Memory。</returns>
+        public ValueTask<ReadOnlyMemory<byte>> ReadLastBlockAsync(CancellationToken ct)
+        {   // 非 async（零 await）——同步扫描完成即返回（CS1998）
             _lastBlock = owner.ScanLastEmbeddedMetaBlockCore();
-            return _lastBlock is null ? default : _lastBlock;
+            return new ValueTask<ReadOnlyMemory<byte>>(_lastBlock is null ? default : _lastBlock);
         }
 
         /// <summary>把 meta block 作为 IS_META 帧追加进宿主流（统一帧机制）。</summary>
+        /// <param name="block">完整 meta 块字节。</param>
         public void WriteBlock(ReadOnlySpan<byte> block)
             => owner.WriteEmbeddedMetaBlockCore(block);
 
         /// <summary>异步写 meta block（引擎写/flush 原生同步，实质等价）。</summary>
+        /// <param name="block">完整 meta 块字节。</param>
+        /// <param name="ct">取消令牌（当前实现不检查取消）。</param>
+        /// <returns>表示异步写入完成的任务；完成后 meta 帧已落盘（含引擎 flush）。</returns>
         public async ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct)
         {
             WriteBlock(block.Span);

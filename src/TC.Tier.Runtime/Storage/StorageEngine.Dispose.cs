@@ -11,15 +11,19 @@ namespace TC.Tier.Runtime.Storage;
 internal sealed partial class StorageEngine
 {
     /// <summary>★ 子类同步额外清理钩子——cancel+wait 后台 task + stop epoch worker + 物理资产收口。</summary>
+    /// <param name="disposing">true = 来自显式 Dispose（执行清理）；false = 终结器路径（直接返回，不做清理）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         if (!disposing) return;
+        // ★ 故障注入面先拆（Compact 活动窗的排他占住须先于段表/句柄释放；挂起点放行）
+        TeardownFaults();
         // ★ 池先关（第一拍）——防 worker 补建任务与 Resources.Dispose 竞态（释放后触碰 IO = 崩宿主）
         lock (_poolLock) _poolEnabled = false;
         // ★ 后台任务协同：触发所有 in-flight 后台任务取消 + 精确等全部退出（5s 超时兜底）
         CancelAndWaitBackgroundTasks();
         // ★ epoch drain worker 先停（C1：reader 已无，drain 安全退出）
         StopEpochProtection();
+        FlushPendingSegmentTuples();   // ★ 元组脏集同步排水（泵已停——Dispose 终局耐久化）
         // ★ IO 层段预备池清池（worker 已停，无补建竞态）——毁未消费余量物理段（架构约定：余量直接毁掉）
         SweepSegmentPoolOnDispose();
         // ★ 未满段元组补写（Ready 态且 maxOffset>0 的尾段——否则元组停在 0，预分配模式扫盘
@@ -41,12 +45,16 @@ internal sealed partial class StorageEngine
     }
 
     /// <summary>★ 异步额外清理——同同步版。</summary>
+    /// <param name="disposing">true = 来自显式 DisposeAsync（执行清理）；false = 终结器路径（直接返回，不做清理）。</param>
+    /// <returns>全部清理步骤（取消等待后台任务、停 epoch worker、元组排水、清池、补写元组、唤醒等待者、句柄收口）完成后完成。</returns>
     protected override async ValueTask DisposeOverrideAsync(bool disposing)
     {
         if (!disposing) return;
+        TeardownFaults(); // ★ 故障注入面先拆（排他占住先于段表/句柄释放；挂起点放行）
         lock (_poolLock) _poolEnabled = false;   // ★ 池先关（防补建与释放竞态）
         await CancelAndWaitBackgroundTasksAsync().ConfigureAwait(false);
         StopEpochProtection(); // ★ epoch drain worker 先停
+        FlushPendingSegmentTuples();   // ★ 元组脏集同步排水（泵已停——Dispose 终局耐久化）
         SweepSegmentPoolOnDispose();
         WriteUnfinishedSegmentTuples();
         try
@@ -63,7 +71,7 @@ internal sealed partial class StorageEngine
 
     /// <summary>
     /// 未满 Written 段的元组补写（Dispose 联动，FileExtra 同步强一致）。
-    /// <para>★ Full 段已在 OnSegmentFull 落盘；Invalid/Empty 段无意义跳过。</para>
+    /// <para>★ Full 段元组随耐久化泵/脏集排水已落盘；Invalid/Empty 段无意义跳过。</para>
     /// </summary>
     private void WriteUnfinishedSegmentTuples()
     {
@@ -95,9 +103,9 @@ internal sealed partial class StorageEngine
         {
             try
             {
-#pragma warning disable TCSG031 // 设计必需：Dispose 等后台任务（有界超时）
+#pragma warning disable TCSG137 // 设计必需：Dispose 等后台任务（有界超时）
                 t.Wait(TimeSpan.FromSeconds(5));
-#pragma warning restore TCSG031
+#pragma warning restore TCSG137
             }
             catch
             {

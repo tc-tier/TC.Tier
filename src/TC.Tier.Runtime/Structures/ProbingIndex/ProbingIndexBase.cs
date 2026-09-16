@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using NativeInt128 = TC.Tier.Core.NativeInterop.Int128;
+using NativeInt128 = TC.Tier.Core.NativeInterop.UInt128Pair;
 using TC.Tier.Contracts.Structures;
 
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
@@ -29,7 +29,7 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
     private readonly IFileSystem _fileSystem;
     private protected readonly ProbingIndexSettings _settings;
     /// <summary>测试可观测位：上次恢复是否走了主存储载入路径（false=全量重放 fail-safe）。</summary>
-    internal bool MainStorageAppliedLastRecovery { get; private protected set; }
+    public bool MainStorageAppliedLastRecovery { get; private protected set; }
     private protected int SectorSize { get; }
 
     private protected LogicalAddress _beginAddress;
@@ -99,6 +99,43 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         var old = Unsafe.As<LogicalAddress, NativeInt128>(ref expected);
         var @new = Unsafe.As<LogicalAddress, NativeInt128>(ref desired);
         return NativeAtomic128.CompareExchange(ref loc, old, @new);
+    }
+
+    /// <summary>
+    /// ★ 槽稳定读（撕裂收口）：<see cref="LogicalAddress"/> 是 16B 结构——C# 内存模型不承诺普通读
+    ///   不撕裂（JIT 可拆两条 8B mov），而并发 Insert/Delete 的 16B CAS 恰可夹住一次读的两半。
+    ///   协议 = 双读比对（16B 全等，含 Extension）——两读结果一致才接受；不一致（撕裂嫌疑）
+    ///   走 CAS 环读兜底（<see cref="ReadSlotAtomic"/>——读到一致快照为止）。
+    ///   稳态成本 = 一次额外读 + 比较；写竞争下才付 CAS。
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private protected static LogicalAddress ReadSlotStable(ref LogicalAddress slot)
+    {
+        var first = slot;
+        var again = slot;
+        return Equals16(in first, in again) ? first : ReadSlotAtomic(ref slot);
+    }
+
+    /// <summary>16B 全等（含 Extension——<see cref="LogicalAddress.Equals(LogicalAddress)"/> 只比 SegId/Offset 不够）。</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private protected static bool Equals16(in LogicalAddress a, in LogicalAddress b)
+        => a.SegId == b.SegId && a.Extension == b.Extension && a.Offset == b.Offset;
+
+    /// <summary>
+    /// 128bit 原子读（CAS 环：compare-exchange 同值——成功=读到一致快照；失败=槽被写者触碰，重读）。
+    /// 供主存储 fuzzy dump（Persistence）与撕裂兜底共用。
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private protected static LogicalAddress ReadSlotAtomic(ref LogicalAddress slot)
+    {
+        ref var loc = ref Unsafe.As<LogicalAddress, NativeInt128>(ref slot);
+        while (true)
+        {
+            var v = slot;
+            if (NativeAtomic128.CompareExchange(ref loc, Unsafe.As<LogicalAddress, NativeInt128>(ref v),
+                    Unsafe.As<LogicalAddress, NativeInt128>(ref v)))
+                return v;
+        }
     }
 
     private protected void ResumeEpoch() => _epoch.Resume();
@@ -188,6 +225,8 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         }
 
         /// <summary>scope 内单查（FindNoEpoch 转发）——epoch 已由 scope 持有，省逐次 Resume/Suspend（~10ns/op）。</summary>
+        /// <param name="key">查找键。</param>
+        /// <returns>命中 = value 逻辑地址；未命中 = <see cref="LogicalAddress.Empty"/>。</returns>
         public LogicalAddress Find(TKey key) => _owner.FindNoEpoch(key);
 
         /// <summary>退出 scope（Suspend epoch——与 EnterScope 的 Resume 成对）。</summary>

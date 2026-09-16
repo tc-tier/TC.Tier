@@ -19,6 +19,8 @@ public ref struct MonitorScope
     private readonly object _gate;
 
     /// <summary>获取 Monitor 的 scope（using 块自动 Enter/Exit，零分配）。</summary>
+    /// <param name="gate">锁对象（任意引用类型实例；同一对象上 Enter/Exit 须同线程配对）。</param>
+    /// <returns>已持有 <paramref name="gate"/> 锁的 scope，using 块结束时 <see cref="Dispose"/> 释放。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static MonitorScope Enter(object gate) => new(gate);
 

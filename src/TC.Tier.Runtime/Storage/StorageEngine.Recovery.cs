@@ -5,6 +5,7 @@ internal sealed partial class StorageEngine
     /// <summary>
     /// 恢复算法工厂——统一扫盘恢复（全介质同构：空目录 ⇒ 零段 ⇒ 合成 seg0；mem 卷新进程天然如此）。
     /// </summary>
+    /// <returns>绑定本引擎的默认恢复器 <see cref="DefaultEngineRecovery"/>。</returns>
     protected override IRecovery<EngineRecoveryHints> CreateRecovery() => new DefaultEngineRecovery(this);
     /// <summary>
     /// 默认引擎恢复——基类默认实现：合成单段 seg0（内存/null 引擎用）。
@@ -12,9 +13,15 @@ internal sealed partial class StorageEngine
     /// </summary>
     private sealed class DefaultEngineRecovery(StorageEngine owner) : RecoveryBase<EngineRecoveryHints>
     {
-        /// <summary>构造——捕获 owner（引擎引用）。</summary>
+        /// <summary>恢复核心——恢复读/写地址表（Reader/Writer）并启动 epoch 保护。</summary>
+        /// <param name="hints">恢复 hints（注入已知水位；default 表示全量扫盘）。</param>
+        /// <param name="ct">取消令牌（各阶段前显式检查）。</param>
+        /// <returns>恢复流程完成（含 epoch 保护已启动）后完成。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(EngineRecoveryHints hints, CancellationToken ct)
         {
+            // ★ 注入恢复窗（EngineFaultState.RecoveringWindow）——窗存续期间恢复核心延后启动
+            //   （上层 WaitForReady/超时容忍路径的确定性验证），Reset 放行。
+            await owner.WaitRecoveryWindowAsync(ct).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             RaiseProgress(10, "config");
             ct.ThrowIfCancellationRequested();

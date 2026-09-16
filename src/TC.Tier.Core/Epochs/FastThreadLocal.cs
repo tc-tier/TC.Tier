@@ -38,6 +38,8 @@ internal sealed class FastThreadLocal<T>
         throw new InvalidOperationException("Unsupported number of simultaneous instances");
     }
 
+    /// <summary>为当前线程初始化本实例的线程局部槽位：懒分配 thread-local 数组并将本实例槽位值
+    /// 重置为 <c>default</c>；本线程已初始化过则无操作。</summary>
     public void InitializeThread()
     {
         if (_tlValues == null)
@@ -51,6 +53,7 @@ internal sealed class FastThreadLocal<T>
         _tlValues![_offset] = default!;
     }
 
+    /// <summary>释放当前线程在本实例槽位上的线程局部值：值置回 <c>default</c> 并清除槽位的实例标记。</summary>
     public void DisposeThread()
     {
         _tlValues![_offset] = default!;

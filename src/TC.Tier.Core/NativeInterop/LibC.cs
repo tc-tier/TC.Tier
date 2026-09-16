@@ -10,9 +10,6 @@ namespace TC.Tier.Core.NativeInterop;
 /// </summary>
 internal static unsafe partial class LibC
 {
-    /// <summary>★ O_DSYNC 可用性探测结果缓存。Linux 2.4.20+（2002 年）普遍可用,首次解析后缓存。</summary>
-    private static int _oDsyncProbed; // 0=未探测,1=可用,2=不可用
-
     // ══ libc P/Invoke 声明（统一 [LibraryImport] + NativeLibraries.Libc 常量）══
     /// <summary>
     /// open(2) - 打开文件，返回文件描述符。
@@ -85,7 +82,7 @@ internal static unsafe partial class LibC
     internal const int FALLOC_FL_PUNCH_HOLE = 0x02;
 
     /// <summary>
-    /// statvfs(2) 返回结构体（POSIX，glibc/Linux x64 布局）。
+    /// statvfs(2) 返回结构体（POSIX，glibc/Linux x64 布局，112B = 11 字段 + __f_spare[6]）。
     /// <para>★ <see cref="FrSize"/>（f_frsize）是基本块大小，用于查 DIO 对齐扇区大小；
     ///   <see cref="FBsize"/>（f_bsize）是文件系统首选块大小，f_frsize 更接近物理扇区。</para>
     /// <para>★ 长度必须与 C struct statvfs 精确匹配（out 参数传递指针，长度不匹配导致内存破坏/AccessViolation）。</para>
@@ -104,20 +101,73 @@ internal static unsafe partial class LibC
         public ulong FFsid;
         public ulong FFlag;     // f_flag: 挂载标志
         public ulong FNamemax;  // f_namemax: 最大文件名长度
-        private ulong _spare0;  // __f_spare[0..1]
+        private ulong _spare0;  // __f_spare[0..1]（Linux glibc 独有）
         private ulong _spare1;  // __f_spare[2..3]
         private ulong _spare2;  // __f_spare[4..5]
     }
 
     /// <summary>
+    /// statvfs(2) 返回结构体（Darwin/macOS 布局，88B = 11 字段，无 __f_spare）。
+    /// <para>★ STORAGE-118 收口：Darwin `sys/statvfs.h` 的 11 个字段（含 f_favail、8B f_fsid）
+    ///   与 glibc 前缀逐字段同序同宽，唯尾部无 24B 的 __f_spare——用 Linux 结构承载会在
+    ///   macOS 上多读 24B（spare 字段读到栈垃圾；虽当前无消费方，仍按平台精确布局）。</para>
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct StatvfsDataMac
+    {
+        public ulong FBsize;
+        public ulong FrSize;
+        public ulong FBlocks;
+        public ulong FBfree;
+        public ulong FBavail;
+        public ulong FFiles;
+        public ulong FFfree;
+        public ulong FFavail;
+        public ulong FFsid;
+        public ulong FFlag;
+        public ulong FNamemax;
+    }
+
+    [LibraryImport(NativeLibraries.Libc, EntryPoint = "statvfs", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int StatvfsLinux(string path, out StatvfsData sv);
+
+    [LibraryImport(NativeLibraries.Libc, EntryPoint = "statvfs", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    private static partial int StatvfsMac(string path, out StatvfsDataMac sv);
+
+    /// <summary>
     /// statvfs(2) — 查询文件系统信息（Linux/macOS 共享，POSIX 标准）。
+    /// <para>★ 平台分派：macOS 用 88B 的 <see cref="StatvfsDataMac"/>（Darwin 实际结构尺寸），
+    ///   Linux 用 112B 的 <see cref="StatvfsData"/>（glibc 含 __f_spare）；两边读出的字段语义一致。</para>
     /// <para>用于查 <c>f_frsize</c>（基本块大小）作 DIO 对齐扇区大小的近似。</para>
     /// </summary>
     /// <param name="path">文件或目录路径（须已存在）。</param>
-    /// <param name="sv">输出：文件系统信息结构体。</param>
+    /// <param name="sv">输出：文件系统信息结构体（平台归一化后的公共字段）。</param>
     /// <returns>0 成功；-1 失败（errno 见 ENOENT=路径不存在）。</returns>
-    [LibraryImport(NativeLibraries.Libc, EntryPoint = "statvfs", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial int Statvfs(string path, out StatvfsData sv);
+    internal static int Statvfs(string path, out StatvfsData sv)
+    {
+        if (OperatingSystem.IsMacOS())
+        {
+            int rc = StatvfsMac(path, out var mac);
+            sv = rc == 0
+                ? new StatvfsData
+                {
+                    FBsize = mac.FBsize,
+                    FrSize = mac.FrSize,
+                    FBlocks = mac.FBlocks,
+                    FBfree = mac.FBfree,
+                    FBavail = mac.FBavail,
+                    FFiles = mac.FFiles,
+                    FFfree = mac.FFfree,
+                    FFavail = mac.FFavail,
+                    FFsid = mac.FFsid,
+                    FFlag = mac.FFlag,
+                    FNamemax = mac.FNamemax,
+                }
+                : default;
+            return rc;
+        }
+        return StatvfsLinux(path, out sv);
+    }
 
     // ══ Linux managed helpers（原 Linux.cs，保持公共 API）══
 
@@ -148,31 +198,25 @@ internal static unsafe partial class LibC
     }
 
     /// <summary>
-    /// 解析 O_DSYNC 可用性，返回适合的同步标志（O_DSYNC 或 O_SYNC）。
+    /// 解析同步标志——返回 O_DSYNC（数据同步写）。
+    /// <para>★ STORAGE-116 收口：原实现维护"探测结果缓存"（_oDsyncProbed：未探测/可用/不可用）
+    /// 但从不实际探测——default 分支直接假定可用，属名义探测。现移除伪状态机，
+    /// Linux 2.4.20+ / macOS 均原生支持 O_DSYNC，直接返回；若未来需适配缺失平台，
+    /// 在此加真实能力探测（open 试探 + 缓存），而非空转状态。</para>
     /// </summary>
-    /// <returns>适合的同步标志（O_DSYNC 或 O_SYNC）</returns>
-    private static int ResolveSyncFlag()
-    {
-        var probed = Interlocked.CompareExchange(ref _oDsyncProbed, 0, 0);
-        switch (probed)
-        {
-            case 1:
-                return NativeConstants.ODsync;
-            case 2:
-                return NativeConstants.OSync;
-            default:
-                Interlocked.Exchange(ref _oDsyncProbed, 1);
-                return NativeConstants.ODsync;
-        }
-    }
+    /// <returns>同步标志（O_DSYNC）</returns>
+    private static int ResolveSyncFlag() => NativeConstants.ODsync;
 
     // ══ macOS managed helpers（原 macOS.cs，保持公共 API）══
 
     /// <summary>
-    /// macOS 特有的 fcntl(fd, F_NOCACHE) —— 禁止文件缓存，避免占用系统页缓存。
+    /// macOS 特有的 fcntl(fd, F_NOCACHE) + fcntl(fd, F_RDAHEAD, 0) —— 禁止文件缓存并关读预读，
+    /// 避免占用系统页缓存（BestEffort hint——APFS/HFS 接受，NFS/SMB 静默忽略，探测归 Ignored）。
+    /// <para>★ 两项缺一不可：F_NOCACHE 只管"读过的数据不缓存"，预读由 F_RDAHEAD 独立控制——
+    /// 不关则读路径仍按预读窗口（默认 128KB 档）把额外数据拉进缓存，与 DIO 的"读多少进多少"形态偏离。</para>
     /// </summary>
     /// <param name="handle">文件句柄</param>
-    /// <param name="logger">可选的日志记录器</param>
+    /// <param name="logger">可选日志记录器</param>
     internal static void TryEnableNoCache(SafeFileHandle handle, ILogger? logger = null)
     {
         if (!OperatingSystem.IsMacOS()) return;
@@ -194,6 +238,12 @@ internal static unsafe partial class LibC
             {
                 var err = Marshal.GetLastPInvokeError();
                 logger?.LogError("device.macos", err, $"F_NOCACHE fcntl returned {rc}, errno={err}");
+            }
+            rc = Fcntl(fd, NativeConstants.FRdahead, 0);
+            if (rc != 0)
+            {
+                var err = Marshal.GetLastPInvokeError();
+                logger?.LogError("device.macos", err, $"F_RDAHEAD(off) fcntl returned {rc}, errno={err}");
             }
         }
         catch (Exception ex)
@@ -511,6 +561,26 @@ internal static unsafe partial class LibC
 
     [LibraryImport(NativeLibraries.Libc, EntryPoint = "removexattr", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
     internal static partial int Removexattr(string path, string name);
+
+    // ★ macOS removexattr 是 3 参（多 options）——与 Linux 2 参同样不兼容（初判"两平台同 2 参"有误，
+    //   FileExtra 清除语义静默失败实锤）。
+
+    [LibraryImport(NativeLibraries.Libc, EntryPoint = "removexattr", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial int RemovexattrMac(string path, string name, int options);
+
+    // ══ macOS xattr——Darwin 6 参 ABI（setxattr/getxattr 多 position+options 两参）══
+    // ★ 与 Linux 5/4 参签名不兼容：按 Linux 签名调用 macOS 时 native 从寄存器读垃圾作 options，
+    //   行为随 JIT 分配漂移（同代码有时"碰巧成功"——Default_IsFallback mac 闪失实锤）。
+    //   removexattr 两平台同 2 参，无需分化。
+
+    [LibraryImport(NativeLibraries.Libc, EntryPoint = "setxattr", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial int SetxattrMac(string path, string name, byte* value, uint size, uint position, int options);
+
+    [LibraryImport(NativeLibraries.Libc, EntryPoint = "getxattr", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial long GetxattrMac(string path, string name, byte[]? value, ulong size, uint position, int options);
+
+    [LibraryImport(NativeLibraries.Libc, EntryPoint = "getxattr", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
+    internal static unsafe partial long GetxattrMac(string path, string name, byte* value, ulong size, uint position, int options);
 
     // ══ lseek SEEK_DATA/SEEK_HOLE — 查询稀疏文件的物理空洞位置 ══
     // 用于 Compact 搬迁时排除 PunchHole 打的洞（只搬有数据的区间）。

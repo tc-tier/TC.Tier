@@ -1,6 +1,8 @@
 using System.Diagnostics;
 using Xunit.Abstractions;
 
+using TC.Tier.Core.Tests;
+using Skip = Xunit.Skip;
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
@@ -100,9 +102,10 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>契约①②③④⑤：多轮 append→打洞删→追赶整理——数据完好、前缀稳定、空洞闭合、逻辑序保持、老地址读零。</summary>
-    [Fact]
+    [SkippableFact]
     public async Task ChaseRounds_DataIntact_SettledPrefixStable_HolesClosed()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         var vol = NewVol();
         using var dev = new StorageEngineOptions( DeviceName, segmentGrowthLimit: Growth).WithPreallocateFile(false).Builder(vol.Fs, logger: TestConsoleLogger.Instance).Start();
         dev.WaitForReady();
@@ -188,9 +191,10 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
     }
 
     /// <summary>契约④强化：整理后顺序读 [起点, cursor) 逐 512B 步进 == 存活记录按追加序的精确拼接。</summary>
-    [Fact]
+    [SkippableFact]
     public async Task AfterChase_SequentialRead_ReturnsExactOrderedConcatenation()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         var vol = NewVol();
         using var dev = new StorageEngineOptions( DeviceName, segmentGrowthLimit: Growth).WithPreallocateFile(false).Builder(vol.Fs, logger: TestConsoleLogger.Instance).Start();
         dev.WaitForReady();
@@ -250,9 +254,10 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
     }
 
     /// <summary>契约⑥：整理进行时并发 Append 不中断、不丢、不坏——使用方模型的并发交织面。</summary>
-    [Fact]
+    [SkippableFact]
     public async Task AppendDuringChaseCompaction_NeverInterrupted_DataIntact()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         var vol = NewVol();
         using var dev = new StorageEngineOptions( DeviceName, segmentGrowthLimit: Growth).WithPreallocateFile(false).Builder(vol.Fs, logger: TestConsoleLogger.Instance).Start();
         dev.WaitForReady();
@@ -347,9 +352,10 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
     }
 
     /// <summary>契约⑦：A7 Broken 空洞落在整理窗口内——行为必须确定（当前引擎行为探针，见断言）。</summary>
-    [Fact]
+    [SkippableFact]
     public async Task BrokenHoleInsideChaseWindow_BehaviorIsDeterministic()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         var vol = NewVol();
         var seg2RelPath = $"{DeviceName}/{DeviceName}.2";   // ★ 注入用相对路径
         vol.Fs.CreateDirectory(seg2RelPath);   // 注入：seg2 建段必失败

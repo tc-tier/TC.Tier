@@ -1,12 +1,107 @@
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// BTreeIndex 删除 partial——单键 Delete 与键序前缀批量删 TruncatePrefix（retention trim）。
+/// </summary>
 public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
+    /// <summary>
+    /// 键序前缀批量删——删除全部 key &lt; <paramref name="boundExclusive"/> 的条目（retention trim 专用），
+    /// O(路径 + 覆盖叶数) 批量完成而非逐键 Delete 的 O(k·log n)。
+    /// <para>★ 算法：Find 同形下降到 bound 的归属叶（沿途记录各层节点+下降位）——归属叶内前段
+    ///   （首个 ≥ bound 槽位之前）整段摘除；路径每层左侧完全覆盖子树（c[0..i-1]，键域全 &lt; bound）
+    ///   逐叶清零（结构保留——与单键 Delete 同款不重平衡哲学：叶可 Count=0，查询侧空叶容忍
+    ///   由游标/前驱算法保证）。节点空间不回收（引擎中段回收=独立课题，现状与单键删除等价）。</para>
+    /// </summary>
+    /// <param name="boundExclusive">边界键（不含）——全部 key &lt; 此值的条目被删除。</param>
+    /// <returns>删除条数。</returns>
+    public override long TruncatePrefix(TKey boundExclusive)
+    {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥——路径摘除/叶清零一致性）
+        _epoch.Resume();
+        try
+        {
+            if (_rootAddress == LogicalAddress.Empty) return 0;
+
+            Span<(LogicalAddress NodeAddr, int Index)> path = stackalloc (LogicalAddress, int)[MaxDescentPath];
+            int depth = 0;
+            var node = _cachedRoot;
+            var nodeAddr = _rootAddress;
+            while (!node.IsLeaf)
+            {
+                int i;
+                for (i = 0; i < node.Count; i++)
+                {
+                    if (KeyComparer.Compare(boundExclusive, node.GetKey(i)) < 0) break;
+                }
+                path[depth++] = (nodeAddr, i);
+                nodeAddr = node.GetValue(i);
+                node = GetInternalNode(nodeAddr);
+            }
+
+            long deleted = 0;
+
+            // 路径各层左侧完全覆盖子树：逐叶清零 + 计数（层间子树互斥，并集 = 全部 key < bound 的条目）
+            for (int d = 0; d < depth; d++)
+            {
+                var (ancAddr, ancIndex) = path[d];
+                var anc = GetInternalNode(ancAddr);
+                for (int j = 0; j < ancIndex; j++)
+                {
+                    deleted += ClearSubtreeLeaves(anc.GetValue(j));
+                }
+            }
+
+            // 归属叶内前段摘除（首个 ≥ bound 槽位之前）
+            int pos = 0;
+            while (pos < node.Count && KeyComparer.Compare(node.GetKey(pos), boundExclusive) < 0)
+                pos++;
+            if (pos > 0)
+            {
+                node.ShiftLeft(pos, 0, node.Count);   // 前段左移出（后段整体前移 pos 位）
+                node.Count -= (ushort)pos;
+                WriteNodeContent(nodeAddr, node);
+                if (nodeAddr == _rootAddress) _cachedRoot = node;
+                else RefreshCache(nodeAddr, node);
+                deleted += pos;
+            }
+
+            if (deleted > 0)
+                Interlocked.Add(ref _entryCount, -deleted);
+            return deleted;
+        }
+        finally
+        {
+            _epoch.Suspend();
+        }
+    }
+
+    /// <summary>子树逐叶清零（internal 结构保留路由，叶 Count=0）——返回清零条数。</summary>
+    private long ClearSubtreeLeaves(LogicalAddress subtreeRoot)
+    {
+        var node = GetInternalNode(subtreeRoot);
+        if (node.IsLeaf)
+        {
+            if (node.Count == 0) return 0;
+            long n = node.Count;
+            node.Count = 0;
+            WriteNodeContent(subtreeRoot, node);
+            RefreshCache(subtreeRoot, node);
+            return n;
+        }
+
+        long total = 0;
+        for (int j = 0; j <= node.Count; j++)
+            total += ClearSubtreeLeaves(node.GetValue(j));
+        return total;
+    }
+
     /// <summary>删除条目——叶根直接移除；internal 树沿 Find 同路径下降到含 key 叶子移除（epoch 读保护内；本轮不重平衡）。</summary>
     /// <param name="key">条目键。</param>
     /// <returns>true = 真删到；false = 不存在。</returns>
     public override bool Delete(TKey key)
     {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥）
         _epoch.Resume();
         try
         {

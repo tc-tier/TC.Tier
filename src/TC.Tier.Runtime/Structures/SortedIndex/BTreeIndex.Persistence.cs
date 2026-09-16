@@ -1,7 +1,7 @@
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 
+using TC.Tier.Runtime.Structures.SortedIndex.Layout;
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 /// <summary>
@@ -44,11 +44,16 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
         }
         _dirtyNodes.Clear();
 
-        // 几何（32B——root/计数/布局自检，恢复直接物化）
+        // 几何（32B——root/计数/布局自检，恢复直接物化；读写唯一路径 = 生成 Codec）
         Span<byte> geo = stackalloc byte[PersistGeometrySize];
-        MemoryMarshal.Write(geo, in _rootAddress);
-        BinaryPrimitives.WriteInt64LittleEndian(geo.Slice(16), Volatile.Read(ref _entryCount));
-        BinaryPrimitives.WriteInt32LittleEndian(geo.Slice(24), Unsafe.SizeOf<BTreeNode>());
+        BTreeIndexGeometryCodec.Write(geo, new BTreeIndexGeometry
+        {
+            RootSegId = _rootAddress.SegId,
+            RootExtension = _rootAddress.Extension,
+            RootOffset = _rootAddress.Offset,
+            EntryCount = Volatile.Read(ref _entryCount),
+            NodeStructSize = Unsafe.SizeOf<BTreeNode>(),
+        });
         WriteBodyChunk(geo);
     }
 
@@ -73,9 +78,10 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 
         Span<byte> geo = stackalloc byte[PersistGeometrySize];
         if (_engine.Read(_engine.CalculationAddress(head, headerSize), geo) < PersistGeometrySize) return false;
-        var rootAddr = MemoryMarshal.Read<LogicalAddress>(geo);
-        long count = BinaryPrimitives.ReadInt64LittleEndian(geo.Slice(16));
-        int structSize = BinaryPrimitives.ReadInt32LittleEndian(geo.Slice(24));
+        var geometry = BTreeIndexGeometryCodec.Read(geo);
+        var rootAddr = new LogicalAddress(geometry.RootSegId, geometry.RootExtension, geometry.RootOffset);
+        long count = geometry.EntryCount;
+        int structSize = geometry.NodeStructSize;
         if (structSize != Unsafe.SizeOf<BTreeNode>()) return false;   // TKey 布局不符=别的流
         if (count < 0) return false;
         if (bodyLen != PersistGeometrySize) return false;

@@ -36,7 +36,7 @@ internal sealed class MockKeyResolver<TKey> : IKeyResolver<TKey>
 
     public LogicalAddress GetFlushedWatermark() => FlushedWatermark;
 
-    public async IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAsync(
+    public async IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(
         LogicalAddress begin, LogicalAddress end,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -45,21 +45,21 @@ internal sealed class MockKeyResolver<TKey> : IKeyResolver<TKey>
         {
             ct.ThrowIfCancellationRequested();
             if (addr >= begin && addr < end)
-                yield return (key, addr);
+                yield return (key, addr, false);
         }
     }
 
-    public IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAsync(CancellationToken ct = default)
+    public IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(CancellationToken ct = default)
         => ScanAll(ct);
 
-    private async IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAll(
+    private async IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAll(
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         await Task.CompletedTask;
         foreach (var (addr, key) in _ordered)
         {
             ct.ThrowIfCancellationRequested();
-            yield return (key, addr);
+            yield return (key, addr, false);
         }
     }
 }

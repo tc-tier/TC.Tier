@@ -8,12 +8,17 @@ using TC.Tier.Core.IO.Shared;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
+/// <summary>TierVolumeFs partial——多载体成员装配（在线扩容 AddCarrier / 缩容 RemoveCarrier）。</summary>
 public sealed partial class TierVolumeFs
 {
     // ═══════════════ 多载体操作族（RM-04 §3.8——扩容/缩容）═══════════════
 
     /// <summary>在线扩容 = 加载体（§3.8）：成员表事务（检查点原子持久）→ 新块立即可用。
     /// 新成员容量须 64 块对齐（位字不跨成员）；设备载体容量自几何，文件载体必填 capacityBytes。</summary>
+    /// <param name="carrier">要并入的载体（须非 TC 卷成员）。</param>
+    /// <param name="capacityBytes">文件成员容量（字节，必填且 &gt;0；设备成员忽略——容量自几何）。</param>
+    /// <exception cref="ArgumentException">文件成员未声明 capacityBytes。</exception>
+    /// <exception cref="FileIOException">成员表满、快照在档、几何不兼容或载体已是 TC 卷成员。</exception>
     public void AddCarrier(TierVolumeCarrier carrier, long capacityBytes = 0)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -213,6 +218,10 @@ public sealed partial class TierVolumeFs
 
     /// <summary>缩容 = 减载体（§3.8 v1：仅允许移除全空成员——位图全零校验）。
     /// 成员表事务（检查点原子）；被移成员后续载体作废（含 RAWC 头）。</summary>
+    /// <param name="memberIndex">成员索引（0 基；0 = 主载体不可移除）。</param>
+    /// <exception cref="ArgumentException">主载体（成员 0）不可移除。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">索引超成员表范围。</exception>
+    /// <exception cref="FileIOException">快照存在期间拒绝成员增减。</exception>
     public void RemoveCarrier(int memberIndex)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -312,6 +321,7 @@ public sealed partial class TierVolumeFs
     private sealed class NoOpLease : IDisposable
     {
         public static readonly NoOpLease Instance = new();
+        /// <summary>no-op 租约释放（无资源）。</summary>
         public void Dispose() { }
     }
 

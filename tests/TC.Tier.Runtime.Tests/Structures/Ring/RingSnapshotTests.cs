@@ -170,4 +170,40 @@ public class RingSnapshotTests
         }
         finally { vol.Dispose(); }
     }
+
+    /// <summary>★ STORAGE-036 回归：热区（未落盘）跨页读取——单次 Read 缓冲大于页且区间跨多页，
+    /// 页边界钳制后热读结果必须与落盘冷读逐字节一致（修复前 ReadHot 跨页越读邻接 native 分配）。</summary>
+    [Fact]
+    public void Snapshot_ReadHot_CrossPage_MatchesColdRead()
+    {
+        var vol = new TestVolume();
+        try
+        {
+            using var ring = TestRingSettingsFactory.NewRing<long>(vol,
+                TestRingSettingsFactory.On(vol, "snap.hot", deleteOnClose: false));
+
+            // 64 条 × (header+payload+padding) ≈ 20KB > 4 页（PageSize=4K）
+            for (long k = 1; k <= 64; k++)
+                ring.Write(k, TestRingSettingsFactory.MakePattern((byte)k, 256));
+
+            byte[] ReadAll(int bufferSize)
+            {
+                using var reader = ring.OpenSnapshotReader();
+                var ms = new System.IO.MemoryStream();
+                var buf = new byte[bufferSize];
+                int n;
+                while ((n = reader.Read(buf)) > 0)
+                    ms.Write(buf, 0, n);
+                return ms.ToArray();
+            }
+
+            var hot = ReadAll(16 * 1024);           // addr ≥ FlushedUntil → ReadHot（单次跨多页）
+            ring.FlushUntil(ring.TailAddress);      // 落盘后同区间走 ReadCold
+            var cold = ReadAll(16 * 1024);
+
+            hot.Length.Should().BeGreaterThan(4096, "快照区间应跨越多页（PageSize=4K）");
+            hot.Should().Equal(cold, "热读与落盘冷读必须逐字节一致（页边界钳制回归）");
+        }
+        finally { vol.Dispose(); }
+    }
 }

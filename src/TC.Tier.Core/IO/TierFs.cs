@@ -66,12 +66,19 @@ public static partial class TierFs
     /// <summary>
     /// 懒初始化糖（bind-any 终态——设计 §2.3）：不存在/未格式化则建，存在则开。显式表达"我接受两种状态"。
     /// </summary>
+    /// <param name="spec">镜像的规格字符串</param>
+    /// <param name="logger">日志记录器</param>
+    /// <returns>已存在则打开、否则创建的文件系统实例</returns>
     public static IFileSystem OpenOrCreate(string spec, ILogger? logger = null)
         => Build(TierSpec.Parse(spec), null, TierFsVerb.OpenOrCreate, logger);
 
     /// <summary>
     /// 懒初始化糖——**spec 定身份 + options 补调优的合流点**（New/Open 同款优先级）。
     /// </summary>
+    /// <param name="spec">镜像的规格字符串</param>
+    /// <param name="options">文件系统的选项</param>
+    /// <param name="logger">日志记录器</param>
+    /// <returns>已存在则打开、否则创建的文件系统实例</returns>
     public static IFileSystem OpenOrCreate(string spec, FileSystemOptions options, ILogger? logger = null)
         => Build(TierSpec.Parse(spec), options, TierFsVerb.OpenOrCreate, logger);
 
@@ -291,9 +298,4 @@ public static partial class TierFs
             s.Label ?? o.Label,
             s.QuotaBytes != -1 ? s.QuotaBytes : o.QuotaBytes,
             s.Exclusive || o.Exclusive);
-
-    private static void NotYet(string what, string phase)
-        => throw new NotSupportedException(
-            $"spec 参数已解析校验但介质能力尚未落地：{what}——{phase}。当前为 P1 工厂骨架：" +
-            "参数不静默忽略（配置写了没生效比报错恶劣），落地后自动生效、无需改 spec。");
 }

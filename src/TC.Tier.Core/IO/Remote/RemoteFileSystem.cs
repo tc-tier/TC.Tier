@@ -30,6 +30,7 @@ public sealed class RemoteFileSystem : IFileSystem
 
     private readonly IObjectStore _store;
     private readonly RemoteFileSystemOptions _options;
+    private readonly TimeProvider _clock;   // 时钟供给源（时钟缝 件一 P2）
     private readonly ILogger? _logger;
     private readonly string _keyPrefix;
     private readonly AccessMode _access;                     // G2 挂载访问三态（总上包络）
@@ -58,6 +59,7 @@ public sealed class RemoteFileSystem : IFileSystem
     {
         _store = store;
         _options = options;
+        _clock = options.Clock;   // 时钟供给源（时钟缝 件一 P2）
         _logger = logger;
         _keyPrefix = options.KeyPrefix;
         _access = options.Access;
@@ -86,6 +88,11 @@ public sealed class RemoteFileSystem : IFileSystem
 
     /// <summary>New = 创建空镜像（设计 §2.3）：前缀有内容即抛 <see cref="IOError.AlreadyExists"/>
     /// （枚举检查——防误覆盖既有命名空间）；label = 设置（标记对象写入一次，New 后不可变）。</summary>
+    /// <param name="store">底层对象存储实现。</param>
+    /// <param name="options">文件系统选项（KeyPrefix/Label/PartSize/QuotaBytes 等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>创建完成的新文件系统实例。</returns>
+    /// <exception cref="FileIOException">目标前缀已有内容（AlreadyExists）。</exception>
     public static RemoteFileSystem New(IObjectStore store, RemoteFileSystemOptions? options = null, ILogger? logger = null)
     {
         var fs = ConstructCore(store, options, logger);
@@ -108,6 +115,11 @@ public sealed class RemoteFileSystem : IFileSystem
 
     /// <summary>Open = 打开既有命名空间视图（前缀存在性由内容推导——空前缀即空视图；零内容枚举）。
     /// label 非 null = 断言（与标记对象比对——不符即抛 fail-fast，§2.5）。</summary>
+    /// <param name="store">底层对象存储实现。</param>
+    /// <param name="options">文件系统选项（Label 断言等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>打开的文件系统实例。</returns>
+    /// <exception cref="FileIOException">label 断言不符（NotFound）。</exception>
     public static RemoteFileSystem Open(IObjectStore store, RemoteFileSystemOptions? options = null, ILogger? logger = null)
     {
         var fs = ConstructCore(store, options, logger);
@@ -132,6 +144,11 @@ public sealed class RemoteFileSystem : IFileSystem
 
     /// <summary>OpenOrCreate = 懒初始化糖（bind-any 终态——纯构造零探测）。
     /// label 语义：标记既有且不符即抛（校验）、缺省则写入（G1 建档）。</summary>
+    /// <param name="store">底层对象存储实现。</param>
+    /// <param name="options">文件系统选项（null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>已打开或建档完成的文件系统实例。</returns>
+    /// <exception cref="FileIOException">label 断言不符（NotFound）。</exception>
     public static RemoteFileSystem OpenOrCreate(IObjectStore store, RemoteFileSystemOptions? options = null, ILogger? logger = null)
     {
         var fs = ConstructCore(store, options, logger);
@@ -407,6 +424,11 @@ public sealed class RemoteFileSystem : IFileSystem
     /// <inheritdoc/>
     /// <remarks>★ 打开已有文件 = 延迟加载：Open 仅 Head 记长度（零下载）；首次读写未物化区间按需 Range GET。
     /// 读句柄长度 = Open 时快照（不追新——需要追新重新 Open）。</remarks>
+    /// <summary>打开/创建文件句柄（延迟加载——Open 仅 Head 记长度，零下载）。</summary>
+    /// <param name="path">文件相对路径（相对 KeyPrefix 根）。</param>
+    /// <param name="options">打开选项（Access/Mode/Sharing/Hints/PreallocateSize）。</param>
+    /// <returns>新开句柄（写句柄 = staging 写回层；读句柄 = 长度/元数据快照）。</returns>
+    /// <exception cref="FileIOException">文件不存在（OpenExisting）、已存在（CreateNew）。</exception>
     public IFileHandle Open(string path, FileOpenOptions options)
     {
         Shared.AccessGate.CheckHandleOpen(_access, options.Access, path);   // G2 包络：构造期 fail-fast
@@ -474,7 +496,9 @@ public sealed class RemoteFileSystem : IFileSystem
         Shared.AccessGate.RejectWrite(_access, nameof(FlushRoot));
     }
 
-    /// <inheritdoc/>
+    /// <summary>文件是否存在（HeadObject 单请求）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <returns>true = 对象在档；false = 不存在（目录不计入）。</returns>
     public bool Exists(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -482,21 +506,27 @@ public sealed class RemoteFileSystem : IFileSystem
         return SyncAsyncBridge.Run(ct => _store.HeadAsync(KeyOf(path), ct), SFsIoOpts) is not null;
     }
 
-    /// <inheritdoc/>
+    /// <summary>删除文件（幂等——对象不存在仍成功）。</summary>
+    /// <param name="path">文件相对路径。</param>
     /// <remarks>幂等（对不存在仍成功——POSIX unlink 对齐）；AppendCursor 盒摘除（重建按新 Length）。</remarks>
     public void Delete(string path)
     {
         Shared.AccessGate.RejectWrite(_access, nameof(Delete));
-        QuotaRelease(path);
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         using var gate = _maintenance.BeginMutation(nameof(Delete), path);
         SyncAsyncBridge.Run(ct => _store.DeleteAsync(KeyOf(path), condition: null, ct), SFsIoOpts);
+        QuotaRelease(path);   // ★ IO-25：删除成功后回收投影（原前置——删除失败投影已丢）
         _appendCursors.TryRemove(path, out _);
     }
 
     /// <inheritdoc/>
     /// <remarks>服务端 Copy（同区零流量）+ Delete 源——>5GB 走 CopyRange 的 multipart 编排。
     /// ★ 未 Flush 的源句柄 staging 不随 Move（Flush 仍写旧键——远程差异，io.md 声明）。</remarks>
+    /// <summary>移动/重命名文件（服务端 Copy + Delete 源；&gt;5GB 走 multipart 编排）。</summary>
+    /// <param name="source">源文件相对路径。</param>
+    /// <param name="dest">目标文件相对路径。</param>
+    /// <param name="overwrite">true = 目标存在时覆盖；false = 目标存在抛 AlreadyExists（默认）。</param>
+    /// <exception cref="FileIOException">源不存在或目标已存在（未允许覆盖）。</exception>
     public void Move(string source, string dest, bool overwrite = false)
     {
         Shared.AccessGate.RejectWrite(_access, nameof(Move));
@@ -523,6 +553,8 @@ public sealed class RemoteFileSystem : IFileSystem
     /// <inheritdoc/>
     /// <remarks>S3 前缀模拟：<b>文档化 no-op</b>（目录因内容而存在——EmptyDirectories 不置位）。
     /// 预留名校验仍在 KeyOf 完成（路径合法性即时失败）——但维护门闩仍拒（契约统一：命名空间变异请求）。</remarks>
+    /// <summary>创建目录——S3 前缀模拟下的文档化 no-op（仅路径合法性校验）。</summary>
+    /// <param name="path">目录相对路径。</param>
     public void CreateDirectory(string path)
     {
         AccessGate.RejectWrite(_access, nameof(CreateDirectory));
@@ -535,6 +567,9 @@ public sealed class RemoteFileSystem : IFileSystem
     /// <remarks>前缀下有对象或子前缀 = 非空（NotEmpty 抛——rmdir 安全边界）；
     /// 空/不存在 = 成功 no-op（S3 无空目录——删完子项后的空目录无对象可删；正常流程
     /// "删子项→删目录"不再必然失败——CORE-17 死 API 修复；幂等删除对齐 Delete 文件倾向）。</remarks>
+    /// <summary>删除目录——前缀非空抛 DirectoryNotEmpty；空/不存在 = 成功 no-op（S3 无空目录）。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <exception cref="FileIOException">目录非空。</exception>
     public void DeleteDirectory(string path)
     {
         AccessGate.RejectWrite(_access, nameof(DeleteDirectory));
@@ -552,6 +587,9 @@ public sealed class RemoteFileSystem : IFileSystem
 
     /// <inheritdoc/>
     /// <remarks>前缀下有对象或子前缀即存在（delimiter 单次列举判定）。</remarks>
+    /// <summary>目录是否存在（前缀下有对象或子前缀即存在）。</summary>
+    /// <param name="path">目录相对路径。</param>
+    /// <returns>true = 前缀有内容；false = 空/不存在。</returns>
     public bool DirectoryExists(string path)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -565,6 +603,10 @@ public sealed class RemoteFileSystem : IFileSystem
     /// <inheritdoc/>
     /// <remarks>★ 回退语义（AtomicDirectoryMove 不置位）：前缀全量 Copy+Delete——<b>非原子</b>，
     /// 部分失败有残留（已迁移对象在新前缀、余者在旧前缀——消费者按枚举幂等重放）。</remarks>
+    /// <summary>移动/重命名目录——前缀全量 Copy+Delete（非原子，部分失败有残留可幂等重放）。</summary>
+    /// <param name="source">源目录相对路径。</param>
+    /// <param name="dest">目标目录相对路径。</param>
+    /// <exception cref="FileIOException">源目录不存在或目标已存在。</exception>
     public void MoveDirectory(string source, string dest)
     {
         AccessGate.RejectWrite(_access, nameof(MoveDirectory));
@@ -592,6 +634,12 @@ public sealed class RemoteFileSystem : IFileSystem
     /// <inheritdoc/>
     /// <remarks>PUT 空对象单请求（元数据随 PUT 原子提交）；preallocateSize 服务端无稀疏长度概念——
     /// 记名接收、服务端 no-op（staging 级预分配走 Open(options.PreallocateSize) 既有协议）。</remarks>
+    /// <summary>创建文件（PUT 空对象；已存在即抛）。</summary>
+    /// <param name="path">文件相对路径。</param>
+    /// <param name="preallocateSize">预分配字节数（服务端无稀疏概念——记名接收 no-op，默认 0）。</param>
+    /// <param name="extra">初始 FileExtra（随 PUT 原子提交；上限 MaxFileExtraBytes，默认空）。</param>
+    /// <exception cref="FileIOException">文件已存在。</exception>
+    /// <exception cref="ArgumentException">extra 超出 MaxFileExtraBytes 上限。</exception>
     public void CreateFile(string path, long preallocateSize = 0, ReadOnlyMemory<byte> extra = default)
     {
         Shared.AccessGate.RejectWrite(_access, nameof(CreateFile));
@@ -616,6 +664,10 @@ public sealed class RemoteFileSystem : IFileSystem
 
     /// <inheritdoc/>
     /// <remarks>文件 = HeadObject（Size/Metadata/LastModified）；目录 = 前缀有内容（时间不可得 MinValue/null）。</remarks>
+    /// <summary>获取条目元信息（文件 = HeadObject；目录 = 前缀有内容）。</summary>
+    /// <param name="path">条目相对路径。</param>
+    /// <returns>条目信息——文件含长度/LastModified/FileExtra；目录长度 0、时间不可得 MinValue/null。</returns>
+    /// <exception cref="FileIOException">条目不存在。</exception>
     public FsEntryInfo Stat(string path)
     {
         Shared.AccessGate.RejectRead(_access, nameof(Stat));
@@ -639,42 +691,66 @@ public sealed class RemoteFileSystem : IFileSystem
 
     // ═════════════════════════════ 枚举族（ListDelimited 前缀模拟）═════════════════════════════
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从根；ListDelimited/ListAsync 前缀模拟，按 Name 有序）。</summary>
+    /// <param name="pattern">文件名通配模式（最终组件名匹配，默认 "*"）。</param>
+    /// <param name="recursive">true = 递归全前缀；false = 仅一层（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对根的路径）。</returns>
     public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateFiles));
         return EnumerateCore(null, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件（从指定目录；按 Name 有序）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">文件名通配模式（最终组件名匹配）。</param>
+    /// <param name="recursive">true = 递归全前缀；false = 仅一层（默认）。</param>
+    /// <returns>文件条目序列（Name 为相对起始目录的路径）。</returns>
+    /// <exception cref="FileIOException">目录不存在且结果为空。</exception>
     public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateFiles));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从根；CommonPrefixes 推导，按 Name 有序）。</summary>
+    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归推导子前缀；false = 仅一层（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对根的路径）。</returns>
     public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
         return EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举目录（从指定目录；按 Name 有序）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">目录名通配模式。</param>
+    /// <param name="recursive">true = 递归推导子前缀；false = 仅一层（默认）。</param>
+    /// <returns>目录条目序列（Name 为相对起始目录的路径）。</returns>
+    /// <exception cref="FileIOException">目录不存在且结果为空。</exception>
     public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从根；按 Name 有序）。</summary>
+    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <param name="recursive">true = 递归；false = 仅一层（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</returns>
     public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateEntries));
         return EnumerateCore(null, pattern, recursive, EntryFilter.Both);
     }
 
-    /// <inheritdoc/>
+    /// <summary>枚举文件与目录（从指定目录；按 Name 有序）。</summary>
+    /// <param name="path">起始目录相对路径。</param>
+    /// <param name="pattern">名称通配模式。</param>
+    /// <param name="recursive">true = 递归；false = 仅一层（默认）。</param>
+    /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</returns>
+    /// <exception cref="FileIOException">目录不存在且结果为空。</exception>
     public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateEntries));
@@ -777,6 +853,11 @@ public sealed class RemoteFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
+    /// <summary>进入维护模式——按 scope 拒绝并发操作，返回的租约 Dispose 即退出。</summary>
+    /// <param name="reason">维护原因（诊断/日志用）。</param>
+    /// <param name="scope">维护范围（决定拒绝面——All 连读也拒）。</param>
+    /// <param name="ct">取消令牌（默认 default = 不取消）。</param>
+    /// <returns>维护租约（Dispose 即退出维护）。</returns>
     public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -796,7 +877,7 @@ public sealed class RemoteFileSystem : IFileSystem
                 $"{nameof(AcquireExclusive)} 需要对象层条件 PUT（ConditionalPut）——当前 store 未置位（老端点可升级或换 store）。",
                 null, nameof(AcquireExclusive));
 
-        var deadline = Environment.TickCount64 + (long)timeout.TotalMilliseconds;
+        var deadline = _clock.GetMsTimestamp() + (long)timeout.TotalMilliseconds;
         lock (_lockGate)
         {
             while (true)
@@ -807,7 +888,7 @@ public sealed class RemoteFileSystem : IFileSystem
                     _heldLease = lease;
                     return lease;
                 }
-                if (Environment.TickCount64 >= deadline)
+                if (_clock.GetMsTimestamp() >= deadline)
                     throw new FileIOException(IOError.SharingViolation,
                         $"AcquireExclusive timed out after {timeout.TotalMilliseconds:F0}ms（fencing 锁被其他持有者持有且心跳未超时）。",
                         null, nameof(AcquireExclusive));
@@ -980,6 +1061,7 @@ public sealed class RemoteFileSystem : IFileSystem
             }, null, interval, interval);
         }
 
+        /// <summary>强制释放租约——条件删除锁对象（无持有者校验；运营接管通道）。</summary>
         public void ForceRelease()
         {
             if (Interlocked.Exchange(ref _released, 1) != 0) return;
@@ -987,6 +1069,7 @@ public sealed class RemoteFileSystem : IFileSystem
             _owner.ReleaseLease(_token, force: true);
         }
 
+        /// <summary>释放租约——停心跳并条件删除锁对象（持有者仍匹配才删——防误删他人接管后的锁）。</summary>
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _released, 1) != 0) return;

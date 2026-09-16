@@ -102,6 +102,7 @@ public abstract class AsyncOperationBase : IAsyncOperation
     public event EventHandler<Exception>? Failed;
 
     /// <summary>上报进度（0.0~1.0）——订阅者异常隔离 + 告警，不中断后台工作。</summary>
+    /// <param name="progress">进度值，0.0~1.0（0.0 = 刚开始，1.0 = 接近完成）。</param>
     public void ReportProgress(double progress)
     {
         var handler = Progress;
@@ -145,15 +146,20 @@ public abstract class AsyncOperationBase : IAsyncOperation
     public virtual void ReportSucceeded() => ReportTerminal(AsyncOperationStatus.Succeeded, null, null);
 
     /// <summary>上报失败（终态）。首个终态生效，后续调用幂等 no-op。</summary>
+    /// <param name="exception">失败原因异常，作为终态异常存储并在消费侧（<see cref="WaitAsync"/>/<see cref="ThrowIfFailed"/>）重抛；非空。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="exception"/> 为 null。</exception>
     public void ReportFailed(Exception exception)
         => ReportTerminal(AsyncOperationStatus.Failed, exception ?? throw new ArgumentNullException(nameof(exception)), null);
 
     /// <summary>上报取消（终态）。首个终态生效，后续调用幂等 no-op。</summary>
+    /// <param name="exception">取消原因的 <see cref="OperationCanceledException"/>，非空；作为终态异常存储并在消费侧重抛。</param>
+    /// <exception cref="ArgumentNullException"><paramref name="exception"/> 为 null。</exception>
     public void ReportCanceled(OperationCanceledException exception)
         => ReportTerminal(AsyncOperationStatus.Canceled,
             exception ?? throw new ArgumentNullException(nameof(exception)), null);
 
     /// <summary>上报成功（终态，携带载荷——泛型变体用）。载荷与终态在锁内原子发布：首个生效，幂等不覆盖。</summary>
+    /// <param name="succeededPayload">成功载荷（泛型变体的结果对象）；可为 null（等价无载荷成功）。</param>
     protected void ReportSucceededWithPayload(object? succeededPayload)
         => ReportTerminal(AsyncOperationStatus.Succeeded, null, succeededPayload);
 
@@ -222,6 +228,8 @@ public abstract class AsyncOperationBase : IAsyncOperation
     /// <para>★ 已完成快路径：终态检查 + 重抛，零分配零等待。</para>
     /// <para>★ ct 仅取消"等待"本身（不取消操作——用 <see cref="Cancel"/>）。</para>
     /// </summary>
+    /// <param name="cancellationToken">取消令牌，默认 <see cref="CancellationToken.None"/>；仅取消等待本身（操作取消用 <see cref="Cancel"/>），取消时以 <see cref="OperationCanceledException"/> 完成。</param>
+    /// <returns>操作终态后完成的 ValueTask；Succeeded 正常完成，Failed/Canceled 重抛存储的原异常。</returns>
     public ValueTask WaitAsync(CancellationToken cancellationToken = default)
     {
         MarkObserved();
@@ -304,6 +312,7 @@ public abstract class AsyncOperationBase : IAsyncOperation
     internal bool IsObserved => Volatile.Read(ref _observed) != 0;
 
     /// <summary>诊断快照（超时/告警现场）：op 名 + 状态 + 年龄（+ DEBUG 转移历史）。</summary>
+    /// <returns>形如 <c>op(name='...' status=... ageMs=...)</c> 的诊断文本；DEBUG 构建下追加转移历史。</returns>
     public string Describe()
     {
         var age = Environment.TickCount64 - _createdTicks;
@@ -315,6 +324,7 @@ public abstract class AsyncOperationBase : IAsyncOperation
     }
 
     /// <inheritdoc/>
+    /// <returns>同 <see cref="Describe"/> 的诊断快照文本。</returns>
     public override string ToString() => Describe();
 
     // ════════════════════════════════════════════════════════════

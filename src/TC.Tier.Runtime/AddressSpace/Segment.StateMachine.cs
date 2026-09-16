@@ -15,6 +15,8 @@ public sealed partial class Segment
     /// CAS 单调推进 MaxOffset（写后调用）。
     /// <para>★ 达 GrowthLimit 自动 MarkFull。推进水位不绑区间表——区间记录由 lease Commit 独立操作。</para>
     /// </summary>
+    /// <param name="newOffset">新的最大偏移量（字节）——只允许单调前进。</param>
+    /// <returns>推进后的 MaxOffset（newOffset ≤ 当前值时不推进，返回当前水位）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public long AdvanceOffset(long newOffset)
     {

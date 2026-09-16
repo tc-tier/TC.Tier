@@ -1,0 +1,28 @@
+/// <summary><c>[RingKey(typeof({{TYPE_NAME}}))]</c> 探测族封闭薄类——判等闭环硬依赖 IKeyResolver（构造期必注入）。</summary>
+public sealed class {{CLASS_NAME}} : global::TC.Tier.Runtime.Structures.ProbingIndex.HashIndex<{{KEY_FQN}}>
+{
+    public {{CLASS_NAME}}(global::TC.Tier.Core.IO.IFileSystem fs,
+        global::TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings settings,
+        global::TC.Tier.Contracts.Structures.IKeyResolver<{{KEY_FQN}}> keyResolver,
+        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null,
+        global::TC.Tier.Core.Primitives.IKeyComparer<{{KEY_FQN}}>? keyComparer = null)
+        : base(fs, settings, epoch, keyResolver, keyComparer)
+    {
+    }
+
+    /// <summary>★ 工厂（异步）：构造 + Initialize(hints) + WaitForReadyAsync 一步到位——hints 注入恢复窗口（缺省空结构首开）；同步 WaitForReady 在异步上下文死锁，异步调用方禁用。</summary>
+    public static async global::System.Threading.Tasks.Task<{{CLASS_NAME}}> CreateAsync(global::TC.Tier.Core.IO.IFileSystem fs,
+        global::TC.Tier.Runtime.Structures.ProbingIndex.HashIndexSettings settings,
+        global::TC.Tier.Contracts.Structures.IKeyResolver<{{KEY_FQN}}> keyResolver,
+        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null,
+        global::TC.Tier.Core.Primitives.IKeyComparer<{{KEY_FQN}}>? keyComparer = null,
+        global::TC.Tier.Runtime.Structures.ProbingIndex.ProbingIndexRecoveryHints hints = default,
+        global::System.Threading.CancellationToken ct = default)
+    {
+        var index = new {{CLASS_NAME}}(fs, settings, keyResolver, epoch, keyComparer);
+        index.Initialize(hints);
+        await index.WaitForReadyAsync(ct);
+        return index;
+    }
+}
+

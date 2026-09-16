@@ -1,9 +1,14 @@
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
 
+/// <summary>
+/// ProbingIndexBase 事务 partial——ITransactionParticipant 显式实现
+/// （prepared/committed 序号水位推进与提交回调登记）。
+/// </summary>
 public abstract partial class ProbingIndexBase<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     private long _lastCommittedSeq = -1;
     private long _lastPreparedSeq = -1;
+    private readonly CommitCallbackRegistry _commitCallbacks = new();
 
     long ITransactionParticipant.LastCommittedSeq => Volatile.Read(ref _lastCommittedSeq);
     long ITransactionParticipant.LastPreparedSeq => Volatile.Read(ref _lastPreparedSeq);
@@ -20,24 +25,10 @@ public abstract partial class ProbingIndexBase<TKey> where TKey : unmanaged, IEq
     }
 
     void ITransactionParticipant.ConfirmCommitted(long seq)
-    {
-        long current;
-        do
-        {
-            current = Volatile.Read(ref _lastCommittedSeq);
-            if (seq <= current) return;
-        } while (Interlocked.CompareExchange(ref _lastCommittedSeq, seq, current) != current);
-    }
+        => _commitCallbacks.AdvanceAndFire(seq, ref _lastCommittedSeq);
 
     void ITransactionParticipant.OnCommitted(long seq, Action callback)
-    {
-        ArgumentNullException.ThrowIfNull(callback);
-        if (seq <= Volatile.Read(ref _lastCommittedSeq))
-        {
-            callback();
-            return;
-        }
-    }
+        => _commitCallbacks.Register(seq, ref _lastCommittedSeq, callback);
 
     void ITransactionParticipant.Abort(long seq)
     {

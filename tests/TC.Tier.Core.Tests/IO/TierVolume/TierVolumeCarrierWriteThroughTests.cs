@@ -69,9 +69,10 @@ public sealed class TierVolumeCarrierWriteThroughTests : IDisposable
         }
     }
 
-    [Fact]
+    [SkippableFact]
     public void CarrierWriteThrough_MmapSectionFlush_SurvivesCrash()
     {
+        Skip.If(OperatingSystem.IsMacOS(), "APFS mmap 写回 + 载体写穿语义不同——mac 适配台账。");
         using var fs = Format();
         using (var h = fs.Open("m", RWO()))
         {

@@ -334,9 +334,10 @@ public sealed class PinnedBufferPool : IDisposable
         if (existing is not null) return existing;
         // 懒创建：用 Interlocked.CompareExchange 保证只创建一次（无锁）
         var created = new Bucket<AlignedMemoryManager>();
-        return Interlocked.CompareExchange(ref _alignedBuckets[idx], created, null) is null
-            ? created
-            : _alignedBuckets[idx]!;
+        var winner = Interlocked.CompareExchange(ref _alignedBuckets[idx], created, null);
+        if (winner is null) return created;
+        created.Dispose();   // 竞态输家：未发布即弃——释放其 ThreadLocal 资源，不留 finalizer 债
+        return winner;
     }
 
     /// <summary>

@@ -22,6 +22,9 @@ public sealed class TierWalBuilder : IDisposable, IAsyncDisposable
     private int _started;   // 0=未启动 1=已启动/启动中（CAS 抢启动权）
 
     /// <summary>构造（= 配置，零 IO）。</summary>
+    /// <param name="fs">文件系统抽象（介质面）。</param>
+    /// <param name="options">TierWAL 选项。</param>
+    /// <exception cref="ArgumentNullException">fs 或 options 为 null。</exception>
     public TierWalBuilder(IFileSystem fs, TierWalOptions options)
     {
         ArgumentNullException.ThrowIfNull(fs);
@@ -93,10 +96,15 @@ public sealed class TierWalBuilder : IDisposable, IAsyncDisposable
 
         try
         {
-            var settings = BuildSettings(_options);
+            ValidateDurability(_fs, _options);
+            var settings = BuildSettings(_options, _fs);
             var stager = new OpaqueStager(_logger);
             var policy = new OpaqueStagingCommitPolicy(stager,
                 _commitPolicy ?? new GroupCommitThresholdPolicy(_options));
+
+            // ★ 元数据载体注入（meta.md §7 3a 外部隔离）：WithMetaPolicyKind(Transport) +
+            //   WithMetaTransport(...) 构建期一行注入（如 MetadataMetaTransport——meta 托管版本链）；
+            //   不注入 = options.MetaPolicyKind 默认装配（Managed 固定块）。EntryLog 生命周期自动托管。
             var log = new EntryLog(_fs, settings, policy,
                 metaPolicyFactory: _metaPolicyFactory, metaTransport: _metaTransport);
 
@@ -131,10 +139,37 @@ public sealed class TierWalBuilder : IDisposable, IAsyncDisposable
         }
     }
 
-    private static EntryLogSettings BuildSettings(TierWalOptions options)
+    /// <summary>
+    /// 持久化质量地板（契约① 选举窗口的介质前提——fail-fast 于构建前，零 IO）：
+    ///  - Network 介质：远端对象存储无 fsync 语义、延迟无界——直接拒绝；
+    ///  - Virtual 介质：须 CarrierWriteThrough 挂载（基线档实测 p99.9 ≥150ms 不达标）；
+    ///  - Local/Memory：通过（memory = 易失高性能介质——稳定环境高吞吐首选：零 fsync 地板、选举窗口天然满足；
+    ///    持久化取舍由部署方自权衡——测试只是附带用法）。
+    /// </summary>
+    private static void ValidateDurability(IFileSystem fs, TierWalOptions options)
     {
+        if (!options.DurabilityValidation) return;
+        if (fs.Volume.Nature == StorageNature.Network)
+            throw new NotSupportedException(
+                "TierWAL 不支持网络介质（network://——远端对象存储无 fsync 语义、延迟无界，" +
+                "投票/任期持久化契约①无保障）。");
+        if (fs.Volume.Nature == StorageNature.Virtual
+            && !fs.Capabilities.HasFlag(FileSystemCapabilities.CarrierWriteThrough))
+            throw new InvalidOperationException(
+                "TierWAL 在 virtual 介质须 CarrierWriteThrough 挂载（契约① 选举窗口：基线档元数据持久化 p99.9 ≥150ms " +
+                "不达标——见 perf/tierwal-contracts.md）。请挂载时置 CarrierWriteThrough=true，或显式关闭验证" +
+                "（TierWalOptions.WithDurabilityValidation(false)——测量/非 raft 用途）。");
+    }
+
+    private static EntryLogSettings BuildSettings(TierWalOptions options, IFileSystem fs)
+    {
+        // ★ mem 介质不预分配物理段（2026-08-28 实锤——全量单测 native 挂死根因）：
+        //   preallocateFile=true 触发 256MB pinned 数组分配——POH 是进程全局堆（每 Fs 独立
+        //   池救不了），N 节点并发建段打爆 POH → CreateFile/CreateDirectory native 挂。
+        //   mem 无磁盘对齐需求，稀疏按需增长零代价。
+        var preallocate = fs is not TC.Tier.Core.IO.Mem.MemoryFileSystem;
         var engine = new StorageEngineOptions(options.WalName, options.SegmentGrowthLimit,
-                enableSegmentation: true, preallocateFile: true, deleteOnClose: false)
+                enableSegmentation: true, preallocateFile: preallocate, deleteOnClose: false)
             .WithHints(options.Hints);
         return new EntryLogSettings(engine)
         {

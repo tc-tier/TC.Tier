@@ -1,4 +1,5 @@
 using TC.Tier.Core.IO;
+using TC.Tier.Core.IO.TierVolume;
 using TC.Tier.Products.Wal;
 
 namespace TC.Tier.Products.Tests.Wal;
@@ -26,7 +27,8 @@ public class TierWalMultiNodeTests : IDisposable
     private IFileSystem NewNodeVolume(string name)
     {
         var vol = Path.Combine(_dir, $"node-{name}-{Guid.NewGuid():N}.tier");
-        var fs = TierFs.New($"virtual:///{vol.Replace('\\', '/')}");
+        var fs = TierFs.New($"virtual:///{vol.Replace('\\', '/')}",
+            new TierVolumeFormatOptions { CarrierWriteThrough = true });   // ★ 契约① 地板验证：virtual 须载体写穿挂载
         _fss.Add(fs);
         return fs;
     }
@@ -88,11 +90,11 @@ public class TierWalMultiNodeTests : IDisposable
             TierWalSnapshotTests.CountSnapshotFrames(image).Should().Be(60_000, "镜像 = [Head..N₀] 全部条目");
             (await TierWalTests.ReadAll(cold, 60_001, default)).Should().BeEmpty("冷节点本地 entryLog 无增量");
 
-            // 4. 冷节点汇报 N₀=60,000 → leader 从 (60,000, 尾] 推增量 → 追平（follower 本地续接）
+            // 4. 冷节点汇报 N₀=60,000 → leader 从 (60,000, 尾] 推增量 → 追平（follower 全局 index 续接）
             await PushDeltaCore(leader, cold, n0 + 1, default);
 
-            cold.AllocatedIndex.Should().Be(5_000, "冷节点本地 5,000 条（raft 层 index 映射——本地顺序）");
-            var first = (await TierWalTests.ReadAll(cold, 1, default))[0];
+            cold.AllocatedIndex.Should().Be(65_000, "冷节点 65,000 条——导入重锚后全局 index 续接（N₀+1 起追加）");
+            var first = (await TierWalTests.ReadAll(cold, 60_001, default))[0];
             first.Data.ToArray().Should().Equal(WalTestFactory.Entry(60_001), "首条内容 = leader 第 60,001 条");
         }
     }
@@ -133,7 +135,7 @@ public class TierWalMultiNodeTests : IDisposable
                 // leader 推增量（AppendEntries 语义——逐 follower 推送；内容对齐验证在 PushDeltaCore 内）
                 await PushDeltaCore(leader, f, 40_001, default);
 
-                f.AllocatedIndex.Should().Be(3_000, $"{name} 追平（本地顺序）");
+                f.AllocatedIndex.Should().Be(43_000, $"{name} 追平（全局 index 续接）");
             }
         }
     }
@@ -164,7 +166,7 @@ public class TierWalMultiNodeTests : IDisposable
             {
                 await cold.ImportSnapshotAsync(default);
                 await PushDeltaCore(leader, cold, 30_001, default);
-                cold.AllocatedIndex.Should().Be(2_000);
+                cold.AllocatedIndex.Should().Be(32_000);
             }
         }
 
@@ -172,18 +174,18 @@ public class TierWalMultiNodeTests : IDisposable
         await using (var cold2 = await NodeOptions("cold").Builder(coldFs).StartAsync())
         {
             cold2.SnapshotIndex.Should().Be(30_000, "重启自动载入快照");
-            cold2.AllocatedIndex.Should().Be(2_000);
+            cold2.AllocatedIndex.Should().Be(32_000);
             var image = await TierWalSnapshotTests.ReadSnapshotAll(cold2);
             TierWalSnapshotTests.CountSnapshotFrames(image).Should().Be(30_000, "镜像完整");
-            var tail = await TierWalTests.ReadAll(cold2, 1, default);
-            tail.Should().HaveCount(2_000, "主数据增量完整（本地顺序）");
+            var tail = await TierWalTests.ReadAll(cold2, 30_001, default);
+            tail.Should().HaveCount(2_000, "主数据增量完整（全局 index 续接）");
             tail[^1].Data.ToArray().Should().Equal(WalTestFactory.Entry(32_000), "末条内容 = leader 第 32,000 条");
         }
     }
 
     /// <summary>
     /// 追平模拟（AppendEntries 语义——leader 推 (start, 尾] 增量给 follower）。
-    /// ★ follower 本地 index 顺序分配（raft 层维护自己的 index 映射——TierWAL index 是存储顺序）；
+    /// ★ follower 全局 index 续接（导入重锚——TierWAL index = raft 全局 index，2026-08-26 定案）；
     ///   验证 = follower 读回内容与 leader 推送条目一致（条目内容含 index 标识——"entry-{i}"）。
     /// </summary>
     private static async Task PushDeltaCore(TierWal leader, TierWal follower, long startIndex, CancellationToken ct)
@@ -207,10 +209,10 @@ public class TierWalMultiNodeTests : IDisposable
             await follower.CommitAsync(ct);
         }
 
-        // ★ 内容对齐验证：follower 本地 [1..N] 读回 = leader 推送条目（同一字节序）
-        var actual = await TierWalTests.ReadAll(follower, 1, ct);
+        // ★ 内容对齐验证：follower [start..N] 读回 = leader 推送条目（同一字节序、同一 index 空间）
+        var actual = await TierWalTests.ReadAll(follower, startIndex, ct);
         actual.Should().HaveCount(expected.Count, "追平条目数一致");
         for (int i = 0; i < expected.Count; i++)
-            actual[i].Data.ToArray().Should().Equal(expected[i], $"第 {i + 1} 条内容一致（raft 层 index 映射）");
+            actual[i].Data.ToArray().Should().Equal(expected[i], $"第 {i + 1} 条内容一致（全局 index 对齐）");
     }
 }

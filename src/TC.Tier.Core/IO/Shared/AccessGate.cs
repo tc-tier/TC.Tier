@@ -10,6 +10,10 @@ namespace TC.Tier.Core.IO.Shared;
 internal static class AccessGate
 {
     /// <summary>ro（Read）：写族操作拒绝——命名空间写（建/删/移/整理）与维护性变异。</summary>
+    /// <param name="access">挂载访问模式（三态）。</param>
+    /// <param name="op">操作名（诊断文案用）。</param>
+    /// <param name="path">相关路径（可选，诊断文案用）。</param>
+    /// <exception cref="FileIOException">access = Read（AccessDenied）。</exception>
     public static void RejectWrite(AccessMode access, string op, string? path = null)
     {
         if (access == AccessMode.Read)
@@ -17,6 +21,10 @@ internal static class AccessGate
     }
 
     /// <summary>wo（Write）：读族操作拒绝——Enumerate/Stat（纯摄入形态防误读兜底；Exists 豁免：幂等创建的写路径支撑）。</summary>
+    /// <param name="access">挂载访问模式（三态）。</param>
+    /// <param name="op">操作名（诊断文案用）。</param>
+    /// <param name="path">相关路径（可选，诊断文案用）。</param>
+    /// <exception cref="FileIOException">access = Write（AccessDenied）。</exception>
     public static void RejectRead(AccessMode access, string op, string? path = null)
     {
         if (access == AccessMode.Write)
@@ -24,6 +32,10 @@ internal static class AccessGate
     }
 
     /// <summary>句柄构造期包络校验：requested ⊑ fs.Access——越包络即抛、句柄不构造。</summary>
+    /// <param name="fsAccess">挂载访问包络。</param>
+    /// <param name="requested">句柄请求访问模式。</param>
+    /// <param name="path">目标路径（诊断文案用）。</param>
+    /// <exception cref="FileIOException">请求越包络（AccessDenied）。</exception>
     public static void CheckHandleOpen(AccessMode fsAccess, AccessMode requested, string path)
     {
         if (!Within(fsAccess, requested))
@@ -32,6 +44,10 @@ internal static class AccessGate
     }
 
     /// <summary>映射构造期包络校验（映射无只写——Write 一并拒绝）。</summary>
+    /// <param name="fsAccess">挂载访问包络。</param>
+    /// <param name="requested">映射请求访问模式（Write 非法）。</param>
+    /// <param name="path">目标路径（诊断文案用）。</param>
+    /// <exception cref="FileIOException">请求为 Write 或越包络（AccessDenied）。</exception>
     public static void CheckMapOpen(AccessMode fsAccess, AccessMode requested, string path)
     {
         if (requested == AccessMode.Write || !Within(fsAccess, requested))

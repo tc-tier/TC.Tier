@@ -15,6 +15,7 @@ public sealed partial class SegmentTable
     /// <para>★ 尾部：ReadFooter → 直接 LoadTail（footer 是水位权威，不需要 InitializeTail 算水位）。</para>
     /// <para>★ 空设备 fallback：合成 seg0(Empty) + LoadTail(Empty)，让 handler 建物理段。</para>
     /// </summary>
+    /// <param name="reader">地址表读取器（提供头部/段载荷/尾部的三段式读取），非空。</param>
     public void LoadAddressTable(IAddressTableReader reader)
     {
         // ★ 生命周期门禁：LoadAddressTable 仅恢复阶段可调，且一次性（重复加载会叠加段 + 重置水位，破坏状态）
@@ -107,6 +108,7 @@ public sealed partial class SegmentTable
     ///   footer 水位超前于段列表 = 已提交数据被当洞覆盖）。推进者的段在推进前已 EnsureSegmentsForLength
     ///   在表——hold 后遍历见完整几何。hold 失败（回退者持有时）有界自旋（回退是短操作——截断毫秒级）。</para>
     /// </summary>
+    /// <param name="writer">地址表写入器（接收头部/段载荷/尾部三段式写入），非空。</param>
     public void SaveAddressTable(IAddressTableWriter writer)
     {
         var spinner = new SpinWait();

@@ -110,9 +110,15 @@ public interface IFileSystem : IDisposable
 
     // ═══════════════════════════════════════════════════════════════
     //  枚举族（三族同形态：单参=根+pattern；双参=path+pattern；recursive 默认 false）
+    // ★★ 重载解析陷阱（#297 S1 实测，a35cbd4e）：**单实参调用命中单参重载 = pattern 语义**
+    //   （在根空间按名匹配条目）。想枚举子目录必须**双参显式** (path, pattern)——单实参
+    //   EnumerateFiles(dir) 会被 C# 解析为 pattern=dir 的根空间匹配，恒空（目录不是文件）
+    //   且无编译告警。子目录枚举调用一律写全双参。
     // ═══════════════════════════════════════════════════════════════
 
     /// <summary>枚举根层文件（pattern 缺省 "*" 全匹配；recursive=true 全部后代）。</summary>
+    /// <remarks>★ 单参 = <b>pattern</b> 语义（根空间按名匹配条目）——子目录枚举必须双参显式
+    ///   (path, pattern)，见枚举族头部的重载解析陷阱说明。</remarks>
     /// <exception cref="FileIOException">IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</exception>
     /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
     /// <param name="recursive">是否递归枚举全部后代目录。</param>

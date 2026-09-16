@@ -57,15 +57,19 @@ public static partial class NativeAtomic128
     [SuppressGCTransition]
     [return: MarshalAs(UnmanagedType.U1)]
     private static partial bool Cmpxchg128Impl(
-        ref Int128 location,
+        ref UInt128Pair location,
         ref ulong oldLo,
         ref ulong oldHi,
         ulong newLo,
         ulong newHi);
 
     /// <summary>128-bit CAS 便捷包装。</summary>
+    /// <param name="location">目标槽位引用，须 16 字节对齐（未对齐 native 路径走兜底分片锁）。</param>
+    /// <param name="oldValue">期望的当前值（128 位位精确比较）。</param>
+    /// <param name="newValue">CAS 成功时写入的新值。</param>
+    /// <returns>true = 当前值与 <paramref name="oldValue"/> 相等且已写入 <paramref name="newValue"/>；false = 不等（*location 不变，不做回写）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool CompareExchange(ref Int128 location, Int128 oldValue, Int128 newValue)
+    public static bool CompareExchange(ref UInt128Pair location, UInt128Pair oldValue, UInt128Pair newValue)
     {
         var ol = oldValue.Lo;
         var oh = oldValue.Hi;
@@ -73,9 +77,13 @@ public static partial class NativeAtomic128
     }
 }
 
-/// <summary>128-bit 值类型（2 × ulong, 16B）。</summary>
+/// <summary>128-bit 值类型（2 × ulong, 16B）。命名避开 <c>System.Int128</c>（.NET 8 内置）——
+/// 消费方同引 TC.Tier.Core.NativeInterop 与 System 时不再歧义。</summary>
+/// <param name="lo">低位 64 位（x86-64 下对应 RAX 承载的半部）。</param>
+/// <param name="hi">高位 64 位（x86-64 下对应 RDX 承载的半部）。</param>
+/// <returns>由 <paramref name="lo"/>/<paramref name="hi"/> 组成的 16 字节只读值。</returns>
 [StructLayout(LayoutKind.Sequential, Size = 16)]
-public readonly struct Int128(ulong lo, ulong hi)
+public readonly struct UInt128Pair(ulong lo, ulong hi)
 {
     /// <summary>低位 64 位（x86-64 下对应 RAX 承载的半部）。</summary>
     public readonly ulong Lo = lo;

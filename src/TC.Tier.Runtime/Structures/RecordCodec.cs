@@ -1,4 +1,7 @@
 using System.Buffers.Binary;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using System.Runtime.Intrinsics.X86;
 
 namespace TC.Tier.Runtime.Structures;
 
@@ -54,6 +57,10 @@ public static class RecordCodec
     /// <para>★ CRC 在末尾（footer）时 crcOffset==crcCoverEnd，单段算 [0,crcCoverEnd)，CRC 不在范围里。</para>
     /// <para>★ 比"拷贝整条记录到临时缓冲再清零"省去 O(crcCoverEnd) 拷贝 + 堆分配；CRC32C 走硬件指令原位算。</para>
     /// </summary>
+    /// <param name="record">整条记录缓冲区（只读，须包含 CRC 字段与全部覆盖范围）。</param>
+    /// <param name="flags">记录 flags（决定 CRC 算法 + 字段长度；无 CRC 位时直接返回 true）。</param>
+    /// <param name="crcCoverEnd">CRC 覆盖范围末尾（exclusive）= headerLen + payloadLen + paddingLen + footerMagicLen，单位字节。</param>
+    /// <param name="crcOffset">CRC 字段在 record 中的起始偏移（单位字节；CRC 在 footer 时等于 crcCoverEnd）。</param>
     /// <returns>true = CRC 匹配；false = CRC 不匹配或记录损坏。</returns>
     public static bool VerifyCrc(ReadOnlySpan<byte> record, ushort flags, int crcCoverEnd, int crcOffset)
     {
@@ -75,6 +82,21 @@ public static class RecordCodec
             {
                 var stored = BinaryPrimitives.ReadUInt32LittleEndian(record.Slice(crcOffset, crcLen));
                 // 累加：header 前 [0,crcOffset) + （若 CRC 在范围内）crcLen 个 0 + 剩余 [afterCrcStart, crcCoverEnd)。
+                // ★ x64 热路径：段循环内联在本方法内（零跨模块调用/零 span 切片链）——读自愈每次
+                //   校验都走这里，调用/建立开销曾占 CRC 校验成本的 ~1/2（112B 实测 29.7ns 中
+                //   crc32q 依赖链仅 ~10ns）。寄存器续算语义与 UnifiedCrc 逐位一致
+                //   （UnifiedCrcTests 差分验证），非 x64 回退 UnifiedCrc（含 ARM/软件路径）。
+                if (Sse42.X64.IsSupported)
+                {
+                    uint crc = 0xFFFF_FFFF;   // 裸寄存器初值（canonical 的 ~0）
+                    crc = Crc32CSegment(crc, record.Slice(0, crcOffset));
+                    if (crcInCover)
+                        crc = Sse42.Crc32(crc, 0u);   // CRC32C 的 crcLen 恒 4——零字节段 = 单条 crc32d
+                    if (afterCrcLen > 0)
+                        crc = Crc32CSegment(crc, record.Slice(afterCrcStart, afterCrcLen));
+                    return stored == ~crc;
+                }
+
                 var computed = UnifiedCrc.ComputeCrc32C(record[..crcOffset]);
                 if (crcInCover)
                     computed = UnifiedCrc.ComputeCrc32C(computed, zeroCrc[..crcLen]);
@@ -99,5 +121,32 @@ public static class RecordCodec
             default:
                 return true;
         }
+    }
+
+    /// <summary>★ CRC32C 段循环（crc32q/crc32d 硬件指令，寄存器续算）——VerifyCrc 热路径专用内联形态。</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static uint Crc32CSegment(uint crc, ReadOnlySpan<byte> data)
+    {
+        ref byte p = ref MemoryMarshal.GetReference(data);
+        nint len = data.Length;
+        while (len >= 8)
+        {
+            crc = (uint)Sse42.X64.Crc32(crc, Unsafe.ReadUnaligned<ulong>(ref p));
+            p = ref Unsafe.Add(ref p, 8);
+            len -= 8;
+        }
+        if (len >= 4)
+        {
+            crc = Sse42.Crc32(crc, Unsafe.ReadUnaligned<uint>(ref p));
+            p = ref Unsafe.Add(ref p, 4);
+            len -= 4;
+        }
+        while (len > 0)
+        {
+            crc = Sse42.Crc32(crc, p);
+            p = ref Unsafe.Add(ref p, 1);
+            len--;
+        }
+        return crc;
     }
 }

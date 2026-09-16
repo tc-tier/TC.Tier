@@ -141,6 +141,7 @@ public sealed class SpinRWLock
     }
 
     /// <summary>尝试获取读锁，不自旋，立刻返回（投机路径——拿不到不排队不阻碍）。</summary>
+    /// <returns>true = 已获取共享锁（须配对 <see cref="ReleaseShared"/>）；false = 写持有/写等待中、读计数满或 CAS 竞争失败，锁状态不变。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryAcquireShared()
     {
@@ -161,6 +162,7 @@ public sealed class SpinRWLock
     }
 
     /// <summary>获取读锁——返回 using scope（自动释放）。简化 try/finally 模式。</summary>
+    /// <returns>已持有共享锁的 scope，using 块结束时 <see cref="SharedScope.Dispose"/> 释放。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public SharedScope EnterShared() => new(this);
 
@@ -252,6 +254,7 @@ public sealed class SpinRWLock
     /// <summary>尝试获取写锁，不自旋、不设置 pending 排队闸门，拿到即返回 true。
     /// <para>★ 投机语义：失败不登记 pending（不给读者上闸）——适合"拿到就赚、拿不到走别路"的路径；
     ///   需要写偏向保证的排他转换必须用 <see cref="AcquireExclusive"/>。</para></summary>
+    /// <returns>true = 已获取排他锁（须配对 <see cref="ReleaseExclusive"/>）；false = 写持有或有在途读者，锁状态不变（未登记 pending）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryAcquireExclusive()
     {
@@ -272,6 +275,7 @@ public sealed class SpinRWLock
     }
 
     /// <summary>获取写锁——返回 using scope（自动释放）。简化 try/finally 模式。</summary>
+    /// <returns>已持有排他锁的 scope，using 块结束时 <see cref="ExclusiveScope.Dispose"/> 释放。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ExclusiveScope EnterExclusive() => new(this);
 

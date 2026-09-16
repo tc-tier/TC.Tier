@@ -14,9 +14,12 @@ public abstract class StructureScanCursorBase : IStructureScanCursor
     public ReadDirection Direction { get; }
 
     /// <inheritdoc/>
+    /// <returns>true = 成功推进到下一块；false = 失败或已到扫描末尾。</returns>
     public abstract bool MoveNext();
 
     /// <inheritdoc/>
+    /// <param name="cancellationToken">取消令牌，可用于取消异步操作。默认 <c>default</c>。</param>
+    /// <returns>完成后结果为 true = 成功推进到下一块；false = 失败或已到扫描末尾。</returns>
     /// <remarks>默认实现：同步委托 MoveNext。有真异步 I/O 的子类 override。</remarks>
     public virtual ValueTask<bool> MoveNextAsync(CancellationToken cancellationToken = default)
         => new(MoveNext());
@@ -25,5 +28,6 @@ public abstract class StructureScanCursorBase : IStructureScanCursor
     public abstract void Dispose();
 
     /// <inheritdoc/>
+    /// <returns>完成后即释放完游标占用的全部资源。</returns>
     public abstract ValueTask DisposeAsync();
 }

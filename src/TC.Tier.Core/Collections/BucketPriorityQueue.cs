@@ -70,6 +70,8 @@ public sealed class BucketPriorityQueue<TPriority, T> : IDisposable where TPrior
     /// <para>★ 严格优先级：值小的桶一定先于值大的桶出队。</para>
     /// <para>★ 同优先级 FIFO：<see cref="ConcurrentQueue{T}"/> 天然保证。</para>
     /// </summary>
+    /// <param name="item">成功时接收出队元素；失败时为 <c>default</c>。</param>
+    /// <returns>true 表示成功出队；false 表示所有桶均为空。</returns>
     public bool TryDequeue(out T item)
     {
         // 按优先级升序扫描所有桶
@@ -88,6 +90,8 @@ public sealed class BucketPriorityQueue<TPriority, T> : IDisposable where TPrior
     /// <summary>
     /// 尝试查看最高优先级元素（不出队）。
     /// </summary>
+    /// <param name="item">成功时接收队首元素；失败时为 <c>default</c>。</param>
+    /// <returns>true 表示查看成功；false 表示所有桶均为空。</returns>
     public bool TryPeek(out T item)
     {
         foreach (var bucket in _buckets)
@@ -107,6 +111,8 @@ public sealed class BucketPriorityQueue<TPriority, T> : IDisposable where TPrior
     ///   （无孤儿许可累积→无 <c>SemaphoreFullException</c>；多消费者逐项公平唤醒→无惊群）。
     ///   许可可用时 <c>WaitAsync</c> 立即返回，故单消费者性能与 fast-path 相当。</para>
     /// </summary>
+    /// <param name="cancellationToken">取消令牌；已取消或等待期间被取消时抛出 <see cref="OperationCanceledException"/>。默认 <c>default</c>。</param>
+    /// <returns>完成后返回出队的元素。</returns>
     public async ValueTask<T> DequeueAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();

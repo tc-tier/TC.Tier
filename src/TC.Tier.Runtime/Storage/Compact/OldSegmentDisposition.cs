@@ -44,6 +44,8 @@ internal struct OldSegmentDisposition
     /// <summary>是否为 DeleteFile 模式。</summary>
     public bool IsDelete => Mode == ModeDelete;
 
+    /// <summary>调试输出——Delete 模式输出 <c>seg{SegId} Delete</c>，Punch 模式输出 <c>seg{SegId} Punch[{PunchStart},{PunchEnd})</c>。</summary>
+    /// <returns>本处置记录的人类可读描述。</returns>
     public override string ToString()
         => IsDelete ? $"seg{SegId} Delete" : $"seg{SegId} Punch[{PunchStart},{PunchEnd})";
 }

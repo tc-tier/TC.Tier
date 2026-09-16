@@ -32,7 +32,11 @@ internal sealed class TestVolume : IDisposable
         {
             // local：每卷唯一子目录（spec 直传会被并行卷撞根）——New 对空根幂等
             _diskDir = TestTempDir.Create("tc-volume");
-            Fs = TierFs.New($"local:///{_diskDir.Replace('\\', '/')}");
+            // ★ MetaWriteDurable=false：测试卷 FileExtra 缓存写（免 fsync）——churn 卷上
+            //   FlushFileBuffers 等 NTFS 元数据静默窗无界停滞（2026-09-08 栈实锤，磁盘全闲
+            //   也可数分钟/次）；进程内存活期读己写恒成立，耐久化语义由同进程 reopen 覆盖。
+            Fs = TierFs.New($"local:///{_diskDir.Replace('\\', '/')}",
+                new TC.Tier.Core.IO.Disk.DiskFileSystemOptions { MetaWriteDurable = false });
         }
         else
         {
@@ -45,4 +49,23 @@ internal sealed class TestVolume : IDisposable
         Fs.Dispose();
         if (_diskDir is not null) TestTempDir.TryCleanup(_diskDir);
     }
+}
+
+/// <summary>
+/// 测试时间预算介质感知——真磁盘介质（TC_TEST_FS_SPEC 指定）按倍数放大等待/超时预算。
+/// <para>★ 依据：机械盘 + 段 meta fsync 串行门（AdsMetaGate 进程级）的物理成本——每次
+///   meta fsync ~15-30ms，小段压测几何（数百段）天然落在数十秒量级。预算按介质校准，
+///   断言语义（完成且不挂死/恰好一次）不变——mem 预算原样。</para>
+/// </summary>
+internal static class TestMediaBudget
+{
+    /// <summary>当前是否真磁盘介质（local/virtual/network spec——mem 为默认缺省）。</summary>
+    public static bool IsRealDiskMedium
+        => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TC_TEST_FS_SPEC"));
+
+    /// <summary>按介质缩放预算：mem 原样；真磁盘 ×<paramref name="diskMultiplier"/>。</summary>
+    public static TimeSpan Scale(TimeSpan baseBudget, double diskMultiplier = 10)
+        => IsRealDiskMedium
+            ? TimeSpan.FromMilliseconds(baseBudget.TotalMilliseconds * diskMultiplier)
+            : baseBudget;
 }

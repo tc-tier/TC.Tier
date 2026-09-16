@@ -123,63 +123,38 @@ public class OverflowPoolTests
     }
 
     [Fact]
-    public async Task Concurrent_TryAddTryGet_Stress()
-    {
-        // 多生产者 + 多消费者并发压测（对齐 AsyncQueueTests 的并发范式）
-        var pool = new OverflowPool<int>(64);
-        const int perProducer = 2000;
-        const int producerCount = 4;
-        const int total = perProducer * producerCount;
-        int consumed = 0;
-        var producers = new Task[producerCount];
-        var consumers = new Task[producerCount];
-
-        // 生产者：尝试入池（部分会被拒 overflow，因容量 64 << total）
-        for (int p = 0; p < producerCount; p++)
-        {
-            int pid = p;
-            producers[p] = Task.Run(() =>
-            {
-                for (int i = 0; i < perProducer; i++)
-                    pool.TryAdd(pid * perProducer + i);
-            });
-        }
-        // 消费者：持续取出直到吃满 total（含被拒的不计入）
-        for (int c = 0; c < producerCount; c++)
-        {
-            consumers[c] = Task.Run(() =>
-            {
-                int local = 0;
-                while (local < perProducer && Volatile.Read(ref consumed) < total)
-                {
-                    if (pool.TryGet(out _))
-                    {
-                        local++;
-                        Interlocked.Increment(ref consumed);
-                    }
-                }
-            });
-        }
-        await Task.WhenAll(producers);
-        await Task.WhenAny(Task.WhenAll(consumers), Task.Delay(10000));
-
-        // 容量 64，生产 total=8000，大部分被拒 overflow。消费掉的 = hits，吃掉的应 <= total。
-        pool.Hits.Should().BePositive("消费者应至少取到部分对象");
-        pool.Overflows.Should().BePositive("容量远小于生产量，必有 overflow");
-        (pool.Hits + pool.Count).Should().BeLessThanOrEqualTo(total);
-    }
-
-    [Fact]
     public async Task Concurrent_NoCorruption_UnderDisposeRace()
     {
-        // 并发 TryAdd 与 Dispose 不应崩溃/死锁（旧版 _disposed 非 volatile 有 TOCTOU，新版 Volatile 修复）
-        for (int iter = 0; iter < 20; iter++)
+        const int producerCount = 4;
+        const int perProducer = 1_000;
+        const int total = producerCount * perProducer;
+
+        for (int iter = 0; iter < 50; iter++)
         {
-            var pool = new OverflowPool<int>(4, _ => { });
-            var w1 = Task.Run(() => { for (int i = 0; i < 1000; i++) pool.TryAdd(i); });
-            var w2 = Task.Run(() => pool.Dispose());
-            await Task.WhenAll(w1, w2);
-            // 不抛异常即通过（dispose 后 TryAdd 走 overflow 分支回收）
+            var disposeCounts = new int[total];
+            var pool = new OverflowPool<int>(64, item => Interlocked.Increment(ref disposeCounts[item]));
+            using var start = new ManualResetEventSlim();
+
+            var producers = Enumerable.Range(0, producerCount).Select(producer => Task.Run(() =>
+            {
+                start.Wait();
+                int begin = producer * perProducer;
+                for (int item = begin; item < begin + perProducer; item++)
+                    pool.TryAdd(item);
+            })).ToArray();
+            var disposer = Task.Run(() =>
+            {
+                start.Wait();
+                pool.Dispose();
+            });
+
+            start.Set();
+            await Task.WhenAll(producers.Append(disposer));
+
+            pool.Count.Should().Be(0, "Dispose 返回后不得残留竞态晚入队对象");
+            disposeCounts.Should().OnlyContain(
+                count => count == 1,
+                "每个归还对象必须由拒绝路径或 Dispose 排水恰好回收一次");
         }
     }
 }

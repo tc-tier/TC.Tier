@@ -97,4 +97,8 @@ public sealed class RemoteFileSystemOptions : FileSystemOptions
             throw new ArgumentException(
                 $"KeyPrefix 过长（{prefixBytes} 字节——加最长文件名将超 S3 键上限 {ObjectKeyValidator.MaxKeyBytes}）。");
     }
+
+    /// <summary>时钟供给源（故障注入面 件一——时钟缝 P2 落点；缺省 <see cref="TimeProvider.System"/> 行为零变化）。
+    /// <para>排他锁等待 deadline 经本源计量——假钟下由快进确定性驱动。</para></summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }

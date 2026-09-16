@@ -1,5 +1,8 @@
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
 
+/// <summary>
+/// ProbingIndexBase 释放 partial——LifecycleBase 模板清理钩子（探测族无引擎外原生资源，空实现）。
+/// </summary>
 public abstract partial class ProbingIndexBase<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>同步额外清理钩子（LifecycleBase 模板）——探测族无引擎外原生资源（引擎/epoch 归 Resources 统一释放），空实现。</summary>

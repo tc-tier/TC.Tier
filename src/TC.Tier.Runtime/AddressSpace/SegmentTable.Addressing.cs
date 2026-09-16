@@ -52,6 +52,9 @@ public sealed partial class SegmentTable
     ///   (N, 0) 只保留"段首字节/原点"身份；段末只有一种写法——与 RetreatAddress 互为精确镜像，
     ///   与扫盘恢复尾 (seg, GrowthLimit) 同形。</para>
     /// </summary>
+    /// <param name="start">起始地址。</param>
+    /// <param name="length">前进的字节数（非负）。</param>
+    /// <returns>前进 length 字节后的地址（Extension 恒为 0）；length == 0 时原样返回 start。</returns>
     public LogicalAddress AdvanceAddress(LogicalAddress start, long length)
     {
         switch (length)
@@ -90,6 +93,9 @@ public sealed partial class SegmentTable
     /// <para>★ 只回退：length &lt; 0 抛异常；== 0 返回 start。</para>
     /// <para>★ 回退到段表头部之前（低于 MinAddress）返回 <see cref="LogicalAddress.Invalid"/>。</para>
     /// </summary>
+    /// <param name="start">起始地址。</param>
+    /// <param name="length">回退的字节数（非负）。</param>
+    /// <returns>回退 length 字节后的地址；length == 0 时原样返回 start；越过段表头部返回 <see cref="LogicalAddress.Invalid"/>。</returns>
     public LogicalAddress RetreatAddress(LogicalAddress start, long length)
     {
         switch (length)
@@ -135,6 +141,9 @@ public sealed partial class SegmentTable
     /// 计算两个地址之间的字节距离（from → to，跨段累加）。若 from &gt; to 返回负值。
     /// <para>★ 不做 AllocatedTail 上界校验——调用方保证 from/to 合法。</para>
     /// </summary>
+    /// <param name="from">起点地址。</param>
+    /// <param name="to">终点地址。</param>
+    /// <returns>from 到 to 的字节距离（非负）；from &gt; to 时返回负值。</returns>
     public long GetDistance(LogicalAddress from, LogicalAddress to)
     {
         var cmp = from.CompareTo(to);
@@ -163,6 +172,8 @@ public sealed partial class SegmentTable
     /// 取段生长上限——段存在用段的，段不存在（Hollow，已回收/未建）用生命周期上限 _growthLimit。
     /// <para>★ 地址空间连续：被回收的段在逻辑地址上仍占 _growthLimit 字节，只是物理没了。</para>
     /// </summary>
+    /// <param name="segId">段号（非负）。</param>
+    /// <returns>该段的生长上限（字节）；段不存在（Hollow）时返回全局生命周期上限 <see cref="GrowthLimit"/>。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     // ReSharper disable once MemberCanBePrivate.Global
     public long SegmentGrowthLimit(int segId)

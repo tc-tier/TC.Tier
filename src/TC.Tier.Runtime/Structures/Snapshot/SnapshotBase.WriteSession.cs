@@ -59,6 +59,9 @@ public abstract partial class SnapshotBase
         /// 高性能异步写入：自动管理 buffer swap + pipeline flush。
         /// ★ 快速路径：数据能放进当前 buffer 时零分配同步返回，避免 async 状态机开销。
         /// </summary>
+        /// <param name="data">待写数据（buffer 满时自动 swap+flush 续写）。</param>
+        /// <param name="ct">取消令牌。默认 default。</param>
+        /// <returns>表示写入完成的任务（放得下当前 buffer 时同步完成）。</returns>
         public ValueTask WriteAsync(ReadOnlyMemory<byte> data, CancellationToken ct = default)
         {
             if (data.IsEmpty) return ValueTask.CompletedTask;
@@ -94,6 +97,7 @@ public abstract partial class SnapshotBase
         }
 
         /// <summary>同步写入：buffer 满时同步 swap+flush。单线程契约。</summary>
+        /// <param name="data">待写数据（可跨 buffer 边界自动续写）。</param>
         public void Write(ReadOnlySpan<byte> data)
         {
             if (data.IsEmpty) return;
@@ -114,6 +118,8 @@ public abstract partial class SnapshotBase
         }
 
         /// <summary>微写入同步 API（header/footer 等固定小数据）。不触发 flush；先 FlushIfFull 确保空间。</summary>
+        /// <param name="data">待写小数据（长度超过当前 buffer 剩余空间抛 InvalidOperationException）。</param>
+        /// <exception cref="InvalidOperationException">当前 buffer 剩余空间不足时抛出（须先 FlushIfFull）。</exception>
         public void WriteSmall(ReadOnlySpan<byte> data)
         {
             if (data.Length > _fullBufferSize - _written)
@@ -125,6 +131,9 @@ public abstract partial class SnapshotBase
         }
 
         /// <summary>空间不足 needed 时 swap + flush（异步）。</summary>
+        /// <param name="needed">即将需要的字节数（超过当前剩余空间即触发）。</param>
+        /// <param name="ct">取消令牌。默认 default。</param>
+        /// <returns>表示 swap+flush 完成的任务（空间充足时同步完成）。</returns>
         public async ValueTask FlushIfFullAsync(int needed, CancellationToken ct = default)
         {
             if (_fullBufferSize - _written < needed)
@@ -132,6 +141,7 @@ public abstract partial class SnapshotBase
         }
 
         /// <summary>空间不足 needed 时同步 swap + flush。</summary>
+        /// <param name="needed">即将需要的字节数（超过当前剩余空间即触发）。</param>
         public void FlushIfFull(int needed)
         {
             if (_fullBufferSize - _written < needed)
@@ -139,6 +149,8 @@ public abstract partial class SnapshotBase
         }
 
         /// <summary>最终 flush：await pipeline 上一次 + flush 剩余。幂等。</summary>
+        /// <param name="ct">取消令牌。默认 default。</param>
+        /// <returns>表示最终 flush 完成的任务；完成后全部已写数据已落盘（剩余部分补零对齐到扇区）、OnFlushed 已触发。</returns>
         public async ValueTask FlushAsync(CancellationToken ct = default)
         {
             await AwaitPendingFlushAsync().ConfigureAwait(false);
@@ -214,9 +226,9 @@ public abstract partial class SnapshotBase
         private void AwaitPendingFlush()
         {
             if (!_hasPendingFlush) return;
-#pragma warning disable TCSG031 // 设计必需：同步写路径等 pending flush 完成
+#pragma warning disable TCSG137 // 设计必需：同步写路径等 pending flush 完成
             _pendingFlush.GetAwaiter().GetResult();
-#pragma warning restore TCSG031
+#pragma warning restore TCSG137
             OnFlushed?.Invoke(_pendingFlushAddress, _pendingFlushLogical, _pendingFlushAligned);
             _hasPendingFlush = false;
         }
@@ -232,6 +244,8 @@ public abstract partial class SnapshotBase
         private void CopyToBuffer(ReadOnlySpan<byte> src)
             => src.CopyTo(_active.GetSpan(_written, src.Length));
 
+        /// <summary>异步释放：最终 flush（幂等）+ 释放双 buffer。</summary>
+        /// <returns>表示释放完成的任务；完成后会话内全部数据已落盘。</returns>
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;
@@ -241,6 +255,7 @@ public abstract partial class SnapshotBase
             _bufferB.Dispose();
         }
 
+        /// <summary>同步释放：最终 flush（幂等）+ 释放双 buffer。</summary>
         public void Dispose()
         {
             if (_disposed) return;

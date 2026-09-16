@@ -57,13 +57,17 @@ internal static class WalProbeCommon
     ];
 
     /// <summary>组提交形态（三维度禁用——仅显式 CommitAsync 推进水位；对齐测试 ManualCommit）。</summary>
+    /// <remarks>★ 探针 = 测量工具（含基线档——virtual 无载体写穿档 p99.9 ≥150ms 是待测数字本身）——地板验证关闭。</remarks>
     public static TierWalOptions GroupCommit() => TierWalOptions.Default
+        .WithDurabilityValidation(false)
         .WithCommitInterval(TimeSpan.FromMilliseconds(-1))
         .WithMaxUnflushedBytes(long.MaxValue)
         .WithMaxUnflushedCount(int.MaxValue);
 
     /// <summary>单条提交形态（三维度全 0——每次 Append 即触发提交）。</summary>
+    /// <remarks>★ 同上——探针测量基线档，地板验证关闭。</remarks>
     public static TierWalOptions SingleForce() => TierWalOptions.Default
+        .WithDurabilityValidation(false)
         .WithCommitInterval(TimeSpan.FromMilliseconds(-1))
         .WithMaxUnflushedBytes(long.MaxValue)
         .WithMaxUnflushedCount(0);

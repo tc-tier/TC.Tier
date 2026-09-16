@@ -2,6 +2,9 @@ using System.Runtime.InteropServices;
 
 namespace TC.Tier.Runtime.Structures.Metadata;
 
+/// <summary>
+/// MetadataBase 头部布局 partial——嵌套 <see cref="MetadataHeader"/>（版本 record 42B 头，CRC in Header）。
+/// </summary>
 public abstract partial class MetadataBase
 {
     /// <summary>

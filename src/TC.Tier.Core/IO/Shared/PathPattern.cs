@@ -9,6 +9,8 @@ namespace TC.Tier.Core.IO.Shared;
 internal static class PathPattern
 {
     /// <summary>校验 pattern（枚举族入口共用）——null/空拒绝（缺省 "*" 由调用方/参数默认值表达）。</summary>
+    /// <param name="pattern">通配模式。</param>
+    /// <exception cref="ArgumentException">pattern 为 null/空。</exception>
     public static void Validate(string? pattern)
     {
         if (string.IsNullOrEmpty(pattern))
@@ -16,6 +18,9 @@ internal static class PathPattern
     }
 
     /// <summary>通配匹配（双指针回溯——'*' 记位回退；O(n·p) 最坏，名字级输入无压力）。</summary>
+    /// <param name="name">条目名（通常为最终组件名）。</param>
+    /// <param name="pattern">通配模式（'*' 任意序列 / '?' 单字符，Ordinal）。</param>
+    /// <returns>true = name 匹配 pattern；false = 不匹配。</returns>
     public static bool IsMatch(ReadOnlySpan<char> name, ReadOnlySpan<char> pattern)
     {
         var n = 0;          // name 游标
@@ -49,6 +54,8 @@ internal static class PathPattern
     }
 
     /// <summary>sidecar 伴生名（§3.6 元数据回退通道）：同目录点前缀——"a/b/data.0" → "a/b/.data.0"。</summary>
+    /// <param name="path">原文件相对路径。</param>
+    /// <returns>伴生文件相对路径（末组件前加 '.'）。</returns>
     public static string SidecarOf(string path)
     {
         var last = path.LastIndexOf('/');
@@ -61,6 +68,8 @@ internal static class PathPattern
     /// 隐藏类判定（§3.5 评审修订）：相对路径<b>任一组件</b>以 <c>.</c> 开头 → 枚举不可见
     /// （含隐藏子树：<c>a/.b/c</c> 整支）。豁免由调用方判定（pattern 首字符 <c>.</c>）。
     /// </summary>
+    /// <param name="relativeName">相对路径（'/' 分隔，逐组件检查）。</param>
+    /// <returns>true = 任一组件以 '.' 开头（枚举默认不可见）；false = 无隐藏组件。</returns>
     public static bool IsHiddenRelative(ReadOnlySpan<char> relativeName)
     {
         var start = 0;
@@ -74,6 +83,8 @@ internal static class PathPattern
     }
 
     /// <summary>枚举调用的隐藏豁免判定（A 方案）：pattern 首字符 <c>.</c> = 显式查看隐藏类。</summary>
+    /// <param name="pattern">通配模式。</param>
+    /// <returns>true = 隐藏类豁免（枚举可见隐藏条目）；false = 默认隐藏。</returns>
     public static bool HiddenExempt(ReadOnlySpan<char> pattern)
         => pattern.Length > 0 && pattern[0] == '.';
 }

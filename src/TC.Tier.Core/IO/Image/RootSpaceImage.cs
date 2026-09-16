@@ -235,8 +235,8 @@ public static class RootSpaceImage
 
     private static uint Crc32Of(byte[] raw)
     {
-        // 复用格式侧同一 CRC（帧校验在 ReadFrame 内已完成；此处为聚合对账重算）
-        return System.IO.Hashing.Crc32.HashToUInt32(raw);
+        // 复用格式侧同一 IEEE CRC-32（帧校验在 ReadFrame 内已完成；此处为聚合对账重算）
+        return UnifiedCrc.ComputeCrc32(raw);
     }
 
     /// <summary>

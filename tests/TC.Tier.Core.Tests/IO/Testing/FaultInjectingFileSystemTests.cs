@@ -77,6 +77,18 @@ public sealed class FaultInjectingFileSystemTests
     }
 
     [Fact]
+    public void Inject_CustomException_PreservesExactType()
+    {
+        using var inner = MemoryFileSystem.New();
+        using var fs = new FaultInjectingFileSystem(inner);
+        fs.AddExceptionRule("a", "Open", static () => new OutOfMemoryException("fatal marker allocation"));
+
+        var act = () => fs.Open("a", Opts());
+
+        act.Should().Throw<OutOfMemoryException>().WithMessage("fatal marker allocation");
+    }
+
+    [Fact]
     public void Inject_AppendFailure_OnDisk()
     {
         // ① Append 失败语义在磁盘介质上的注入载体验证（ReservedOffset 全语义已由 mem 配额测试覆盖——

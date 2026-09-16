@@ -43,10 +43,19 @@ public abstract partial class RingBase<TKey>
     private protected class RingSnapshot<TRing>(TRing owner) : IRingSnapshot
         where TRing : RingBase<TKey>
     {
+        /// <summary>创建覆盖 [begin, end) 区间的快照读取器（上层 pull 导出 Ring 页池数据）。</summary>
+        /// <param name="begin">导出区间的起始逻辑地址。</param>
+        /// <param name="end">导出区间的结束逻辑地址（不含）。</param>
+        /// <returns>快照读取器实例。</returns>
         public IRingSnapshotReader Reader(LogicalAddress begin, LogicalAddress end)
         {
             return new RingSnapshotReader(owner, begin, end);
         }
+
+        /// <summary>创建覆盖 [begin, end) 区间的快照写入器（导入数据填回 Ring 页池）。</summary>
+        /// <param name="begin">导入区间的起始逻辑地址。</param>
+        /// <param name="end">导入区间的结束逻辑地址（超出当前 AllocatedTail 时先整段预留 Allocate）。</param>
+        /// <returns>快照写入器实例。</returns>
         public IRingSnapshotWriter Writer(LogicalAddress begin, LogicalAddress end)
         {
             return new RingSnapshotWriter(owner, begin, end);
@@ -73,6 +82,9 @@ public abstract partial class RingBase<TKey>
 
         public long Length => _owner._engine.GetDistance(_begin, _end);
 
+        /// <summary>同步读快照剩余数据到 buffer（热区页池直读 / 冷区设备回源，跨页自动分段拷贝）。</summary>
+        /// <param name="buffer">接收缓冲区（长度 0 直接返回 0）。</param>
+        /// <returns>实际读入的字节数（0 = 已到快照末尾 _end）。</returns>
         public int Read(Span<byte> buffer)
         {
             ThrowIfDisposed();
@@ -97,6 +109,10 @@ public abstract partial class RingBase<TKey>
             return written;
         }
 
+        /// <summary>异步读快照剩余数据到 buffer（冷区真异步 IO，跨页自动分段拷贝）。</summary>
+        /// <param name="buffer">接收缓冲区（长度 0 直接返回 0）。</param>
+        /// <param name="ct">取消令牌，可用于取消异步操作。默认 <c>default</c>。</param>
+        /// <returns>完成后结果为实际读入的字节数（0 = 已到快照末尾 _end）。</returns>
         public async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
         {
             ThrowIfDisposed();
@@ -129,7 +145,11 @@ public abstract partial class RingBase<TKey>
             try
             {
                 long phys = _owner.GetPhysicalAddress(addr);
-                int copyLen = Math.Min(maxBytes, dest.Length);
+                // ★ STORAGE-036：按页边界钳制——拷贝区间可跨页，页与页是独立 native 分配，
+                //   单次拷贝不得越出当前页槽（原 min(maxBytes, dest.Length) 会跨页越读）。
+                //   外层 while 按返回的 written 推进 addr，下一页由下一次迭代处理。
+                int pageRemain = _owner.PageSize - (int)(addr.Offset & _owner.PageSizeMask);
+                int copyLen = Math.Min(Math.Min(maxBytes, dest.Length), pageRemain);
                 new ReadOnlySpan<byte>((void*)phys, copyLen).CopyTo(dest);
                 return copyLen;
             }
@@ -168,6 +188,7 @@ public abstract partial class RingBase<TKey>
             return available;
         }
 
+        /// <summary>释放读取器（释放页框缓冲；幂等）。</summary>
         public void Dispose()
         {
             if (_disposed) return;
@@ -175,6 +196,8 @@ public abstract partial class RingBase<TKey>
             _frame.Dispose();
         }
 
+        /// <summary>异步释放读取器（同步完成——仅释放 native 页框；幂等）。</summary>
+        /// <returns>完成后读取器已释放。</returns>
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;
@@ -210,6 +233,8 @@ public abstract partial class RingBase<TKey>
             }
         }
 
+        /// <summary>同步写入数据到导入区间（超出 _end 的尾部截断；Complete 后再写抛异常）。</summary>
+        /// <param name="buffer">待写入的字节数据。</param>
         public void Write(ReadOnlySpan<byte> buffer)
         {
             ThrowIfDisposed();
@@ -225,6 +250,10 @@ public abstract partial class RingBase<TKey>
             }
         }
 
+        /// <summary>异步写入数据到导入区间（当前实现同步落页池后即完成；Complete 后再写抛异常）。</summary>
+        /// <param name="buffer">待写入的字节数据。</param>
+        /// <param name="ct">取消令牌（当前实现写前检查）。默认 <c>default</c>。</param>
+        /// <returns>完成后 buffer 已写入页池（截断规则同 <see cref="Write"/>）。</returns>
         public async ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken ct = default)
         {
             ThrowIfDisposed();
@@ -233,14 +262,24 @@ public abstract partial class RingBase<TKey>
             await ValueTask.CompletedTask.ConfigureAwait(false);
         }
 
+        /// <summary>完成导入——把 Ring 写尾 _tailAddress 推进到 _end（幂等；Dispose 后再调抛异常）。</summary>
         public void Complete()
         {
             ThrowIfDisposed();
             if (_completed) return;
             _completed = true;
-            _owner._tailAddress = _end;
+            // ★ #166：导入区水位收口（原实现裸设 tail，ReadOnly/SafeReadOnly 滞留旧位——
+            //   导入数据被当 mutable、永不进入 flush/驱逐管线）
+            lock (_owner._tailLock)
+            {
+                if (_end > _owner._tailAddress) _owner._tailAddress = _end;
+            }
+            _owner.CompleteSnapshotRegion(_end);
         }
 
+        /// <summary>异步完成导入（语义同 <see cref="Complete"/>）。</summary>
+        /// <param name="ct">取消令牌（当前实现写前检查）。默认 <c>default</c>。</param>
+        /// <returns>完成后写尾已推进到 _end。</returns>
         public async ValueTask CompleteAsync(CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
@@ -282,8 +321,11 @@ public abstract partial class RingBase<TKey>
             }
         }
 
+        /// <summary>释放写入器（仅置 disposed 标记——页池内存归 Ring 所有，无需另行回收；幂等）。</summary>
         public void Dispose() => _disposed = true;
 
+        /// <summary>异步释放写入器（同步完成，语义同 <see cref="Dispose"/>）。</summary>
+        /// <returns>完成后写入器已释放。</returns>
         public async ValueTask DisposeAsync()
         {
             _disposed = true;

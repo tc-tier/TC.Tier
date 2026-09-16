@@ -1,5 +1,5 @@
-using System.IO.Hashing;
 using TC.Tier.Core.IO;
+using TC.Tier.Core.Primitives;
 using TC.Tier.Core.IO.TierVolume;
 
 namespace TC.Tier.Core.Tests.IO.TierVolume;
@@ -214,7 +214,7 @@ public sealed class TierVolumeJournalTests : IDisposable
             using (var raw = File.OpenHandle(path, FileMode.Open, FileAccess.Read, FileShare.Read))
                 RandomAccess.Read(raw, sb, sbOffset);
             System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(sb.AsSpan(178, 8), 77);   // 伪造非零 JournalStart
-            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(sb.AsSpan(4088), Crc32.HashToUInt32(sb.AsSpan(0, 4088)));
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(sb.AsSpan(4088), UnifiedCrc.ComputeCrc32C(sb.AsSpan(0, 4088)));
             using (var raw = File.OpenHandle(path, FileMode.Open, FileAccess.ReadWrite, FileShare.Read))
                 RandomAccess.Write(raw, sb, sbOffset);
         }

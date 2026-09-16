@@ -176,6 +176,46 @@ public class LogAbortTests
         finally { vol.Dispose(); }
     }
 
+    [Fact]
+    public void OnCommitted_CallbackThrows_SubsequentCallbacksStillFire_AggregatePropagates()
+    {
+        var (settings, vol) = TestLogSettingsFactory.CreateEntry(metaKind: MetaPolicyKind.Managed);
+        try
+        {
+            using var log = TestLogSettingsFactory.NewEntryLog(vol, settings);
+            log.Append("A"u8.ToArray());
+
+            int firedAfterThrow = 0;
+            log.OnCommitted(1, () => throw new InvalidOperationException("callback boom"));
+            log.OnCommitted(1, () => firedAfterThrow++);
+
+            var act = () => log.ConfirmCommitted(1);
+            act.Should().Throw<AggregateException>()
+                .Which.InnerExceptions.Should().Contain(e => e is InvalidOperationException);
+
+            firedAfterThrow.Should().Be(1, "前序回调异常不得中断后续回调（回调已出队，中断即永久丢失）");
+        }
+        finally { vol.Dispose(); }
+    }
+
+    [Fact]
+    public void OnCommitted_AfterCommit_FiresImmediately()
+    {
+        var (settings, vol) = TestLogSettingsFactory.CreateEntry(metaKind: MetaPolicyKind.Managed);
+        try
+        {
+            using var log = TestLogSettingsFactory.NewEntryLog(vol, settings);
+            log.Append("A"u8.ToArray());
+            log.Prepare(1);
+            log.ConfirmCommitted(1);
+
+            int fired = 0;
+            log.OnCommitted(1, () => fired++);   // 已提交 seq——注册即同步触发
+            fired.Should().Be(1);
+        }
+        finally { vol.Dispose(); }
+    }
+
     /// <summary>Phase-1 故障注入参与者：Prepare 必抛。</summary>
     private sealed class ThrowingParticipant : ITransactionParticipant
     {

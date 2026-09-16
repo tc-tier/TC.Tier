@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <IsPackable>true</IsPackable>
+    <!-- embedded 符号模式下 snupkg 无内容（NU5017）——符号随主包，关掉二次符号包 -->
+    <IncludeSymbols>false</IncludeSymbols>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <RootNamespace>TC.Tier.Analyzers</RootNamespace>
+    <AssemblyName>TC.Tier.Analyzers</AssemblyName>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <!-- RS2007 豁免理由：AnalyzerReleases 文件（BOM+LF+无首尾竖线表格）经三种形态验证合规，
+         clean/incremental 构建间仍非确定性误报——release 登记改为人工维护，规则清单见 Unshipped.md -->
+    <NoWarn>$(NoWarn);RS2007</NoWarn>
+    <PackageId>TC.Tier.Analyzers</PackageId>
+    <Description>TC.Tier 配置化分析器——分层依赖规则族（tier_layer.*）与禁用模式规则族（tier_forbidden.*），.editorconfig 声明规则与作用域；零默认诊断（装包未配置零打扰）</Description>
+    <!-- 分析器包配方：构建产物不走 lib/，经 None+相对路径落 analyzers/dotnet/cs（64ecc501 判例）；
+         DevelopmentDependency=消费方项目不流式传递 -->
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <!-- NU5128 豁免理由：分析器包无 lib/ 有意（纯分析器形态）——Roslyn 官方打包配方 -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+    <!-- NU5128 豁免理由：分析器包无 lib/ 有意（纯分析器形态）——Roslyn 官方打包配方 -->
+    <NoWarn>$(NoWarn);NU5128</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- RS2008 规则登记（全规则入 AnalyzerReleases） -->
+  <ItemGroup>
+    <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+    <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
+</Project>

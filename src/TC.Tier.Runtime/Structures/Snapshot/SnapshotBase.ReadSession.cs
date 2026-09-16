@@ -78,6 +78,8 @@ public abstract partial class SnapshotBase
         /// 内部按物理对齐预读 + 双 buffer 流水线，剔除 padding，只交付 [logicalStart, logicalEnd) 内的逻辑字节。
         /// </summary>
         /// <returns>实际填充字节数；0 表示到达逻辑 EOF。</returns>
+        /// <param name="dest">调用方目标缓冲区（零分配填充）。</param>
+        /// <param name="ct">取消令牌。默认 default。</param>
         public async ValueTask<int> ReadAsync(Memory<byte> dest, CancellationToken ct = default)
         {
             if (dest.IsEmpty) return 0;
@@ -188,6 +190,8 @@ public abstract partial class SnapshotBase
             _hasPrefetch = true;
         }
 
+        /// <summary>异步释放：消费挂起的预读（避免孤儿 ValueTask）+ 释放双 buffer。</summary>
+        /// <returns>表示释放完成的任务。</returns>
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;
@@ -211,6 +215,7 @@ public abstract partial class SnapshotBase
             _bufferB.Dispose();
         }
 
+        /// <summary>同步释放：直接释放双 buffer（不等待挂起预读，语义与 <see cref="DisposeAsync"/> 不同）。</summary>
         public void Dispose()
         {
             if (_disposed) return;

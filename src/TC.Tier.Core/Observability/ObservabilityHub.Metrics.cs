@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Core.Observability;
 
+/// <summary>可观测 hub——本部分定义 <see cref="MetricsView"/>（三原语公共视图：Counter/Histogram/Gauge）。</summary>
 public sealed partial class ObservabilityHub
 {
     /// <summary>三原语公共视图 —— 镜像 <see cref="IMetricsSink"/>，带 IsEnabled 短路。</summary>

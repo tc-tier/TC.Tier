@@ -10,7 +10,7 @@ namespace TC.Tier.Runtime.Tests.Transactions;
 /// ② 保护区纪律：区内零拷贝读（Ring GetValueSpan——无自保护）正常、区内自带保护 API（Ring 写/Index Find）
 /// 触发重入绊线立即暴露；</para>
 /// <para>③ 同实例不可重入（Enter 未 Exit 又 Enter）；④ 跨实例并发持有（Session 聚合域形态）；
-/// ⑤ ref struct scope 与协议形态同真源（先后互用不残留）。</para>
+/// ⑤ 协议连续进出对不残留（Ring 读 scope 形态已随 read-protection-tiering v2 退役）。</para>
 /// <para>断言依据为行为（结构可用/绊线抛异常）而非窥探 epoch 内部表（每实例一张表，无共享可观测位）。</para>
 /// </summary>
 public class EpochProtectionTests
@@ -157,10 +157,10 @@ public class EpochProtectionTests
     }
 
     [Fact]
-    public void RefStructScopes_EquivalentToProtocol_SingleSource()
+    public void ProtocolPair_ReusableWithoutResidue()
     {
-        // ref struct scope（EnterReadScope）与 IEpochProtected 同真源：
-        // scope 内读正常，Dispose 后可再经协议进出（互不残留）。
+        // ★ 读 scope 形态已退役（read-protection-tiering v2 W2：读保护从 epoch 编排重构为内容自愈读）
+        // ——协议形态连续两对进出不残留（配对纪律保留；Ring 保留 EnterEpoch/ExitEpoch 底层原语——Q1）。
         var vol = new TestVolume();
         try
         {
@@ -168,15 +168,14 @@ public class EpochProtectionTests
                 TestRingSettingsFactory.On(vol, "epoch-ring2"));
             var addr = ring.Write(5L, new byte[] { 1, 2, 3 });
 
-            using (var scope = ring.EnterReadScope())
+            for (int round = 0; round < 2; round++)
             {
-                ring.GetValueSpan(addr).Length.Should().Be(3, "scope 内零拷贝读正常");
+                ((IEpochProtected)ring).EnterEpoch();
+                ring.GetValueSpan(addr).Length.Should().Be(3, $"第 {round + 1} 轮进出对内零拷贝读正常");
+                ((IEpochProtected)ring).ExitEpoch();
             }
 
-            ((IEpochProtected)ring).EnterEpoch();
-            ((IEpochProtected)ring).ExitEpoch();
-
-            // scope 与协议两形态先后使用——均正确配对，结构 Dispose 无持保护残留（隐式断言）
+            // 连续两对进出均正确配对——结构 Dispose 无持保护残留（隐式断言）
         }
         finally { vol.Dispose(); }
     }

@@ -76,6 +76,7 @@ public sealed class TierSession : IDisposable
     /// <para>需要协调的读（RYW/scope 批量/未来路由）经此入口；地址直达读（自缓冲句柄）无会话零税
     /// ——一等公民永远保留（设计稿 §3.2 两档）。保护区纪律见 <see cref="SessionReadScope"/>。</para>
     /// </summary>
+    /// <returns>聚合域内全部 epoch 读保护参与者的读 scope（using 退出时统一释放）。</returns>
     public SessionReadScope EnterReadScope()
     {
         ThrowIfNotActive();
@@ -149,6 +150,10 @@ public sealed class TierSession : IDisposable
     /// （决策注入：多数派共识——Phase 4 自研协议对接位）→ true: Confirm-all（★不可回退点）；
     /// false/超时/异常: Abort 已 Prepare 者（D2 截断）→ <see cref="RollbackException"/>。
     /// </summary>
+    /// <param name="awaitDecision">多数派决策委托（入参候选 seq + 取消令牌；true = 提交，false/异常 = 回滚），非空。</param>
+    /// <param name="context">调用方关联上下文（随回执域诊断面可读——协议不解释内容）。</param>
+    /// <param name="ct">取消令牌（取消 = 排队撤销：出队丢弃；在途回合不可打断，等终态防登记泄漏），默认 default。</param>
+    /// <returns>完成后得到提交成功的域 seq（本回合所在批的共享 seq）；决策失败抛 <see cref="RollbackException"/>。</returns>
     public async ValueTask<long> CommitReplicatedAsync(
         Func<long, CancellationToken, ValueTask<bool>> awaitDecision,
         object? context = null, CancellationToken ct = default)

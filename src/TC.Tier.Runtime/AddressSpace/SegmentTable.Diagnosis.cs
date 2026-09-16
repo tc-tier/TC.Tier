@@ -42,6 +42,8 @@ public sealed partial class SegmentTable
     /// <summary>
     /// 拍指定段的区间表快照（诊断/测试用）——验证 lease 协议的区间状态流转。
     /// </summary>
+    /// <param name="segId">目标段号。</param>
+    /// <returns>该段区间的持锁零拷贝遍历器（using 释放时归还锁）；段不存在时返回 <see cref="Segment.ExtentReader.Empty"/>。</returns>
     public Segment.ExtentReader SnapshotSegmentExtents(int segId)
     {
         if (!TryGetSegmentRaw(segId, out var seg) || seg is null)
@@ -55,6 +57,8 @@ public sealed partial class SegmentTable
     /// 单段碎片化统计——区间分布、空洞率、可合并建议。
     /// <para>★ 外部碎片化分析入口——决定是否触发 CompactIntervals / RangeCompact。</para>
     /// </summary>
+    /// <param name="segId">目标段号。</param>
+    /// <returns>该段按状态（Committed/Wasted/Aborted/InFlight）统计的条数与字节分布；段不存在时仅填充 SegId。</returns>
     public SegmentFragmentation GetSegmentFragmentation(int segId)
     {
         if (!TryGetSegmentRaw(segId, out var seg) || seg is null)
@@ -79,6 +83,7 @@ public sealed partial class SegmentTable
     /// 全表碎片化汇总——遍历所有有效段，返回每段的碎片化统计。
     /// <para>★ 外部运维工具用——全段表碎片化总览，决定整理策略。</para>
     /// </summary>
+    /// <returns>每个有效段（跳过 Invalid）一条 <see cref="SegmentFragmentation"/>，惰性枚举。</returns>
     public IEnumerable<SegmentFragmentation> GetTableFragmentation()
     {
         var segs = Volatile.Read(ref _segments);

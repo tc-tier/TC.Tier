@@ -1,5 +1,4 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
 using TC.Tier.Runtime.Structures.Mirror.Contracts;
 
 namespace TC.Tier.Runtime.Structures.Mirror;
@@ -246,17 +245,25 @@ public abstract partial class MirrorBase
     /// <summary>帧 CRC 增量计算器（头+体+尾前缀分段累积 → Finalize 对尾 Crc 字段）。</summary>
     private interface IMirrorFrameCrc
     {
+        /// <summary>增量累积一段字节进 CRC。</summary>
+        /// <param name="data">待累积字节（按帧内顺序分段调用）。</param>
         void Append(ReadOnlySpan<byte> data);
 
+        /// <summary>收官并返回最终 CRC 值（写入帧尾 Crc 字段）。</summary>
+        /// <returns>最终 CRC 值（CRC64 或 CRC32C 零扩展为 ulong，按 header flags）。</returns>
         ulong Finalize();
     }
 
     private sealed class Crc64FrameCrc : IMirrorFrameCrc
     {
-        private readonly Crc64 _crc = UnifiedCrc.CreateCrc64();
+        private readonly UnifiedCrc64 _crc = UnifiedCrc.CreateCrc64();
 
+        /// <summary>增量累积一段字节进 CRC64。</summary>
+        /// <param name="data">待累积字节。</param>
         public void Append(ReadOnlySpan<byte> data) => _crc.Append(data);
 
+        /// <summary>收官 CRC64 累积。</summary>
+        /// <returns>最终 CRC64 值。</returns>
         public ulong Finalize() => UnifiedCrc.FinalizeCrc64(_crc);
     }
 
@@ -264,8 +271,12 @@ public abstract partial class MirrorBase
     {
         private uint _crc;
 
+        /// <summary>增量累积一段字节进 CRC32C。</summary>
+        /// <param name="data">待累积字节。</param>
         public void Append(ReadOnlySpan<byte> data) => _crc = UnifiedCrc.ComputeCrc32C(_crc, data);
 
+        /// <summary>返回累计的 CRC32C（零扩展为 ulong）。</summary>
+        /// <returns>最终 CRC32C 值。</returns>
         public ulong Finalize() => _crc;
     }
 }

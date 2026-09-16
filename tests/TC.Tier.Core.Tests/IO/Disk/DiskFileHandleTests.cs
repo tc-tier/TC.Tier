@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using TC.Tier.Core.IO;
 using TC.Tier.Core.IO.Disk;
 using TC.Tier.Core.NativeInterop;
+using Xunit;
+using Skip = Xunit.Skip;
 
 namespace TC.Tier.Core.Tests.IO.Disk;
 
@@ -220,9 +222,10 @@ public sealed class DiskFileHandleTests : IDisposable
         h.Length.Should().BeGreaterThanOrEqualTo(1 << 20);
     }
 
-    [Fact]
+    [SkippableFact]
     public void PunchHole_AllocatedShrinks_LengthUnchanged()
     {
+        Skip.If(OperatingSystem.IsMacOS(), "APFS punch-hole 物理分配语义不同——分配收缩断言跳过。");
         using var h = _fs.Open("ph", Opts());
         var unit = _fs.Volume.AllocationUnit;
         // ★ 大文件：NTFS 稀疏化后按 64K 压缩单元分配——小文件（< 64K）打洞后 AllocatedSize 反而可能变大，
@@ -309,11 +312,14 @@ public sealed class DiskFileHandleTests : IDisposable
         h.RequiredAlignment.Should().Be(1);   // 缓冲句柄零对齐要求
     }
 
-    [Theory]
+    [SkippableTheory]
     [InlineData(true)]
     [InlineData(false)]
     public void UnbufferedSupport_DioHandle_ProbedAndAligned(bool useCache)
     {
+        // ★ 全平台可跑（DIO open 即拒降级落地后，NoBuffering 请求链路不再有硬失败环境）：
+        //   Win=Supported / Linux x64=Supported / Linux arm=降级 Ignored / mac=BestEffort——
+        //   四形态统一断言"请求→上报→对齐一致性"。
         var hints = useCache ? FileOpenHints.None : FileOpenHints.NoBuffering;
         using var h = _fs.Open("dio", Opts(hints: hints));
         if (!useCache)
@@ -336,18 +342,76 @@ public sealed class DiskFileHandleTests : IDisposable
         }
     }
 
-    [Fact]
-    public void Dio_MisalignedBuffer_ThrowsAlignmentError()
+    [SkippableFact]
+    public void Open_NoBuffering_OnVolumeRejectingDirectIo_DowngradesToBufferedIgnored()
     {
+        // ★ 平台一致性契约（裁定：能力缺席=降级运行+平台警告，禁"换环境跑不起来"）——
+        //   NoBuffering 遭卷 open 即拒（Linux 无 O_DIRECT 能力卷，GH arm runner EINVAL 实锤）
+        //   必须降级缓冲句柄 + UnbufferedSupport=Ignored 如实上报，而非 open 抛异常。
+        //   触发条件仅"Linux 且卷拒 O_DIRECT"可复现（macOS F_NOCACHE 为 BestEffort 不拒开；
+        //   Windows NTFS 恒可 NO_BUFFERING）——其余环境无触发条件，跳过。
+        Skip.IfNot(OperatingSystem.IsLinux() && !DiskMediumGate.DirectIo,
+            "非\"Linux 卷 open 即拒\"环境——降级路径无触发条件。");
+        using var h = _fs.Open("dio-fallback", Opts(hints: FileOpenHints.NoBuffering));
+        h.UnbufferedSupport.Should().Be(UnbufferedIoSupport.Ignored);
+        h.RequiredAlignment.Should().Be(1);   // 降级句柄非强制对齐
+        // 降级句柄全字节语义完好：非对偏移写读往返（缓冲路径履行全部字节语义）
+        var payload = new byte[900];
+        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i * 7);
+        h.Write(3, payload);
+        h.Flush();
+        var readBack = new byte[900];
+        h.Read(3, readBack).Should().Be(900);
+        readBack.Should().Equal(payload);
+    }
+
+    [SkippableFact]
+    public void Open_NoBuffering_OnMacOS_BestEffortHint_FullByteSemantics()
+    {
+        // ★ mac 降级形态契约（平台裁定：全平台跑得起来，DIO 缺席=F_NOCACHE+F_RDAOFF hint）——
+        //   NoBuffering 请求在 mac 永不失败：BestEffort 上报 + 非强制对齐 + 全字节语义履行。
+        //   与 arm 的"open 即拒降级 Ignored"和 Win/Linux x64 的"Supported 契约"构成三形态全集。
+        Skip.IfNot(OperatingSystem.IsMacOS(), "mac 特有形态（F_NOCACHE hint=BestEffort）——其余平台无此形态。");
+        using var h = _fs.Open("dio-mac-hint", Opts(hints: FileOpenHints.NoBuffering));
+        h.UnbufferedSupport.Should().Be(UnbufferedIoSupport.BestEffort);   // APFS/HFS 接受 hint 不承诺
+        h.RequiredAlignment.Should().Be(1);   // hint 档非强制对齐
+        // 全字节语义：非对齐偏移写读往返（hint 句柄履行全部字节语义）
+        var payload = new byte[900];
+        for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i * 7);
+        h.Write(3, payload);
+        h.Flush();
+        var readBack = new byte[900];
+        h.Read(3, readBack).Should().Be(900);
+        readBack.Should().Equal(payload);
+    }
+
+    [SkippableFact]
+    public void Dio_MisalignedBuffer_RmwWritesExactBytes_NoThrow()
+    {
+        Skip.IfNot(DiskMediumGate.DirectIo, "卷不支持 O_DIRECT——非对齐 RMW 精确字节断言跳过。");
         using var h = _fs.Open("diom", Opts(hints: FileOpenHints.NoBuffering));
         if (h.UnbufferedSupport != UnbufferedIoSupport.Supported) return;   // 非真 DIO 环境（CI 容器）
         var align = h.RequiredAlignment;
         using var good = PinnedBufferPool_RentAligned((int)align * 4, (int)align);
-        h.Write(0, good.Memory.Span);   // 对齐路径零异常
+        var seed = good.Memory.Span.ToArray();
+        for (var i = 0; i < seed.Length; i++) seed[i] = 0x40;
+        h.Write(0, seed);   // 对齐快路径
+        h.Flush();
 
         var plain = new byte[(int)align * 4];   // 普通 byte[]——地址几乎必不对齐
-        var act = () => h.Write(0, plain);
-        act.Should().Throw<FileIOException>().Which.Error.Should().Be(IOError.AlignmentError);
+        for (var i = 0; i < plain.Length; i++) plain[i] = 0x5A;
+        var off = (int)align + 3;               // offset/长度/缓冲三重非对齐
+        var act = () => h.Write(off, plain);
+        act.Should().NotThrow("DIO 句柄字节粒度契约——非对齐写经扇区 RMW 履行，不再 fail-fast");
+
+        var verify = new byte[off + plain.Length];
+        using (var v = _fs.Open("diom", Opts(access: AccessMode.Read, mode: FileOpenMode.OpenExisting, sharing: FileSharing.ReadWrite)))
+        {
+            v.Length.Should().Be(off + plain.Length, "写语义精确 EOF");
+            v.Read(0, verify).Should().Be(verify.Length);
+        }
+        verify.AsSpan(0, off).ToArray().Should().Equal(seed.AsSpan(0, off).ToArray(), "未触及前缀保持");
+        verify.AsSpan(off).ToArray().Should().Equal(plain, "RMW 补丁逐字节落位");
     }
 
     private static AlignedMemoryManager PinnedBufferPool_RentAligned(int size, int alignment)
@@ -475,9 +539,10 @@ public sealed class DiskFileHandleTests : IDisposable
 
     // ══════════════════ 范围锁 ══════════════════
 
-    [Fact]
+    [SkippableFact]
     public void RangeLock_CrossHandleExclusive_MutualExclusion()
     {
+        Skip.IfNot(DiskMediumGate.RangeLocks, "平台无范围锁原语（macOS）——锁语义跳过。");
         using var h1 = _fs.Open("lk", Opts());
         using var h2 = _fs.Open("lk", Opts());
         h1.Write(0, new byte[4096]);
@@ -491,9 +556,10 @@ public sealed class DiskFileHandleTests : IDisposable
         h2.Unlock(0, 1024);
     }
 
-    [Fact]
+    [SkippableFact]
     public void RangeLock_SharedVsExclusive()
     {
+        Skip.IfNot(DiskMediumGate.RangeLocks, "平台无范围锁原语（macOS）——锁语义跳过。");
         using var h1 = _fs.Open("sh", Opts());
         using var h2 = _fs.Open("sh", Opts());
         h1.Write(0, new byte[4096]);
@@ -506,9 +572,10 @@ public sealed class DiskFileHandleTests : IDisposable
         h3.TryLock(0, 1024, FileLockMode.Exclusive).Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public void RangeLock_DisposeReleasesAllLocks()
     {
+        Skip.IfNot(DiskMediumGate.RangeLocks, "平台无范围锁原语（macOS）——锁语义跳过。");
         using var h2 = _fs.Open("dl2", Opts());
         var h1 = _fs.Open("dl", Opts());
         h1.Write(0, new byte[4096]);
@@ -518,9 +585,10 @@ public sealed class DiskFileHandleTests : IDisposable
         h2.Unlock(0, 2048);
     }
 
-    [Fact]
+    [SkippableFact]
     public void RangeLock_DifferentRanges_Coexist()
     {
+        Skip.IfNot(DiskMediumGate.RangeLocks, "平台无范围锁原语（macOS）——锁语义跳过。");
         using var h1 = _fs.Open("nr", Opts());
         using var h2 = _fs.Open("nr", Opts());
         h1.Write(0, new byte[4096]);

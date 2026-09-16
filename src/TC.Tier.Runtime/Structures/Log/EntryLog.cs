@@ -30,6 +30,7 @@ public sealed partial class EntryLog : LogBase
     private CancellationTokenSource? _loopCts;
     private Task? _earlyCommitLoopTask;
     private Exception? _lastCommitError; // 提交错误冒泡（上层查询）
+    private readonly TimeProvider _clock;   // 时钟供给源（时钟缝 件一 P1）
     private readonly EntryLogSettings _settings;
 
     /// <summary>已 commit 的最高地址（commit 边界水位）。</summary>
@@ -51,15 +52,18 @@ public sealed partial class EntryLog : LogBase
     /// <param name="recovery">恢复策略（null = 默认 EntryLogRecovery——恢复后设 CommittedOffset + 启提前提交循环）。</param>
     /// <param name="cursorFactory">扫描游标工厂。</param>
     /// <param name="metaPolicyFactory">meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。</param>
+    /// <param name="clock">时间供给源（时间戳/超时度量；null = 系统时钟）。</param>
     /// <param name="metaTransport">Transport 模式的外部 meta 传输（Managed/Disabled 不用）。</param>
     public EntryLog(IFileSystem fileSystem,EntryLogSettings settings,
         ICommitPolicy? commitPolicy = null,
         IRecovery<LogRecoveryHints>? recovery = null,
         LogCursorFactory<ILogCursor>? cursorFactory = null,
         MetaPolicyFactory<LogMetaHeader, LogMetaPayload>? metaPolicyFactory = null,
-        IMetaTransport? metaTransport = null)
+        IMetaTransport? metaTransport = null,
+        TimeProvider? clock = null)
         : base(new Codec(),fileSystem, settings, recovery, cursorFactory, metaPolicyFactory, metaTransport)
     {
+        _clock = clock ?? TimeProvider.System;   // 时钟缝 件一 P1（EntryLog 后台提交循环）
         _settings = settings;
         _commitInterval = settings.CommitInterval;
         // ★ commitPolicy 为 null 时，自动从 settings 构造默认 GroupCommitPolicy（三维度阈值全部生效）
@@ -70,7 +74,7 @@ public sealed partial class EntryLog : LogBase
             Interval = settings.CommitInterval,
         };
         _committedOffset = LogicalAddress.Empty; // Initialize 后由 OnLogRecovered 更新（恢复后 _logicalTail 已正确）
-        _lastCommitTicks = DateTime.UtcNow.Ticks;
+        _lastCommitTicks = _clock.GetUtcNow().Ticks;
     }
 
     /// <summary>★ EntryLog 专属 Recovery——继承 <see cref="LogBase.LogRecovery{TLogBase}"/>（复用四级回退），
@@ -79,6 +83,8 @@ public sealed partial class EntryLog : LogBase
     private sealed class EntryLogRecovery(EntryLog owner) : LogRecovery<EntryLog>(owner)
     {
         private readonly EntryLog _owner = owner;
+        /// <summary>恢复完成钩子：此时 <see cref="LogBase.TailAddress"/> 已回放到正确位置，
+        /// 把 CommittedOffset 夹到 TailAddress（恢复后天然一致）并启动提前提交循环。</summary>
         protected override void OnLogRecovered()
         {
             _owner._committedOffset = _owner.TailAddress; // ★ 恢复后 _logicalTail 已正确，_committedOffset 天然正确
@@ -86,7 +92,8 @@ public sealed partial class EntryLog : LogBase
         }
     }
 
-    /// <inheritdoc/>（默认 EntryLogRecovery——Initialize 的 CAS 闸门内创建一次；注入实例经构造函数直接赋 _recovery）
+    /// <summary>创建默认恢复器（EntryLogRecovery——Initialize 的 CAS 闸门内创建一次；注入实例经构造函数直接赋 _recovery）。</summary>
+    /// <returns>EntryLog 专属恢复器；恢复完成后设 CommittedOffset = TailAddress 并启动提前提交循环。</returns>
     protected override IRecovery<LogRecoveryHints> CreateRecovery()
         => new EntryLogRecovery(this);
 
@@ -98,6 +105,9 @@ public sealed partial class EntryLog : LogBase
     /// <para>  旧实现直接 CommitCore(TailAddress) 跳过 flush，TailAddress 可能指向仍在 _pageBuf 内存的 entry，</para>
     /// <para>  导致 _committedOffset 超前于真实落盘字节，崩溃丢失已 commit 数据。</para>
     /// </summary>
+    /// <param name="entryAddress">本条 entry 的起始地址（含）。</param>
+    /// <param name="payloadLength">entry payload 字节数（不含 header/padding）。</param>
+    /// <param name="isMeta">true = meta entry（直接忽略——防提交链无限递归）；false = 业务 entry（参与提前提交判定）。</param>
     protected override void OnAppended(LogicalAddress entryAddress, int payloadLength, bool isMeta)
     {
         // ★ meta entry 来自 AppendMeta 委托链（CommitCore→AppendMeta→策略→WriteMetaPayload→AppendCore isMeta=true），
@@ -174,6 +184,7 @@ public sealed partial class EntryLog : LogBase
     /// <para>走纯异步 commit 链（<see cref="CommitCoreAsync"/> → meta.CommitAsync），无 sync-over-async。</para>
     /// </summary>
     /// <param name="committedTail">已 flush 落盘的页尾地址（含）</param>
+    /// <returns>表示异步提交链（CommitCoreAsync）完成的任务；重入/Dispose 守卫命中时同步完成。</returns>
     protected override async ValueTask OnPageFlushedAsync(LogicalAddress committedTail)
     {
         // ★ 重入守卫（同 OnPageFlushed）
@@ -297,7 +308,7 @@ public sealed partial class EntryLog : LogBase
                 Interlocked.Exchange(ref _earlyUnflushedCount, 0);
             }
 
-            _lastCommitTicks = DateTime.UtcNow.Ticks;
+            _lastCommitTicks = _clock.GetUtcNow().Ticks;
             Volatile.Write(ref _lastCommitError, null);
             Monitor.PulseAll(_commitLock);
         }
@@ -451,7 +462,7 @@ public sealed partial class EntryLog : LogBase
             {
                 try
                 {
-                    await Task.Delay(_commitInterval, ct).ConfigureAwait(false);
+                    await _clock.Delay(_commitInterval, ct).ConfigureAwait(false);
                 }
                 catch (TaskCanceledException)
                 {
@@ -468,6 +479,9 @@ public sealed partial class EntryLog : LogBase
                     //   末页仍在 _pageBuf 内存的数据不在 FlushedTail 内，由下次 Append 页满 FlushPage
                     //   或显式 CommitAsync 落盘。保证 §7 不变量 CommittedOffset ≤ FlushedTail（已 commit 必已落盘）。
                     //   ★ 不能用 engine.CommittedTail——它含 Allocate 预留空洞，会把 CommittedOffset 推到无数据区。
+                    //   ★ V0.1 教训（2026-09-14 取证）：本循环曾试验改走完整提交链（含末页 flush/策略通知），
+                    //     全量套件形态下引入挂死——写窗口观察协议在显式 × 自动双驱动下的丢唤醒窗口仍在
+                    //     （VALIDATIONS V0.1 留档，raft 层剩余环节一并记录），热路径改动须按冻结裁定专项进行。
                     await CommitCoreAsync(FlushedTail).ConfigureAwait(false);
                 }
                 catch (Exception ex)
@@ -494,7 +508,7 @@ public sealed partial class EntryLog : LogBase
         {
             UnflushedBytes = unflushedBytes,
             UnflushedCount = Volatile.Read(ref _earlyUnflushedCount),
-            SinceLastCommit = TimeSpan.FromTicks(DateTime.UtcNow.Ticks - Volatile.Read(ref _lastCommitTicks)),
+            SinceLastCommit = TimeSpan.FromTicks(_clock.GetUtcNow().Ticks - Volatile.Read(ref _lastCommitTicks)),
         };
     }
 

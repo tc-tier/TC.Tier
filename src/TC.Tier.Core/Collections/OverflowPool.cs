@@ -21,6 +21,7 @@ public sealed class OverflowPool<T> : IDisposable
     private long _overflows;  // TryAdd 被拒（池满/disposed，调 disposer）
 
     private int _disposed;    // 0=存活, 1=已释放（Volatile/Interlocked，修旧版非 volatile TOCTOU）
+    private int _activeAdds;  // 已通过存活检查、尚未结束入队临界区的 TryAdd
 
     /// <summary>当前池中对象数（快照，并发下近似值）。</summary>
     public int Count => _itemQueue.Count;
@@ -66,12 +67,41 @@ public sealed class OverflowPool<T> : IDisposable
     /// <remarks>★ 高并发下 TryGet/TryAdd 可能瞬时超出 size 几个（软上限），但对调用方无正确性影响。</remarks>
     public bool TryAdd(T item)
     {
+        if (!TryEnterAdd())
+            return Reject(item);
+
         // 软上限：Count 快照与 Enqueue 非原子，高并发下可能瞬时超出 size 几个（无正确性影响，见类注释）
-        if (Volatile.Read(ref _disposed) == 0 && _itemQueue.Count < _size)
+        try
         {
-            _itemQueue.Enqueue(item);
-            return true;
+            if (_itemQueue.Count < _size)
+            {
+                _itemQueue.Enqueue(item);
+                return true;
+            }
         }
+        finally
+        {
+            Interlocked.Decrement(ref _activeAdds);
+        }
+
+        return Reject(item);
+    }
+
+    private bool TryEnterAdd()
+    {
+        if (Volatile.Read(ref _disposed) != 0)
+            return false;
+
+        Interlocked.Increment(ref _activeAdds);
+        if (Volatile.Read(ref _disposed) == 0)
+            return true;
+
+        Interlocked.Decrement(ref _activeAdds);
+        return false;
+    }
+
+    private bool Reject(T item)
+    {
         Interlocked.Increment(ref _overflows);
         _disposer(item);
         return false;
@@ -86,6 +116,11 @@ public sealed class OverflowPool<T> : IDisposable
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
+
+        var spinner = new SpinWait();
+        while (Volatile.Read(ref _activeAdds) != 0)
+            spinner.SpinOnce();
+
         while (_itemQueue.TryDequeue(out var item))
             _disposer(item);
     }

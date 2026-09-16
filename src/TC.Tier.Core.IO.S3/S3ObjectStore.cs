@@ -26,6 +26,9 @@ public sealed class S3ObjectStore : IObjectStore
     private int _disposed;
 
     /// <summary>构造——按 options 创建内部 HttpClient（连接池 10min 复用）。</summary>
+    /// <param name="options">S3 客户端配置（endpoint/credentials/桶/超时/重试等——立即调用 Validate 校验）。</param>
+    /// <returns>自管 HttpClient 的新实例（Dispose 时连带释放 handler 与连接池）。</returns>
+    /// <exception cref="ArgumentException">options 字段不合法（Bucket/Endpoint/Credentials 任一缺失或不合规）。</exception>
     public static S3ObjectStore Create(S3ClientOptions options)
     {
         options.Validate();
@@ -43,6 +46,11 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <summary>构造——注入外部 HttpClient（测试假服务器/共享连接池场景）。</summary>
+    /// <param name="options">S3 客户端配置（endpoint/credentials/桶/超时等——立即调用 Validate 校验）。</param>
+    /// <param name="http">外部注入的 HttpClient（调用方管理生命周期——本实例 Dispose 不释放）。</param>
+    /// <returns>复用外部 HttpClient 的新实例（不持有 handler 所有权）。</returns>
+    /// <exception cref="ArgumentException">options 字段不合法（Bucket/Endpoint/Credentials 任一缺失或不合规）。</exception>
+    /// <exception cref="ArgumentNullException"><paramref name="http"/> 为 null。</exception>
     public static S3ObjectStore Create(S3ClientOptions options, HttpClient http)
     {
         options.Validate();
@@ -76,6 +84,15 @@ public sealed class S3ObjectStore : IObjectStore
     // ═════════════════════════════ 六件套 ═════════════════════════════
 
     /// <inheritdoc/>
+    /// <param name="key">对象键（path-style 路径段，须满足 ObjectKeyValidator 约束）。</param>
+    /// <param name="data">待上传字节数据（全量驻内存——单次 PUT 整体发送）。</param>
+    /// <param name="metadata">可选对象元数据（写入 x-amz-meta-* 头；null 不写）。</param>
+    /// <param name="condition">可选条件 PUT（If-Match/If-None-Match——厂商差异由本地 Head 校验兜底归一）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不满足 ObjectKeyValidator 约束。</exception>
+    /// <exception cref="FileIOException">条件 PUT 失配（NotFound/PreconditionFailed）；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
+    /// <returns>完成时对象已上传（条件 PUT 失配/服务端错误抛）。</returns>
     public async ValueTask PutAsync(string key, ReadOnlyMemory<byte> data, ObjectMetadata? metadata = null,
                                     PutCondition? condition = null, CancellationToken ct = default)
     {
@@ -88,6 +105,16 @@ public sealed class S3ObjectStore : IObjectStore
 
     /// <inheritdoc/>
     /// <remarks>长度已知流：传（须可寻——单遍流式 SHA-256 后回卷流式上哈希后 Position 回卷；不可寻流内部缓冲）。</remarks>
+    /// <param name="key">对象键（须满足 ObjectKeyValidator 约束）。</param>
+    /// <param name="data">待上传流（length≥0 须可寻以回卷哈希；length&lt;0 走 spool 临时文件中转；不可寻走 chunked）。</param>
+    /// <param name="length">流的已知字节长度（负值=未知长度，触发 spool 缓冲；非负且流可寻时须 ≤ 流内剩余可用字节）。</param>
+    /// <param name="metadata">可选对象元数据（写入 x-amz-meta-* 头；null 不写）。</param>
+    /// <param name="condition">可选条件 PUT（If-Match/If-None-Match——本地校验兜底归一厂商差异）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不合规；或流可寻且可用字节不足 length。</exception>
+    /// <exception cref="FileIOException">条件 PUT 失配；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
+    /// <returns>完成时对象已上传（长度路径/回卷哈希路径/chunked 路径按流形态内部分派）。</returns>
     public async ValueTask PutAsync(string key, Stream data, long length, ObjectMetadata? metadata = null,
                                     PutCondition? condition = null, CancellationToken ct = default)
     {
@@ -134,6 +161,13 @@ public sealed class S3ObjectStore : IObjectStore
     /// chunked 流式签名 PUT：内容经 <see cref="ChunkedSignedStream"/> 分帧链签（seed → chunk 链 → 终帧）；
     /// HTTP 层 Transfer-Encoding: chunked（Content-Length 不设）。★ 单次发送（源不可回卷——不重试）。
     /// </summary>
+    /// <param name="key">对象键（已由调用方校验）。</param>
+    /// <param name="source">不可回卷的源流（chunked 签名链的原始数据源——零回卷需求）。</param>
+    /// <param name="decodedLength">解码后的实际字节长度（写入 x-amz-decoded-content-length 头——服务端按此对账）。</param>
+    /// <param name="metadata">可选对象元数据（写入 x-amz-meta-* 头；null 不写）。</param>
+    /// <param name="condition">可选条件 PUT（经 CheckPutConditionLocalAsync 本地兜底）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="FileIOException">条件 PUT 失配；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
     private async ValueTask PutChunkedAsync(string key, Stream source, long decodedLength,
                                             ObjectMetadata? metadata, PutCondition? condition, CancellationToken ct)
     {
@@ -163,6 +197,10 @@ public sealed class S3ObjectStore : IObjectStore
     /// COS 完全忽略条件头。客户端前置 Head + 本地校验兜底归一契约语义（接受极小竞态，与
     /// 条件 DELETE 同款声明——fencing 为尽力型，token/心跳校验在接管与释放路径兜底）。
     /// </summary>
+    /// <param name="key">对象键（已由调用方校验）。</param>
+    /// <param name="condition">条件 PUT（null 或 IfMatch/IfNoneMatch 均 null 时直接返回——无校验）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="FileIOException">NotFound——If-Match 但对象不存在（并发删除或从未创建）；PreconditionFailed——If-Match 不等于当前 ETag（对象已被并发替换），或 If-None-Match:* 撞已存在（抢占失败）。</exception>
     private async ValueTask CheckPutConditionLocalAsync(string key, PutCondition? condition, CancellationToken ct)
     {
         if (condition is not { } c || (c.IfMatch is null && c.IfNoneMatch is null)) return;
@@ -181,6 +219,13 @@ public sealed class S3ObjectStore : IObjectStore
                 $"条件写失配（If-None-Match:* 撞已存在——抢占失败）: {key}", key, nameof(PutAsync));
     }
 
+    /// <param name="key">对象键（已由调用方校验）。</param>
+    /// <param name="contentFactory">HttpContent 工厂（每次重试重建——HttpContent 发送后不可复用）。</param>
+    /// <param name="payloadHash">载荷 SHA-256 hex（空 body = SigV4.EmptyPayloadHash）。</param>
+    /// <param name="metadata">可选对象元数据（写入 x-amz-meta-* 头；null 不写）。</param>
+    /// <param name="condition">可选条件 PUT（经 CheckPutConditionLocalAsync 本地兜底）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="FileIOException">条件 PUT 失配；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
     private async ValueTask PutCoreAsync(string key, Func<HttpContent> contentFactory, string payloadHash,
                                          ObjectMetadata? metadata, PutCondition? condition, CancellationToken ct)
     {
@@ -196,6 +241,14 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="key">对象键（须满足 ObjectKeyValidator 约束）。</param>
+    /// <param name="offset">读取起始偏移（≥0；通过 Range: bytes=offset- 请求）。</param>
+    /// <param name="destination">目标缓冲区（长度 0 时立即返回 0，不发请求；其余情形长度决定 Range 末字节）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际读取的字节数；offset ≥ 对象长度时返回 0（416 → EOF 语义归一，不抛）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不合规；或 offset 为负。</exception>
+    /// <exception cref="FileIOException">对象不存在（NotFound）；或 S3 返回非 2xx 且非 416（详见 MapError 映射）。</exception>
     public async ValueTask<int> GetAsync(string key, long offset, Memory<byte> destination, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -239,6 +292,12 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="key">对象键（须满足 ObjectKeyValidator 约束）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>对象元信息（key/size/ETag/元数据/Last-Modified）；对象不存在时返回 null（不抛）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不合规。</exception>
+    /// <exception cref="FileIOException">S3 返回非 2xx 且非 404（详见 MapError 映射）。</exception>
     public async ValueTask<ObjectInfo?> HeadAsync(string key, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -261,6 +320,13 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="key">对象键（须满足 ObjectKeyValidator 约束）。</param>
+    /// <param name="condition">可选条件 DELETE（If-Match——SupportsConditionalDelete=true 时经本地 Head 校验后无条件删；开关关闭时抛 Unsupported）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不合规。</exception>
+    /// <exception cref="FileIOException">NotFound——条件删除时对象不存在；PreconditionFailed——If-Match 不等于当前 ETag（锁已被他人接管）；Unsupported——SupportsConditionalDelete=false 但传了 If-Match。</exception>
+    /// <returns>完成时对象已删除（无条件 DELETE 对不存在对象亦为幂等成功——服务端语义）。</returns>
     public async ValueTask DeleteAsync(string key, DeleteCondition? condition = null, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -292,6 +358,12 @@ public sealed class S3ObjectStore : IObjectStore
 
     /// <inheritdoc/>
     /// <remarks>原生 ListObjectsV2 + delimiter（服务端聚合——大前缀省流量；无 delimiter ≡ <see cref="ListAsync"/>）。</remarks>
+    /// <param name="prefix">可选键前缀过滤（服务端聚合；null 列全部）。</param>
+    /// <param name="delimiter">可选分隔符（按此聚合公共前缀——典型 '/' 模拟目录层级；null 退化为 <see cref="ListAsync"/>）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>对象列表 + 公共前缀列表（delimiter 聚合的"目录"前缀）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="FileIOException">S3 返回非 2xx（详见 MapError 映射）。</exception>
     public async ValueTask<ObjectListing> ListDelimitedAsync(string? prefix = null, string? delimiter = null,
                                                              CancellationToken ct = default)
     {
@@ -326,6 +398,11 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="prefix">可选键前缀过滤（服务端聚合；null 列全部）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>对象条目列表（已分页聚合——大桶零游标暴露）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="FileIOException">S3 返回非 2xx（详见 MapError 映射）。</exception>
     public async ValueTask<IReadOnlyList<ObjectEntry>> ListAsync(string? prefix = null, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -354,6 +431,14 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="sourceKey">源对象键（须满足 ObjectKeyValidator 约束；须存在——否则抛 NotFound）。</param>
+    /// <param name="destKey">目标对象键（须满足 ObjectKeyValidator 约束）。</param>
+    /// <param name="metadata">可选元数据指令（null=服务端 COPY 保留源元数据；非 null=REPLACE 写入新元数据）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">sourceKey 或 destKey 不合规。</exception>
+    /// <exception cref="FileIOException">源对象不存在（NotFound）；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
+    /// <returns>完成时对象已服务端复制（源对象保持不变）。</returns>
     public async ValueTask CopyAsync(string sourceKey, string destKey, CopyMetadata? metadata = null,
                                      CancellationToken ct = default)
     {
@@ -364,6 +449,13 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="sourceKey">源对象键（须满足 ObjectKeyValidator 约束；须存在——否则抛 NotFound）。</param>
+    /// <param name="replace">可选替换元数据（非 null 时自拷自写 REPLACE 元数据并返回该值；null 时只读 Head 返回当前元数据）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>当前对象元数据（replace 非 null 时为 replace 值；replace null 时为源对象元数据快照）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">sourceKey 不合规。</exception>
+    /// <exception cref="FileIOException">源对象不存在（NotFound）；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
     public async ValueTask<ObjectMetadata> CopyMetadataAsync(string sourceKey, ObjectMetadata? replace = null,
                                                              CancellationToken ct = default)
     {
@@ -382,6 +474,11 @@ public sealed class S3ObjectStore : IObjectStore
     // ═════════════════════════════ multipart / 范围拷贝 ═════════════════════════════
 
     /// <inheritdoc/>
+    /// <param name="key">对象键（须满足 ObjectKeyValidator 约束——上传完成后的最终对象路径）。</param>
+    /// <param name="metadata">可选对象元数据（写入 x-amz-meta-* 头；null 不写）。</param>
+    /// <returns>multipart 上传会话句柄（懒初始化——首次 UploadPart/Complete 才真正建会话）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不合规。</exception>
     public IMultipartUpload CreateMultipartUpload(string key, ObjectMetadata? metadata = null)
     {
         ThrowIfDisposed();
@@ -392,6 +489,16 @@ public sealed class S3ObjectStore : IObjectStore
     /// <inheritdoc/>
     /// <remarks>通用实现 = multipart 编排（UploadPartCopy 循环 + complete）——单 part ≤5GB 约束在切分内吸收；
     ///   源不存在 → NotFound；源尾截断 → 返回实际可拷贝长度（契约）。</remarks>
+    /// <param name="sourceKey">源对象键（须存在——否则抛 NotFound）。</param>
+    /// <param name="destKey">目标对象键（创建新对象——不可与 sourceKey 相同语义）。</param>
+    /// <param name="sourceOffset">源起始偏移（≥0；超过源尾时按 0 长度处理，创建空对象）。</param>
+    /// <param name="length">期望拷贝长度（≥0；超出源尾时按实际可拷贝长度截断）。</param>
+    /// <param name="metadata">可选元数据指令（null=COPY 保留；非 null=REPLACE 替换）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>实际拷贝字节数（源尾截断时小于 length；源完全在范围内时等于 length）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">sourceKey/destKey 不合规；或 sourceOffset/length 为负。</exception>
+    /// <exception cref="FileIOException">源对象不存在（NotFound）；或上传过程中 S3 返回非 2xx（失败时已自动 Abort 会话）。</exception>
     public async ValueTask<long> CopyRangeAsync(string sourceKey, string destKey, long sourceOffset, long length,
                                                 CopyMetadata? metadata = null, CancellationToken ct = default)
     {
@@ -434,6 +541,10 @@ public sealed class S3ObjectStore : IObjectStore
 
     /// <inheritdoc/>
     /// <remarks>key-marker/upload-id-marker 分页循环归一（桥侧按 KeyPrefix 过滤）。</remarks>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>所有进行中的 multipart 会话列表（已分页聚合——无前缀过滤，全桶扫描）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="FileIOException">S3 返回非 2xx（详见 MapError 映射）。</exception>
     public async ValueTask<IReadOnlyList<MultipartUploadSession>> ListMultipartUploadsAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -464,6 +575,13 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <param name="key">对象键（须满足 ObjectKeyValidator 约束——会话对应的目标对象路径）。</param>
+    /// <param name="uploadId">会话 UploadId（由 CreateMultipartUpload 或 ListMultipartUploadsAsync 取得）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="ArgumentException">key 不合规。</exception>
+    /// <exception cref="FileIOException">S3 返回非 2xx 且非 404（NoSuchUpload 视为幂等成功，不抛）。</exception>
+    /// <returns>完成时会话已中止（NoSuchUpload = 已完成/已中止——幂等成功）。</returns>
     public ValueTask AbortMultipartUploadAsync(string key, string uploadId, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -472,6 +590,11 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <summary>流式枚举覆写——分页在实现内推进（大桶零整量驻留）。</summary>
+    /// <param name="prefix">可选键前缀过滤（服务端聚合；null 列全部）。</param>
+    /// <param name="ct">取消令牌（[EnumeratorCancellation] 标注使流式枚举可取消）。</param>
+    /// <returns>异步可枚举对象条目序列（按 ListObjectsV2 分页逐项 yield——单次仅驻一页）。</returns>
+    /// <exception cref="ObjectDisposedException">实例已 Dispose。</exception>
+    /// <exception cref="FileIOException">S3 返回非 2xx（详见 MapError 映射）。</exception>
     public async IAsyncEnumerable<ObjectEntry> ListStreamingAsync(string? prefix = null,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -514,12 +637,23 @@ public sealed class S3ObjectStore : IObjectStore
     /// 构造已签名请求（同步——凭证经同步路径取用；异步凭证源消费者自行预取后用 StaticCredentials 包装）。
     /// canonical URI 与 URL 路径同源（同编码器）——签名与实发恒一致。
     /// </summary>
+    /// <param name="method">HTTP 方法（GET/HEAD/PUT/DELETE/POST）。</param>
+    /// <param name="key">对象键（null = 桶级操作如 list；非 null 经 UriEncode 拼入路径段）。</param>
+    /// <param name="query">查询参数列表（null 或空 = 无查询串；键值各自 UriEncode 后按 Ordinal 排序）。</param>
+    /// <param name="content">请求体（null = 无 body；PUT 单 part / POST complete 时为 ByteArrayContent）。</param>
+    /// <param name="extraHeaders">额外请求头（已小写——x-amz-* 元数据/条件/复制源等；null 不附加）。</param>
+    /// <param name="payloadHash">载荷 SHA-256 hex（无 body=SigV4.EmptyPayloadHash；流式=SigV4.StreamingContentSha256）。</param>
+    /// <returns>已注入 Authorization/x-amz-date/x-amz-content-sha256 头的 HttpRequestMessage。</returns>
     internal HttpRequestMessage BuildRequest(HttpMethod method, string? key,
         IReadOnlyList<(string Name, string Value)>? query, HttpContent? content,
         IReadOnlyList<(string Name, string Value)>? extraHeaders, string payloadHash)
         => BuildRequestCore(method, key, query, content, extraHeaders, payloadHash).Request;
 
     /// <summary>签名上下文（chunked 流式链的种子——签名链由此演进）。</summary>
+    /// <param name="SigningKey">派生签名密钥（HMAC 链根——kSecret→kDate→kRegion→kService→kSigning）。</param>
+    /// <param name="Signature">首块签名（chunked 链的 seed——ChunkedSignedStream 据此推演后续块签名）。</param>
+    /// <param name="AmzDate">ISO 8601 简化日期时间（yyyyMMdd'T'HHmmss'Z'——写入 x-amz-date 头）。</param>
+    /// <param name="Scope">签名作用域（{date}/{region}/{service}/aws4_request——Authorization Credential 段）。</param>
     internal sealed record SignedContext(byte[] SigningKey, string Signature, string AmzDate, string Scope);
 
     internal (HttpRequestMessage Request, SignedContext Ctx) BuildRequestWithContext(HttpMethod method, string? key,
@@ -538,10 +672,10 @@ public sealed class S3ObjectStore : IObjectStore
         else if (path.Length == 0)
             path = "/";   // virtual-host 桶级操作（list/uploads）——canonical URI 根
 
-#pragma warning disable TCSG031 // 设计必需：同步签名构建路径取凭证（BuildRequestCore 同步契约）
+#pragma warning disable TCSG137 // 设计必需：同步签名构建路径取凭证（BuildRequestCore 同步契约）
         var credential = _options.Credentials.GetCredentialsAsync(CancellationToken.None).AsTask()
             .GetAwaiter().GetResult();
-#pragma warning restore TCSG031
+#pragma warning restore TCSG137
         var now = DateTimeOffset.UtcNow;
         var amzDate = SigV4.AmzDate(now);
         var scopeDate = SigV4.ScopeDate(now);
@@ -600,6 +734,12 @@ public sealed class S3ObjectStore : IObjectStore
     /// 发送 + 重试——★ 工厂式（HttpContent 发送后不可复用，重试须整请求重建；签名参数确定性 → 重建即同签名）。
     /// 重试条件：幂等操作 ×（5xx/429/网络抖动/超时）× 次数未满；指数退避 + 抖动。
     /// </summary>
+    /// <param name="requestFactory">请求构造工厂（每次重试调用——须重建 HttpContent；幂等性由调用方按操作语义给出）。</param>
+    /// <param name="idempotent">是否幂等（true=对 5xx/429/网络抖动指数退避重试；false=任何错误直通——CreateMultipartUpload 等不可重试操作）。</param>
+    /// <param name="ct">取消令牌（与内部超时 cts 链接——任一触发即取消）。</param>
+    /// <returns>最终响应（已 dispose 重试中间响应——成功或耗尽重试后的最终响应）。</returns>
+    /// <exception cref="OperationCanceledException">ct 取消（调用方语义，直通抛出）。</exception>
+    /// <exception cref="FileIOException">非幂等操作遇网络抖动；或幂等操作重试耗尽后仍网络失败（经 WrapNetwork 包装）。</exception>
     private async Task<HttpResponseMessage> SendWithRetryAsync(Func<HttpRequestMessage> requestFactory,
                                                                bool idempotent, CancellationToken ct)
     {
@@ -637,6 +777,8 @@ public sealed class S3ObjectStore : IObjectStore
         }
     }
 
+    /// <param name="status">HTTP 状态码。</param>
+    /// <returns>true = 5xx/429（可重试：InternalServerError/BadGateway/ServiceUnavailable/GatewayTimeout/TooManyRequests）；其余 false。</returns>
     private static bool IsRetryableStatus(HttpStatusCode status)
         => status is HttpStatusCode.InternalServerError
             or HttpStatusCode.BadGateway
@@ -644,15 +786,23 @@ public sealed class S3ObjectStore : IObjectStore
             or HttpStatusCode.GatewayTimeout
             or HttpStatusCode.TooManyRequests;
 
+    /// <param name="attempt">已失败次数（0=首次重试前——基期 ×2^attempt × [0.8,1.2) 抖动）。</param>
+    /// <param name="ct">取消令牌（Delay 期间可取消）。</param>
     private async Task DelayBackoffAsync(int attempt, CancellationToken ct)
     {
         var delay = _options.RetryBaseDelay.TotalMilliseconds * Math.Pow(2, attempt) * (0.8 + Random.Shared.NextDouble() * 0.4);
         await Task.Delay(TimeSpan.FromMilliseconds(delay), ct).ConfigureAwait(false);
     }
 
+    /// <param name="ex">原始网络异常（HttpRequestException/IOException/OperationCanceledException）。</param>
+    /// <returns>归一为 <see cref="IOError.IOFailure"/> 的 FileIOException（保留原异常为 InnerException——调用方按 FileIOException 统一处理）。</returns>
     private static FileIOException WrapNetwork(Exception ex) => new(
         IOError.IOFailure, $"S3 网络故障: {ex.Message}", null, "network", ex);
 
+    /// <param name="response">HTTP 响应消息。</param>
+    /// <param name="key">对象键（写入异常 message 上下文；桶级操作可传 null）。</param>
+    /// <param name="operation">调用方操作名（写入异常 message 上下文——便于溯源）。</param>
+    /// <exception cref="FileIOException">响应非 2xx——按 MapError 映射到对应 IOError（NotFound/AccessDenied/PreconditionFailed 等）。</exception>
     private static async Task EnsureSuccessAsync(HttpResponseMessage response, string? key, string operation)
     {
         if (response.IsSuccessStatusCode) return;
@@ -675,6 +825,12 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <summary>状态码 + S3 错误码 → <see cref="FileIOException"/> 归一映射。</summary>
+    /// <param name="status">HTTP 状态码（优先映射维度）。</param>
+    /// <param name="code">S3 Error 响应体 Code 字段（status 未命中时按此二次映射；"Unknown"=无 XML 错误体）。</param>
+    /// <param name="message">S3 Error 响应体 Message 字段（写入异常 message）。</param>
+    /// <param name="key">对象键（写入异常上下文；可 null）。</param>
+    /// <param name="operation">调用方操作名（写入异常上下文——便于溯源）。</param>
+    /// <returns>归一后的 FileIOException（NotFound/AccessDenied/PreconditionFailed/DiskFull/Unsupported/Unknown 之一）。</returns>
     private static FileIOException MapError(HttpStatusCode status, string code, string message, string? key, string operation)
     {
         var error = status switch
@@ -695,6 +851,8 @@ public sealed class S3ObjectStore : IObjectStore
         return new FileIOException(error, $"S3 {status} [{code}]: {message}", key, operation);
     }
 
+    /// <param name="response">HTTP 响应消息（其正文需被排空以释放回连接池——典型用于 GET/HEAD 后未消费完的响应）。</param>
+    /// <param name="ct">取消令牌。</param>
     private static async Task DrainBodyAsync(HttpResponseMessage response, CancellationToken ct)
     {
         try
@@ -709,6 +867,7 @@ public sealed class S3ObjectStore : IObjectStore
         }
     }
 
+    /// <param name="session">multipart 会话句柄（可能未初始化——Abort 内部判空）。</param>
     private static async Task TryAbortNoThrow(IMultipartUpload session)
     {
         try { await session.AbortAsync().ConfigureAwait(false); }
@@ -717,6 +876,8 @@ public sealed class S3ObjectStore : IObjectStore
 
     // ═════════════════════════════ 元数据/条件/ETag 头映射 ═════════════════════════════
 
+    /// <param name="headers">请求头累加列表（被原地追加 x-amz-meta-* 项）。</param>
+    /// <param name="metadata">对象元数据（null 不追加；UserMetadata 各项加 MetadataHeaderPrefix 前缀）。</param>
     private static void AddMetadataHeaders(List<(string, string)> headers, ObjectMetadata? metadata)
     {
         if (metadata is null) return;
@@ -724,6 +885,8 @@ public sealed class S3ObjectStore : IObjectStore
             headers.Add((MetadataHeaderPrefix + k, v));   // 键已校验（[A-Za-z0-9_.-]）——HTTP token 安全
     }
 
+    /// <param name="headers">请求头累加列表（被原地追加 if-match / if-none-match 项）。</param>
+    /// <param name="condition">PUT 条件（null 不追加；IfMatch→if-match；IfNoneMatch→if-none-match，"*" 原样直通）。</param>
     private static void AddConditionHeaders(List<(string, string)> headers, PutCondition? condition)
     {
         if (condition is not { } c) return;
@@ -733,6 +896,8 @@ public sealed class S3ObjectStore : IObjectStore
             headers.Add(("if-none-match", ifNoneMatch == "*" ? "*" : QuoteETag(ifNoneMatch)));
     }
 
+    /// <param name="response">HTTP 响应消息（从其 Headers 集合过滤 x-amz-meta-* 项）。</param>
+    /// <returns>解析出的对象元数据（无 x-amz-meta-* 头时返回 <see cref="ObjectMetadata.Empty"/>；否则键已去前缀归一）。</returns>
     private static ObjectMetadata ParseMetadataHeaders(HttpResponseMessage response)
     {
         var dict = new Dictionary<string, string>();
@@ -745,13 +910,22 @@ public sealed class S3ObjectStore : IObjectStore
         return dict.Count == 0 ? ObjectMetadata.Empty : ObjectMetadata.Create(dict);
     }
 
+    /// <param name="etag">原始 ETag 字符串（可能带首尾引号；null 直通）。</param>
+    /// <returns>已去除首尾引号的 ETag；<paramref name="etag"/> 为 null 时返回 null。</returns>
     private static string? StripQuotes(string? etag) => etag?.Trim('"');
 
+    /// <param name="etag">原始 ETag 字符串（非 null；可能已带引号也可能未带）。</param>
+    /// <returns>已带首尾双引号的 ETag（已带引号时原样直通，避免双重引号）。</returns>
     private static string QuoteETag(string etag)
         => etag.Length > 1 && etag.StartsWith('"') && etag.EndsWith('"') ? etag : $"\"{etag}\"";
 
     // ═════════════════════════════ CopyObject 核心 ═════════════════════════════
 
+    /// <param name="sourceKey">源对象键（拼入 x-amz-copy-source——须存在）。</param>
+    /// <param name="destKey">目标对象键（PUT 请求的目标——覆盖既有同名对象）。</param>
+    /// <param name="metadata">可选元数据指令（null=COPY 保留源元数据；非 null=REPLACE 写入新元数据）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="FileIOException">源对象不存在（NotFound）；或 S3 返回非 2xx（详见 MapError 映射）；或响应缺 ETag（IOFailure）。</exception>
     private async ValueTask CopyObjectCoreAsync(string sourceKey, string destKey, CopyMetadata? metadata,
                                                  CancellationToken ct)
     {
@@ -773,6 +947,10 @@ public sealed class S3ObjectStore : IObjectStore
     }
 
     /// <summary>按 uploadId 放弃会话（幂等：NoSuchUpload = 已终结）——session.Abort 与治理原语共享。</summary>
+    /// <param name="owner">S3ObjectStore 实例（用于发送请求）。</param>
+    /// <param name="key">会话对应对象键。</param>
+    /// <param name="uploadId">会话 UploadId。</param>
+    /// <param name="ct">取消令牌。</param>
     private static async Task AbortUploadByIdAsync(S3ObjectStore owner, string key, string uploadId, CancellationToken ct)
     {
         var query = new List<(string, string)> { ("uploadId", uploadId) };
@@ -796,11 +974,17 @@ public sealed class S3ObjectStore : IObjectStore
 
     // ═════════════════════════════ multipart 会话实现 ═════════════════════════════
 
+    /// <param name="owner">所属 S3ObjectStore 实例（用于发送 BuildRequest 与 SendWithRetryAsync）。</param>
+    /// <param name="key">目标对象键（multipart 上传完成后的最终对象路径）。</param>
+    /// <param name="metadata">可选对象元数据（创建会话时写入 x-amz-meta-* 头；null 不写）。</param>
     private sealed class S3MultipartUpload(S3ObjectStore owner, string key, ObjectMetadata? metadata) : IMultipartUpload
     {
         private string? _uploadId;
         private readonly SemaphoreSlim _initGate = new(1, 1);   // 懒初始化闸门（并发首传防双开会话）
 
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>当前会话的 UploadId（已存在则直返；不存在则 POST ?uploads 创建后缓存返回）。</returns>
+        /// <exception cref="FileIOException">CreateMultipartUpload 响应缺 UploadId（IOFailure）；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
         private async ValueTask<string> EnsureUploadIdAsync(CancellationToken ct)
         {
             if (_uploadId is { } id) return id;
@@ -831,6 +1015,13 @@ public sealed class S3ObjectStore : IObjectStore
             }
         }
 
+        /// <summary>上传内存分片（懒初始化会话——首次调用才真正 CreateMultipartUpload）。</summary>
+        /// <param name="partNumber">分片序号（≥1；S3 接受 1-10000——由调用方在切分时分配）。</param>
+        /// <param name="data">分片字节数据（全量驻内存——单 part ≤5GB 实际受内存约束）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>分片结果（partNumber + ETag——Complete 时按序组装）。</returns>
+        /// <exception cref="ArgumentException">partNumber ≤0。</exception>
+        /// <exception cref="FileIOException">UploadPart 响应缺 ETag（IOFailure）；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
         public async ValueTask<UploadPartResult> UploadPartAsync(int partNumber, ReadOnlyMemory<byte> data,
                                                                  CancellationToken ct = default)
         {
@@ -854,6 +1045,15 @@ public sealed class S3ObjectStore : IObjectStore
             return new UploadPartResult(partNumber, etag);
         }
 
+        /// <summary>服务端拷贝上传分片（源对象范围 → 本会话分片——大对象免下载中转）。</summary>
+        /// <param name="partNumber">分片序号（≥1）。</param>
+        /// <param name="sourceKey">源对象键（须存在——拼入 x-amz-copy-source）。</param>
+        /// <param name="sourceOffset">源起始偏移（拼入 x-amz-copy-source-range 起始字节）。</param>
+        /// <param name="length">本分片期望拷贝字节数（拼入 x-amz-copy-source-range 长度）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>分片结果（partNumber + ETag——服务端按拷贝结果回填）。</returns>
+        /// <exception cref="ArgumentException">partNumber ≤0；或 sourceKey 不合规。</exception>
+        /// <exception cref="FileIOException">Copy 响应缺 ETag（IOFailure）；或 S3 返回非 2xx（详见 MapError 映射）。</exception>
         public async ValueTask<UploadPartResult> UploadPartCopyAsync(int partNumber, string sourceKey,
                                                                      long sourceOffset, long length,
                                                                      CancellationToken ct = default)
@@ -882,6 +1082,13 @@ public sealed class S3ObjectStore : IObjectStore
             }
         }
 
+        /// <summary>完成 multipart 上传（按序组装分片——会话终结，对象可见）。</summary>
+        /// <param name="parts">所有分片结果列表（须至少 1 项；按 partNumber 升序组装 complete 请求体）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>完成时 multipart 会话已终结、对象已组装可见（200 + Error body 延迟失败按错误映射抛）。</returns>
+        /// <exception cref="ArgumentNullException">parts 为 null。</exception>
+        /// <exception cref="ArgumentException">parts 为空列表。</exception>
+        /// <exception cref="FileIOException">S3 返回非 2xx；或 200 + Error body（延迟失败——按 TryReadErrorBody 解析后映射）。</exception>
         public async ValueTask CompleteAsync(IReadOnlyList<UploadPartResult> parts, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(parts);
@@ -906,11 +1113,16 @@ public sealed class S3ObjectStore : IObjectStore
             }
         }
 
+        /// <summary>中止 multipart 会话（幂等——未初始化会话为 no-op；已完成会话由服务端 NoSuchUpload 兜底）。</summary>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>会话已存在时返回 Abort 请求的 ValueTask；未初始化会话立即返回 CompletedTask（无服务端调用）。</returns>
         public ValueTask AbortAsync(CancellationToken ct = default)
             => _uploadId is { } uploadId
                 ? new ValueTask(AbortUploadByIdAsync(owner, key, uploadId, ct))
                 : ValueTask.CompletedTask;
 
+        /// <summary>释放会话（尽力 Abort——未完成会话的已上传分片由服务端按生命周期策略清理）。</summary>
+        /// <returns>完成时 Abort 已尽力执行（异常吞——Dispose 语义）。</returns>
         public async ValueTask DisposeAsync()
         {
             try { await AbortAsync().ConfigureAwait(false); }

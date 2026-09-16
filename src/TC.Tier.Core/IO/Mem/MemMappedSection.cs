@@ -32,16 +32,18 @@ internal sealed unsafe class MemDirectMappedSection : IMappedSection
         _memory = _manager.Memory;
     }
 
-    internal static MemDirectMappedSection Create(MemoryFileSystem fs, int slotIdx, long offset, long length,
+    internal static MemDirectMappedSection Create(MemoryFileSystem fs, int slotIdx, int gen, long offset, long length,
         AccessMode access, string path)
     {
         // ★ ReadOnly 在直址模式下不可强制（Memory<byte> 无法只读化）——文档纪律：可移植消费者不得依赖
         //   ReadOnly 直址视图的写抑制（写仍会落文件）；需要真只读语义用 Sparse 卷物化快照。
         lock (fs.SyncRoot)
         {
-            fs.RegisterMap(slotIdx);
-            var data = fs.GetSlot(slotIdx).Data
+            var slot = fs.GetSlot(slotIdx);
+            if (slot.Generation != gen) MemoryFileSystem.ThrowStale(slotIdx, gen);   // ★ IO-24：槽已换主拒映射
+            var data = slot.Data
                        ?? throw new FileIOException(IOError.NotFound, "文件数据缺失。", path, "Map");
+            fs.RegisterMap(slotIdx);   // ★ IO-12：校验后计数（原顺序 Data null 抛出路径 RefCount 泄漏）
             return new MemDirectMappedSection(fs, slotIdx, offset, length, data);
         }
     }
@@ -57,6 +59,7 @@ internal sealed unsafe class MemDirectMappedSection : IMappedSection
     }
 
     /// <inheritdoc/>
+    /// <param name="advise">访问提示（本实现 no-op——mem 无页缓存概念）。</param>
     public void Advise(FileAdvise advise)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);   // no-op（mem 无页缓存概念）
@@ -85,22 +88,30 @@ internal sealed unsafe class MemDirectMappedSection : IMappedSection
 
     private sealed class UnmanagedViewManager(MemDirectMappedSection owner) : MemoryManager<byte>
     {
+        /// <summary>暴露槽直址内存视图（零拷贝）。</summary>
+        /// <returns>覆盖整个映射区间的 <see cref="Span{T}"/>。</returns>
         public override Span<byte> GetSpan()
         {
             owner.ThrowIfUnusable();
             return new Span<byte>(owner._data.Ptr + owner._offset, (int)owner._length);
         }
 
+        /// <summary>取得直址指针句柄（非托管内存地址恒定，无固定开销）。</summary>
+        /// <param name="elementIndex">起始元素索引（0 基）。</param>
+        /// <returns>指向该元素的 <see cref="MemoryHandle"/>。</returns>
         public override MemoryHandle Pin(int elementIndex = 0)
         {
             owner.ThrowIfUnusable();
             return new MemoryHandle(owner._data.Ptr + owner._offset + elementIndex);
         }
 
+        /// <summary>解除固定——非托管地址恒定，no-op。</summary>
         public override void Unpin()
         {
         }
 
+        /// <summary>实际释放在 owner.Dispose 统一执行——no-op。</summary>
+        /// <param name="disposing">true = 显式释放；false = 终结器。</param>
         protected override void Dispose(bool disposing)
         {
             // 实际释放在 owner.Dispose
@@ -165,6 +176,7 @@ internal sealed class MemSparseMappedSection : IMappedSection
     }
 
     /// <inheritdoc/>
+    /// <param name="advise">访问提示（本实现 no-op）。</param>
     public void Advise(FileAdvise advise)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);   // no-op
@@ -240,12 +252,17 @@ internal sealed class MemSparseMappedSection : IMappedSection
     /// <summary>副本视图（Dispose/拔盘后访问抛 <see cref="ObjectDisposedException"/>——不返回悬垂 Memory）。</summary>
     private sealed class ArrayViewManager(MemSparseMappedSection owner) : MemoryManager<byte>
     {
+        /// <summary>暴露物化副本的内存视图。</summary>
+        /// <returns>覆盖整个映射区间的 <see cref="Span{T}"/>。</returns>
         public override Span<byte> GetSpan()
         {
             owner.ThrowIfUnusable();
             return owner._copy;
         }
 
+        /// <summary>钉住物化副本（托管数组——真 GCHandle 钉定）。</summary>
+        /// <param name="elementIndex">起始元素索引（0 基）。</param>
+        /// <returns>指向该元素的 <see cref="MemoryHandle"/>（Dispose 自动释放 GCHandle）。</returns>
         public override unsafe MemoryHandle Pin(int elementIndex = 0)
         {
             owner.ThrowIfUnusable();
@@ -254,10 +271,13 @@ internal sealed class MemSparseMappedSection : IMappedSection
             return new MemoryHandle((byte*)gc.AddrOfPinnedObject() + elementIndex, gc, null);
         }
 
+        /// <summary>解除固定——GCHandle 由 <see cref="MemoryHandle.Dispose"/> 自管理，no-op。</summary>
         public override void Unpin()
         {
         }
 
+        /// <summary>实际释放在 owner.Dispose 统一执行——no-op。</summary>
+        /// <param name="disposing">true = 显式释放；false = 终结器。</param>
         protected override void Dispose(bool disposing)
         {
             // 实际释放在 owner.Dispose

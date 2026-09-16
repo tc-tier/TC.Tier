@@ -41,6 +41,8 @@ public sealed class FileHandlePool : IDisposable
     private readonly ILogger? _logger;
     private readonly ConcurrentDictionary<HandleCacheKey, Entry> _cache = new();
     private readonly ConcurrentDictionary<IFileHandle, HandleCacheKey> _reverse = new();
+    private readonly ConcurrentDictionary<IFileHandle, byte> _orphans = new();   // ★ IO-10：淘汰回插失败的在用句柄——归零即真关闭
+    private readonly object _cacheSync = new();   // ★ IO-10：命中自增 vs 淘汰摘除的互斥（原 check-then-act 返回已关闭句柄）
     private long _clock;
     private int _disposed;
 
@@ -60,16 +62,23 @@ public sealed class FileHandlePool : IDisposable
     /// （含 PreallocateSize——open 即幂等执行）创建、挂载、入池。三步入字典 + 败者自毁
     /// （竞争输家真关闭——从未被服务，不走归还簿记）。
     /// </summary>
+    /// <param name="path">目标文件路径（相对文件系统根或绝对）。</param>
+    /// <param name="options">打开意图（Access/Mode/Sharing/Hints/PreallocateSize）。</param>
+    /// <returns>池内共享句柄（使用计数 +1；调用方须以 Dispose/<see cref="Release"/> 归还）。</returns>
     public IFileHandle Acquire(string path, FileOpenOptions options)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         var key = KeyOf(path, options);
-        if (_cache.TryGetValue(key, out var hit))
+        lock (_cacheSync)
         {
-            Interlocked.Increment(ref hit.Attachment.Usage);
-            hit.Attachment.Trace("acquire-hit");
-            Volatile.Write(ref hit.LastUsed, Interlocked.Increment(ref _clock));
-            return hit.Handle;
+            // ★ IO-10：自增与淘汰摘除同锁——原 TryGetValue→Increment 两步间可被 Evict 判 idle 真关闭
+            if (_cache.TryGetValue(key, out var hit))
+            {
+                Interlocked.Increment(ref hit.Attachment.Usage);
+                hit.Attachment.Trace("acquire-hit");
+                Volatile.Write(ref hit.LastUsed, Interlocked.Increment(ref _clock));
+                return hit.Handle;
+            }
         }
 
         var created = _fs.Open(path, options);
@@ -97,16 +106,24 @@ public sealed class FileHandlePool : IDisposable
     }
 
     /// <summary>命中获取（未命中返回 false，不创建、无副作用）。</summary>
+    /// <param name="path">目标文件路径。</param>
+    /// <param name="options">打开意图（参与缓存 key）。</param>
+    /// <param name="handle">命中时输出池内句柄（使用计数 +1）；未命中为 null。</param>
+    /// <returns>true=命中并已获取使用权；false=池中无此 (path, 打开语义)。</returns>
     public bool TryAcquire(string path, FileOpenOptions options, out IFileHandle handle)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        if (_cache.TryGetValue(KeyOf(path, options), out var hit))
+        lock (_cacheSync)
         {
-            Interlocked.Increment(ref hit.Attachment.Usage);
-            hit.Attachment.Trace("try-acquire-hit");
-            Volatile.Write(ref hit.LastUsed, Interlocked.Increment(ref _clock));
-            handle = hit.Handle;
-            return true;
+            // ★ IO-10：同 Acquire——自增与淘汰互斥
+            if (_cache.TryGetValue(KeyOf(path, options), out var hit))
+            {
+                Interlocked.Increment(ref hit.Attachment.Usage);
+                hit.Attachment.Trace("try-acquire-hit");
+                Volatile.Write(ref hit.LastUsed, Interlocked.Increment(ref _clock));
+                handle = hit.Handle;
+                return true;
+            }
         }
         handle = null!;
         return false;
@@ -116,6 +133,8 @@ public sealed class FileHandlePool : IDisposable
     /// 归还使用权——★ 默认（close:false）只注销本次借用，底层照常留池服务其他共享者（句柄 Dispose 等价）；
     /// close:true = 定向关闭：底层 Dispose + 出缓存（关闭必与出缓存同发——无僵尸窗口）。
     /// </summary>
+    /// <param name="handle">须经本池 <see cref="Acquire"/> 获取的句柄；否则抛 <see cref="ArgumentException"/>。</param>
+    /// <param name="close">true=定向关闭底层并出缓存；false=仅归还使用权（默认）。</param>
     public void Release(IFileHandle handle, bool close = false)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -134,6 +153,9 @@ public sealed class FileHandlePool : IDisposable
     {
         attachment.Trace("release");
         var usage = Interlocked.Decrement(ref attachment.Usage);
+        // ★ IO-10：淘汰回插失败挂孤儿簿记的句柄——最后一次归还即真关闭（原脱离池永不关闭 = 底层句柄泄漏）
+        if (usage == 0 && _orphans.TryRemove(handle, out _))
+            ((IPoolAttachable)handle).CloseUnderlying();
 #if DEBUG
         if (usage < 0)
             throw new InvalidOperationException(
@@ -146,6 +168,8 @@ public sealed class FileHandlePool : IDisposable
     }
 
     /// <summary>按谓词批量关闭（业务事件——删文件；引擎 lease 保证静默）。在用计数&gt;0 时强制关闭并告警。</summary>
+    /// <param name="pathMatch">路径谓词，true 表示该路径对应的池内句柄全部关闭。</param>
+    /// <returns>实际关闭并移出缓存的句柄数。</returns>
     public int RemoveAll(Predicate<string> pathMatch)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -173,6 +197,9 @@ public sealed class FileHandlePool : IDisposable
             if (_cache.TryRemove(kv.Key, out var entry))
                 ForceCloseEntry(entry, source: nameof(Dispose));
         }
+        foreach (var orphan in _orphans.Keys)
+            if (_orphans.TryRemove(orphan, out _))
+                ((IPoolAttachable)orphan).CloseUnderlying();   // ★ IO-10：孤儿簿记随池收敛
         _reverse.Clear();
     }
 
@@ -218,22 +245,31 @@ public sealed class FileHandlePool : IDisposable
                 found = true;
             }
             if (!found) return;
-            if (!_cache.TryGetValue(oldest, out var entry) || !_cache.TryRemove(oldest, out var removed)) continue;
+            IFileHandle? closeUnderlying = null;
+            lock (_cacheSync)
+            {
+                // ★ IO-10：摘除与 idle 判定同锁——命中路径自增也在本锁内，check-then-act 窗口封闭
+                if (!_cache.TryGetValue(oldest, out var entry) || !_cache.TryRemove(oldest, out var removed)) continue;
 
-            // ★ 安全淘汰：只逐 idle——最久未用但在用的句柄放回（告警），标记已尝试后扫次旧
-            if (Volatile.Read(ref removed.Attachment.Usage) == 0)
-            {
-                _reverse.TryRemove(removed.Handle, out _);
-                ((IPoolAttachable)removed.Handle).CloseUnderlying();
-                _logger?.LogWarning("[FileHandlePool] LRU 淘汰 idle 句柄 path={Path}（容量 {Cap}）；派生映射不受影响",
-                    oldest.Path, cap);
+                // ★ 安全淘汰：只逐 idle——最久未用但在用的句柄放回（告警），标记已尝试后扫次旧
+                if (Volatile.Read(ref removed.Attachment.Usage) == 0)
+                {
+                    _reverse.TryRemove(removed.Handle, out _);
+                    closeUnderlying = removed.Handle;   // 底层关闭锁外执行（可能阻塞 IO）
+                    _logger?.LogWarning("[FileHandlePool] LRU 淘汰 idle 句柄 path={Path}（容量 {Cap}）；派生映射不受影响",
+                        oldest.Path, cap);
+                }
+                else
+                {
+                    _logger?.LogWarning("[FileHandlePool] LRU 跳过在用句柄 path={Path}（usage>0——安全淘汰不误伤）", oldest.Path);
+                    Volatile.Write(ref removed.LastUsed, Interlocked.Increment(ref _clock));   // 标记已尝试——下轮扫次旧
+                    // ★ IO-10：回插失败（并发同键新建抢先入池）→ 挂孤儿簿记，最后一次归还时关闭
+                    if (!_cache.TryAdd(oldest, removed))
+                        _orphans.TryAdd(removed.Handle, 0);
+                }
             }
-            else
-            {
-                _logger?.LogWarning("[FileHandlePool] LRU 跳过在用句柄 path={Path}（usage>0——安全淘汰不误伤）", oldest.Path);
-                Volatile.Write(ref removed.LastUsed, Interlocked.Increment(ref _clock));   // 标记已尝试——下轮扫次旧
-                _cache.TryAdd(oldest, removed);
-            }
+            if (closeUnderlying is not null)
+                ((IPoolAttachable)closeUnderlying).CloseUnderlying();   // 底层关闭锁外（可能阻塞 IO）
         }
     }
 }

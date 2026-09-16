@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
+using TC.Tier.Runtime.Structures.SortedIndex.Layout;
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
 /// <summary>
@@ -38,9 +39,14 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
 
         // 几何（32B——层/计数/塔顶锚点，恢复直接物化）
         Span<byte> geo = stackalloc byte[PersistGeometrySize];
-        BinaryPrimitives.WriteInt32LittleEndian(geo, _currentLevel);
-        BinaryPrimitives.WriteInt64LittleEndian(geo.Slice(8), Volatile.Read(ref _entryCount));
-        MemoryMarshal.Write(geo.Slice(16), in _headAddress);
+        SkipListIndexGeometryCodec.Write(geo, new SkipListIndexGeometry
+        {
+            CurrentLevel = _currentLevel,
+            EntryCount = Volatile.Read(ref _entryCount),
+            HeadSegId = _headAddress.SegId,
+            HeadExtension = _headAddress.Extension,
+            HeadOffset = _headAddress.Offset,
+        });
         WriteBodyChunk(geo);
     }
 
@@ -65,9 +71,10 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
 
         Span<byte> geo = stackalloc byte[PersistGeometrySize];
         if (_engine.Read(_engine.CalculationAddress(head, headerSize), geo) < PersistGeometrySize) return false;
-        int currentLevel = BinaryPrimitives.ReadInt32LittleEndian(geo);
-        long count = BinaryPrimitives.ReadInt64LittleEndian(geo.Slice(8));
-        var headAddr = MemoryMarshal.Read<LogicalAddress>(geo.Slice(16));
+        var geometry = SkipListIndexGeometryCodec.Read(geo);
+        int currentLevel = geometry.CurrentLevel;
+        long count = geometry.EntryCount;
+        var headAddr = new LogicalAddress(geometry.HeadSegId, geometry.HeadExtension, geometry.HeadOffset);
         if (currentLevel < 1 || currentLevel > _maxLevel || count < 0) return false;
         if (bodyLen != PersistGeometrySize) return false;
         if (headAddr == LogicalAddress.Empty) return false;           // 空塔无帧（fail-safe 兜底）

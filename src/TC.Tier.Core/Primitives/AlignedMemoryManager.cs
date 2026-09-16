@@ -125,6 +125,7 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     /// 获取整个内存切片（含 ThrowIfDisposed，仅对外接口使用）。
     /// Hot path 用 <see cref="GetSpanUnsafe"/> 走零校验通道。
     /// </summary>
+    /// <returns>覆盖全部 <see cref="Size"/> 字节的切片；管理器已释放时抛出 <see cref="ObjectDisposedException"/>。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public override Span<byte> GetSpan()
     {
@@ -135,6 +136,8 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     /// <summary>
     /// 获取指定偏移的内存切片（含校验，仅对外接口使用）。
     /// </summary>
+    /// <param name="offset">起始字节偏移，0 到 <see cref="Size"/>（取 Size 时返回空切片）。</param>
+    /// <returns>从 <paramref name="offset"/> 到缓冲区末尾的切片，长度为 Size-offset 字节；已释放或越界时抛出异常。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int offset)
     {
@@ -147,6 +150,9 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     /// <summary>
     /// 获取指定偏移和长度的内存切片（含校验，仅对外接口使用）。
     /// </summary>
+    /// <param name="offset">起始字节偏移，须满足 0 &lt;= offset 且 offset+length &lt;= Size。</param>
+    /// <param name="length">切片长度，单位字节，非负。</param>
+    /// <returns>长度为 <paramref name="length"/> 字节的切片；已释放或 offset/length 越界时抛出异常。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpan(int offset, int length)
     {
@@ -158,6 +164,8 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     /// <summary>
     /// 获取指定偏移的强类型引用（含校验，仅对外接口使用）。
     /// </summary>
+    /// <param name="offset">起始字节偏移，须满足 0 &lt;= offset 且 offset+sizeof(T) &lt;= Size。</param>
+    /// <returns>指向 <paramref name="offset"/> 处的 <typeparamref name="T"/> 引用；已释放或越界时抛出异常。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref T GetRef<T>(int offset) where T : struct
     {
@@ -170,6 +178,9 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     /// <summary>
     /// 获取指定偏移和长度的 Span（零校验，hot path 专用）。
     /// </summary>
+    /// <param name="offset">起始字节偏移，单位字节，调用方自行保证 0 &lt;= offset 且 offset+length &lt;= Size。</param>
+    /// <param name="length">切片长度，单位字节。</param>
+    /// <returns>长度为 <paramref name="length"/> 字节的切片；参数越界或已释放时行为未定义。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public Span<byte> GetSpanUnsafe(int offset, int length) =>
         new(BytePtr + offset, length);
@@ -177,6 +188,8 @@ public sealed unsafe class AlignedMemoryManager : MemoryManager<byte>
     /// <summary>
     /// 获取强类型引用（零校验，hot path 专用）。
     /// </summary>
+    /// <param name="offset">起始字节偏移，单位字节，调用方自行保证 offset+sizeof(T) 不超出缓冲区。</param>
+    /// <returns>指向 <paramref name="offset"/> 处的 <typeparamref name="T"/> 引用；越界或已释放时行为未定义。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ref T GetRefUnsafe<T>(int offset) where T : struct =>
         ref Unsafe.As<byte, T>(ref Unsafe.AddByteOffset(ref *BytePtr, offset));

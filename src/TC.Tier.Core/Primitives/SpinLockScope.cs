@@ -15,6 +15,8 @@ public ref struct SpinLockScope
     /// <summary>
     /// 获取 <see cref="SpinLock"/> 的 scope（using 块自动 Enter/Exit <see cref="SpinLock"/>，零分配）。
     /// </summary>
+    /// <param name="spinLock">目标锁（<see cref="SpinLock"/> 为 struct，按引用传入——调用方须保证锁实例生命周期覆盖 scope 使用期）。</param>
+    /// <returns>已持有锁的 scope（构造内已完成 <see cref="SpinLock.Enter(ref bool)"/>），using 块结束时释放。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static SpinLockScope Enter(ref SpinLock spinLock)
         => new(ref spinLock);

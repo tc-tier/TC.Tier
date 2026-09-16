@@ -160,6 +160,7 @@ public sealed partial class SegmentTable : IDisposable, ILeaseSource
     ///   （LoadAddressTable 全程可选）。</para>
     /// <para>★ 裸写安全：启动单线程 + worker 不推进水位 + 业务 lease 等 Ready 之后。</para>
     /// </summary>
+    /// <param name="startup">启动参数（携带上层裁决的 Allocated/Committed 双尾水位）。</param>
     public void SetStartupTails(StartupParameters startup)
     {
         // ★ 生命周期门禁：仅启动阶段可调。一旦 Allocate 推进水位（进入 Runtime），裸写会破坏 CAS 不变量。

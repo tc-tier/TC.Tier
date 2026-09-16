@@ -130,6 +130,9 @@ internal sealed partial class StorageEngine
 
         public static readonly CompactRangeInfo Inactive = new();
 
+        /// <summary>判断段号是否落在当前 Compact 范围内。</summary>
+        /// <param name="segId">段号。</param>
+        /// <returns>true = 范围激活且 segId ∈ [StartSeg, EndSeg]（闭区间）；false = 未激活或不在范围内。</returns>
         public bool Contains(int segId) => Active && segId >= StartSeg && segId <= EndSeg;
     }
 
@@ -193,16 +196,21 @@ internal sealed partial class StorageEngine
         var ttlMs = HoleRatioCacheTtlMs;
         if (_holeRatioCache.TryGetValue(segId, out var entry))
         {
-            // ★ 使用 Timestamp * 1000 / Frequency 标准模式，避免 Frequency < 1000 时除以零
-            long nowMs = Stopwatch.GetTimestamp() * 1000 / Stopwatch.Frequency;
-            if (nowMs - entry.Timestamp < ttlMs)
+            if (TimestampMs() - entry.Timestamp < ttlMs)
                 return entry.Ratio;
         }
 
-        long nowMs2 = Stopwatch.GetTimestamp() * 1000 / Stopwatch.Frequency;
+        long nowMs2 = TimestampMs();
         var ratio = ComputeHoleRatio(segId);
         _holeRatioCache[segId] = (ratio, nowMs2);
         return ratio;
+    }
+
+    /// <summary>当前毫秒时间戳（先除后余——ticks*1000 在长 uptime 溢出为负）。</summary>
+    private static long TimestampMs()
+    {
+        long t = Stopwatch.GetTimestamp();
+        return t / Stopwatch.Frequency * 1000 + t % Stopwatch.Frequency * 1000 / Stopwatch.Frequency;
     }
 
     private double ComputeHoleRatio(int segId)
@@ -335,6 +343,10 @@ internal sealed partial class StorageEngine
     ///   漏报活数据 = 该数据整理后不可达。范围外（from 前、to 后）仍物理保守保留。</para>
     /// <para>★ 同步入口废除（强制等待死锁风险）——后台句柄形态，0 等待返回。</para>
     /// </summary>
+    /// <param name="from">整理范围起点（含）。</param>
+    /// <param name="to">整理范围终点（不含）；上界为提交水位线，越界抛。</param>
+    /// <param name="liveRecords">使用方申报的活记录区间列表（Start + Length，记录粒度），非空且必须 ⊆ [from, to)。</param>
+    /// <returns>后台 Compact 句柄（0 等待返回）；完成后得到 <see cref="CompactResult"/>，取消经句柄的 <c>Cancel()</c>。</returns>
     public IAsyncOperation<CompactResult> StartRangeCompact(LogicalAddress from, LogicalAddress to,
         IReadOnlyList<(LogicalAddress Start, long Length)> liveRecords)
     {
@@ -360,6 +372,7 @@ internal sealed partial class StorageEngine
         IReadOnlyDictionary<int, List<(long Start, long End)>>? livePlan)
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("StartRangeCompact");
         EnsureReady();
         EnsureCompactSupported();
         ValidateRangeCompactBounds(from, to);
@@ -368,17 +381,12 @@ internal sealed partial class StorageEngine
         CompactLease? lease = null;
         try
         {
-            var lastSegId = to.Offset == 0 ? to.SegId - 1 : to.SegId;
             var leaseFrom = new LogicalAddress(from.SegId, 0);
-            // ★ L19（）：lease 覆盖 [from 段@0, 尾段 GrowthLimit] 整段——
-            //   尾段不再钳到 CommittedTail：追加在尾段 [CommittedTail.Offset, GrowthLimit)
-            //   贴边启动，旧钳制下 CanAcquireUnsafe 判无重叠放行 → promote rename 旧 inode
-            //   丢写 / 换段后 CompleteAndMerge 静默 no-op（P0）。全 GrowthLimit 覆盖使
-            //   追加与整理在尾段互斥（整理等写入者、写入者等整理），A8不挡追加以
-            //   有界阻塞不失败形式保持（范围外段仍零影响）。
-            //   整理数据窗仍为 [from, to]（to ≤ CommittedTail，bounds 校验保证）——lease
-            //   只加锁不加数据。
-            var leaseTo = new LogicalAddress(lastSegId, _segmentTable.SegmentGrowthLimit(lastSegId));
+            // ★ 活跃尾段语义（尾段不 rename——原地搬移+打洞）：lease 上界钳整理上界 to
+            //   （= 提交水位线/快照覆盖点）——写者在尾段 [to.Offset, GrowthLimit) 追加与 lease
+            //   无重叠 → 并行（A8 整理不挡追加）。尾段不替换文件，写者句柄恒有效，贴边追加不丢。
+            //   整理数据窗 = [from, to]（to ≤ CommittedTail，bounds 校验保证）。
+            var leaseTo = to;
 
             // ★ promote 是 rename 替换段文件，引擎 _handleCache 的旧句柄指向旧 inode——不预释放则
             //   紧凑后现场读全零（探针取证）。★ A8 收窄：只释放整理范围段——前沿段句柄归并发写者
@@ -518,16 +526,18 @@ internal sealed partial class StorageEngine
     public IAsyncOperation<CompactResult> StartCompact()
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("StartCompact");
         EnsureReady();
         EnsureCompactSupported();
         TryEnterCompactingOrFail();
         CompactLease? lease = null;
         try
         {
-            // ★ L19（）：lease 上界扩到尾段 GrowthLimit（同 Compact(timeout) 契约），
-            //   数据窗钳 CommittedTail（lease.DataEnd）。
+            // ★ 活跃尾段语义（尾段不 rename——原地搬移+打洞）：lease 上界钳提交水位线
+            //   CommittedTail——写者在尾段 [CommittedTail.Offset, GrowthLimit) 追加与 lease
+            //   无重叠 → 并行（A8 整理不挡追加）；数据窗 DataEnd 同钳 CommittedTail。
             var committed = CommittedTail;
-            var leaseTo = new LogicalAddress(committed.SegId, _segmentTable.SegmentGrowthLimit(committed.SegId));
+            var leaseTo = committed;
             ReleaseCompactRangeHandles(MinAddress, committed);  // ★ 同 Compact(timeout)：范围释放（A8）
             // 异步入口：立即返回句柄，调用方控制 Cancel/WaitAsync
             lease = _segmentTable.CompactLease(MinAddress, leaseTo);

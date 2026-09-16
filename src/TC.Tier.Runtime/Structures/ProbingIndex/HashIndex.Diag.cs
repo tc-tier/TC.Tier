@@ -21,6 +21,63 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
         return FindInTableRef(hash, tag, key, _table);
     }
 
+    /// <summary>★ 诊断方法：dump 某 key 所在桶（主表+溢出链）的全部原始槽位（临时排障用）。</summary>
+    internal string DiagDumpBucketRaw(TKey key)
+    {
+        var hash = ComputeHash(key);
+        var mainBucket = (int)(hash & Volatile.Read(ref _table).SizeMask);
+        var sb = new System.Text.StringBuilder();
+        var table = Volatile.Read(ref _table);
+        void DumpBuckets(HashBucket[] buckets, bool isOverflow)
+        {
+            for (long b = 0; b < buckets.LongLength; b++)
+            {
+                var slots = buckets[b].AsSpan();
+                for (int sI = 0; sI < 8; sI++)
+                {
+                    var entry = ReadSlotStable(ref slots[sI]);
+                    if (entry.Equals(LogicalAddress.Empty)) continue;
+                    sb.Append($"{(isOverflow ? "ofb" : "tbl")}{b}:{sI}=({entry.SegId},0x{entry.Extension:X},0x{entry.Offset:X}) ");
+                }
+            }
+        }
+        DumpBuckets(table.TableRaw, isOverflow: false);
+        DumpBuckets(table.OverflowPool, isOverflow: true);
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// ★ 诊断方法：当前代<b>全表扫描</b>收集某 key 的全部实体（不受 hash 路由限制——幽灵实体定位用）。
+    /// <para>★ O(全表)，仅供测试诊断，非生产路径。返回 "Offset@桶:槽" 定位串。</para>
+    /// </summary>
+    internal string[] DiagScanKeyAllSlots(TKey key)
+    {
+        var hash = ComputeHash(key);
+        var tag = ComputeTag(key);
+        var found = new List<string>();
+        var table = Volatile.Read(ref _table);
+
+        void ScanBuckets(HashBucket[] buckets, bool isOverflow)
+        {
+            for (long b = 0; b < buckets.LongLength; b++)
+            {
+                var slots = buckets[b].AsSpan();
+                for (int s = 0; s < MaxOverflowSlots; s++)
+                {
+                    var entry = ReadSlotStable(ref slots[s]);
+                    if (HashEntry.GetState(entry) != HashEntry.Occupied || HashEntry.GetTag(entry) != tag)
+                        continue;
+                    if (KeyResolver!.TryGetKey(entry, out var k) && KeyComparer.Equals(k, key))
+                        found.Add($"{entry.Offset}@{(isOverflow ? "ofb" : "tbl")}{b}:{s}");
+                }
+            }
+        }
+
+        ScanBuckets(table.TableRaw, isOverflow: false);
+        ScanBuckets(table.OverflowPool, isOverflow: true);
+        return found.ToArray();
+    }
+
     /// <summary>
     /// ★ <see cref="FindInTable"/> 的 ref 版本：bucket 用 <c>ref</c> 引用而非值拷贝,
     /// overflow 同理。逻辑与 <see cref="FindInTable"/> 完全一致。

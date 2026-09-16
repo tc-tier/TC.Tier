@@ -27,12 +27,15 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 
 ## 代码规范（编译期强制）
 
-`TC.Tier.CodeGen.Analyzers` 内置代码规范规则（`src/**` 下 Error 级）：
+`TC.Tier.Analyzers` 配置化分析器包（Tier 仓经根 `.editorconfig` 声明，`src/**` 下 Error 级）：
 
 | 规则 | 内容 |
 |---|---|
-| `TCSG030` | 禁止运行时反射——白盒访问走 `InternalsVisibleTo`，反射破坏 AOT/裁剪/性能 |
-| `TCSG031` | 禁止同步强制等待异步（`.GetAwaiter().GetResult()` / `.Wait()`）——同步阻塞后台 Task 会死锁 + 线程池耗尽 |
+| `TCSG136` | 禁止运行时反射——白盒访问走 `InternalsVisibleTo`，反射破坏 AOT/裁剪/性能 |
+| `TCSG137` | 禁止同步强制等待异步（`.GetAwaiter().GetResult()` / `.Wait()`）——同步阻塞后台 Task 会死锁 + 线程池耗尽 |
+| `TCSG138` | 禁止丢弃 Task/ValueTask（`_ =` fire-and-forget）——异常未观测/无背压/生命周期失控，走 `TaskSink` |
+| `TCSG130-133` | 分层依赖规则族（禁引用/零内部依赖/白名单/命名空间归属——`tier_layer.*` 键配置） |
+| `TCSG139` | 分析器配置非法 fail-fast |
 
 设计必需的同步等待（Dispose 契约、同步 API 落盘语义）需带理由的 `#pragma warning disable`，不允许裸写。
 
@@ -52,6 +55,7 @@ dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj
 ## 文档
 
 - 使用文档与 API 参考统一在独立文档站：https://docs.mytzz.top/（DocFX 自动生成，本地 scripts/docs-deploy.sh 部署）
+- 开发指南（全库设计思想：价值取向/组合式架构/数据反腐/代码组织范式）：[DEVELOPMENT.md](DEVELOPMENT.md)——新增结构/能力前先读 §5 代码组织范式
 
 ## 许可
 

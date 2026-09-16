@@ -1,6 +1,8 @@
 using TC.Tier.Core.Primitives;
 using TC.Tier.Core.Primitives;
 
+using TC.Tier.Core.Tests;
+using Skip = Xunit.Skip;
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
@@ -66,9 +68,10 @@ public sealed class SegmentCompactorTests : IDisposable
         dst.SequenceEqual(data).Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task Compact_Full_MultiSegment_NewSegCountLessThanOld()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         // ★ 多段 Compact：新段数 < 旧段数（紧凑消除碎片）
         var vol = NewVol();
         var options = new StorageEngineOptions("test", segmentGrowthLimit: 1024).WithPreallocateFile(false);
@@ -377,10 +380,22 @@ var options = new StorageEngineOptions("test", segmentGrowthLimit: 256 * 1024).W
         var compactOp = dev.StartCompact();
 
         // 同时继续 Append（活跃段未涉及，不应阻塞）
+        // ★ 证据硬化：Append 在本场景契约上不可失败（活跃段不在 Compact 范围）——一旦抛出，
+        //   包装迭代号与原始异常重抛（裸传播会丢失现场，套件并行下偶发且难复现）
         var appendTask = Task.Run(() =>
         {
             for (int i = 0; i < 5; i++)
-                dev.Append(MakePattern(1024, (byte)(0x10 + i)));
+            {
+                try
+                {
+                    dev.Append(MakePattern(1024, (byte)(0x10 + i)));
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException(
+                        $"Append #{i} 在并发 Compact 下失败（契约上不应发生）", ex);
+                }
+            }
         });
 
         // 两者都应完成，不死锁

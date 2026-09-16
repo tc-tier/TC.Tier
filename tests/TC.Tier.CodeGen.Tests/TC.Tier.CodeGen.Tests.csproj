@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>CA1707,CA1716,CA1852,CA2201,xUnit1000,xUnit1031,CS0618,CS1998,NU1507</NoWarn>
+  </PropertyGroup>
+
+  <!-- ★ golden 测试：GeneratorDriver 直跑 TC.Tier.CodeGen 生成器，产物与 Golden/*.g.cs 逐字比对。
+       （全局 analyzer 注入已在 Directory.Build.props 对本项目豁免——需普通引用实例化生成器） -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TC.Tier.CodeGen\TC.Tier.CodeGen.csproj" />
+    <ProjectReference Include="..\..\src\TC.Tier.CodeGen.Abstractions\TC.Tier.CodeGen.Abstractions.csproj" />
+    <!-- ★ KvStore 契约测试：fixture 实现 IValueFormatter&lt;T&gt;/引用 TierKv 真符号（golden + 诊断校验用） -->
+    <ProjectReference Include="..\..\src\TC.Tier.Products\TC.Tier.Products.csproj" />
+  </ItemGroup>
+
+  <!-- golden 快照文件：不参与编译，作为测试数据复制到输出目录 -->
+  <ItemGroup>
+    <Compile Remove="Golden/**" />
+    <None Include="Golden/**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

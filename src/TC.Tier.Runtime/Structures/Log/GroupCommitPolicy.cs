@@ -41,6 +41,8 @@ internal sealed class GroupCommitPolicy : ICommitPolicy
     /// 判定是否触发提前提交：三维度任一满足即 true。
     /// <para>★ 0 值 = 该维度立即满足（与文档一致）；-1ms / 大值 = 禁用该维度。</para>
     /// </summary>
+    /// <param name="s">提交判定快照（UnflushedBytes 未提交字节数 / UnflushedCount 未提交条数 / SinceLastCommit 距上次提交时长）。</param>
+    /// <returns>true = 至少一个维度达到阈值，应触发提前提交；false = 所有维度均未达阈值，不提交。</returns>
     public bool ShouldCommit(in CommitSnapshot s) =>
         s.UnflushedBytes >= MaxUnflushedBytes ||
         (Interval != TimeSpan.FromMilliseconds(-1) && s.SinceLastCommit >= Interval) ||

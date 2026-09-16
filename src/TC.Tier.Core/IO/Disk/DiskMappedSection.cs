@@ -123,6 +123,7 @@ internal sealed unsafe class DiskMappedSection : IMappedSection
     }
 
     /// <inheritdoc/>
+    /// <param name="advise">访问提示（本实现 no-op——手工映射路径无 view 级 madvise 暴露）。</param>
     /// <remarks>★ 手工路径无 view 级 madvise 暴露——Windows/Unix 均 no-op（文档化回退）。</remarks>
     public void Advise(FileAdvise advise)
     {
@@ -188,22 +189,30 @@ internal sealed unsafe class DiskMappedSection : IMappedSection
     /// </summary>
     private sealed class UnmanagedViewManager(DiskMappedSection owner) : MemoryManager<byte>
     {
+        /// <summary>暴露非托管映射视图的内存段。</summary>
+        /// <returns>覆盖整个映射区间的 <see cref="Span{T}"/>。</returns>
         public override Span<byte> GetSpan()
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref owner._disposed) != 0, owner);
             return new Span<byte>(owner._view, (int)owner._length);
         }
 
+        /// <summary>钉住非托管视图（地址恒定——返回指针句柄，无实际固定开销）。</summary>
+        /// <param name="elementIndex">起始元素索引（0 基）。</param>
+        /// <returns>指向该元素的 <see cref="MemoryHandle"/>。</returns>
         public override MemoryHandle Pin(int elementIndex = 0)
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref owner._disposed) != 0, owner);
             return new MemoryHandle(owner._view + elementIndex);
         }
 
+        /// <summary>解除固定——非托管地址恒定，no-op。</summary>
         public override void Unpin()
         {
         }
 
+        /// <summary>实际释放在 owner.Dispose 统一执行——no-op。</summary>
+        /// <param name="disposing">true = 显式释放；false = 终结器。</param>
         protected override void Dispose(bool disposing)
         {
             // 实际释放在 owner.Dispose——manager 仅是视图出口

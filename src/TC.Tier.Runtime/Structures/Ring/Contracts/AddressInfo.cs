@@ -15,6 +15,10 @@ internal struct AddressInfo
     [FieldOffset(0)]  public LogicalAddress Address;
     [FieldOffset(16)] public long Size;
 
+    /// <summary>构造溢出指针（写溢出值后随 record 内联持久化）。</summary>
+    /// <param name="address">溢出值在溢出引擎地址空间内的逻辑地址。</param>
+    /// <param name="size">溢出值长度（字节）。</param>
+    /// <returns>填好 Address/Size 的 24B 溢出指针。</returns>
     public static AddressInfo WriteInfo(LogicalAddress address, long size)
     {
         var ai = new AddressInfo

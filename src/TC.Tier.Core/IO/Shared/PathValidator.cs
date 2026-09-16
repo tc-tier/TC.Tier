@@ -22,6 +22,8 @@ internal static class PathValidator
     private static readonly SearchValues<char> InvalidChars = SearchValues.Create("\0<>:\"|?*");
 
     /// <summary>校验 fs 根目录路径（fs 构造用）——须为非空。★ 根是绝对路径，盘符/UNC 合法（非法字符集只约束单组件文件名）。</summary>
+    /// <param name="root">根目录路径。</param>
+    /// <exception cref="ArgumentException">root 为空/纯空白。</exception>
     public static void ValidateRoot(string root)
     {
         if (string.IsNullOrWhiteSpace(root))
@@ -36,6 +38,9 @@ internal static class PathValidator
     /// <para>单组件路径天然合法（旧扁平文件名的规则子集——引擎既有段文件名零影响）；
     /// 点前缀组件（<c>.tier-volume-lock</c> / sidecar <c>.data.0</c>）合法。</para>
     /// </summary>
+    /// <param name="path">待校验的相对路径（'/' 分隔）。</param>
+    /// <param name="root">根标识（参与组合长度上限计算）。</param>
+    /// <exception cref="ArgumentException">命中任一拒绝规则。</exception>
     public static void ValidateRelative(string path, string root)
     {
         // ① 空 / null / 纯空白

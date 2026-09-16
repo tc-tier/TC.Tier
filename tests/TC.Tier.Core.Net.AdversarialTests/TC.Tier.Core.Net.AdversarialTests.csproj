@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <LangVersion>12.0</LangVersion>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- ★ Core.Net 装配期开启 preview（QUIC 介质——System.Net.Quic preview API），其公共面整体
+         带 RequiresPreviewFeatures——消费项目必须同步 opt-in，否则 CA2252 判错（TreatWarningsAsErrors
+         下 196 错）。 -->
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <NoWarn>CA1707,CA1716,CA1852,CA2201,xUnit1000,xUnit1026,xUnit1031,CS0618,NU1507</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TC.Tier.Core.Net\TC.Tier.Core.Net.csproj" />
+    <ProjectReference Include="..\..\src\TC.Tier.Core\TC.Tier.Core.csproj" />
+  </ItemGroup>
+  <!-- ★ 对抗性测试（spec-09 §3 故障注入矩阵）独立项目——2026-08-21 用户裁定惯例：
+       故障注入/soak 以挂起/慢时序为常态，与单元测试混合会拖垮整个单测套件。
+       Core.Net 对抗项目单独跑、单独取证，不与 TC.Tier.Core.Net.Tests 混跑。
+       （D4-T6 首轮 = 故障注入矩阵 6 场景 × InProcess/TCP 双介质；soak/断电归 D5-T3 收口验收。） -->
+  <!-- ★ 共享基础设施从单测项目链接（单一真源，禁止复制）：FsRaftStore（真持久化语义夹具）。 -->
+  <ItemGroup>
+    <Compile Include="..\TC.Tier.Core.Net.Tests\Fixtures\FsRaftStore.cs" Link="Shared\FsRaftStore.cs" />
+    <Compile Include="..\TC.Tier.Core.Net.Tests\Fixtures\ClusterTransportRig.cs" Link="Shared\ClusterTransportRig.cs" />
+    <Compile Include="..\TC.Tier.Core.Net.Tests\Fixtures\RecordingMetricsSink.cs" Link="Shared\RecordingMetricsSink.cs" />
+    <Compile Include="..\TC.Tier.Core.Net.Tests\Fixtures\InMemoryRaftStore.cs" Link="Shared\InMemoryRaftStore.cs" />
+    <Compile Include="..\TC.Tier.Core.Net.Tests\Fixtures\FreezeForensics.cs" Link="Shared\FreezeForensics.cs" />
+  </ItemGroup>
+  <!-- ★ xunit.runner.json 复制到输出目录（对抗项目串行执行——时序敏感，禁并行）。 -->
+  <ItemGroup>
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

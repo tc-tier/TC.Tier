@@ -28,6 +28,8 @@ internal sealed class ChunkedSignedStream : Stream
     /// 精确预计算分帧编码后的字节长度（chunk 数 × 帧头/尾 + 终帧）——设为 HTTP Content-Length，
     /// 免 HTTP 层 Transfer-Encoding: chunked（部分服务端/中间件对该形态请求体支持不佳）。
     /// </summary>
+    /// <param name="decodedLength">原始（未编码）载荷字节数。</param>
+    /// <returns>分帧编码后的总字节数（含所有帧头行、CRLF、数据、终帧）。</returns>
     public static long EncodedLength(long decodedLength)
     {
         const int sigLen = 64;   // hex(HMAC-SHA256)
@@ -62,6 +64,11 @@ internal sealed class ChunkedSignedStream : Stream
     public override long Length => throw new NotSupportedException();
     public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
+    /// <summary>从分帧签名流读取已编码字节到缓冲区（耗尽返回 0）。</summary>
+    /// <param name="buffer">填充目标缓冲区。</param>
+    /// <param name="offset">缓冲区写入起始偏移。</param>
+    /// <param name="count">最多读取字节数。</param>
+    /// <returns>实际读取的字节数；终帧读尽后返回 0。</returns>
     public override int Read(byte[] buffer, int offset, int count)
     {
         while (_pending.Position >= _pending.Length && !_finished)
@@ -86,6 +93,9 @@ internal sealed class ChunkedSignedStream : Stream
         return take;
     }
 
+    /// <summary>编码并签名一个数据帧（帧头 + 数据 + CRLF），写入待读缓冲。</summary>
+    /// <param name="data">原始数据块。</param>
+    /// <param name="length">本帧有效字节数（≤ <c>data</c>.Length，≤ ChunkSize）。</param>
     private void EmitChunk(byte[] data, int length)
     {
         var hash = SigV4.Sha256Hex(data.AsSpan(0, length));
@@ -106,14 +116,30 @@ internal sealed class ChunkedSignedStream : Stream
         _pending.Write(frame, 0, frame.Length);
     }
 
+    /// <summary>释放资源（仅托管资源——关闭待读帧缓冲；不关闭上游源流）。</summary>
+    /// <param name="disposing">true = 显式/隐式 Dispose 调用（释放托管资源）；false = 终结器路径（本类无非托管资源，无操作）。</param>
     protected override void Dispose(bool disposing)
     {
         if (disposing) _pending.Dispose();
         base.Dispose(disposing);
     }
 
+    /// <summary>无操作（分帧按需在 <see cref="Read"/> 内实时产生——无缓冲外排概念）。</summary>
     public override void Flush() { }
+    /// <summary>不支持 Seek（单向流）。</summary>
+    /// <param name="offset">偏移量。</param>
+    /// <param name="origin">寻址基准。</param>
+    /// <returns>不返回——恒抛。</returns>
+    /// <exception cref="NotSupportedException">本流不可寻。</exception>
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    /// <summary>不支持 SetLength（单向流）。</summary>
+    /// <param name="value">目标长度。</param>
+    /// <exception cref="NotSupportedException">本流不可设长。</exception>
     public override void SetLength(long value) => throw new NotSupportedException();
+    /// <summary>不支持 Write（只读流）。</summary>
+    /// <param name="buffer">写入缓冲（未用）。</param>
+    /// <param name="offset">偏移量（未用）。</param>
+    /// <param name="count">字节数（未用）。</param>
+    /// <exception cref="NotSupportedException">本流只读。</exception>
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }

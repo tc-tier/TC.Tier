@@ -17,6 +17,12 @@ internal sealed partial class DefaultCompactor
     /// <summary>申报活区间版（§XVIII）——livePlan 覆盖 [from,to) 内的搬迁规划（记录粒度洞可见）。
     /// ★ 统一异步形态（同 <see cref="Compact(CompactLease[])"/>）——后台执行 + 句柄驱动，
     ///   取消经 op.CancellationToken（链接 _cts + Cancel()），lease 由后台任务收尾 Dispose。</summary>
+    /// <param name="lease">已获取的 Compact 租约（覆盖整理范围），非空；生命周期移交后台任务收尾。</param>
+    /// <param name="from">整理范围起点（含）。</param>
+    /// <param name="to">整理范围终点（不含）。</param>
+    /// <param name="addresses">参与搬迁的记录地址列表（申报的活数据），非空。</param>
+    /// <param name="livePlan">按段分组的活区间规划（记录粒度）；null = 不做记录粒度规划（按地址搬迁）。</param>
+    /// <returns>后台区间 Compact 句柄（0 等待返回）；完成后得到 <see cref="CompactResult"/>，失败/取消经句柄异常重抛。</returns>
     public IAsyncOperation<CompactResult> RangeCompact(
         CompactLease lease,
         LogicalAddress from,
@@ -74,21 +80,31 @@ internal sealed partial class DefaultCompactor
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            CreateRangeImages(chunks, images, cancellationToken);
+            CreateRangeImages(chunks, images, to, cancellationToken);
 
             using var buffer = new AlignedMemoryManager(CopyChunkSize, AlignmentConst.Alignment4K);
             CopyOutsideRange(images, from, to, buffer, cancellationToken);
             var (moves, compactedEnd) = CopyCompactedRange(
                 images, from, to, buffer, livePlan, cancellationToken);
             PopulateMigrationMap(addresses, moves, images, migrationMap);
+            // ★ 活跃尾段：搬移完成后源区打洞（打包尾到水位线之间的窗口内数据已全部搬走）
+            PunchTailSource(images, compactedEnd, to);
 
             foreach (var image in images)
-                image.Temp.Flush();
+            {
+                if (image.Temp is not null) image.Temp.Flush();
+                else if (image.IsTail) image.InPlace.Flush();   // ★ 尾段原地：原段文件 flush
+            }
 
             // ★ 新段自写元数据（设计决策）：段元组写临时段 FileExtra——promote（rename）
-            //   随文件同步就位，不再经引擎 tupleWriter 委托事后补写。
+            //   随文件同步就位，不再经引擎 tupleWriter 委托事后补写。活跃尾段原地搬移——
+            //   元组写原段 FileExtra（文件不替换，元组就地更新）。
             foreach (var image in images)
-                WriteTempSegmentMeta(image.Temp, image.Length, image.GrowthLimit, image.Length);
+            {
+                var metaHandle = image.Temp ?? (image.IsTail ? image.InPlace : null);
+                if (metaHandle is not null)
+                    WriteTempSegmentMeta(metaHandle, image.Length, image.GrowthLimit, image.Length);
+            }
 
             cancellationToken.ThrowIfCancellationRequested();
             foreach (var image in images)
@@ -127,7 +143,7 @@ internal sealed partial class DefaultCompactor
 
             // Once the durable marker exists, promotion is a non-cancellable commit phase.
 
-            DeleteCommitMarkerRequired();
+            DeleteLastWrittenCommitMarker();
             markerWritten = false;
             // ★ lease 释放先于完成通知（同全量契约）：等待者苏醒时 lease 必已释放（可重新入闸）
             try
@@ -151,7 +167,7 @@ internal sealed partial class DefaultCompactor
             //   marker 未写 → 清理半成品（无恢复路径防泄漏）。失败决策权归使用方——只报异常。
             if (!markerWritten)
             {
-                DeleteCommitMarker();
+                DeleteLastWrittenCommitMarker();
                 DeleteAllTemps();
                 lease.Rollback();
             }
@@ -181,11 +197,12 @@ internal sealed partial class DefaultCompactor
     }
 
     private void CreateRangeImages(
-        IReadOnlyList<CompactChunk> chunks,
+        CompactChunk[] chunks,
         ICollection<RangeSegmentImage> images,
+        LogicalAddress to,
         CancellationToken cancellationToken)
     {
-        for (var i = 0; i < chunks.Count; i++)
+        for (var i = 0; i < chunks.Length; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var chunk = chunks[i];
@@ -208,14 +225,21 @@ internal sealed partial class DefaultCompactor
                     .OrderBy(static range => range.Start)
                     .ToArray();
 
-                temp = CreateTempHandle(chunk.SegId, 0);
-                if (length > 0)
+                // ★ 活跃尾段（水位线 to 落在段中间）：不建 temp、不 rename——窗口内数据原地
+                //   前移打包 + 源区 PunchHole 打洞（写者句柄恒有效——并行整理语义）。
+                var isTail = chunk.SegId == to.SegId && to.Offset < chunk.OldGrowthLimit;
+                if (!isTail)
                 {
-                    temp.SetLength(length);
-                    temp.PunchHole(0, length);
+                    temp = CreateTempHandle(chunk.SegId, 0);
+                    if (length > 0)
+                    {
+                        temp.SetLength(length);
+                        temp.PunchHole(0, length);
+                    }
                 }
 
                 images.Add(new RangeSegmentImage(
+                    this,
                     chunk.SegId,
                     length,
                     chunk.OldGrowthLimit,
@@ -242,6 +266,9 @@ internal sealed partial class DefaultCompactor
     {
         foreach (var image in images)
         {
+            // ★ 活跃尾段：窗口外数据原地就在（不建 temp 不搬）——跳过
+            if (image.IsTail) continue;
+
             var rangeStart = image.SegmentId == from.SegId ? from.Offset : 0;
             var rangeEnd = image.SegmentId == to.SegId ? to.Offset : image.GrowthLimit;
 
@@ -250,14 +277,14 @@ internal sealed partial class DefaultCompactor
                 if (allocated.Start < rangeStart)
                 {
                     var end = Math.Min(allocated.End, rangeStart);
-                    CopyRange(image.Source, allocated.Start, image.Temp, allocated.Start,
+                    CopyRange(image.Source, allocated.Start, image.Temp!, allocated.Start,
                         end - allocated.Start, buffer, cancellationToken);
                 }
 
                 if (allocated.End > rangeEnd)
                 {
                     var start = Math.Max(allocated.Start, rangeEnd);
-                    CopyRange(image.Source, start, image.Temp, start,
+                    CopyRange(image.Source, start, image.Temp!, start,
                         allocated.End - start, buffer, cancellationToken);
                 }
             }
@@ -308,6 +335,7 @@ internal sealed partial class DefaultCompactor
                 moves.Add(new RangeMove(image.SegmentId, start, end, destination));
                 CopyToLogicalDestination(
                     image.Source,
+                    image.SegmentId,
                     start,
                     end - start,
                     destination,
@@ -325,7 +353,7 @@ internal sealed partial class DefaultCompactor
         IReadOnlyList<LogicalAddress> addresses,
         IReadOnlyList<RangeMove> moves,
         IReadOnlyList<RangeSegmentImage> images,
-        IDictionary<LogicalAddress, LogicalAddress?> migrationMap)
+        Dictionary<LogicalAddress, LogicalAddress?> migrationMap)
     {
         // ★ A8 待打磨②收口（）：moves 按构建序 (SourceSegmentId, SourceStart) 升序
         //   （CopyCompactedRange 逐段逐区间顺序产出）——二分定位包含区间，O(地址数 × log 搬移数)
@@ -377,6 +405,7 @@ internal sealed partial class DefaultCompactor
 
     private static void CopyToLogicalDestination(
         IFileHandle source,
+        int sourceSegmentId,
         long sourceOffset,
         long length,
         LogicalAddress destination,
@@ -404,10 +433,25 @@ internal sealed partial class DefaultCompactor
             var available = image.GrowthLimit - segOffset;
             var count = Math.Min(remaining, available);
             var requiredLength = segOffset + count;
-            if (requiredLength > image.Temp.Length)
-                image.Temp.SetLength(requiredLength);
+            // ★ 活跃尾段目标 = 原地写（同段句柄）；非尾段 = temp 文件
+            var target = image.Temp;
+            if (target is null)
+            {
+                target = image.InPlace;
+                if (target.Length < requiredLength)
+                    target.SetLength(requiredLength);
+            }
+            else if (requiredLength > target.Length)
+            {
+                target.SetLength(requiredLength);
+            }
 
-            CopyRange(source, readOffset, image.Temp, segOffset, count, buffer, cancellationToken);
+            // ★ 尾段同段前移搬移（源、目标同文件且目标 < 源）：必须反向拷贝（memmove 反向分支——
+            //   正向会先覆盖源区未读部分）；同址/跨段（异文件）正向安全。
+            if (image.IsTail && sourceSegmentId == segId && segOffset < readOffset)
+                CopyRangeBackward(source, readOffset, target, segOffset, count, buffer, cancellationToken);
+            else
+                CopyRange(source, readOffset, target, segOffset, count, buffer, cancellationToken);
             readOffset += count;
             remaining -= count;
             segOffset += count;
@@ -416,6 +460,25 @@ internal sealed partial class DefaultCompactor
                 segId++;
                 segOffset = 0;
             }
+        }
+    }
+
+    /// <summary>★ 尾段源区打洞（搬移完成后）：[尾段内打包尾, to.Offset) 的窗口内数据已全部搬走
+    /// （目标恒在 [from, compactedEnd)）——源区 PunchHole 归还物理空间。同址未搬区间不在此列
+    /// （compactedEnd 之前）。幂等（Reclaim 同款语义）。</summary>
+    private static void PunchTailSource(
+        IReadOnlyList<RangeSegmentImage> images,
+        LogicalAddress compactedEnd,
+        LogicalAddress to)
+    {
+        foreach (var image in images)
+        {
+            if (!image.IsTail) continue;
+            var punchStart = compactedEnd.SegId == image.SegmentId ? compactedEnd.Offset : 0;
+            var punchEnd = image.SegmentId == to.SegId ? to.Offset : image.Length;
+            punchEnd = Math.Min(punchEnd, image.Length);
+            if (punchStart >= punchEnd) continue;
+            image.InPlace.PunchHole(punchStart, punchEnd - punchStart);
         }
     }
 
@@ -440,6 +503,31 @@ internal sealed partial class DefaultCompactor
                     $"RangeCompact short read: expected {count} bytes, got {read}.");
             destination.Write(destinationOffset + copied, span);
             copied += count;
+        }
+    }
+
+    /// <summary>★ 反向分块拷贝（同文件前移搬移——从区间尾向头，memmove 反向分支）。</summary>
+    private static void CopyRangeBackward(
+        IFileHandle source,
+        long sourceOffset,
+        IFileHandle destination,
+        long destinationOffset,
+        long length,
+        AlignedMemoryManager buffer,
+        CancellationToken cancellationToken)
+    {
+        var remaining = length;
+        while (remaining > 0)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var count = (int)Math.Min(buffer.Size, remaining);
+            var span = buffer.GetSpan().Slice(0, count);
+            var read = source.Read(sourceOffset + remaining - count, span);
+            if (read != count)
+                throw new EndOfStreamException(
+                    $"RangeCompact short read (backward): expected {count} bytes, got {read}.");
+            destination.Write(destinationOffset + remaining - count, span);
+            remaining -= count;
         }
     }
 
@@ -541,20 +629,25 @@ internal sealed partial class DefaultCompactor
 
     private sealed class RangeSegmentImage : IDisposable
     {
+        private readonly DefaultCompactor _owner;
+
         internal RangeSegmentImage(
+            DefaultCompactor owner,
             int segmentId,
             long length,
             long growthLimit,
             PhysicalRange[] allocatedRanges,
             IFileHandle source,
-            IFileHandle temp)
+            IFileHandle? temp)
         {
+            _owner = owner;
             SegmentId = segmentId;
             Length = length;
             GrowthLimit = growthLimit;
             AllocatedRanges = allocatedRanges;
             Source = source;
             Temp = temp;
+            IsTail = temp is null;   // ★ 活跃尾段（水位线在段中间）：不建 temp——原地搬移 + 打洞
         }
 
         internal int SegmentId { get; }
@@ -562,7 +655,19 @@ internal sealed partial class DefaultCompactor
         internal long GrowthLimit { get; }
         internal PhysicalRange[] AllocatedRanges { get; }
         internal IFileHandle Source { get; }
-        internal IFileHandle Temp { get; }
+        internal IFileHandle? Temp { get; }
+        /// <summary>★ 活跃尾段标志（水位线落在段中间——该段不 rename：写者句柄恒有效，并行不丢）。</summary>
+        internal bool IsTail { get; }
+
+        private IFileHandle? _inPlace;
+        /// <summary>★ 尾段原地写句柄（懒打开——同段 pwrite 搬移 + PunchHole 源区；非尾段恒 null）。</summary>
+        internal IFileHandle InPlace => _inPlace ??= _owner._fileSystem.Open(_owner.GetSegmentPath(SegmentId),
+            new FileOpenOptions
+            {
+                Access = AccessMode.ReadWrite,
+                Mode = FileOpenMode.OpenExisting,
+                Sharing = FileSharing.ReadWrite | FileSharing.Delete,
+            });
 
         private int _sourceDisposed;
         private int _disposed;
@@ -573,12 +678,14 @@ internal sealed partial class DefaultCompactor
                 Source.Dispose();
         }
 
+        /// <summary>释放整理会话资源——幂等：释放源句柄、临时目标与原位搬移上下文（各内部自防双释放）。</summary>
         public void Dispose()
         {
             if (Interlocked.Exchange(ref _disposed, 1) != 0)
                 return;
             DisposeSource();
-            Temp.Dispose();
+            Temp?.Dispose();
+            _inPlace?.Dispose();
         }
     }
 }

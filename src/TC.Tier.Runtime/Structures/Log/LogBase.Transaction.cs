@@ -23,7 +23,9 @@ public abstract partial class LogBase
 
     /// <summary>
     /// ★ Prepare（事务准备）：本结构准备提交到 seq。落盘数据 + meta。
-    /// <para>★ 新模型：FlushUntil(TailAddress) 数据落盘后，用 TailAddress 作为 committedOffset 写 meta。</para>
+    /// <para>★ 新模型：FlushUntil(tail) 数据落盘后，用同一 tail 作为 committedOffset 写 meta。
+    /// ★ 尾快照契约：tail 在入口一次性捕获——flush 与 meta 记账同一地址。若两次独立求值，
+    /// flush 与记账之间并发追加推进尾，meta 会记录未 flush 的 committedOffset（崩溃恢复脏读）。</para>
     /// <para>★ Abort 支撑：meta 同块持久化当前提交边界（<see cref="_txRollbackTail"/> →
     /// PreparedTailAddress 字段）——本轮 Prepare 窗口的回退点跨崩溃可用。</para>
     /// </summary>
@@ -31,23 +33,27 @@ public abstract partial class LogBase
     public void Prepare(long seq)
     {
         Volatile.Write(ref _lastPreparedSeq, seq);
-        FlushUntil(TailAddress);
-        AppendMeta(TailAddress);  // opaque 由 SetOpaqueMetaPayload 预设值自动带入
+        var tail = TailAddress;   // ★ 快照：flush 与 meta 记账同一地址
+        FlushUntil(tail);
+        AppendMeta(tail);  // opaque 由 SetOpaqueMetaPayload 预设值自动带入
     }
 
     /// <summary>
     /// ★ Prepare 异步对等版（同步 <see cref="Prepare(long)"/>）：FlushUntilAsync 数据落盘 +
-    /// AppendMetaAsync 写 meta（TailAddress 作 committedOffset；opaque 由 SetOpaqueMeta stage 自动带入）。
+    /// AppendMetaAsync 写 meta（同一尾快照作 committedOffset；opaque 由 SetOpaqueMeta stage 自动带入）。
+    /// <para>★ 尾快照契约：await 间隙并发追加推进尾不影响本次提交边界（快照语义同同步版）。</para>
     /// <para>★ Abort 支撑：meta 同块持久化当前提交边界（<see cref="_txRollbackTail"/> →
     /// PreparedTailAddress 字段）——本轮 Prepare 窗口的回退点跨崩溃可用。</para>
     /// </summary>
     /// <param name="seq">准备提交的序号。</param>
     /// <param name="ct">取消令牌。</param>
+    /// <returns>表示数据 flush + meta 落盘完成的任务；完成后进入悬空状态（ConfirmCommitted 前崩溃恢复时丢弃）。</returns>
     public async ValueTask PrepareAsync(long seq, CancellationToken ct)
     {
         Volatile.Write(ref _lastPreparedSeq, seq);
-        await FlushUntilAsync(TailAddress, ct).ConfigureAwait(false);
-        await AppendMetaAsync(TailAddress, ct).ConfigureAwait(false);  // opaque 由 SetOpaqueMeta stage 自动带入
+        var tail = TailAddress;   // ★ 快照：await 间隙并发推进的尾不混入提交边界
+        await FlushUntilAsync(tail, ct).ConfigureAwait(false);
+        await AppendMetaAsync(tail, ct).ConfigureAwait(false);  // opaque 由 SetOpaqueMeta stage 自动带入
     }
 
     /// <summary>
@@ -80,6 +86,7 @@ public abstract partial class LogBase
     /// 仅复位记账；无既有提交边界（Empty，如首事务）/ 边界已被头截断回收 / 无悬干数据 → 仅复位记账。</para>
     /// <para>⚠️ 调用契约：与 Append/Flush 单写者串行（事务终态点调用，TransactionLog 协议天然满足）。</para>
     /// </summary>
+    /// <param name="seq">要回滚的 Prepare 序号。</param>
     public void Abort(long seq)
     {
         EnsureNotDisposed();
@@ -107,6 +114,7 @@ public abstract partial class LogBase
     /// </summary>
     /// <param name="seq">回滚的 Prepare 序号。</param>
     /// <param name="ct">取消令牌。</param>
+    /// <returns>表示回滚完成的任务（守卫不命中/无回退场景同步完成）。</returns>
     public async ValueTask AbortAsync(long seq, CancellationToken ct)
     {
         EnsureNotDisposed();
@@ -178,9 +186,19 @@ public abstract partial class LogBase
             }
         }
 
-        // 锁外触发（避免回调里再注册回调死锁）
+        // 锁外触发（避免回调里再注册回调死锁）。★ 逐回调 try/catch：回调已从注册表移除，
+        // 前序回调异常若中断循环，后续回调直接丢失（调用方永久死等）——全部执行完再聚合上抛。
         if (toFire != null)
+        {
+            List<Exception>? errors = null;
             foreach (var cb in toFire)
-                cb();
+            {
+                try { cb(); }
+                catch (Exception ex) { (errors ??= []).Add(ex); }
+            }
+
+            if (errors != null)
+                throw new AggregateException($"事务提交回调异常（seq={committedSeq}，共 {toFire.Count} 个回调已全部执行）", errors);
+        }
     }
 }

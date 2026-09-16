@@ -31,7 +31,10 @@ public sealed class SegmentSingleFlightTests : IDisposable
     {
         var vol = NewVol();
         IStorageEngine dev;
-        var options = new StorageEngineOptions("test", segmentGrowthLimit: 4 * 1024).WithPreallocateFile(false);
+        var options = new StorageEngineOptions("test", segmentGrowthLimit: 4 * 1024).WithPreallocateFile(false)
+            // ★ 600 段 × 建+满元组 = 千次 meta fsync——满并发磁盘下每次 ~1s 串行 = fsync 风暴。
+            //   本测试验证 single-flight 语义，耐久化锚定 Dispose（配置轴——MetaTupleFlushInterval）。
+            .WithMetaTupleFlushInterval(Timeout.InfiniteTimeSpan);
         options = options.WithOptimization(options.Optimization with { WorkerConsumers = 2 });
         using var builder = options.Builder(vol.Fs);
         using (dev = builder.Start())
@@ -43,7 +46,7 @@ public sealed class SegmentSingleFlightTests : IDisposable
             var payload = new byte[512];
             for (var i = 0; i < payload.Length; i++) payload[i] = (byte)(i & 0xFF);
 
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TestMediaBudget.Scale(TimeSpan.FromSeconds(30)));
             var tasks = Enumerable.Range(0, threads).Select(_ => Task.Run(() =>
             {
                 for (var i = 0; i < perThread; i++)
@@ -55,7 +58,7 @@ public sealed class SegmentSingleFlightTests : IDisposable
 
             // 若死锁/挂起，30s 内 WhenAll 不返回 → 超时失败
             var all = Task.WhenAll(tasks);
-            var timeout = Task.Delay(TimeSpan.FromSeconds(30));
+            var timeout = Task.Delay(TestMediaBudget.Scale(TimeSpan.FromSeconds(30)));
             (await Task.WhenAny(all, timeout)).Should().Be(all, "N=2 并发 Append 不应挂起");
 
             await WaitForBuildLogStableAsync(builder.Engine);
@@ -79,7 +82,7 @@ public sealed class SegmentSingleFlightTests : IDisposable
         var prev = -1;
         for (var i = 0; i < 100; i++)
         {
-            await Task.Delay(100);
+            await Task.Delay(TestMediaBudget.Scale(TimeSpan.FromMilliseconds(100)));
             var cur = dev.PhysicalBuildLog.Count;
             if (cur == prev) return;
             prev = cur;

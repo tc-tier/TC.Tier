@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.IO.Hashing;
 
 namespace TC.Tier.Core.IO.Image;
 
@@ -113,7 +112,7 @@ internal static class ImageFormat
     internal static (long Offset, int RawLen, uint FrameCrc) WriteFrame(BinaryWriter w, uint entryIdx,
         long offset, ReadOnlySpan<byte> raw, ImageCompression codec)
     {
-        uint crc = Crc32.HashToUInt32(raw);
+        uint crc = UnifiedCrc.ComputeCrc32(raw);
         byte[] stored;
         var storedCodec = (byte)codec;
         if (codec == ImageCompression.ZLib)
@@ -203,7 +202,7 @@ internal static class ImageFormat
 
         if (raw.Length != rawLen)
             throw NewFormatError(null, $"帧长度不符：解压 {raw.Length} ≠ 头声明 {rawLen}");
-        if (verify && Crc32.HashToUInt32(raw) != crc)
+        if (verify && UnifiedCrc.ComputeCrc32(raw) != crc)
             throw NewFormatError(null, $"帧 CRC 校验失败（offset={offset}）——数据损坏");
         return (offset, raw);
     }
@@ -248,44 +247,14 @@ internal static class ImageFormat
                 $"流尾对账失败：帧 {fc}=={frameCount}? 字节 {rb}=={rawBytes}? 聚合CRC {fcr:X8}=={framesCrc:X8}?");
     }
 
-    /// <summary>帧 CRC 聚合（帧 CRC 序列的滚动 CRC-32——尾对账基准；增量实现，与库的一次散列独立）。</summary>
+    /// <summary>帧 CRC 聚合（帧 CRC 序列的滚动 CRC-32——尾对账基准；UnifiedCrc 增量续算，语义与整段一致）。</summary>
     /// <param name="current">当前聚合 CRC（初始 0）</param>
     /// <param name="frameCrc">单帧 CRC</param>
     internal static uint AggregateCrc(uint current, uint frameCrc)
     {
         Span<byte> b = stackalloc byte[4];
         System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(b, frameCrc);
-        return Crc32Incremental(current, b);
-    }
-
-    /// <summary>
-    /// CRC-32 查表（标准反射多项式 0xEDB88320——System.IO.Hashing 8.x 无静态 Update，自持增量）。
-    /// </summary>
-    private static readonly uint[] SCrcTable = BuildCrcTable();
-
-    /// <summary>增量 CRC-32（标准反射多项式 0xEDB88320——System.IO.Hashing 8.x 无静态 Update，自持增量）。</summary>
-    /// <param name="crc">当前 CRC（初始 0）</param>
-    /// <param name="data">增量数据</param>
-    /// <returns>增量后的 CRC</returns>
-    private static uint Crc32Incremental(uint crc, ReadOnlySpan<byte> data)
-    {
-        crc = ~crc;
-        foreach (var b in data)
-            crc = SCrcTable[(crc ^ b) & 0xFF] ^ (crc >> 8);
-        return ~crc;
-    }
-
-    private static uint[] BuildCrcTable()
-    {
-        var table = new uint[256];
-        for (var i = 0u; i < 256; i++)
-        {
-            var c = i;
-            for (var k = 0; k < 8; k++)
-                c = (c & 1) != 0 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
-            table[i] = c;
-        }
-        return table;
+        return UnifiedCrc.ComputeCrc32(current, b);
     }
 
     /// <summary>

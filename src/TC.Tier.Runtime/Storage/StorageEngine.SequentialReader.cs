@@ -18,6 +18,7 @@ internal sealed partial class StorageEngine
         SnapshotMode snapshotMode = SnapshotMode.Consistent)
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("OpenSequentialReader");
         EnsureReady();
         return new SequentialReader(this, start, end, direction, usePageCache, snapshotMode);
     }
@@ -80,6 +81,9 @@ internal sealed partial class StorageEngine
         public ReadDirection Direction => _direction;
         public SnapshotMode SnapshotMode => _snapshotMode;
 
+        /// <summary>从当前游标读取 destination.Length 字节，读后游标自动推进（跨段自动，方向随 <see cref="Direction"/>）。</summary>
+        /// <param name="destination">目标缓冲区（长度可为 0——直接返回 0）。</param>
+        /// <returns>实际读取的字节数（可能 0 = 已到 <see cref="End"/> 边界）。</returns>
         public int Read(Span<byte> destination)
         {
             ThrowIfDisposed();
@@ -91,6 +95,10 @@ internal sealed partial class StorageEngine
                 : ReadBackward(destination);
         }
 
+        /// <summary>异步从当前游标读取（语义同 <see cref="Read"/>，物理读走 <see cref="IFileHandle.ReadAsync"/>）。</summary>
+        /// <param name="destination">目标缓冲区（长度可为 0——直接完成并返回 0）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>完成后得到实际读取的字节数（可能 0 = 已到 <see cref="End"/> 边界）。</returns>
         public ValueTask<int> ReadAsync(Memory<byte> destination, CancellationToken ct)
         {
             ThrowIfDisposed();
@@ -102,6 +110,8 @@ internal sealed partial class StorageEngine
                 : ReadBackwardAsync(destination, ct);
         }
 
+        /// <summary>相对移动游标 length 字节，不读数据（正序前进 / 倒序后退，跨段自动）。</summary>
+        /// <param name="length">要跳过的字节数（非正数时静默忽略）。</param>
         public void Skip(long length)
         {
             ThrowIfDisposed();
@@ -113,6 +123,10 @@ internal sealed partial class StorageEngine
                 SkipBackward(length);
         }
 
+        /// <summary>绝对地址跳转——把游标定位到任意地址（方向不变）。</summary>
+        /// <param name="target">目标地址（必须在 [Start, End] 范围内且段有效）。</param>
+        /// <exception cref="ArgumentOutOfRangeException">target 越界（不在读范围内）。</exception>
+        /// <exception cref="PartitionInvalidException">target 指向的段已不存在（Invalid）。</exception>
         public void Seek(LogicalAddress target)
         {
             ThrowIfDisposed();
@@ -126,6 +140,7 @@ internal sealed partial class StorageEngine
             _position = target;
         }
 
+        /// <summary>释放顺序读句柄——Consistent 模式下退出 Compact 双相门并释放构造时持有的全部段共享锁（幂等）。</summary>
         public void Dispose()
         {
             if (_disposed) return;
@@ -154,9 +169,15 @@ internal sealed partial class StorageEngine
                 var seg = _owner._segmentTable.GetSegment(segId);
                 if (seg.StableState == StableState.Invalid)
                 {
-                    // ★ 跳段进入的段不存在 = 自然数据边界（物理尾 < end——截断后 meta 未夹）→ EOF；
-                    //   直接读段内 Invalid（offset > 0）= 真错误（段被删除）
-                    if (_position.Offset == 0) break;
+                    // ★ Hollow 段（已回收，占位连续）段首跨到下段继续读——cursor 起点锚点在
+                    //   回收段时仍能读到其后实数据（skip 同语义）；带界：越过读窗口尾即 EOF
+                    //   （截断后 meta 未夹的物理尾 < end 场景）。段内越界（offset > 0）= 真错误。
+                    if (_position.Offset == 0)
+                    {
+                        if (DistanceToEnd(segId, 0) <= 0) break;
+                        _position = new LogicalAddress(segId + 1, 0);
+                        continue;
+                    }
                     throw new PartitionInvalidException("Segment not found.", _position);
                 }
 
@@ -165,7 +186,10 @@ internal sealed partial class StorageEngine
                 long toEnd = DistanceToEnd(segId, _position.Offset);
                 if (toEnd <= 0) break;
 
-                long segRemaining = seg.RealSize - _position.Offset;
+                // ★ 段内数据剩余 = View.MaxOffset - Offset（★语义层次：位置计算用布局游标
+                //   MaxOffset——cursor 只需知道数据在哪；VisibleOffset 是可见性门语义
+                //   （读句柄层职责）——两字段语义不同层，位置计算误用可见门 = 提前停丢读）
+                long segRemaining = seg.MaxOffset - _position.Offset;
                 if (segRemaining <= 0)
                 {
                     segId++;
@@ -193,7 +217,10 @@ internal sealed partial class StorageEngine
                     using var handle = _owner.GetReadHandle(segId, _usePageCache);
                     int n = handle.Read(_position.Offset, destination.Slice(dstOffset, chunkLen));
                     dstOffset += n;
-                    _position = new LogicalAddress(segId, _position.Offset + n);
+                    // ★ 游标推进走段表算术（教义：地址 ± 走引擎/段表计算方法——Hollow 段占位
+                    //   语义 + 恰好填满停驻 (seg, limit) 规范形；n 已被 chunkLen≤segRemaining
+                    //   夹逼在段内，与段表算术等价且不再依赖隐式夹逼链）
+                    _position = _owner._segmentTable.AdvanceAddress(_position, n);
                     if (n < chunkLen) break;
                 }
                 finally
@@ -225,9 +252,13 @@ internal sealed partial class StorageEngine
                 var seg = _owner._segmentTable.GetSegment(segId);
                 if (seg.StableState == StableState.Invalid)
                 {
-                    // ★ 跳段进入的段不存在 = 自然数据边界（物理尾 < end——截断后 meta 未夹）→ EOF；
-                    //   直接读段内 Invalid（offset > 0）= 真错误（段被删除）
-                    if (_position.Offset == 0) break;
+                    // ★ Hollow 段段首跨段继续读（同 ReadForward——占位连续 + 带界 EOF）
+                    if (_position.Offset == 0)
+                    {
+                        if (DistanceToEnd(segId, 0) <= 0) break;
+                        _position = new LogicalAddress(segId + 1, 0);
+                        continue;
+                    }
                     throw new PartitionInvalidException("Segment not found.", _position);
                 }
 
@@ -236,7 +267,10 @@ internal sealed partial class StorageEngine
                 long toEnd = DistanceToEnd(segId, _position.Offset);
                 if (toEnd <= 0) break;
 
-                long segRemaining = seg.RealSize - _position.Offset;
+                // ★ 段内数据剩余 = View.MaxOffset - Offset（★语义层次：位置计算用布局游标
+                //   MaxOffset——cursor 只需知道数据在哪；VisibleOffset 是可见性门语义
+                //   （读句柄层职责）——两字段语义不同层，位置计算误用可见门 = 提前停丢读）
+                long segRemaining = seg.MaxOffset - _position.Offset;
                 if (segRemaining <= 0)
                 {
                     segId++;
@@ -258,11 +292,12 @@ internal sealed partial class StorageEngine
                 }
                 try
                 {
-                    using var handle = _owner.GetReadHandle(segId, _usePageCache);
-                    int n = await handle.ReadAsync(_position.Offset, destination.Slice(dstOffset, chunkLen), ct)
+                    await using var handle = _owner.GetReadHandle(segId, _usePageCache);
+                    var n = await handle.ReadAsync(_position.Offset, destination.Slice(dstOffset, chunkLen), ct)
                         .ConfigureAwait(false);
                     dstOffset += n;
-                    _position = new LogicalAddress(segId, _position.Offset + n);
+                    // ★ 游标推进走段表算术（同 ReadForward——Hollow 占位 + 停驻规范形）
+                    _position = _owner._segmentTable.AdvanceAddress(_position, n);
                     if (n < chunkLen) break;
                 }
                 finally
@@ -295,8 +330,12 @@ internal sealed partial class StorageEngine
                 if (segAvailable <= 0)
                 {
                     segId--;
-                    seg = _owner._segmentTable.GetSegment(segId);   // 前一段，读 RealSize（SegmentView）
-                    _position = new LogicalAddress(segId, seg.RealSize);
+                    // ★ 跨段回退：TryGetSegment 一步到位——实段=MaxOffset（数据末——布局语义）/
+                    //   段不存在=SegmentGrowthLimit（占位末——地址空间连续）
+                    _position = new LogicalAddress(segId,
+                        _owner._segmentTable.TryGetSegment(segId, out var prevSeg) && prevSeg is { IsValid: true }
+                            ? prevSeg.Value.MaxOffset
+                            : _owner._segmentTable.SegmentGrowthLimit(segId));
                     continue;
                 }
 
@@ -320,10 +359,12 @@ internal sealed partial class StorageEngine
                 try
                 {
                     using var handle = _owner.GetReadHandle(segId, _usePageCache);
-                    Span<byte> buf = destination.Slice(totalLen - dstOffset - chunkLen, chunkLen);
-                    int n = handle.Read(readOffset, buf);
+                    var buf = destination.Slice(totalLen - dstOffset - chunkLen, chunkLen);
+                    var n = handle.Read(readOffset, buf);
                     dstOffset += n;
-                    _position = new LogicalAddress(segId, readOffset);
+                    // ★ 游标推进走段表算术：RetreatAddress(_position, chunkLen) == (segId, readOffset)
+                    //   （chunkLen ≤ segAvailable 夹逼段内，借位语义 Hollow 占位——等价替换）
+                    _position = _owner._segmentTable.RetreatAddress(_position, chunkLen);
                     if (n < chunkLen) break;
                 }
                 finally
@@ -359,10 +400,10 @@ internal sealed partial class StorageEngine
                 }
                 else
                 {
-                    // ★ L23 防御推进（）：缺失段退到前段段首——旧实现空转死循环
-                    //   （dstOffset/位置都不变；当前运行期无摘索引路径，潜伏缺陷）。
-                    _position = new LogicalAddress(segId - 1, 0);
-                    continue;
+                    // ★ 段缺失 = 数据边界到达（ReclaimHead 已回收）：安静停止——与 SkipForward
+                    //   同款语义。禁"退到前段段首继续"式防御推进：下轮 segAvailable==0 走跳段
+                    //   分支会跳过前段全部数据（漏读）；原实现即此病灶（L23 残留）。
+                    break;
                 }
 
 
@@ -370,8 +411,11 @@ internal sealed partial class StorageEngine
                 if (segAvailable <= 0)
                 {
                     segId--;
-                    seg = _owner._segmentTable.GetSegment(segId); // 前一段，读 RealSize
-                    _position = new LogicalAddress(segId, seg.Value.RealSize);
+                    // ★ 跨段回退：TryGetSegment 一步到位（同 ReadBackward）
+                    _position = new LogicalAddress(segId,
+                        _owner._segmentTable.TryGetSegment(segId, out var prevSeg) && prevSeg is { IsValid: true }
+                            ? prevSeg.Value.MaxOffset
+                            : _owner._segmentTable.SegmentGrowthLimit(segId));
                     continue;
                 }
 
@@ -393,11 +437,12 @@ internal sealed partial class StorageEngine
                 }
                 try
                 {
-                    using var handle = _owner.GetReadHandle(segId, _usePageCache);
-                    Memory<byte> buf = destination.Slice(totalLen - dstOffset - chunkLen, chunkLen);
-                    int n = await handle.ReadAsync(readOffset, buf, ct).ConfigureAwait(false);
+                    await using var handle = _owner.GetReadHandle(segId, _usePageCache);
+                    var buf = destination.Slice(totalLen - dstOffset - chunkLen, chunkLen);
+                    var n = await handle.ReadAsync(readOffset, buf, ct).ConfigureAwait(false);
                     dstOffset += n;
-                    _position = new LogicalAddress(segId, readOffset);
+                    // ★ 游标推进走段表算术（同 ReadBackward——RetreatAddress == (segId, readOffset)）
+                    _position = _owner._segmentTable.RetreatAddress(_position, chunkLen);
                     if (n < chunkLen) break;
                 }
                 finally
@@ -422,30 +467,45 @@ internal sealed partial class StorageEngine
                 int segId = _position.SegId;
                 if (_owner._segmentTable.TryGetSegment(segId, out var seg) && seg is { IsValid: true })
                 {
-                    long segRemaining = seg.Value.RealSize - _position.Offset;
+                    // ★ 段内数据剩余（同 ReadForward——MaxOffset 布局游标）
+                    long segRemaining = seg.Value.MaxOffset - _position.Offset;
                     long toEnd = DistanceToEnd(segId, _position.Offset);
 
-                    if (segRemaining <= 0 || toEnd <= 0) break;
+                    if (toEnd <= 0) break;
+
+                    if (segRemaining <= 0)
+                    {
+                        // ★ 段末停驻（AdvanceAddress 恰好填满规范形）→ 跨到下段原点继续——
+                        //   (N,0) = 段首原点身份（读游标合法形态；区间端点才要求停驻形）。
+                        //   不能 break：remaining 可能未耗尽（跨段 skip 未完成——提前终止=游标错位）
+                        _position = new LogicalAddress(segId + 1, 0);
+                        continue;
+                    }
 
                     long step = Math.Min(remaining, Math.Min(segRemaining, toEnd));
                     remaining -= step;
-                    long newOff = _position.Offset + step;
-
-                    if (newOff >= seg.Value.RealSize)
-                    {
-                        segId++;
-                        _position = new LogicalAddress(segId, 0);
-                    }
-                    else
-                    {
-                        _position = new LogicalAddress(segId, newOff);
-                    }
+                    // ★ 游标推进走段表算术：step ≤ segRemaining 夹逼段内；恰好填满停驻
+                    //   (segId, MaxOffset) 规范形——由上方跳段分支跨段收敛
+                    _position = _owner._segmentTable.AdvanceAddress(_position, step);
                 }
                 else
                 {
-                    // ★ L23 防御推进（）：段缺失时游标前进——旧实现空转死循环
-                    //   （当前运行期无摘索引路径，潜伏缺陷；索引考古曾实锤空洞段窗口）。
-                    _position = new LogicalAddress(segId + 1, 0);
+                    // ★ 段缺失 = Hollow 段（Reclaim 回收——地址空间占位连续，SegmentGrowthLimit
+                    //   占位）：skip 用段表占位跨过它推进到下一实段继续——不能 break（跨 Hollow
+                    //   的 skip 会提前终止——cursor 读不到其后实数据，2026-08-27 soak 实锤：
+                    //   ReadLogTermAsync 空 → commit 判定失效/applied 卡）；也不能只推位置不减
+                    //   remaining（原始死循环——GrowthLimit 占位推进两者都做，天然不循环）
+                    var hollowLimit = _owner._segmentTable.SegmentGrowthLimit(segId);
+                    var hollowRemaining = hollowLimit - _position.Offset;
+                    if (hollowRemaining <= 0)
+                    {
+                        // 占位段末（含 GrowthLimit 未知段退化为段末）：跨到下段原点
+                        _position = new LogicalAddress(segId + 1, 0);
+                        continue;
+                    }
+                    var hollowStep = Math.Min(remaining, hollowRemaining);
+                    remaining -= hollowStep;
+                    _position = _owner._segmentTable.AdvanceAddress(_position, hollowStep);
                 }
             }
         }
@@ -468,18 +528,17 @@ internal sealed partial class StorageEngine
                 if (newOff <= 0)
                 {
                     segId--;
-                    if (!_owner._segmentTable.TryGetSegment(segId, out var seg) || seg is not { IsValid: true })
-                    {
-                        // ★ L23 防御推进：缺失段退到段首（RealSize 未知）——下一轮 segAvailable==0 自然 break
-                        _position = new LogicalAddress(segId, 0);
-                        continue;
-                    }
-                    var prevSeg = seg.Value;
-                    _position = new LogicalAddress(segId, prevSeg.RealSize);
+                    // ★ 跨段回退：TryGetSegment 一步到位——实段=MaxOffset（数据末——布局语义）/
+                    //   段不存在=SegmentGrowthLimit（占位末，对称 SkipForward 占位推进）
+                    _position = new LogicalAddress(segId,
+                        _owner._segmentTable.TryGetSegment(segId, out var seg) && seg is { IsValid: true }
+                            ? seg.Value.MaxOffset
+                            : _owner._segmentTable.SegmentGrowthLimit(segId));
                 }
                 else
                 {
-                    _position = new LogicalAddress(segId, newOff);
+                    // ★ 游标推进走段表算术：step ≤ segAvailable 夹逼段内，借位语义 Hollow 占位
+                    _position = _owner._segmentTable.RetreatAddress(_position, step);
                 }
             }
         }

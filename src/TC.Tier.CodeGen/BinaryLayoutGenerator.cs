@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TC.Tier.CodeGen.Templating;
 
 namespace TC.Tier.CodeGen;
 
@@ -69,6 +70,14 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
 
+    private static readonly DiagnosticDescriptor FieldOverlapRule = new(
+        id: "TCSG006",
+        title: "BinaryLayout fields overlap",
+        messageFormat: "[BinaryLayout] struct '{0}' 的字段 '{1}' [{2},{3}) 与字段 '{4}' [{5},{6}) 重叠。持久化字段必须占用互不重叠的字节区间。",
+        category: "CodeGeneration",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
     /// <summary>
     /// ★ Spec 27：嵌套字段类型未标记 [BinaryLayout] 报错。
     /// 只有源生成器收集表里（已标 [BinaryLayout]）的 struct 才支持作嵌套字段。
@@ -112,7 +121,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         isEnabledByDefault: true);
 
     /// <summary>
-    /// 注册生成管道：收集阶段（[BinaryLayout] struct 元数据 + TCSG001/TCSG003/TCSG005 诊断）→
+    /// 注册生成管道：收集阶段（[BinaryLayout] struct 元数据 + TCSG001/TCSG003/TCSG005/TCSG006 诊断）→
     /// Collect 聚合全表 → 生成阶段（嵌套大小表 + 逐个 emit Codec）。
     /// </summary>
     /// <param name="context">增量生成器初始化上下文。</param>
@@ -210,7 +219,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                 //   旧 break 令 FieldOffset 命中即退出，校验特性从未解析（Validate 从未生成、validate:true 静默空转）。
                 if (LayoutFieldAttributeNames["FieldOffset"] == name)
                 {
-                    if (attr.ConstructorArguments is [{ Value: int o } _])
+                    if (attr.ConstructorArguments.Length == 1 && attr.ConstructorArguments[0].Value is int o)
                         offset = o;
                     continue;
                 }
@@ -243,11 +252,11 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             }
             if (offset < 0) continue;
 
-            // ★ 缺陷 3（fail-fast）：基元/enum 类型必须在 Emit 支持集（EmitWriteStmt/EmitReadExpr
+            // ★ 缺陷 3（fail-fast）：基元/enum 类型必须在 Emit 支持集（TypeEmitter.Form
             //   只覆盖 UInt32/UInt16/UInt64/Int64/Int32/Byte + 底层同集枚举）——Int16/SByte 静默
             //   生成注释/"default"（写缺字节/读恒 0）且 TCSG001 交叉校验不触发；嵌套 struct 由
-            //   IsNestedStruct 路由（Emit 阶段处理）不在此检查。
-            if (!IsNestedStruct(field.Type) && !IsEmitSupportedPrimitiveOrEnum(field.Type))
+            //   TypeEmitter.IsNestedStruct 路由（Emit 阶段处理）不在此检查。
+            if (!TypeEmitter.IsNestedStruct(field.Type) && !IsEmitSupportedPrimitiveOrEnum(field.Type))
             {
                 unsupportedFieldType ??= Diagnostic.Create(UnsupportedFieldTypeRule, location,
                     structSymbol.Name, field.Name, field.Type.ToDisplayString());
@@ -267,7 +276,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             fields.Add(new FieldInfo(field.Name, field.Type, offset, constraint)
             {
                 // ★ 收集阶段：基元/enum 算好 size；嵌套 struct 留 null（生成阶段查收集表）
-                ResolvedSize = IsNestedStruct(field.Type)
+                ResolvedSize = TypeEmitter.IsNestedStruct(field.Type)
                     ? null
                     : int.Parse(GetPrimitiveOrEnumSize(field.Type), System.Globalization.CultureInfo.InvariantCulture)
             });
@@ -294,6 +303,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                     break;
                 }
             }
+            if (sizeConst <= 0)
+                sizeMismatch ??= Diagnostic.Create(MissingStructLayoutRule, location, structSymbol.Name);
         }
 
         // ★ Spec 27 问题 4 修复：交叉验证 StructLayout.Size vs 字段实际偏移和。
@@ -309,9 +320,14 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             if (extent > computedFieldExtent) computedFieldExtent = extent;
         }
         // 仅当无嵌套字段（全部已解析）时才在收集阶段校验；有嵌套的推迟到 EmitCodec
+        if (!hasUnresolvedNested && FindFieldOverlap(fields) is { } overlap)
+        {
+            sizeMismatch ??= CreateFieldOverlapDiagnostic(
+                location, structSymbol.Name, overlap.First, overlap.Second);
+        }
         if (!hasUnresolvedNested && sizeConst > 0 && computedFieldExtent != sizeConst)
         {
-            sizeMismatch = Diagnostic.Create(SizeMismatchRule, location,
+            sizeMismatch ??= Diagnostic.Create(SizeMismatchRule, location,
                 structSymbol.Name, sizeConst, computedFieldExtent);
         }
 
@@ -348,15 +364,18 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         {
             // readonly：按 offset 排序的字段类型序列
             var fieldTypeSeq = fields.OrderBy(f => f.Offset).Select(f => f.Type).ToList();
-            // 找最大参数的实例构造函数（排除无参默认）
-            var maxCtor = structSymbol.InstanceConstructors
+            // 最大参数长度的构造函数中任一参数类型序列匹配即可（同长多 ctor 的确定性选择——
+            //   如组合形态 [Opaque16 _value] 恰有 internal(Opaque16) 与 public(ReadOnlySpan) 两个单参 ctor）
+            var maxLength = structSymbol.InstanceConstructors
                 .Where(c => c.Parameters.Length > 0)
-                .OrderByDescending(c => c.Parameters.Length)
-                .FirstOrDefault();
-            canConstruct = maxCtor is not null
-                && maxCtor.Parameters.Length == fieldTypeSeq.Count
-                && maxCtor.Parameters.Select(p => p.Type)
-                    .SequenceEqual(fieldTypeSeq, SymbolEqualityComparer.Default);
+                .Select(c => c.Parameters.Length)
+                .DefaultIfEmpty(0)
+                .Max();
+            canConstruct = maxLength == fieldTypeSeq.Count
+                && structSymbol.InstanceConstructors
+                    .Where(c => c.Parameters.Length == maxLength)
+                    .Any(c => c.Parameters.Select(p => p.Type)
+                        .SequenceEqual(fieldTypeSeq, SymbolEqualityComparer.Default));
         }
 
         return new LayoutInfo(
@@ -381,6 +400,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
     ///   否则裸名（如 <c>DeviceMetaHeader</c>）在顶层命名空间下找不到嵌套类型。
     /// <para>★ 多层嵌套（A.B.C）按外→内顺序拼接：ContainingType 自顶向下遍历累加。</para>
     /// </summary>
+    /// <param name="structSymbol">目标 struct 的类型符号（可能嵌于多层包含类型内）。</param>
+    /// <returns>包含类型前缀（外→内顺序，如 "DeviceBase.Nested."；非嵌套为 ""）。</returns>
     private static string BuildContainingTypePrefix(INamedTypeSymbol structSymbol)
     {
         if (structSymbol.ContainingType is null) return "";
@@ -397,6 +418,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
 
     /// <summary>
     /// 生成单个 struct 的 Codec。生成阶段调用——此时嵌套大小表已建好（本编译内所有 [BinaryLayout] struct）。
+    /// <para>★ 模板驱动：节选模板（Templates/BinaryLayout/*.sbn）按 FeatureFlags 组装；
+    ///   字段语句/表达式由 TypeEmitter 单一映射表供参（六份重复 switch 的收敛点）。</para>
     /// <param name="layout">目标 struct 的收集阶段元数据。</param>
     /// <param name="nestedSizeTable">本编译内所有 [BinaryLayout] struct 的全名→大小表（收集表）。</param>
     /// <returns>(hintName, source, diagnostic)。diagnostic 非 null 表示嵌套字段类型不支持（TCSG002），不生成。</returns>
@@ -407,7 +430,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         // ★ 生成阶段：解析嵌套字段大小（收集阶段留 null 的）。查收集表，查不到报 TCSG002。
         foreach (var f in layout.Fields.Where(f => !f.ResolvedSize.HasValue))
         {
-            if (!IsNestedStruct(f.Type))
+            if (!TypeEmitter.IsNestedStruct(f.Type))
             {
                 f.ResolvedSize = 0; // 不该发生（非嵌套非基元），安全兜底
                 continue;
@@ -437,6 +460,13 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             }
         }
 
+        if (FindFieldOverlap(layout.Fields) is { } overlap)
+        {
+            return (HintName(layout), "",
+                CreateFieldOverlapDiagnostic(
+                    layout.Location, layout.StructName, overlap.First, overlap.Second));
+        }
+
         // ★ TCSG001 补校验（含嵌套字段）：收集阶段因嵌套 size 未解析跳过了校验，
         //   此处全部字段已解析，重算 extent 与 StructLayout.Size 比对。
         if (layout.SizeConstValue > 0)
@@ -461,46 +491,55 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         var structRefName = layout.ContainingType + structName;
         var codecName = structName + "Codec";
 
-        var sb = new System.Text.StringBuilder();
-        sb.AppendLine("// <auto-generated/>");
-        sb.AppendLine("#pragma warning disable 1591 // 生成 Codec 成员不进 API 文档（DocFX 从 XML 注释取语义）");
-        if (!string.IsNullOrEmpty(ns))
-        {
-            sb.Append("namespace ").Append(ns).AppendLine(";");
-            sb.AppendLine();
-        }
-
-        sb.Append(layout.IsPublic ? "public" : "internal").Append(" static class ").AppendLine(codecName);
-        sb.AppendLine("{");
+        var sections = new System.Text.StringBuilder();
 
         // ── StructSize ──
         if ((layout.FeatureFlags & FeatureStructSize) != 0 && layout.SizeConstValue > 0)
         {
-            sb.Append("    public const int StructSize = ").Append(layout.SizeConstValue).AppendLine(";");
-            sb.AppendLine();
+            sections.Append(RenderTpl(TplStructSize, Tokens(
+                ("SIZE", layout.SizeConstValue.ToString()))));
         }
 
         // ── FieldConstants: Offset_*/Size_* ──
         if ((layout.FeatureFlags & FeatureFieldConstants) != 0)
         {
-            foreach (var f in layout.Fields)
-            {
-                sb.Append("    public const int Offset_").Append(f.Name).Append(" = ").Append(f.Offset).AppendLine(";");
-                sb.Append("    public const int Size_").Append(f.Name).Append(" = ").Append(FieldSizeStr(f)).AppendLine(";");
-            }
-            sb.AppendLine();
+            var fields = string.Join("\n", layout.Fields.Select(f => RenderTpl(TplFieldConstant, Tokens(
+                ("NAME", f.Name),
+                ("OFFSET", f.Offset.ToString()),
+                ("SIZE", FormOf(f).Size)))));
+            sections.Append(RenderTpl(TplFieldConstants, Tokens(("FIELDS", fields))));
         }
 
         // ── FieldReaders: Read_* ──
         if ((layout.FeatureFlags & FeatureFieldReaders) != 0)
         {
-            EmitFieldReaders(sb, layout.Fields);
+            var readers = TemplateEngine.RenderEach(TemplateSet.Get(TplFieldReader),
+                layout.Fields.Select(f =>
+                {
+                    var tokens = ExprTokens(f);
+                    tokens["TYPE"] = f.Type.ToDisplayString();
+                    tokens["NAME"] = f.Name;
+                    tokens["EXPR"] = RenderTpl(ReadExprTpl(FormOf(f).Kind), tokens);
+                    return tokens;
+                }),
+                TplFieldReader);
+            sections.Append(readers);
         }
 
         // ── FieldWriters: Write_*（对称 Read_*，收口字节序，避免业务层手写 BinaryPrimitives）──
         if ((layout.FeatureFlags & FeatureFieldWriters) != 0)
         {
-            EmitFieldWriters(sb, layout.Fields);
+            var writers = TemplateEngine.RenderEach(TemplateSet.Get(TplFieldWriter),
+                layout.Fields.Select(f =>
+                {
+                    var tokens = StmtTokens(f, "value");
+                    tokens["TYPE"] = f.Type.ToDisplayString();
+                    tokens["NAME"] = f.Name;
+                    tokens["STMT"] = RenderTpl(WriteStmtTpl(FormOf(f).Kind), tokens);
+                    return tokens;
+                }),
+                TplFieldWriter);
+            sections.Append(writers);
         }
 
         // ── Create（默认值——ValidEquals 约束字段自动填常量；调用方只填变化字段）──
@@ -510,64 +549,47 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         bool hasEqualsDefaults = layout.Fields.Exists(f => f.Constraint is { Kind: ConstraintKind.Equals });
         if (hasEqualsDefaults && !layout.IsReadOnly)
         {
-            sb.Append("    /// <summary>合法默认实例——[ValidEquals] 字段自动填常量（写侧只填变化字段）。</summary>").AppendLine();
-            sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-            sb.Append("    public static ").Append(structRefName).AppendLine(" Create()");
-            sb.AppendLine("    {");
-            sb.Append("        return new ").Append(structRefName).AppendLine();
-            sb.AppendLine("        {");
-            for (int i = 0; i < layout.Fields.Count; i++)
-            {
-                var f = layout.Fields[i];
-                string init = f.Constraint is { Kind: ConstraintKind.Equals } c
+            var fields = string.Join("\n", layout.Fields.Select((f, i) => RenderTpl(TplCreateField, Tokens(
+                ("NAME", f.Name),
+                ("INIT", f.Constraint is { Kind: ConstraintKind.Equals } c
                     ? FormatConst(c.EqExpected, f.Type)
-                    : "default";
-                sb.Append("            ").Append(f.Name).Append(" = ").Append(init)
-                  .Append(i == layout.Fields.Count - 1 ? "" : ",").AppendLine();
-            }
-            sb.AppendLine("        };");
-            sb.AppendLine("    }");
-            sb.AppendLine();
+                    : "default"),
+                ("COMMA", i == layout.Fields.Count - 1 ? "" : ",")))));
+            sections.Append(RenderTpl(TplCreate, Tokens(
+                ("STRUCTREF", structRefName),
+                ("FIELDS", fields))));
         }
 
         // ── Validate ──
         bool hasConstraints = layout.Fields.Exists(f => f.Constraint is not null);
         if (hasConstraints)
         {
-            sb.Append("    public static bool Validate(in ").Append(structRefName).AppendLine(" value)");
-            sb.AppendLine("    {");
-            foreach (var f in layout.Fields)
-            {
-                if (f.Constraint is not null)
-                    EmitValidateLine(sb, structName, f);
-            }
-            sb.AppendLine("        return true;");
-            sb.AppendLine("    }");
-            sb.AppendLine();
+            var checks = string.Join("\n",
+                layout.Fields.Where(f => f.Constraint is not null).Select(RenderCheck));
+            sections.Append(RenderTpl(TplValidate, Tokens(
+                ("STRUCTREF", structRefName),
+                ("CHECKS", checks))));
         }
 
         // ── Write ──
         // ★ validate 语义 = 防御性补全（非抛异常）：ValidEquals 字段不信任入参、强制写常量——
         //   调用方可传 default（如 MetaPolicy.WriteHeader(default)），布局层保证规范字段合法。
-        sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-        sb.Append("    public static void Write(System.Span<byte> dest, in ").Append(structRefName).AppendLine(" value, bool validate = false)");
-        sb.AppendLine("    {");
-        if (layout.SizeConstValue > 0)
-        {
-            sb.Append("        if (dest.Length < ").Append(layout.SizeConstValue).AppendLine(")");
-            sb.AppendLine("            throw new System.ArgumentException(\"Buffer too small\");");
-        }
+        var writeStmts = new List<string>();
         foreach (var f in layout.Fields)
         {
-            if (f.Constraint is { Kind: ConstraintKind.Equals } c)
-                // ★ 防御性补全：validate=true 时 ValidEquals 字段不信任入参、强制写常量
-                //   （调用方可传 default——如 MetaPolicy.WriteHeader(default)，布局层保证规范字段合法）
-                EmitWriteLine(sb, f, "validate ? " + FormatConst(c.EqExpected, f.Type) + " : value." + f.Name);
-            else
-                EmitWriteLine(sb, f, null);
+            // ★ 防御性补全：validate=true 时 ValidEquals 字段不信任入参、强制写常量
+            //   （调用方可传 default——如 MetaPolicy.WriteHeader(default)，布局层保证规范字段合法）
+            string valueExpr = f.Constraint is { Kind: ConstraintKind.Equals } c
+                ? "validate ? " + FormatConst(c.EqExpected, f.Type) + " : value." + f.Name
+                : "value." + f.Name;
+            writeStmts.Add(RenderTpl(WriteStmtTpl(FormOf(f).Kind), StmtTokens(f, valueExpr)));
         }
-        sb.AppendLine("    }");
-        sb.AppendLine();
+        var guard = RenderGuard(layout.SizeConstValue, "dest");
+        var writeBody = string.Join("\n",
+            guard.Length == 0 ? writeStmts : new[] { guard }.Concat(writeStmts));
+        sections.Append(RenderTpl(TplWrite, Tokens(
+            ("STRUCTREF", structRefName),
+            ("BODY", writeBody))));
 
         // ── Read ──
         // ★ 字节序铁律（unified-binary-layout.md §1.2）：全部 BinaryPrimitives 小端，禁 MemoryMarshal。
@@ -578,214 +600,227 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         //   - 非 readonly：object initializer（字段可写）。
         if (!layout.IsReadOnly || layout.CanConstruct)
         {
-            sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-            sb.Append("    public static ").Append(structRefName).AppendLine(" Read(System.ReadOnlySpan<byte> source)");
-            sb.AppendLine("    {");
-            if (layout.SizeConstValue > 0)
-            {
-                sb.Append("        if (source.Length < ").Append(layout.SizeConstValue).AppendLine(")");
-                sb.AppendLine("            throw new System.ArgumentException(\"Buffer too small\");");
-            }
+            string body;
             if (layout.IsReadOnly)
             {
                 // readonly + CanConstruct：构造调用（字段按 offset 排序对应构造函数参数序）
-                var orderedFields = layout.Fields.OrderBy(f => f.Offset).ToList();
-                sb.Append("        return new ").Append(structRefName).Append('(');
-                for (var i = 0; i < orderedFields.Count; i++)
-                {
-                    if (i > 0) sb.Append(", ");
-                    sb.Append(EmitReadExpr(orderedFields[i], "source"));
-                }
-                sb.AppendLine(");");
+                var args = string.Join(", ", layout.Fields.OrderBy(f => f.Offset)
+                    .Select(f => RenderTpl(ReadExprTpl(FormOf(f).Kind), ExprTokens(f))));
+                body = RenderTpl(TplReadCtorBody, Tokens(
+                    ("STRUCTREF", structRefName),
+                    ("ARGS", args)));
             }
             else
             {
-                sb.Append("        return new ").Append(structRefName).AppendLine();
-                sb.AppendLine("        {");
-                for (int i = 0; i < layout.Fields.Count; i++)
-                    EmitReadLine(sb, layout.Fields[i], i == layout.Fields.Count - 1);
-                sb.AppendLine("        };");
+                var fields = string.Join("\n", layout.Fields.Select((f, i) =>
+                {
+                    var tokens = ExprTokens(f);
+                    tokens["NAME"] = f.Name;
+                    tokens["EXPR"] = RenderTpl(ReadExprTpl(FormOf(f).Kind), tokens);
+                    tokens["COMMA"] = i == layout.Fields.Count - 1 ? "" : ",";
+                    return RenderTpl(TplReadField, tokens);
+                }));
+                body = RenderTpl(TplReadInitBody, Tokens(
+                    ("STRUCTREF", structRefName),
+                    ("FIELDS", fields)));
             }
-            sb.AppendLine("    }");
-            sb.AppendLine();
+            var readGuard = RenderGuard(layout.SizeConstValue, "source");
+            sections.Append(RenderTpl(TplRead, Tokens(
+                ("STRUCTREF", structRefName),
+                ("BODY", readGuard.Length == 0 ? body : readGuard + "\n" + body))));
         }
         else
         {
             // readonly + !CanConstruct：不生成整体 Read
-            sb.Append("    // readonly struct ").Append(structName).AppendLine(" 的最大构造函数不覆盖全部字段，不生成整体 Read。");
-            sb.Append("    // 可用 FieldConstants(Offset_/Size_) + 单字段 Read_* 方法自行组合。");
-            sb.AppendLine();
+            sections.Append(RenderTpl(TplReadUnavailable, Tokens(("STRUCTNAME", structName))));
         }
 
         // ── OrFlags / IsEmpty ──
         if (!string.IsNullOrEmpty(layout.OrFlagsField))
         {
             var f = layout.Fields.Find(x => x.Name == layout.OrFlagsField);
-            if (f is not null) EmitOrFlagsMethod(sb, structName, f);
+            if (f is not null)
+                sections.Append(RenderTpl(TplOrFlags, Tokens(
+                    ("STRUCTNAME", structName),
+                    ("FIELD", f.Name),
+                    ("OFFSET", f.Offset.ToString()))));
         }
         if (!string.IsNullOrEmpty(layout.IsEmptyField))
         {
             var f = layout.Fields.Find(x => x.Name == layout.IsEmptyField);
-            if (f is not null) EmitIsEmptyMethod(sb, structName, f);
+            if (f is not null)
+                sections.Append(RenderTpl(TplIsEmpty, Tokens(
+                    ("STRUCTNAME", structName),
+                    ("FIELD", f.Name),
+                    ("OFFSET", f.Offset.ToString()))));
         }
 
-        sb.AppendLine("}");
+        var source = RenderTpl(TplClass, Tokens(
+            ("NAMESPACE", string.IsNullOrEmpty(ns) ? "" : "namespace " + ns + ";\n\n"),
+            ("ACCESS", layout.IsPublic ? "public" : "internal"),
+            ("CODECNAME", codecName),
+            ("SECTIONS", sections.ToString())));
 
-        return (hintName, sb.ToString(), null);
+        return (hintName, source, null);
     }
 
-    // ── FieldReaders 生成 ──
-
-    private static void EmitFieldReaders(System.Text.StringBuilder sb,
-        System.Collections.Generic.List<FieldInfo> fields)
+    private static (FieldInfo First, FieldInfo Second)? FindFieldOverlap(
+        IEnumerable<FieldInfo> fields)
     {
-        foreach (var f in fields)
+        FieldInfo? furthestField = null;
+        long furthestEnd = -1;
+        foreach (var field in fields.OrderBy(static field => field.Offset))
         {
-            var retType = f.Type.ToDisplayString();
-            var readExpr = EmitReadExpr(f, "source");
-            sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-            sb.Append("    public static ").Append(retType).Append(" Read_").Append(f.Name)
-              .AppendLine("(System.ReadOnlySpan<byte> source)");
-            sb.Append("        => ").Append(readExpr).AppendLine(";");
-            sb.AppendLine();
+            if (field.ResolvedSize is not > 0)
+                continue;
+
+            if (furthestField is not null && field.Offset < furthestEnd)
+                return (furthestField, field);
+
+            long end = (long)field.Offset + field.ResolvedSize.Value;
+            if (end > furthestEnd)
+            {
+                furthestField = field;
+                furthestEnd = end;
+            }
         }
+        return null;
     }
 
-    // ── FieldWriters 生成（对称 FieldReaders）──
-    // 生成 Write_{FieldName}(Span<byte> dest, T value)：单字段写入（带字节序收口），
-    // 避免业务层手写 BinaryPrimitives.WriteXxxLittleEndian（字节序铁律强制统一）。
+    private static Diagnostic CreateFieldOverlapDiagnostic(
+        Location? location, string structName, FieldInfo first, FieldInfo second)
+        => Diagnostic.Create(
+            FieldOverlapRule,
+            location,
+            structName,
+            first.Name,
+            first.Offset,
+            (long)first.Offset + first.ResolvedSize!.Value,
+            second.Name,
+            second.Offset,
+            (long)second.Offset + second.ResolvedSize!.Value);
 
-    private static void EmitFieldWriters(System.Text.StringBuilder sb,
-        System.Collections.Generic.List<FieldInfo> fields)
+    // ── 模板名常量（Templates/BinaryLayout/*.sbn 内嵌资源）──
+
+    private const string TplClass = "BinaryLayout/CodecClass";
+    private const string TplStructSize = "BinaryLayout/StructSize";
+    private const string TplFieldConstants = "BinaryLayout/FieldConstants";
+    private const string TplFieldConstant = "BinaryLayout/FieldConstant";
+    private const string TplFieldReader = "BinaryLayout/FieldReader";
+    private const string TplFieldWriter = "BinaryLayout/FieldWriter";
+    private const string TplCreate = "BinaryLayout/Create";
+    private const string TplCreateField = "BinaryLayout/CreateField";
+    private const string TplValidate = "BinaryLayout/Validate";
+    private const string TplValidateEquals = "BinaryLayout/ValidateEquals";
+    private const string TplValidateHasFlags = "BinaryLayout/ValidateHasFlags";
+    private const string TplValidateRange = "BinaryLayout/ValidateRange";
+    private const string TplValidateNonDefault = "BinaryLayout/ValidateNonDefault";
+    private const string TplWrite = "BinaryLayout/Write";
+    private const string TplGuard = "BinaryLayout/Guard";
+    private const string TplWriteField = "BinaryLayout/WriteField";
+    private const string TplWriteByteField = "BinaryLayout/WriteByteField";
+    private const string TplWriteNestedField = "BinaryLayout/WriteNestedField";
+    private const string TplRead = "BinaryLayout/Read";
+    private const string TplReadCtorBody = "BinaryLayout/ReadCtorBody";
+    private const string TplReadInitBody = "BinaryLayout/ReadInitBody";
+    private const string TplReadField = "BinaryLayout/ReadField";
+    private const string TplReadExpr = "BinaryLayout/ReadExpr";
+    private const string TplReadByteExpr = "BinaryLayout/ReadByteExpr";
+    private const string TplReadNestedExpr = "BinaryLayout/ReadNestedExpr";
+    private const string TplReadUnavailable = "BinaryLayout/ReadUnavailable";
+    private const string TplOrFlags = "BinaryLayout/OrFlags";
+    private const string TplIsEmpty = "BinaryLayout/IsEmpty";
+
+    // ── 模板渲染助手 ──
+
+    private static string RenderTpl(string templateName, IReadOnlyDictionary<string, string?> values)
+        => TemplateEngine.Render(templateName, values);
+
+    private static Dictionary<string, string?> Tokens(params (string Key, string? Value)[] pairs)
+        => TemplateEngine.Tokens(pairs);
+
+    private static FieldEmitForm FormOf(FieldInfo f) => TypeEmitter.Form(f.Type, f.ResolvedSize ?? 0);
+
+    /// <summary>写语句 token 集（VALUE = 写入值表达式；CAST = 写侧 cast，基元为空）。</summary>
+    /// <param name="f">字段信息（含 Offset/Type/ResolvedSize）。</param>
+    /// <param name="valueExpr">写入值表达式（如 "value.Field" 或 "validate ? const : value.Field"）。</param>
+    /// <returns>写模板的 token 字典（OFFSET/SIZE/PRIMITIVE/CAST/FQN/VALUE）。</returns>
+    private static Dictionary<string, string?> StmtTokens(FieldInfo f, string valueExpr)
     {
-        foreach (var f in fields)
+        var form = FormOf(f);
+        return Tokens(
+            ("OFFSET", f.Offset.ToString()),
+            ("SIZE", form.Size),
+            ("PRIMITIVE", form.Primitive),
+            ("CAST", form.ValueCast),
+            ("FQN", form.NestedFqn),
+            ("VALUE", valueExpr));
+    }
+
+    /// <summary>读表达式 token 集（CAST = 读侧 cast，enum 转回枚举类型、基元为空）。</summary>
+    /// <param name="f">字段信息（含 Offset/Type/ResolvedSize）。</param>
+    /// <returns>读模板的 token 字典（OFFSET/SIZE/PRIMITIVE/CAST/FQN）。</returns>
+    private static Dictionary<string, string?> ExprTokens(FieldInfo f)
+    {
+        var form = FormOf(f);
+        return Tokens(
+            ("OFFSET", f.Offset.ToString()),
+            ("SIZE", form.Size),
+            ("PRIMITIVE", form.Primitive),
+            ("CAST", form.ReadCast),
+            ("FQN", form.NestedFqn));
+    }
+
+    private static string WriteStmtTpl(FieldEmitKind kind) => kind switch
+    {
+        FieldEmitKind.Primitive => TplWriteField,
+        FieldEmitKind.Byte => TplWriteByteField,
+        _ => TplWriteNestedField,
+    };
+
+    private static string ReadExprTpl(FieldEmitKind kind) => kind switch
+    {
+        FieldEmitKind.Primitive => TplReadExpr,
+        FieldEmitKind.Byte => TplReadByteExpr,
+        _ => TplReadNestedExpr,
+    };
+
+    /// <summary>长度校验守卫（Size 未声明时不生成——TCSG005 已挡缺 Size 声明）。</summary>
+    /// <param name="sizeConstValue">[StructLayout].Size 的常量值（>0 才生成守卫）。</param>
+    /// <param name="bufferVar">缓冲变量名（"dest"=写 / "source"=读，用于守卫表达式）。</param>
+    /// <returns>守卫语句（如 "if (dest.Length &lt; 16) throw ...;"）；Size 未声明时为空串。</returns>
+    private static string RenderGuard(int sizeConstValue, string bufferVar) => sizeConstValue > 0
+        ? RenderTpl(TplGuard, Tokens(("VAR", bufferVar), ("SIZE", sizeConstValue.ToString())))
+        : "";
+
+    /// <summary>单字段 Validate 行（按约束种类选模板）。</summary>
+    /// <param name="f">字段信息（<c>f.Constraint</c> 必非 null——调用方已过滤）。</param>
+    /// <returns>该字段的 Validate 行（按 Equals/HasFlags/Range/NonDefault 选模板）。</returns>
+    private static string RenderCheck(FieldInfo f)
+    {
+        var c = f.Constraint!;
+        return c.Kind switch
         {
-            var paramType = f.Type.ToDisplayString();
-            var writeStmt = EmitWriteStmt(f, "dest", "value");
-            sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-            sb.Append("    public static void Write_").Append(f.Name)
-              .Append("(System.Span<byte> dest, ").Append(paramType).AppendLine(" value)");
-            sb.AppendLine("    {");
-            sb.Append("        ").Append(writeStmt);
-            sb.AppendLine("    }");
-            sb.AppendLine();
-        }
+            ConstraintKind.Equals => RenderTpl(TplValidateEquals, Tokens(
+                ("NAME", f.Name),
+                ("EXPECTED", FormatConst(c.EqExpected, f.Type)))),
+            ConstraintKind.HasFlags => RenderTpl(TplValidateHasFlags, Tokens(
+                ("NAME", f.Name),
+                ("MASK", FormatConst(c.HasFlagsMask, f.Type)))),
+            ConstraintKind.Range => RenderTpl(TplValidateRange, Tokens(
+                ("NAME", f.Name),
+                ("MIN", FormatConst(c.RangeMin, f.Type)),
+                ("MAX", FormatConst(c.RangeMax, f.Type)))),
+            _ => RenderTpl(TplValidateNonDefault, Tokens(
+                ("NAME", f.Name),
+                ("ZERO", DefaultLiteral(f.Type)))),
+        };
     }
 
-    /// <summary>
-    /// 构造单字段写入语句（不带缩进前缀，调用方加）。
-    /// <param name="f">字段元数据（类型 + 偏移 + 大小，决定写语句形态：基元小端写 / 嵌套 Codec 委托 / enum cast）。</param>
-    /// <param name="destVar">目标 buffer 变量名（Span&lt;byte&gt;）。</param>
-    /// <param name="valueVar">值变量名（单字段写入时，值直接是该字段类型，非 struct 字段访问）。</param>
-    /// </summary>
-    private static string EmitWriteStmt(FieldInfo f, string destVar, string valueVar)
-    {
-        var s = f.Type;
-        var slice = destVar + ".Slice(" + f.Offset + ", " + FieldSizeStr(f) + ")";
-        switch (s.SpecialType)
-        {
-            case SpecialType.System_UInt32:
-                return "System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(" + slice + ", " + valueVar + ");";
-            case SpecialType.System_UInt16:
-                return "System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(" + slice + ", " + valueVar + ");";
-            case SpecialType.System_UInt64:
-                return "System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(" + slice + ", " + valueVar + ");";
-            case SpecialType.System_Int64:
-                return "System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(" + slice + ", " + valueVar + ");";
-            case SpecialType.System_Int32:
-                return "System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(" + slice + ", " + valueVar + ");";
-            case SpecialType.System_Byte:
-                return destVar + "[" + f.Offset + "] = " + valueVar + ";";
-            default:
-                // 嵌套 [BinaryLayout] struct：委托被嵌套 Codec.Write（小端逐字段）
-                if (IsNestedStruct(s))
-                    return s.ToDisplayString() + "Codec.Write(" + slice + ", in " + valueVar + ");";
-                // enum：按底层基元 cast 后小端写
-                if (s.TypeKind == TypeKind.Enum && s is INamedTypeSymbol e && e.EnumUnderlyingType is { } under)
-                {
-                    var ut = under.SpecialType;
-                    var v = "(" + under.ToDisplayString() + ")" + valueVar;
-                    switch (ut)
-                    {
-                        case SpecialType.System_UInt32:
-                            return "System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(" + slice + ", " + v + ");";
-                        case SpecialType.System_UInt16:
-                            return "System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(" + slice + ", " + v + ");";
-                        case SpecialType.System_UInt64:
-                            return "System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(" + slice + ", " + v + ");";
-                        case SpecialType.System_Int64:
-                            return "System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(" + slice + ", " + v + ");";
-                        case SpecialType.System_Byte:
-                            return destVar + "[" + f.Offset + "] = " + v + ";";
-                        default:
-                            return "System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(" + slice + ", " + v + ");";
-                    }
-                }
-                // 其它不支持（与 Read/Write 整体一致：源生成器只处理基元/enum/嵌套 struct）
-                return "// unsupported field type: " + s.ToDisplayString();
-        }
-    }
-
-    private static string EmitReadExpr(FieldInfo f, string sourceVar)
-    {
-        var s = f.Type;
-        var sl = sourceVar + ".Slice(" + f.Offset + ", " + FieldSizeStr(f) + ")";
-        switch (s.SpecialType)
-        {
-            case SpecialType.System_UInt32:
-                return "System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(" + sl + ")";
-            case SpecialType.System_UInt16:
-                return "System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(" + sl + ")";
-            case SpecialType.System_UInt64:
-                return "System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(" + sl + ")";
-            case SpecialType.System_Int64:
-                return "System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(" + sl + ")";
-            case SpecialType.System_Int32:
-                return "System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(" + sl + ")";
-            case SpecialType.System_Byte:
-                return sourceVar + "[" + f.Offset + "]";
-            default:
-                // ★ Spec 27: 嵌套 [BinaryLayout] struct（如 SegmentAddress）——委托给被嵌套 struct 的 Codec.Read
-                //   （小端逐字段，符合字节序铁律；禁 MemoryMarshal——平台字节序违反 §1.2）。
-                //   被嵌套 struct 必标 [BinaryLayout]（TCSG002 保证在收集表 → 有 Codec）。
-                if (IsNestedStruct(s))
-                    return s.ToDisplayString() + "Codec.Read(" + sl + ")";
-                if (s.TypeKind == TypeKind.Enum && s is INamedTypeSymbol e && e.EnumUnderlyingType is { } under)
-                {
-                    var cast = "(" + e.ToDisplayString() + ")";
-                    switch (under.SpecialType)
-                    {
-                        case SpecialType.System_UInt32:
-                            return cast + "System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(" + sl + ")";
-                        case SpecialType.System_UInt16:
-                            return cast + "System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(" + sl + ")";
-                        case SpecialType.System_UInt64:
-                            return cast + "System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(" + sl + ")";
-                        case SpecialType.System_Int64:
-                            return cast + "System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(" + sl + ")";
-                        case SpecialType.System_Byte:
-                            return cast + sourceVar + "[" + f.Offset + "]";
-                        default:
-                            return cast + "System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(" + sl + ")";
-                    }
-                }
-                return "default";
-        }
-    }
-
-    /// <summary>
-    /// 字段大小（字符串形式，用于代码生成）。基元/enum 走 <see cref="GetPrimitiveOrEnumSize"/>，
-    /// 嵌套 struct 走 <see cref="FieldInfo.ResolvedSize"/>（生成阶段查收集表填好）。
-    /// </summary>
-    private static string FieldSizeStr(FieldInfo f)
-    {
-        // 基元/enum：收集阶段已算好存入 ResolvedSize
-        // 嵌套 struct：生成阶段查表填入 ResolvedSize
-        return (f.ResolvedSize ?? 0).ToString();
-    }
-
-    /// <summary>★ 缺陷 3：字段类型是否在 Emit 支持集（EmitWriteStmt/EmitReadExpr 覆盖）——
-    /// uint/ushort/ulong/long/int/byte + 底层同集的 enum（嵌套 struct 走 IsNestedStruct 路由）。</summary>
+    /// <summary>★ 缺陷 3：字段类型是否在 Emit 支持集（TypeEmitter.Form 覆盖）——
+    /// uint/ushort/ulong/long/int/byte + 底层同集的 enum（嵌套 struct 走 TypeEmitter.IsNestedStruct 路由）。</summary>
+    /// <param name="t">字段类型符号。</param>
+    /// <returns>true 表示在支持集（基元或底层为支持基元的 enum）；false 表示不支持（TCSG003 上报）。</returns>
     private static bool IsEmitSupportedPrimitiveOrEnum(ITypeSymbol t)
     {
         var st = t.SpecialType;
@@ -797,6 +832,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
     }
 
     /// <summary>基元类型 + enum 的字节大小（收集阶段可解析，不依赖跨 struct 表）。</summary>
+    /// <param name="s">基元类型或 enum 类型符号。</param>
+    /// <returns>字节数字面串（"1"/"2"/"4"/"8"；未知基元或非 enum 时为 "0"）。</returns>
     private static string GetPrimitiveOrEnumSize(ITypeSymbol s) => s.SpecialType switch
     {
         SpecialType.System_UInt32 or SpecialType.System_Int32 => "4",
@@ -807,20 +844,12 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
     };
 
     /// <summary>
-    /// ★ Spec 27: 判断字段类型是否嵌套 unmanaged struct（读写委托给被嵌套 struct 的 Codec）。
-    /// <para>★ 跨程序集可靠：用类型系统判断（IsValueType + IsUnmanagedType），不依赖
-    ///   <c>[StructLayout]</c> 伪属性（跨程序集 GetAttributes 拿不到）。</para>
-    /// <para>★ 标记驱动：只有 <c>[BinaryLayout]</c> 收集表里的 struct 才支持嵌套（见 EmitCodec 的 TCSG002）。</para>
-    /// </summary>
-    private static bool IsNestedStruct(ITypeSymbol s)
-        => s is { TypeKind: TypeKind.Struct, IsUnmanagedType: true }
-           && !s.SpecialType.ToString().StartsWith("System_", StringComparison.Ordinal);
-
-    /// <summary>
     /// 尝试从引用程序集的 [StructLayout] 获取 Size。
     /// 当嵌套字段类型不在本编译的收集表中时（跨程序集引用），
     /// 回退读取 [StructLayout(Size=N)] 的 Size 参数。
     /// </summary>
+    /// <param name="type">嵌套字段类型符号（跨程序集引用）。</param>
+    /// <returns>该 struct 的字节数（>0 表示解析成功；0 表示无法解析——调用方按 TCSG002 处理）。</returns>
     private static int ResolveExternalStructSize(ITypeSymbol type)
     {
         // ★ 跨程序集 struct size fallback：对于常见的一等公民类型，直接返回已知大小。
@@ -828,6 +857,10 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         //   无法静态计算 extent。此处手动维护已知嵌套类型大小表。
         var fullName = type.ToDisplayString();
         if (fullName.EndsWith(".LogicalAddress", StringComparison.Ordinal))
+            return 16;
+        // NodeId（spec-12 一等身份结构）：布局真源是 Opaque16 嵌套承载字——跨程序集伪属性不可见，
+        // 字段 extent 无法静态计算；宽度 128-bit 钉死（"免协调不碰撞使其永不成议题"），硬编码零漂移。
+        if (fullName.EndsWith(".NodeId", StringComparison.Ordinal))
             return 16;
         if (type is not INamedTypeSymbol namedType) return 0;
         if (namedType.TypeKind != TypeKind.Struct) return 0;
@@ -840,7 +873,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             int fieldSize = 0;
             foreach (var attr in field.GetAttributes())
             {
-                if (attr.AttributeClass?.Name == "FieldOffsetAttribute" && attr.ConstructorArguments.Length == 1)
+                if (attr.AttributeClass?.Name == LayoutFieldAttributeNames["FieldOffset"] && attr.ConstructorArguments.Length == 1)
                 {
                     if (attr.ConstructorArguments[0].Value is int o)
                         offset = o;
@@ -880,6 +913,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
     /// 从引用程序集中收集所有带 [StructLayout] 的 unmanaged struct 的大小，
     /// 补充到嵌套大小表中，解决跨程序集的嵌套 struct 大小解析。
     /// </summary>
+    /// <param name="compilation">当前编译（用于取 ReferencedAssemblySymbols）。</param>
+    /// <param name="table">嵌套大小表（按全名更新；已有键不覆盖）。</param>
     private static void CollectExternalStructSizes(
         Compilation compilation, Dictionary<string, int> table)
     {
@@ -927,31 +962,6 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         return "0";
     }
 
-    // ── Validate ──
-
-    private static void EmitValidateLine(System.Text.StringBuilder sb, string structName, FieldInfo f)
-    {
-        var c = f.Constraint!;
-        var fieldName = "value." + f.Name;
-        switch (c.Kind)
-        {
-            case ConstraintKind.Equals:
-                sb.Append("        if (").Append(fieldName).Append(" != ").Append(FormatConst(c.EqExpected, f.Type)).AppendLine(") return false;");
-                break;
-            case ConstraintKind.HasFlags:
-                sb.Append("        if ((").Append(fieldName).Append(" & ").Append(FormatConst(c.HasFlagsMask, f.Type))
-                  .Append(") != ").Append(FormatConst(c.HasFlagsMask, f.Type)).AppendLine(") return false;");
-                break;
-            case ConstraintKind.Range:
-                sb.Append("        if (").Append(fieldName).Append(" < ").Append(FormatConst(c.RangeMin, f.Type))
-                  .Append(" || ").Append(fieldName).Append(" > ").Append(FormatConst(c.RangeMax, f.Type)).AppendLine(") return false;");
-                break;
-            case ConstraintKind.NonDefault:
-                sb.Append("        if (").Append(fieldName).Append(" == ").Append(DefaultLiteral(f.Type)).AppendLine(") return false;");
-                break;
-        }
-    }
-
     private static string FormatConst(object? v, ITypeSymbol type)
     {
         if (v is null) return "default";
@@ -977,176 +987,6 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         or SpecialType.System_Byte or SpecialType.System_SByte => "0",
         _ => "default"
     };
-
-    // ── Write ──
-
-    /// <summary>
-    /// 构造单字段写入行。值表达式缺省 = <c>value.{FieldName}</c>（写入参）；
-    /// 显式传入（ValidEquals 常量）用于 validate 防御性补全（不信任入参）。
-    /// </summary>
-    private static void EmitWriteLine(System.Text.StringBuilder sb, FieldInfo f, string? valueExpr)
-    {
-        var v = valueExpr ?? "value." + f.Name;
-        switch (f.Type.SpecialType)
-        {
-            case SpecialType.System_UInt32:
-                sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(").Append(f.Offset).Append(", 4), ").Append(v).AppendLine(");");
-                break;
-            case SpecialType.System_UInt16:
-                sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(dest.Slice(").Append(f.Offset).Append(", 2), ").Append(v).AppendLine(");");
-                break;
-            case SpecialType.System_UInt64:
-                sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(").Append(f.Offset).Append(", 8), ").Append(v).AppendLine(");");
-                break;
-            case SpecialType.System_Int64:
-                sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(dest.Slice(").Append(f.Offset).Append(", 8), ").Append(v).AppendLine(");");
-                break;
-            case SpecialType.System_Int32:
-                sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(dest.Slice(").Append(f.Offset).Append(", 4), ").Append(v).AppendLine(");");
-                break;
-            case SpecialType.System_Byte:
-                sb.Append("        dest[").Append(f.Offset).Append("] = ").Append(v).AppendLine(";");
-                break;
-            default:
-                // ★ Spec 27: 嵌套 [BinaryLayout] struct（如 SegmentAddress）——委托给被嵌套 struct 的 Codec.Write
-                //   （小端逐字段，符合字节序铁律；禁 MemoryMarshal——平台字节序违反 §1.2）。
-                if (IsNestedStruct(f.Type))
-                {
-                    sb.Append("        ").Append(f.Type.ToDisplayString()).Append("Codec.Write(dest.Slice(").Append(f.Offset).Append(", ").Append(FieldSizeStr(f)).Append("), in ").Append(v).AppendLine(");");
-                    break;
-                }
-                EmitWriteNonPrimitive(sb, f, v);
-                break;
-        }
-    }
-
-    private static void EmitWriteNonPrimitive(System.Text.StringBuilder sb, FieldInfo f, string v)
-    {
-        var t = f.Type;
-        if (t.TypeKind == TypeKind.Enum && t is INamedTypeSymbol e && e.EnumUnderlyingType is { } under)
-        {
-            switch (under.SpecialType)
-            {
-                case SpecialType.System_UInt32:
-                    sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(dest.Slice(").Append(f.Offset).Append(", 4), (uint)").Append(v).AppendLine(");");
-                    return;
-                case SpecialType.System_UInt16:
-                    sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(dest.Slice(").Append(f.Offset).Append(", 2), (ushort)").Append(v).AppendLine(");");
-                    return;
-                case SpecialType.System_UInt64:
-                    sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(dest.Slice(").Append(f.Offset).Append(", 8), (ulong)").Append(v).AppendLine(");");
-                    return;
-                case SpecialType.System_Int64:
-                    sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(dest.Slice(").Append(f.Offset).Append(", 8), (long)").Append(v).AppendLine(");");
-                    return;
-                case SpecialType.System_Byte:
-                    sb.Append("        dest[").Append(f.Offset).Append("] = (byte)").Append(v).AppendLine(";");
-                    return;
-                default:
-                    sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(dest.Slice(").Append(f.Offset).Append(", 4), (int)").Append(v).AppendLine(");");
-                    return;
-            }
-        }
-        sb.Append("        // unsupported field type: ").Append(t.ToDisplayString()).Append(' ').Append(f.Name).AppendLine();
-    }
-
-    // ── Read ──
-
-    private static void EmitReadLine(System.Text.StringBuilder sb, FieldInfo f, bool isLast)
-    {
-        var comma = isLast ? "" : ",";
-        switch (f.Type.SpecialType)
-        {
-            case SpecialType.System_UInt32:
-                sb.Append("            ").Append(f.Name).Append(" = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(").Append(f.Offset).Append(", 4))").AppendLine(comma);
-                break;
-            case SpecialType.System_UInt16:
-                sb.Append("            ").Append(f.Name).Append(" = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(source.Slice(").Append(f.Offset).Append(", 2))").AppendLine(comma);
-                break;
-            case SpecialType.System_UInt64:
-                sb.Append("            ").Append(f.Name).Append(" = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(").Append(f.Offset).Append(", 8))").AppendLine(comma);
-                break;
-            case SpecialType.System_Int64:
-                sb.Append("            ").Append(f.Name).Append(" = System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(source.Slice(").Append(f.Offset).Append(", 8))").AppendLine(comma);
-                break;
-            case SpecialType.System_Int32:
-                sb.Append("            ").Append(f.Name).Append(" = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(source.Slice(").Append(f.Offset).Append(", 4))").AppendLine(comma);
-                break;
-            case SpecialType.System_Byte:
-                sb.Append("            ").Append(f.Name).Append(" = source[").Append(f.Offset).Append(']').AppendLine(comma);
-                break;
-            default:
-                // ★ Spec 27: 嵌套 [BinaryLayout] struct（如 SegmentAddress）——委托给被嵌套 struct 的 Codec.Read
-                //   （小端逐字段，符合字节序铁律；禁 MemoryMarshal——平台字节序违反 §1.2）。
-                if (IsNestedStruct(f.Type))
-                {
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(f.Type.ToDisplayString()).Append("Codec.Read(source.Slice(").Append(f.Offset).Append(", ").Append(FieldSizeStr(f)).AppendLine("))").Append(comma);
-                    break;
-                }
-                EmitReadNonPrimitive(sb, f, comma);
-                break;
-        }
-    }
-
-    private static void EmitReadNonPrimitive(System.Text.StringBuilder sb, FieldInfo f, string comma)
-    {
-        var t = f.Type;
-        if (t.TypeKind == TypeKind.Enum && t is INamedTypeSymbol e && e.EnumUnderlyingType is { } under)
-        {
-            var cast = "(" + t.ToDisplayString() + ")";
-            switch (under.SpecialType)
-            {
-                case SpecialType.System_UInt32:
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(cast).Append("System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(").Append(f.Offset).Append(", 4))").AppendLine(comma);
-                    return;
-                case SpecialType.System_UInt16:
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(cast).Append("System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(source.Slice(").Append(f.Offset).Append(", 2))").AppendLine(comma);
-                    return;
-                case SpecialType.System_UInt64:
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(cast).Append("System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(source.Slice(").Append(f.Offset).Append(", 8))").AppendLine(comma);
-                    return;
-                case SpecialType.System_Int64:
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(cast).Append("System.Buffers.Binary.BinaryPrimitives.ReadInt64LittleEndian(source.Slice(").Append(f.Offset).Append(", 8))").AppendLine(comma);
-                    return;
-                case SpecialType.System_Byte:
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(cast).Append("source[").Append(f.Offset).Append(']').AppendLine(comma);
-                    return;
-                default:
-                    sb.Append("            ").Append(f.Name).Append(" = ").Append(cast).Append("System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(source.Slice(").Append(f.Offset).Append(", 4))").AppendLine(comma);
-                    return;
-            }
-        }
-        sb.Append("            // unsupported field type: ").Append(t.ToDisplayString()).Append(' ').Append(f.Name).AppendLine();
-    }
-
-    // ── OrFlags / IsEmpty ──
-
-    private static void EmitOrFlagsMethod(System.Text.StringBuilder sb, string structName, FieldInfo f)
-    {
-        sb.Append("    /// <summary>原地 OR 设置 ").Append(structName).Append('.').Append(f.Name)
-          .Append("（偏移 ").Append(f.Offset).AppendLine("）。Seal 用。</summary>");
-        sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-        sb.Append("    public static void Or").Append(f.Name).AppendLine("(System.Span<byte> dest, ushort flagsToSet)");
-        sb.AppendLine("    {");
-        sb.Append("        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(dest.Slice(")
-          .Append(f.Offset).Append(", 2), (ushort)(System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(dest.Slice(")
-          .Append(f.Offset).Append(", 2)) | flagsToSet));").AppendLine();
-        sb.AppendLine("    }");
-        sb.AppendLine();
-    }
-
-    private static void EmitIsEmptyMethod(System.Text.StringBuilder sb, string structName, FieldInfo f)
-    {
-        sb.Append("    /// <summary>判断 ").Append(structName).Append('.').Append(f.Name)
-          .Append(" == 0（偏移 ").Append(f.Offset).AppendLine("）——空位 record。</summary>");
-        sb.Append("    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]").AppendLine();
-        sb.Append("    public static bool IsEmpty").Append(f.Name).AppendLine("(System.ReadOnlySpan<byte> source)");
-        sb.AppendLine("    {");
-        sb.Append("        return System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(source.Slice(")
-          .Append(f.Offset).Append(", 4)) == 0;").AppendLine();
-        sb.AppendLine("    }");
-        sb.AppendLine();
-    }
 
     // ── 数据载体 ──
 
@@ -1184,6 +1024,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
 
     /// <summary>★ 缺陷 11：Codec 生成 hintName 唯一化（命名空间 + 含类型前缀，. → _）——跨命名空间
     /// 同名 struct 不再触发 AddSource 同名注册（CS8785——生成器整体失效）。</summary>
+    /// <param name="layout">目标 struct 的元数据（取 Namespace/ContainingType/StructName 拼接）。</param>
+    /// <returns>唯一 hintName（如 "TC_Tier_Runtime_DeviceBase_DeviceMetaHeaderCodec.g.cs"）。</returns>
     private static string HintName(LayoutInfo layout)
         => (string.IsNullOrEmpty(layout.Namespace) ? "" : layout.Namespace.Replace('.', '_') + "_")
            + layout.ContainingType.Replace('.', '_') + layout.StructName + "Codec.g.cs";

@@ -2,7 +2,7 @@ namespace TC.Tier.Core.Tracing;
 
 /// <summary>
 /// 链路 span 契约 —— 一次操作的执行上下文（参照 OpenTelemetry ISpan / Datadog IScope）。
-/// <para>由 <see cref="ITracer.BeginSpan"/> 创建，<see cref="System.IDisposable.Dispose"/> 结束 span（= EndSpan）。</para>
+/// <para>由 <see cref="ITracer.BeginSpan(string, SpanKind)"/> 创建，<see cref="System.IDisposable.Dispose"/> 结束 span（= EndSpan）。</para>
 /// <para>典型用法：<c>using var span = _tracer.BeginSpan("wal.append", SpanKind.Producer);</c></para>
 /// <para>★ AOT 友好：纯接口 + 枚举，无反射/Emit。NullSpan 是零开销空实现。</para>
 /// </summary>

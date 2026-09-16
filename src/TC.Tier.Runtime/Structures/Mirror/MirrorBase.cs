@@ -122,6 +122,7 @@ public abstract partial class MirrorBase : LifecycleBase<MirrorRecoveryHints>, I
     }
 
     /// <summary>释放帧基建缓冲（异步轨实质等价）。</summary>
+    /// <param name="disposing">true = 显式 Dispose（false = 终结器路径）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         _frameIoBuf.Dispose();
@@ -129,6 +130,8 @@ public abstract partial class MirrorBase : LifecycleBase<MirrorRecoveryHints>, I
     }
 
     /// <summary>释放帧基建缓冲（异步轨）。</summary>
+    /// <param name="disposing">true = 显式 Dispose（false = 终结器路径）。</param>
+    /// <returns>表示异步释放完成的任务（当前实现同步完成）。</returns>
     protected override async ValueTask DisposeOverrideAsync(bool disposing)
     {
         _frameIoBuf.Dispose();
@@ -189,6 +192,7 @@ public abstract partial class MirrorBase : LifecycleBase<MirrorRecoveryHints>, I
     /// <summary>
     /// ★ 恢复算法工厂——默认 DefaultMirrorRecovery。在 Initialize 的 CAS 闸门内被调一次
     /// （基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</summary>
+    /// <returns>默认恢复器（meta O(1) 水位 → 三级回退 → 悬干帧裁决重建链头）。</returns>
     protected override IRecovery<MirrorRecoveryHints> CreateRecovery()
         => new DefaultMirrorRecovery(this);
 }

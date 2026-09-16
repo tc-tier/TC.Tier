@@ -26,6 +26,7 @@ public sealed class MediumOptionsAttribute(string nature) : System.Attribute
 /// network 协议注册标注（§3）——贴在协议构建器上，生成器发射 ModuleInitializer 注册代码
 /// （替代手写 TierFsS3ModuleInitializer——形态相同但自维护；加协议 = 实现接口 + 标注）。
 /// </summary>
+/// <param name="protocol">协议注册键（与 spec path 首段一致——如 "s3"）。</param>
 [System.AttributeUsage(System.AttributeTargets.Class, Inherited = false)]
 public sealed class NetworkProtocolAttribute(string protocol) : System.Attribute
 {

@@ -1,5 +1,8 @@
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// SkipListIndex 计数 partial——EntryCount（Volatile 读）与 IndexSize 估算。
+/// </summary>
 public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>条目数（Volatile 读——写者维护计数）。</summary>

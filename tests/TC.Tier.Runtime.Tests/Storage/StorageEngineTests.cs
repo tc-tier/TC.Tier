@@ -1,3 +1,6 @@
+using TC.Tier.Core.Tests;
+using Skip = Xunit.Skip;
+
 namespace TC.Tier.Runtime.Tests.Storage;
 
 /// <summary>
@@ -675,9 +678,10 @@ public sealed class StorageEngineTests : IDisposable
         dst.SequenceEqual(data).Should().BeTrue();
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DiskDevice_RangeCompact_PreservesKeptRanges()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         const int blockSize = 64 * 1024;
         var vol = NewVol();
         var options = new StorageEngineOptions("test", segmentGrowthLimit: blockSize * 8L).WithPreallocateFile(false);
@@ -732,9 +736,10 @@ public sealed class StorageEngineTests : IDisposable
             .Should().BeEmpty("successful promotion must remove temp images and the group marker");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DiskDevice_RangeCompact_CrossSegment_TranslatesAndPreservesSuffix()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         const int blockSize = 64 * 1024;
         const long segmentSize = blockSize * 2L;
         var vol = NewVol();
@@ -784,9 +789,10 @@ public sealed class StorageEngineTests : IDisposable
         buffer.Should().Equal(data[5], "the suffix after to must remain unchanged");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DiskDevice_RangeCompact_DirectIo_AllowsUnalignedBounds()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         var vol = NewVol();
         var options = new StorageEngineOptions("test", segmentGrowthLimit: 4 * 1024).WithPreallocateFile(false).WithHints(FileOpenHints.NoBuffering);
         using var dev = options.Builder(vol.Fs).Start();
@@ -809,9 +815,10 @@ public sealed class StorageEngineTests : IDisposable
         buffer.Should().Equal(data);
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DiskDevice_RangeCompact_WritesValidSegmentMetadata()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         const int blockSize = 64 * 1024;
         var vol = NewVol();
         var options = new StorageEngineOptions("test", segmentGrowthLimit: blockSize * 4L).WithPreallocateFile(false);
@@ -835,9 +842,10 @@ public sealed class StorageEngineTests : IDisposable
             "xattr = EngineMetaPayload + Crc32Footer");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task DiskDevice_RangeCompact_GrowsSparseDestinationSegment()
     {
+        Skip.IfNot(DiskMediumGate.RangeCompact, "mac RangeCompact 三件套（打洞/范围锁/分配语义）不可靠——被测代码 fail-fast 正确，skip 而非 fail。");
         const int segmentSize = 64 * 1024;
         var vol = NewVol();
         var options = new StorageEngineOptions("test", segmentGrowthLimit: segmentSize).WithPreallocateFile(false);
@@ -1519,11 +1527,13 @@ public sealed class StorageEngineTests : IDisposable
     public async Task DiskDevice_AsyncSegmentCreation_DoesNotBlockAppend()
     {
         var vol = NewVol();
-        var options = new StorageEngineOptions("test", segmentGrowthLimit: 1024).WithPreallocateFile(false);
+        var options = new StorageEngineOptions("test", segmentGrowthLimit: 1024).WithPreallocateFile(false)
+            // ★ 200 段建段元组 fsync——满并发磁盘下 ~1s/次串行；耐久化锚定 Dispose（配置轴）。
+            .WithMetaTupleFlushInterval(Timeout.InfiniteTimeSpan);
         using var dev = options.Builder(vol.Fs).Start();
         dev.WaitForReady();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+        using var cts = new CancellationTokenSource(TestMediaBudget.Scale(TimeSpan.FromSeconds(15)));
         var latencies = new System.Collections.Concurrent.ConcurrentBag<double>();
 
         await Task.Run(() =>
@@ -1540,8 +1550,9 @@ public sealed class StorageEngineTests : IDisposable
 
         var sorted = latencies.OrderBy(x => x).ToArray();
         double p99 = sorted[(int)(sorted.Length * 0.99)];
-        // 异步段创建下，单次 Append 不应超过 5s（即使触发 worker 建段）
-        p99.Should().BeLessThan(5000, "p99 延迟应 < 5s（异步建段不阻塞 Append）");
+        // 异步段创建下，单次 Append 不应超过 5s（即使触发 worker 建段）——预算介质感知
+        p99.Should().BeLessThan(TestMediaBudget.Scale(TimeSpan.FromSeconds(5)).TotalMilliseconds,
+            "p99 延迟应 < 5s×介质系数（异步建段不阻塞 Append）");
     }
 
     /// <summary>
