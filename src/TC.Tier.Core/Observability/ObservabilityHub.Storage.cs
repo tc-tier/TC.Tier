@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Core.Observability;
 
+/// <summary>可观测 hub——本部分定义 <see cref="StorageView"/>（Storage Engine IO 维度视图：Read/Write/Flush/Compact/Reclaim/Throttle）。</summary>
 public sealed partial class ObservabilityHub
 {
     /// <summary>Storage Engine IO 维度视图 —— Read/Write/Flush/Compact/Reclaim/Throttle。</summary>
@@ -19,28 +20,36 @@ public sealed partial class ObservabilityHub
         public bool IsEnabled => _enabled;
 
         /// <summary>Read 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleRead() => _enabled && ShouldSample(ref _readCtr, _rate);
         /// <summary>Write 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleWrite() => _enabled && ShouldSample(ref _writeCtr, _rate);
         /// <summary>Flush 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleFlush() => _enabled && ShouldSample(ref _flushCtr, _rate);
         /// <summary>Compact 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleCompact() => _enabled && ShouldSample(ref _compactCtr, _rate);
 
         /// <summary>开始 Read 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginReadSample() => MicroTimer.Start(ShouldSampleRead());
         /// <summary>开始 Write 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginWriteSample() => MicroTimer.Start(ShouldSampleWrite());
         /// <summary>开始 Flush 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginFlushSample() => MicroTimer.Start(ShouldSampleFlush());
         /// <summary>开始 Compact 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginCompactSample() => MicroTimer.Start(ShouldSampleCompact());
 

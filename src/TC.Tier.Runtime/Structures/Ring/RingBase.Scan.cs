@@ -9,7 +9,19 @@ namespace TC.Tier.Runtime.Structures.Ring;
 public abstract partial class RingBase<TKey>
 {
     /// <summary>已落盘水位（IKeyResolver 契约——派生结构后台持久化的 footer 锚点 W）。</summary>
+    /// <returns>当前 FlushedUntilAddress（此地址之前的数据已写引擎）。</returns>
     public LogicalAddress GetFlushedWatermark() => FlushedUntilAddress;
+
+    /// <summary>两地址间的页跨度（P1 扫描模式选择器的成本模型输入：addr 聚集度判定）。</summary>
+    /// <param name="from">起点地址。</param>
+    /// <param name="to">终点地址（须 ≥ from）。</param>
+    /// <returns>from 到 to 跨越的页数（(to-from) 字节距离整除 PageSize）。</returns>
+    public long SpanPages(LogicalAddress from, LogicalAddress to)
+    {
+        var fromDist = _engine.GetDistance(_dataStart, from);
+        var toDist = _engine.GetDistance(_dataStart, to);
+        return (toDist - fromDist) >> PageSizeBits;
+    }
 
     /// <summary>
     /// 范围扫描（IKeyResolver 契约）——从 begin 扫到 end（开区间），异步迭代器流式回源（冷区真异步 IO，不阻塞调用线程）。
@@ -19,7 +31,7 @@ public abstract partial class RingBase<TKey>
     /// <param name="end">扫描终点（开区间，不含；为 default 时取当前尾）。</param>
     /// <param name="ct">取消令牌——冷区异步回源途中响应取消（EnumeratorCancellation）。</param>
     /// <returns>(Key, Address) 异步流。</returns>
-    public async IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAsync(
+    public async IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(
         LogicalAddress begin, LogicalAddress end,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -27,17 +39,19 @@ public abstract partial class RingBase<TKey>
         await using var cursor = OpenScanCursor(begin, end);
         while (await cursor.MoveNextAsync(ct).ConfigureAwait(false))
         {
-            // meta record 非用户数据（水位块），索引重建语义只吐数据 record
+            // meta record 非用户数据（水位块），索引重建语义只吐数据 record；
+            // 墓碑旗标随三元组吐出（重放/重建需 Delete 语义——已删 key 不复活）
             var fields = cursor.GetFields();
             if ((fields.Flags & RecordFlags.FLAG_ENTRY_IS_META) != 0) continue;
             if (TryGetKey(cursor.CurrentAddress, out var key))
-                yield return (key, cursor.CurrentAddress);
+                yield return (key, cursor.CurrentAddress,
+                    (fields.Flags & RecordFlags.FLAG_RINGRECORD_TOMBSTONE) != 0);
         }
     }
 
     /// <summary>全量扫描（IKeyResolver 重载契约）——从 BeginAddress 扫到当前尾（TailAddress）。</summary>
     /// <param name="ct">取消令牌——冷区异步回源途中响应取消。</param>
-    /// <returns>(Key, Address) 异步流。</returns>
-    public IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAsync(CancellationToken ct = default)
+    /// <returns>(Key, Address, IsTombstone) 异步流。</returns>
+    public IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(CancellationToken ct = default)
         => ScanAsync(BeginAddress, TailAddress, ct);
 }

@@ -18,20 +18,28 @@ public abstract partial class MetadataBase
     /// ② 写（同步）——把 data 写入内存镜像，推进版本号，返回版本号（long）。按落盘策略触发持久化。
     /// <para>Sync 策略立即落盘 / Async 策略后台批量。Prepare(seq) 无论何种策略都强制同步 flush。</para>
     /// </summary>
+    /// <param name="data">写入数据。固定档：长度 &gt; PayloadSize 截断，不足时尾部补零到 PayloadSize。
+    /// 变长档（MaxPayloadSize 启用）：长度 ≤ 上限按实际长度写入（record 按实际长度落盘），超上限抛。</param>
+    /// <returns>新版本号（long，单调递增；恢复后从载入版本续推）。</returns>
     public long Write(ReadOnlySpan<byte> data)
     {
         EnsureNotDisposed();
         EnsureReady();
-        int n = Math.Min(data.Length, _payloadSize);
+        bool variable = _hotCapacity != _payloadSize;
+        if (variable && data.Length > _hotCapacity)
+            throw new ArgumentException($"payload {data.Length}B 超出变长上限 {_hotCapacity}B（VersionedMetadataSettings.MaxPayloadSize）", nameof(data));
+        int n = variable ? data.Length : Math.Min(data.Length, _payloadSize);
         _epoch.Resume();
         try
         {
+            EnsureHotSlotSize(n);
             // ★ 覆盖 [0] 前先把当前 [0] 滑到 [1]（保留为 Abort 零 IO 回退源）。
             //   [0] 此刻 = 当前已提交/待覆盖版本，写入新数据后 [1] 持有上一版本。
             SlideMemoryWindow();
 
-            _hotVersions[0].GetSpanUnsafe(0, _payloadSize).Clear(); // 清零（data < payloadSize 时尾部补零）
-            data[..n].CopyTo(_hotVersions[0].GetSpanUnsafe(0, _payloadSize));
+            _hotVersions[0].GetSpanUnsafe(0, _hotSlotSize).Clear(); // 清零（data < 槽尺寸时尾部补零）
+            data[..n].CopyTo(_hotVersions[0].GetSpanUnsafe(0, _hotSlotSize));
+            _hotLengths[0] = variable ? n : _payloadSize;   // 固定档镜像恒 PayloadSize（零尾补齐语义）
         }
         finally
         {
@@ -71,6 +79,8 @@ public abstract partial class MetadataBase
     /// <summary>③ 读——读当前内容（零 IO）。epoch 保护。
     /// <para>★ 加载版本优先：首次 Write 前当前内容 = 恢复载入的历史版本（按其<b>真实大小</b>交付——
     ///   不补零不截断，历史大小 ≠ 当前 PayloadSize 也完整读回）；Write 后 = 热区（当前配置大小）。</para></summary>
+    /// <param name="dst">目标缓冲区（至多填满）。</param>
+    /// <returns>实际读取的字节数（min(当前内容大小, dst.Length)）。</returns>
     public int Read(Span<byte> dst)
     {
         EnsureNotDisposed();
@@ -87,6 +97,8 @@ public abstract partial class MetadataBase
     }
 
     /// <summary>★ 热路径变体：不含 epoch 进出的读（供已持 epoch 的 scope/batch 内调）。裸调危险。</summary>
+    /// <param name="dst">目标缓冲区（至多填满）。</param>
+    /// <returns>实际读取的字节数（语义同 <see cref="Read"/>）。</returns>
     public int ReadNoEpoch(Span<byte> dst)
     {
         EnsureNotDisposed();
@@ -102,10 +114,20 @@ public abstract partial class MetadataBase
             lv.GetSpanUnsafe(0, n).CopyTo(dst);
             return n;
         }
-        int m = Math.Min(_payloadSize, dst.Length);
+        // 热区未写时交付初始镜像长度：固定档 = PayloadSize（零镜像——既有语义）；变长档 = 0（空）
+        int len = _hotVersionCount > 0 ? _hotLengths[0]
+                : (_hotCapacity != _payloadSize ? 0 : _payloadSize);
+        int m = Math.Min(len, dst.Length);
         _hotVersions[0].GetSpanUnsafe(0, m).CopyTo(dst);
         return m;
     }
+
+    /// <summary>当前内容长度（字节）——加载版本按盘上真实 PayloadLength / 热区按最近 Write 长度
+    /// （固定档恒 PayloadSize；变长档随块增长）/ 未写无载入按初始镜像。分配读缓冲前探测用。</summary>
+    public int CurrentPayloadLength
+        => _serveLoaded ? _loadedVersionLength
+         : _hotVersionCount > 0 ? _hotLengths[0]
+         : (_hotCapacity != _payloadSize ? 0 : _payloadSize);
 
     /// <summary>当前内容 Span（加载版本 slice 或热区，热路径 GetSpanUnsafe 零校验）。</summary>
     private protected Span<byte> CurrentMemorySpan
@@ -117,6 +139,7 @@ public abstract partial class MetadataBase
     /// 读路径：返回当前版本 payload 的 0-copy Span 视图给调用方读。
     /// 调用方持有 Span 读数据，销毁 Span 不影响内部数据。写数据用 Write(data)。
     /// </summary>
+    /// <returns>当前内容字节 Span（加载版本 slice 或热区；视图仅在 epoch 存活期内有效——并发写/Abort 可能使其失效）。</returns>
     public Span<byte> AsSpan() => CurrentMemorySpan;
 
     /// <summary>强类型引用视图——返回当前版本 payload 起始的 <typeparamref name="T"/> 引用
@@ -130,6 +153,7 @@ public abstract partial class MetadataBase
 
     /// <summary>强类型 Span 视图。★ 要求当前内容大小与 sizeof(T) 对齐——恢复载入的历史大小
     /// ≠ 当前 PayloadSize 时可能不满足（MemoryMarshal.Cast 将抛），大小无关读取用 Read/AsSpan。</summary>
+    /// <returns>当前内容字节按 <typeparamref name="T"/> 重解释的 Span（长度 = 内容字节数 ÷ sizeof(T)）。</returns>
     public Span<T> GetSpan<T>() where T : unmanaged => MemoryMarshal.Cast<byte, T>(CurrentMemorySpan);
 
     // ════════════════════════════════════════════════════════════
@@ -144,28 +168,35 @@ public abstract partial class MetadataBase
         {
             // ★ 不推进版本号——Write() 已推进。这里只落盘当前版本
             long newVersion = _currentVersion;
+            var sectorSize = (int)_engine.SectorSize;
+
+            // record 几何按当前内容实际长度（固定档恒 _payloadSize；变长档 = 最近 Write 的长度）
+            int len = _hotLengths[0];
+            int pad = (_codec.HeaderSize + len).AlignUp(sectorSize) - _codec.HeaderSize - len;
+            int recordSize = _codec.HeaderSize + len + pad;
 
             // 写 record（Header + Payload + Padding）——★ Allocate + Write（引擎统一模型，§3.6）
             // Allocate 预留空间（零 IO CAS 推 AllocatedTail），Write 覆写已分配区
-            using var buf = new AlignedMemoryManager(_recordSize, (int)_engine.SectorSize);
+            using var buf = new AlignedMemoryManager(recordSize, sectorSize);
             var span = buf.GetSpan();
             span.Clear();
             // Header
             _codec.WriteHeader(span, new MetadataRecordFields(
                 Flags: MetadataHeader.DefaultFlags,
-                PayloadLength: (uint)_payloadSize,
-                PaddingLength: (ushort)_paddingLength,
+                PayloadLength: (uint)len,
+                PaddingLength: (ushort)pad,
                 PreviousVersion: _highestVersionAddress,
                 MetadataVersion: newVersion));
             // Payload（从热区当前镜像拷到 record buffer）
-            _hotVersions[0].GetSpanUnsafe(0, _payloadSize)
-                .CopyTo(buf.GetSpan(_codec.HeaderSize, _payloadSize + _paddingLength));
+            _hotVersions[0].GetSpanUnsafe(0, len)
+                .CopyTo(buf.GetSpan(_codec.HeaderSize, len + pad));
             // CRC
-            _codec.FillCrc(span, _codec.HeaderSize, _payloadSize, _paddingLength);
+            _codec.FillCrc(span, _codec.HeaderSize, len, pad);
             // Allocate + Write（统一模型）
-            var addr = _engine.Allocate(_recordSize).Start;
+            var addr = _engine.Allocate(recordSize).Start;
             _engine.Write(addr, span);
             _engine.Flush();
+            _lastAppendedRecordSize = recordSize;   // Abort 尾截断按本条 record 自身几何回退
 
             // 更新水位——用 _currentVersion == 0 判断首版本（不用地址值，Empty 是合法地址）
             if (_lowestVersionAddress == default && _highestVersionAddress == default)
@@ -191,9 +222,32 @@ public abstract partial class MetadataBase
     private void SlideMemoryWindow()
     {
         for (int i = _maxMemoryVersions - 1; i > 0; i--)
-            _hotVersions[i - 1].GetSpanUnsafe(0, _payloadSize).CopyTo(_hotVersions[i].GetSpanUnsafe(0, _payloadSize));
+        {
+            _hotVersions[i - 1].GetSpanUnsafe(0, _hotSlotSize).CopyTo(_hotVersions[i].GetSpanUnsafe(0, _hotSlotSize));
+            _hotLengths[i] = _hotLengths[i - 1];
+        }
         if (_hotVersionCount < _maxMemoryVersions)
             _hotVersionCount++;
+    }
+
+    /// <summary>确保热区槽尺寸 ≥ needed（变长档按需增长——整组重分配 + 搬移既有镜像；epoch 内调）。
+    /// 增长策略 = max(needed, 当前×2) 对数摊薄，上限 _hotCapacity。固定档恒跳过（槽尺寸 = PayloadSize）。</summary>
+    private void EnsureHotSlotSize(int needed)
+    {
+        if (needed <= _hotSlotSize) return;
+        int target = Math.Min(_hotCapacity, Math.Max(needed, _hotSlotSize * 2));
+        var sectorSize = (int)_engine.SectorSize;
+        var old = _hotVersions;
+        var grown = new AlignedMemoryManager[old.Length];
+        for (int i = 0; i < old.Length; i++)
+        {
+            grown[i] = new AlignedMemoryManager(target, sectorSize, zeroed: true);
+            if (i < _hotVersionCount)
+                old[i].GetSpanUnsafe(0, _hotSlotSize).CopyTo(grown[i].GetSpanUnsafe(0, _hotSlotSize));
+            old[i].Dispose();
+        }
+        _hotVersions = grown;
+        _hotSlotSize = target;
     }
 
     // ════════════════════════════════════════════════════════════
@@ -258,6 +312,7 @@ public abstract partial class MetadataBase
     /// <summary>Prepare：记录回退快照 → 追加新版本到磁盘链头 → flush + 写 meta。
     /// <para>★ 内容未变跳过追加（防重复/防缩容零覆写）：本会话无新 Write（_currentVersion ==
     ///   _persistedVersion）时链头已是最新镜像，再追加只会复制旧内容或把零内容当新版本写进链。</para></summary>
+    /// <param name="seq">准备提交的事务序号。</param>
     public void Prepare(long seq)
     {
         EnsureNotDisposed();
@@ -278,7 +333,8 @@ public abstract partial class MetadataBase
     /// （内容未变跳过追加）→ 写 meta。★ 数据 flush 原生同步（AppendVersionToDisk 同步执行），
     /// 仅 meta 走异步轨（MetaPolicy.CommitAsync）。</summary>
     /// <param name="seq">准备提交的序号。</param>
-    /// <param name="ct">取消令牌。</param>
+    /// <param name="ct">取消令牌（透传 meta CommitAsync）。</param>
+    /// <returns>表示 Prepare 完成的任务；完成后数据已同步落盘 + meta 已异步提交（悬空状态）。</returns>
     public async ValueTask PrepareAsync(long seq, CancellationToken ct)
     {
         EnsureNotDisposed();
@@ -294,6 +350,7 @@ public abstract partial class MetadataBase
     }
 
     /// <summary>ConfirmCommitted：CAS 推进 LastCommittedSeq + 持久化 meta（刷新水位）+ 清空 Abort 回退快照 + 触发回调。</summary>
+    /// <param name="seq">确认提交的事务序号（≤ 已提交 seq 时 no-op）。</param>
     public void ConfirmCommitted(long seq)
     {
         long current;
@@ -328,6 +385,7 @@ public abstract partial class MetadataBase
     }
 
     /// <summary>★ Abort：内存窗口回退到上一版本（零 IO）+ 尾截断 ReclaimTail 回退悬干新版本 + flush + 写 meta。</summary>
+    /// <param name="seq">要回滚的事务序号（≤ 已 abort 的 seq 时幂等 no-op）。</param>
     public void Abort(long seq)
     {
         EnsureNotDisposed();
@@ -345,7 +403,10 @@ public abstract partial class MetadataBase
                 if (_hotVersionCount >= 2 || _loadedVersion is null)
                 {
                     if (_hotVersionCount >= 1)
-                        _hotVersions[1].GetSpanUnsafe(0, _payloadSize).CopyTo(_hotVersions[0].GetSpanUnsafe(0, _payloadSize));
+                    {
+                        _hotVersions[1].GetSpanUnsafe(0, _hotSlotSize).CopyTo(_hotVersions[0].GetSpanUnsafe(0, _hotSlotSize));
+                        _hotLengths[0] = _hotLengths[1];
+                    }
                     _serveLoaded = false;
                 }
                 else
@@ -374,9 +435,9 @@ public abstract partial class MetadataBase
                     // 物理回收（ReclaimTail）走 BumpCurrentEpoch 等 readers 退出后执行（防 use-after-free）
                     _epoch.BumpCurrentEpoch(() =>
                     {
-                        // 回退 AllocatedTail 到 Prepare 前链头之后：丢弃悬干新版本 [snapshot, snapshot+_recordSize)
-                        // ★ 用 CalculationAddress 推算回退点（不能手动算 Offset）
-                        var reclaimFrom = _engine.CalculationAddress(snapshot, _recordSize);
+                        // 回退 AllocatedTail 到 Prepare 前链头之后：丢弃悬干新版本（按该 record 自身几何——
+                        // 变长档 record 尺寸随内容长度走，_lastAppendedRecordSize 由 AppendVersionToDisk 记账）
+                        var reclaimFrom = _engine.CalculationAddress(snapshot, _lastAppendedRecordSize);
                         _engine.ReclaimTail(reclaimFrom);
                     });
                 }
@@ -400,6 +461,7 @@ public abstract partial class MetadataBase
     /// 尾截断回退悬干新版本 + meta），异步轨仅包一层已完成 Task（引擎 flush 原生同步）。</summary>
     /// <param name="seq">回滚的 Prepare 序号。</param>
     /// <param name="ct">取消令牌（本实现同步完成，不参与取消）。</param>
+    /// <returns>表示回滚完成的任务（同步完成）。</returns>
     public async ValueTask AbortAsync(long seq, CancellationToken ct)
     {
         Abort(seq);
@@ -407,6 +469,9 @@ public abstract partial class MetadataBase
     }
 
     /// <summary>注册提交回调（链式触发）。</summary>
+    /// <param name="seq">注册回调的事务序号。</param>
+    /// <param name="callback">提交回调（已提交到更高 seq 时立即同步触发）。</param>
+    /// <exception cref="ArgumentNullException">callback 为 null 时抛出。</exception>
     public void OnCommitted(long seq, Action callback)
     {
         ArgumentNullException.ThrowIfNull(callback);
@@ -462,6 +527,7 @@ public abstract partial class MetadataBase
     /// <summary>★ 子类额外清理钩子（基类核心清理不可绕过：Resources.Dispose 释放 owned 资源 + 取消后台 task）。
     /// <para>释放 MetadataBase 私有非托管内存（冷区/热区）+ MetaPolicy + epoch（自管的）。
     /// 先归还加载版本到池——随后 Resources 释放池（归还的 buffer 随池一并释放）。</para></summary>
+    /// <param name="disposing">true = 显式 Dispose（false = 终结器路径）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         _bufferPool.ReturnAligned(_loadedVersion);
@@ -471,6 +537,8 @@ public abstract partial class MetadataBase
     }
 
     /// <summary>异步额外清理（同 <see cref="DisposeOverride"/>，MetaPolicy 走异步轨）。</summary>
+    /// <param name="disposing">true = 显式 Dispose（false = 终结器路径）。</param>
+    /// <returns>表示异步清理完成的任务（当前实现同步完成）。</returns>
     protected override async ValueTask DisposeOverrideAsync(bool disposing)
     {
         _bufferPool.ReturnAligned(_loadedVersion);

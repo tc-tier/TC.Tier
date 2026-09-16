@@ -107,6 +107,8 @@ public sealed partial class WholeMirror : MirrorBase
     }
 
     /// <summary>帧 payload 长度（推导）。无有效帧尾返回 0。</summary>
+    /// <param name="frameHead">帧头地址。</param>
+    /// <returns>payload 字节数（= 帧尾地址 − 帧头 − HeaderSize）；无有效帧时为 0。</returns>
     public long GetPayloadLength(LogicalAddress frameHead)
     {
         EnsureNotDisposed();
@@ -117,6 +119,8 @@ public sealed partial class WholeMirror : MirrorBase
     /// <summary>
     /// 验证整个帧的 CRC（头+体+尾前缀 对 尾 Crc 字段——流式分段重读重算，大帧不驻内存）。
     /// </summary>
+    /// <param name="frameHead">帧头地址。</param>
+    /// <returns>true = 帧存在且 CRC 校验一致；false = 帧无效或 CRC 不符。</returns>
     public bool Verify(LogicalAddress frameHead)
     {
         EnsureNotDisposed();

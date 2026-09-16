@@ -1,4 +1,4 @@
-using TC.Tier.Core.Shared;
+using TC.Tier.Core.Lifecycle;
 using TC.Tier.Contracts.Structures;
 
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
@@ -24,12 +24,17 @@ public abstract partial class ProbingIndexBase<TKey>
     private protected class DefaultProbingIndexBaseRecovery(ProbingIndexBase<TKey> owner) : RecoveryBase<ProbingIndexRecoveryHints>
     {
         /// <summary>层间 join——主引擎异步就绪（OnInitializeBegin 已启动；主存储帧读经主引擎）。</summary>
+        /// <param name="ct">取消令牌（透传底层等待）。</param>
+        /// <returns>主引擎就绪后完成的 ValueTask。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await owner._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
         }
 
         /// <summary>★ 恢复核心（模板唯一必 override）——先试主存储（帧有效=增量重放），否则建空结构+全量重放。</summary>
+        /// <param name="hints">重放窗口 hints（组合层锚点 W + Ring 尾；无窗口 = 不载帧不重放）。</param>
+        /// <param name="ct">取消令牌（重放循环前后检查，取消即中止恢复）。</param>
+        /// <returns>恢复完成后完成的 ValueTask（主存储载入 + 增量重放，或建空结构 + 全量重放）。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(ProbingIndexRecoveryHints hints, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
@@ -56,10 +61,13 @@ public abstract partial class ProbingIndexBase<TKey>
                     ? $"Main-storage replay [{replayFrom}, {hints.End})"
                     : $"Replay entries [{hints.Begin}, {hints.End})");
                 // begin 传 Empty（最小地址）：重放不做旧条目抑制——同 key 多版本靠流序覆盖（最新写胜出）
-                await foreach (var (key, addr) in owner.KeyResolver.ScanAsync(replayFrom, hints.End, ct)
+                await foreach (var (key, addr, isTombstone) in owner.KeyResolver.ScanAsync(replayFrom, hints.End, ct)
                                    .ConfigureAwait(false))
                 {
-                    owner.Insert(key, addr, LogicalAddress.Empty);
+                    if (isTombstone)
+                        owner.Delete(key);   // 墓碑 → 删除语义（已删 key 不复活；窗口内旧 put 先插后删收敛）
+                    else
+                        owner.Insert(key, addr, LogicalAddress.Empty);
                 }
                 ct.ThrowIfCancellationRequested();
             }

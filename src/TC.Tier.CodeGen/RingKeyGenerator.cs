@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using TC.Tier.CodeGen.Templating;
 
 namespace TC.Tier.CodeGen;
 
@@ -28,9 +29,13 @@ public sealed class RingKeyGenerator : IIncrementalGenerator
         isEnabledByDefault: true);
 
     /// <summary>单条 [RingKey] 标注（Key 类型符号 + 诊断定位）。</summary>
+    /// <param name="Type">标注的 Key 类型符号（须满足 unmanaged 约束，否则报 TCSG020）。</param>
+    /// <param name="Location">标注应用位置（用于诊断定位）。</param>
     private readonly record struct KeySpec(INamedTypeSymbol Type, Location Location);
 
     /// <summary>封闭类名叶子——基元类型用 C# 关键字拼型（long→RingOfLong，设计稿 §2 命名），其余取类型名。</summary>
+    /// <param name="type">Key 类型符号（基元取关键字拼型，其余取 <c>type.Name</c>）。</param>
+    /// <returns>封闭类名叶子（首字母大写，如 "Long"/"Ulong"/"Float"；非基元取类型名）。</returns>
     private static string ClosedLeafName(INamedTypeSymbol type) => type.SpecialType switch
     {
         SpecialType.System_SByte => "Sbyte",
@@ -80,9 +85,9 @@ public sealed class RingKeyGenerator : IIncrementalGenerator
             if (items.IsEmpty) return;
 
             var emitted = new HashSet<string>(StringComparer.Ordinal);
-            var ringSb = RingSb();
-            var probingSb = ProbingSb();
-            var sortedSb = SortedSb();
+            var ringClasses = new StringBuilder();
+            var probingClasses = new StringBuilder();
+            var sortedClasses = new StringBuilder();
             var ringAny = false; var probingAny = false; var sortedAny = false;
 
             foreach (var item in items)
@@ -99,134 +104,46 @@ public sealed class RingKeyGenerator : IIncrementalGenerator
                 if (!emitted.Add(keyFqn)) continue;   // 同 Key 重复标注去重
 
                 var leaf = ClosedLeafName(type);
-                EmitRingClosed(ringSb, type, leaf, keyFqn); ringAny = true;
-                EmitHashClosed(probingSb, type, leaf, keyFqn); probingAny = true;
-                EmitSortedClosed(sortedSb, "BTree", leaf, keyFqn); sortedAny = true;
-                EmitSortedClosed(sortedSb, "SkipList", leaf, keyFqn);
+                ringClasses.Append(TemplateEngine.Render(TplRingClosed, TemplateEngine.Tokens(
+                    ("TYPE_NAME", type.Name),
+                    ("CLASS_NAME", "RingOf" + leaf),
+                    ("KEY_FQN", keyFqn))));
+                ringAny = true;
+                probingClasses.Append(TemplateEngine.Render(TplHashClosed, TemplateEngine.Tokens(
+                    ("TYPE_NAME", type.Name),
+                    ("CLASS_NAME", "HashOf" + leaf),
+                    ("KEY_FQN", keyFqn))));
+                probingAny = true;
+                sortedClasses.Append(TemplateEngine.Render(TplSortedClosed, TemplateEngine.Tokens(
+                    ("CLASS_NAME", "BTreeOf" + leaf),
+                    ("FAMILY", "BTree"),
+                    ("KEY_FQN", keyFqn))));
+                sortedClasses.Append(TemplateEngine.Render(TplSortedClosed, TemplateEngine.Tokens(
+                    ("CLASS_NAME", "SkipListOf" + leaf),
+                    ("FAMILY", "SkipList"),
+                    ("KEY_FQN", keyFqn))));
+                sortedAny = true;
             }
 
-            if (ringAny) spc.AddSource("RingKeyClosed.g.cs", ringSb.ToString());
-            if (probingAny) spc.AddSource("RingKeyProbingClosed.g.cs", probingSb.ToString());
-            if (sortedAny) spc.AddSource("RingKeySortedClosed.g.cs", sortedSb.ToString());
+            if (ringAny) spc.AddSource("RingKeyClosed.g.cs", TemplateEngine.Render(TplShell, TemplateEngine.Tokens(
+                ("TITLE", "[RingKey] 封闭薄类——Ring"),
+                ("NAMESPACE", RingNamespace),
+                ("CLASSES", ringClasses.ToString()))));
+            if (probingAny) spc.AddSource("RingKeyProbingClosed.g.cs", TemplateEngine.Render(TplShell, TemplateEngine.Tokens(
+                ("TITLE", "[RingKey] 封闭薄类——探测族索引（Hash）"),
+                ("NAMESPACE", ProbingNamespace),
+                ("CLASSES", probingClasses.ToString()))));
+            if (sortedAny) spc.AddSource("RingKeySortedClosed.g.cs", TemplateEngine.Render(TplShell, TemplateEngine.Tokens(
+                ("TITLE", "[RingKey] 封闭薄类——比较族索引（BTree/SkipList）"),
+                ("NAMESPACE", SortedNamespace),
+                ("CLASSES", sortedClasses.ToString()))));
         });
     }
 
-    private static StringBuilder RingSb()
-    {
-        var sb = Header("[RingKey] 封闭薄类——Ring");
-        sb.AppendLine($"namespace {RingNamespace};");
-        sb.AppendLine();
-        return sb;
-    }
+    // ── 模板名常量（Templates/RingKey/*.sbn 内嵌资源）──
 
-    private static StringBuilder ProbingSb()
-    {
-        var sb = Header("[RingKey] 封闭薄类——探测族索引（Hash）");
-        sb.AppendLine($"namespace {ProbingNamespace};");
-        sb.AppendLine();
-        return sb;
-    }
-
-    private static StringBuilder SortedSb()
-    {
-        var sb = Header("[RingKey] 封闭薄类——比较族索引（BTree/SkipList）");
-        sb.AppendLine($"namespace {SortedNamespace};");
-        sb.AppendLine();
-        return sb;
-    }
-
-    private static StringBuilder Header(string title)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"// <auto-generated>{title}（ring-generic-key 设计稿 §2——一行 [RingKey] 声明产出全套封闭形态）</auto-generated>");
-        sb.AppendLine("#pragma warning disable 1591 // 生成封闭形态成员不进 API 文档");
-        sb.AppendLine("#nullable enable");
-        sb.AppendLine();
-        return sb;
-    }
-
-    private static void EmitRingClosed(StringBuilder sb, INamedTypeSymbol type, string leaf, string keyFqn)
-    {
-        var className = $"RingOf{leaf}";
-        sb.AppendLine($"/// <summary><c>[RingKey(typeof({type.Name}))]</c> 封闭薄类——开放泛型内核的编译期封闭，消费面只见本类型。</summary>");
-        sb.AppendLine($"public sealed class {className} : global::{RingNamespace}.BlittableRing<{keyFqn}>");
-        sb.AppendLine("{");
-        sb.AppendLine($"    public {className}(global::{RingNamespace}.BlittableRingSettings settings,");
-        sb.AppendLine("        global::TC.Tier.Core.IO.IFileSystem fs,");
-        sb.AppendLine("        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null,");
-        sb.AppendLine("        global::TC.Tier.Core.Logging.ILogger? logger = null)");
-        sb.AppendLine("        : base(settings, fs, epoch: epoch, logger: logger)");
-        sb.AppendLine("    {");
-        sb.AppendLine("    }");
-        sb.AppendLine();
-        sb.AppendLine($"    /// <summary>★ 工厂：构造 + Initialize + WaitForReady 一步到位（对齐 BlittableRing.Create 形态）。</summary>");
-        sb.AppendLine($"    public static {className} Create(global::{RingNamespace}.BlittableRingSettings settings,");
-        sb.AppendLine("        global::TC.Tier.Core.IO.IFileSystem fs,");
-        sb.AppendLine("        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null)");
-        sb.AppendLine("    {");
-        sb.AppendLine($"        var ring = new {className}(settings, fs, epoch);");
-        sb.AppendLine("        ring.Initialize();");
-        sb.AppendLine("        ring.WaitForReady();");
-        sb.AppendLine("        return ring;");
-        sb.AppendLine("    }");
-        sb.AppendLine("}");
-        sb.AppendLine();
-    }
-
-    private static void EmitHashClosed(StringBuilder sb, INamedTypeSymbol type, string leaf, string keyFqn)
-    {
-        var className = $"HashOf{leaf}";
-        sb.AppendLine($"/// <summary><c>[RingKey(typeof({type.Name}))]</c> 探测族封闭薄类——判等闭环硬依赖 IKeyResolver（构造期必注入）。</summary>");
-        sb.AppendLine($"public sealed class {className} : global::{ProbingNamespace}.HashIndex<{keyFqn}>");
-        sb.AppendLine("{");
-        sb.AppendLine($"    public {className}(global::TC.Tier.Core.IO.IFileSystem fs,");
-        sb.AppendLine($"        global::{ProbingNamespace}.HashIndexSettings settings,");
-        sb.AppendLine($"        global::TC.Tier.Contracts.Structures.IKeyResolver<{keyFqn}> keyResolver,");
-        sb.AppendLine("        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null)");
-        sb.AppendLine("        : base(fs, settings, epoch, keyResolver)");
-        sb.AppendLine("    {");
-        sb.AppendLine("    }");
-        sb.AppendLine();
-        sb.AppendLine($"    /// <summary>★ 工厂：构造 + Initialize + WaitForReady 一步到位（空结构首开；恢复窗口经 Initialize(hints) 注入）。</summary>");
-        sb.AppendLine($"    public static {className} Create(global::TC.Tier.Core.IO.IFileSystem fs,");
-        sb.AppendLine($"        global::{ProbingNamespace}.HashIndexSettings settings,");
-        sb.AppendLine($"        global::TC.Tier.Contracts.Structures.IKeyResolver<{keyFqn}> keyResolver,");
-        sb.AppendLine("        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null)");
-        sb.AppendLine("    {");
-        sb.AppendLine($"        var index = new {className}(fs, settings, keyResolver, epoch);");
-        sb.AppendLine("        index.Initialize();");
-        sb.AppendLine("        index.WaitForReady();");
-        sb.AppendLine("        return index;");
-        sb.AppendLine("    }");
-        sb.AppendLine("}");
-        sb.AppendLine();
-    }
-
-    private static void EmitSortedClosed(StringBuilder sb, string family, string leaf, string keyFqn)
-    {
-        var className = $"{family}Of{leaf}";
-        sb.AppendLine($"/// <summary><c>[RingKey(typeof(...))]</c> 比较族封闭薄类——keyResolver 可选（判等不需要，恢复重放需要）。</summary>");
-        sb.AppendLine($"public sealed class {className} : global::{SortedNamespace}.{family}Index<{keyFqn}>");
-        sb.AppendLine("{");
-        sb.AppendLine($"    public {className}(global::TC.Tier.Core.IO.IFileSystem fs,");
-        sb.AppendLine($"        global::{SortedNamespace}.{family}IndexSettings settings,");
-        sb.AppendLine("        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null,");
-        sb.AppendLine($"        global::TC.Tier.Contracts.Structures.IKeyResolver<{keyFqn}>? keyResolver = null)");
-        sb.AppendLine("        : base(fs, settings, epoch, keyResolver)");
-        sb.AppendLine("    {");
-        sb.AppendLine("    }");
-        sb.AppendLine();
-        sb.AppendLine($"    /// <summary>★ 工厂：构造 + Initialize + WaitForReady 一步到位（空结构首开；恢复窗口经 Initialize(hints) 注入）。</summary>");
-        sb.AppendLine($"    public static {className} Create(global::TC.Tier.Core.IO.IFileSystem fs,");
-        sb.AppendLine($"        global::{SortedNamespace}.{family}IndexSettings settings,");
-        sb.AppendLine("        global::TC.Tier.Core.Epochs.LightEpoch? epoch = null)");
-        sb.AppendLine("    {");
-        sb.AppendLine($"        var index = new {className}(fs, settings, epoch);");
-        sb.AppendLine("        index.Initialize();");
-        sb.AppendLine("        index.WaitForReady();");
-        sb.AppendLine("        return index;");
-        sb.AppendLine("    }");
-        sb.AppendLine("}");
-        sb.AppendLine();
-    }
+    private const string TplShell = "RingKey/Shell";
+    private const string TplRingClosed = "RingKey/RingClosed";
+    private const string TplHashClosed = "RingKey/HashClosed";
+    private const string TplSortedClosed = "RingKey/SortedClosed";
 }

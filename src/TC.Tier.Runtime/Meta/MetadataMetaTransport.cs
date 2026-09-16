@@ -62,6 +62,7 @@ public sealed class MetadataMetaTransport : IMetaTransport, IDisposable
     }
 
     /// <summary>写完整块 = 持久化点：内存镜像推进版本 → 追加版本链 + flush → N=2 轮转回收。</summary>
+    /// <param name="block">完整 meta 块（字节）；长度不得超过 PayloadSize，超限抛 <see cref="ArgumentException"/>。</param>
     public void WriteBlock(ReadOnlySpan<byte> block)
     {
         if (block.Length > _payloadSize)

@@ -51,29 +51,44 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
     /// <summary>内存驻留字节数（spill 压力观测）。</summary>
     internal long MemoryBytes => Volatile.Read(ref _memoryBytes);
 
-    /// <summary>设置逻辑长度（收缩即裁掉区间外页——不可达数据不占预算）。</summary>
+    /// <summary>设置逻辑长度（收缩即裁掉区间外页——不可达数据不占预算）。
+    /// ★ IO-01：保留非对齐尾页并清尾——原实现 `lastKeep = length/pageSize - 1` 把部分尾页整页丢弃，
+    ///   页内 [pageStart, length) 的未 flush 用户写一并丢失（Flush 分类"无脏页→服务端自拷贝"或零填
+    ///   上传 = 静默数据损坏）；清尾对齐 Mem TruncateNoLock 语义（truncate-extend 读零、不复活旧数据）。</summary>
+    /// <param name="length">目标逻辑长度（字节，≥0；收缩即裁掉区间外页 + 非对齐尾页清尾）。</param>
     public void SetLength(long length)
     {
         lock (_sync)
         {
             if (length < _length)
             {
-                var lastKeep = length / pageSize - 1;   // 完整保留的最后一页
-                var toDrop = _pages.Where(kv => kv.Key > lastKeep).ToArray();
+                var keepPages = length / pageSize;   // 完整保留页数；非对齐时 key == keepPages 的部分页保留
+                var aligned = length % pageSize == 0;
+                var toDrop = _pages.Where(kv => kv.Key > keepPages || (kv.Key == keepPages && aligned)).ToArray();
                 foreach (var kv in toDrop)
                     DropPageNoLock(kv.Key, kv.Value);
+                // 部分保留页清尾（[length, pageEnd) 不可达——防截断后扩展复活旧数据；对齐 Mem 语义）
+                if (!aligned && _pages.TryGetValue(keepPages, out var partial))
+                {
+                    var memory = ReadPageNoLock(keepPages, partial, pageSize);   // spilled 页先回读
+                    Array.Clear(memory, (int)(length % pageSize), pageSize - (int)(length % pageSize));
+                    partial.Clean = false;   // 内容 ≠ 已持久对象（增量 Flush 判定基准）
+                }
             }
             _length = length;
         }
     }
 
     /// <summary>页是否已物化。</summary>
+    /// <param name="pageIndex">页号（0 基，页大小由构造参数 pageSize 决定）。</param>
+    /// <returns>true = 页已物化（写入或加载过）；false = 未触（读零/Flush 服务端回填）。</returns>
     public bool IsPageMaterialized(long pageIndex)
     {
         lock (_sync) return _pages.ContainsKey(pageIndex);
     }
 
     /// <summary>物化一页（未物化则分配零页；已物化 no-op）——PunchHole 全覆页场景。</summary>
+    /// <param name="pageIndex">页号（0 基；未物化则分配零页，已物化 no-op）。</param>
     public void EnsurePage(long pageIndex)
     {
         lock (_sync)
@@ -89,6 +104,8 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
     /// 写入（覆写语义）——未物化页按需分配（确定性零填充）。★ 调用方须先完成"补集加载"
     /// （RemoteFileHandle.MaterializeComplement）——本层不触达对象存储。
     /// </summary>
+    /// <param name="offset">写入起始偏移（字节，≥0；超出当前长度即扩长）。</param>
+    /// <param name="source">源数据（空则 no-op）。</param>
     public void Write(long offset, ReadOnlySpan<byte> source)
     {
         if (source.IsEmpty) return;
@@ -118,6 +135,9 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
     /// 读取——已物化页取实值，未物化页取零。★ 调用方须先完成"补集加载"（对旧对象区间）——
     /// 本层对未物化区间按零返回（越 effectiveBase 的语义即零）。
     /// </summary>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即单次最多读取字节数）。</param>
+    /// <returns>实际读取的字节数（0 = offset 已达逻辑长度末尾；未物化区间读零）。</returns>
     public int Read(long offset, Span<byte> destination)
     {
         lock (_sync)
@@ -150,6 +170,8 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
     /// 干净物化（补集加载路径专用）：页<b>缺失</b>时分配+填充并标记 clean（内容镜像自当前对象——
     /// 增量 Flush 不得因加载而重传）；已存在页不动（补集加载从不触达已物化页）。
     /// </summary>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="source">镜像数据（仅填充页缺失部分——已物化页不动）。</param>
     public void WriteClean(long offset, ReadOnlySpan<byte> source)
     {
         if (source.IsEmpty) return;
@@ -187,6 +209,9 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
     }
 
     /// <summary>页区间内是否存在脏页（增量 Flush 分类：无脏且在基线内 → 服务端拷贝）。</summary>
+    /// <param name="firstPage">起始页号（含）。</param>
+    /// <param name="lastPage">结束页号（含）。</param>
+    /// <returns>true = 区间内至少一页已物化且非 clean；false = 全 clean 或未物化。</returns>
     public bool HasDirtyPage(long firstPage, long lastPage)
     {
         lock (_sync)
@@ -201,6 +226,10 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
     }
 
     /// <summary>读取一页到新数组（Flush 路径——物化页取实值/未物化零）。</summary>
+    /// <summary>读取一段到新数组（Flush 路径——物化页取实值/未物化零）。</summary>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="length">读取字节数（输出数组长度）。</param>
+    /// <returns>新分配的字节数组（长度 = length；未物化区间为零填充）。</returns>
     public byte[] ReadToArray(long offset, int length)
     {
         var buf = new byte[length];
@@ -292,7 +321,9 @@ internal sealed class StagingBuffer(int pageSize, long memoryLimit, string? spil
         if (_memoryBytes <= memoryLimit) return;
         // ★ CORE-22：批量驱逐——一次扫描 + 排序取最旧（旧实现每页一次全表扫描 = O(P²)；
         //   大批量写入超预算时 1GB/64KiB 页 ≈ 33M+ 次比较量级）
-        var needBytes = _memoryBytes - memoryLimit;
+        // ★ IO-P4：驱逐到半水位（原回补到 memoryLimit——随后每写一页又越限再全表扫描，
+        //   O(P log P)/写）。一次多驱逐一半预算，摊薄扫描频率 ~limit/2 字节的写量。
+        var needBytes = _memoryBytes - memoryLimit / 2;
         var candidates = new List<(long Touch, long PageIdx, Page Page)>();
         foreach (var kv in _pages)
             if (kv.Value.Memory is not null)

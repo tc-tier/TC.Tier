@@ -22,10 +22,11 @@ public interface IKeyResolver<TKey> where TKey : unmanaged, IEquatable<TKey>
     /// </summary>
     LogicalAddress GetFlushedWatermark();
 
-    /// <summary>范围扫描——吐 (Key, Address) 对（光有 key 建不了条目）；异步迭代器流式回源。</summary>
-    IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAsync(
+    /// <summary>范围扫描——吐 (Key, Address, IsTombstone) 三元组（重放/重建需墓碑感知：墓碑记录
+    ///   须触发 Delete 而非 Insert，否则窗口内旧 put 复活已删 key）；异步迭代器流式回源。</summary>
+    IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(
         LogicalAddress begin, LogicalAddress end, CancellationToken ct = default);
 
     /// <summary>全量扫描（重载）——从 BeginAddress 扫到当前尾。</summary>
-    IAsyncEnumerable<(TKey Key, LogicalAddress Address)> ScanAsync(CancellationToken ct = default);
+    IAsyncEnumerable<(TKey Key, LogicalAddress Address, bool IsTombstone)> ScanAsync(CancellationToken ct = default);
 }

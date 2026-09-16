@@ -60,7 +60,7 @@ public sealed class ManagedMetaPolicy<THeader, TPayload>(
     /// 同步加载——从引擎读盘上自描述块（footer 位 = HeaderSize + 盘上 header.PayloadLength），
     /// 验证 magic/version/CRC 后采纳；盘上块超本启动容量几何时经临时对齐缓冲按盘自述全量读。
     /// </summary>
-    /// <returns>true = 读到且验证通过；false = 空/无数据/校验失败（不区分原因）。</returns>
+    /// <returns>true = 读到且验证通过；false = 空/无数据/校验失败；IO 故障上抛（不伪装"无 meta"）。</returns>
     public bool Load()
     {
         ThrowIfDisposed();
@@ -86,12 +86,17 @@ public sealed class ManagedMetaPolicy<THeader, TPayload>(
             AdoptLoaded(temp.GetSpan(0, needLen), fromBuffer: false);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) when (ex is not FileIOException and not OperationCanceledException)
+        {
+            // ★ 只把"内容级失效"折叠为 false；IO 故障上抛——伪装"无 meta"会让恢复静默丢水位。
+            _logger?.LogWarning(ex, "ManagedMetaPolicy.Load: 未预期异常按无 meta 处理");
+            return false;
+        }
     }
 
     /// <summary>异步加载（对等同步版）——同一自描述读取/验证/采纳路径，读引擎走异步 API。</summary>
     /// <param name="ct">取消令牌。</param>
-    /// <returns>true = 读到且验证通过；false = 空/无数据/校验失败（不区分原因）。</returns>
+    /// <returns>true = 读到且验证通过；false = 空/无数据/校验失败；IO 故障上抛（不伪装"无 meta"）。</returns>
     public async ValueTask<bool> LoadAsync(CancellationToken ct)
     {
         ThrowIfDisposed();
@@ -115,7 +120,12 @@ public sealed class ManagedMetaPolicy<THeader, TPayload>(
             AdoptLoaded(temp.GetSpan(0, needLen), fromBuffer: false);
             return true;
         }
-        catch { return false; }
+        catch (Exception ex) when (ex is not FileIOException and not OperationCanceledException)
+        {
+            // ★ 口径同同步版：IO 故障上抛（OCE 透传），仅内容级失效折叠为 false。
+            _logger?.LogWarning(ex, "ManagedMetaPolicy.LoadAsync: 未预期异常按无 meta 处理");
+            return false;
+        }
     }
 
     /// <summary>验证整块：magic/version + CRC（覆盖 Header+水位+实际 opaque，到 footer 前）。</summary>

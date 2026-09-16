@@ -22,6 +22,9 @@ public sealed record RemoteSpill
     }
 
     /// <summary>磁盘目录形态（staging 超限落盘）。</summary>
+    /// <param name="directory">spill 根目录（非空；per-fs 子目录自举）。</param>
+    /// <returns>磁盘目录形态的 spill 配置。</returns>
+    /// <exception cref="ArgumentException">directory 为空白。</exception>
     public static RemoteSpill ToDisk(string directory)
     {
         if (string.IsNullOrWhiteSpace(directory))
@@ -30,5 +33,6 @@ public sealed record RemoteSpill
     }
 
     /// <summary>内存私有卷形态（无盘部署——fs 级 MemoryFileSystem 自举）。</summary>
+    /// <returns>内存形态的 spill 配置。</returns>
     public static RemoteSpill ToMemory() => new(null, true);
 }

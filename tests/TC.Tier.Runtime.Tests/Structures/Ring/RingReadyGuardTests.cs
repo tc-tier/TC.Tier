@@ -71,11 +71,13 @@ public class RingReadyGuardTests
         try
         {
             using var ring = TestRingSettingsFactory.NewRing<long>(vol, settings);
-            ring.Write(1L, new byte[] { 10 });
+            var addr = ring.Write(1L, new byte[] { 10 });
             ring.Initialize();
             ring.WaitForReady();
 
-            Action read = () => ring.GetKey(new LogicalAddress(0, 100));
+            // ★ 读用真实写入的 addr——内容自愈读契约下读从未写入的地址 = 无有效记录，fail-fast 抛
+            //   （read-protection-tiering v2：GetKey 对无效内容不再静默返回垃圾）
+            Action read = () => ring.GetKey(addr);
             read.Should().NotThrow("Initialize 后 EnsureReady 应放行读");
         }
         finally { vol.Dispose(); }

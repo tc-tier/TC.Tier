@@ -27,10 +27,10 @@ public class HashIndexMainStorageTests
             });
 
     [Fact]
-    public void MainStorageRecovery_ZeroReplay_AllFound()
+    public async Task MainStorageRecovery_ZeroReplay_AllFound()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var index = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring);
             for (long k = 1; k <= 200; k++)
@@ -43,7 +43,7 @@ public class HashIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring2,
             hints: new ProbingIndexRecoveryHints(ring2.BeginAddress, ring2.TailAddress));
 
@@ -61,10 +61,10 @@ public class HashIndexMainStorageTests
     }
 
     [Fact]
-    public void MainStorageRecovery_IncrementalReplay_DeltaApplied()
+    public async Task MainStorageRecovery_IncrementalReplay_DeltaApplied()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var index = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring);
             for (long k = 1; k <= 150; k++)
@@ -85,7 +85,7 @@ public class HashIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring2,
             hints: new ProbingIndexRecoveryHints(ring2.BeginAddress, ring2.TailAddress));
 
@@ -103,10 +103,10 @@ public class HashIndexMainStorageTests
     }
 
     [Fact]
-    public void NoFrame_FallsBackToFullReplay()
+    public async Task NoFrame_FallsBackToFullReplay()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var index = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring);
             for (long k = 1; k <= 50; k++)
@@ -118,7 +118,7 @@ public class HashIndexMainStorageTests
             index.Dispose();   // ★ 从未 TryDump——主存储无帧
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring2,
             hints: new ProbingIndexRecoveryHints(ring2.BeginAddress, ring2.TailAddress));
 
@@ -129,10 +129,10 @@ public class HashIndexMainStorageTests
     }
 
     [Fact]
-    public void PersistenceKindNone_DisabledStorage()
+    public async Task PersistenceKindNone_DisabledStorage()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var index = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol, builtin: false), ring);
             for (long k = 1; k <= 50; k++)
@@ -145,7 +145,7 @@ public class HashIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol, builtin: false), ring2,
             hints: new ProbingIndexRecoveryHints(ring2.BeginAddress, ring2.TailAddress));
 
@@ -156,10 +156,10 @@ public class HashIndexMainStorageTests
     }
 
     [Fact]
-    public void MainStorageAcrossOverwrite_LatestWins()
+    public async Task MainStorageAcrossOverwrite_LatestWins()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var index = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring);
             for (long k = 1; k <= 60; k++)
@@ -171,7 +171,7 @@ public class HashIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring2,
             hints: new ProbingIndexRecoveryHints(ring2.BeginAddress, ring2.TailAddress));
         var buf = new byte[16];
@@ -189,10 +189,10 @@ public class HashIndexMainStorageTests
     }
 
     [Fact]
-    public void FuzzyDump_ConcurrentWriters_RecoveryConverges()
+    public async Task FuzzyDump_ConcurrentWriters_RecoveryConverges()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var index = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring);
 
@@ -220,7 +220,7 @@ public class HashIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol, HashSettings(vol), ring2,
             hints: new ProbingIndexRecoveryHints(ring2.BeginAddress, ring2.TailAddress));
 
@@ -238,10 +238,10 @@ public class HashIndexMainStorageTests
     }
 
     [Fact]
-    public void VersionRotation_KeepsNewestFrame_ReclaimsOldest()
+    public async Task VersionRotation_KeepsNewestFrame_ReclaimsOldest()
     {
         using var vol = new TestVolume();
-        using (var ring = RingOfLong.Create(RingSettings(vol), vol.Fs))
+        using (var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs))
         {
             var settings = TestProbingIndexSettingsFactory.On(vol, "rot-hash", deleteOnClose: false,
                 persistenceKind: ProbingIndexPersistenceKind.Builtin,
@@ -280,7 +280,7 @@ public class HashIndexMainStorageTests
             index.Dispose();
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         var index2 = TestProbingIndexSettingsFactory.NewHash<long>(vol,
             TestProbingIndexSettingsFactory.On(vol, "rot-hash", deleteOnClose: false),
             ring2,

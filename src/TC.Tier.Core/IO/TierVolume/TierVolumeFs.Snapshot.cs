@@ -1,5 +1,5 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
+using TC.Tier.Core.Primitives;
 using System.Text;
 
 namespace TC.Tier.Core.IO.TierVolume;
@@ -181,6 +181,9 @@ public sealed partial class TierVolumeFs
     /// <summary>创建快照（V2 §1.1）：捕获 = 检查点（CommitMetadata 挂接）+ 冻结位图副本——检查点原子
     /// （翻转前崩溃 = 快照不存在、冻结区孤儿回收；翻转后 = 完整态）。上限 <see cref="Sb.SnapshotMax"/>；
     /// 名字唯一；须日志卷（捕获 LSN = 增量导出基点，§1.2）。</summary>
+    /// <param name="name">快照名（非空、UTF-8 ≤32 字节、不含 '/'、卷内唯一）。</param>
+    /// <returns>新快照信息（捕获时刻/LSN/镜像 CRC）。</returns>
+    /// <exception cref="FileIOException">非日志卷、只读卷、快照表满或名字已存在。</exception>
     public SnapshotInfo CreateSnapshot(string name)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -219,6 +222,8 @@ public sealed partial class TierVolumeFs
 
     /// <summary>删除快照（V2 §1.1）：位图差集对账（可达集之外的冻结块 → 释放）+ 镜像/冻结区释放 +
     /// 表条目移除——检查点原子。活跃挂载在档 → <see cref="IOError.SharingViolation"/>（钉块解除会毁其读面）。</summary>
+    /// <param name="name">快照名（须已存在）。</param>
+    /// <exception cref="FileIOException">快照不存在或有活跃挂载实例在档。</exception>
     public void DeleteSnapshot(string name)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -266,6 +271,7 @@ public sealed partial class TierVolumeFs
     }
 
     /// <summary>快照清单（捕获序）。</summary>
+    /// <returns>全部快照信息（按捕获顺序排列）。</returns>
     public IReadOnlyList<SnapshotInfo> ListSnapshots()
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
@@ -411,7 +417,7 @@ public sealed partial class TierVolumeFs
             ReadCarrierExactly((long)(start * (ulong)_pageSize), image.AsSpan((int)pos, take));
             pos += take;
         }
-        if (Crc32.HashToUInt32(image) != winner.ImageCrc)
+        if (UnifiedCrc.ComputeCrc32C(image) != winner.ImageCrc)
             throw new FileIOException(IOError.IOFailure,
                 $"快照元数据镜像 CRC 校验失败（{winnerSide} 侧，快照 {_snapshotName}）", _carrier.Path, "Open");
         LoadMetadata(image);
@@ -419,6 +425,10 @@ public sealed partial class TierVolumeFs
 }
 
 /// <summary>快照信息（V2 §1.1——CreateSnapshot/ListSnapshots 返回）。</summary>
+/// <param name="Name">快照名（卷内唯一）。</param>
+/// <param name="CaptureTicks">捕获时刻 UTC ticks（DateTimeOffset.UtcNow.UtcTicks）。</param>
+/// <param name="CaptureLsn">捕获时已提交 LSN（增量导出基点）。</param>
+/// <param name="ImageCrc">元数据镜像 CRC32C（基线校验锚）。</param>
 public readonly record struct SnapshotInfo(string Name, long CaptureTicks, ulong CaptureLsn, uint ImageCrc)
 {
     /// <summary>捕获时刻（UTC）。</summary>

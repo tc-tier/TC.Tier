@@ -5,6 +5,7 @@
     <Description>TC.Tier 内核——生命周期骨架（LifecycleBase/RecoveryBase）、并发原语、原生内存/IO 基础设施（依赖 TC.Tier.Contracts）。</Description>
     <PackageTags>storage;kv;wal;concurrency;native-memory;core</PackageTags>
     <TargetFramework>net8.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>12.0</LangVersion>
@@ -12,7 +13,6 @@
     <RootNamespace>TC.Tier.Core</RootNamespace>
     <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
     <PackageId>TC.Tier.Core</PackageId>
-    <Version>0.1.0-alpha</Version>
     <Description>TC.Tier 公共基石层——可观测原语、原生互操作、公共契约与核心工具</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
@@ -22,10 +22,16 @@
 
 
   <ItemGroup>
-    <PackageReference Include="System.IO.Hashing" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\TC.Tier.Contracts\TC.Tier.Contracts.csproj" />
+    <!-- ★ TC.Tier.CodeGen 源生成器（[BinaryLayout]/[RingKey] 教义）——Core 的 TierVolumeFs/
+         帧布局（JournalFrameHeader/DeltaFileHeader/Superblock* 等）依赖此生成器产出 *Codec 类，
+         缺失则 76 项 CS0103 错误（2026-09-07 销案：源生成器未被引用 = TierVolume 全盘编译失败）。 -->
+    <ProjectReference Include="..\TC.Tier.CodeGen.Abstractions\TC.Tier.CodeGen.Abstractions.csproj" />
+    <ProjectReference Include="..\TC.Tier.CodeGen\TC.Tier.CodeGen.csproj"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="TC.Tier.Core.Tests" />
@@ -33,6 +39,7 @@
     <InternalsVisibleTo Include="TC.Tier.Core.IO.S3" />
     <InternalsVisibleTo Include="TC.Tier.Runtime.Tests" />
     <InternalsVisibleTo Include="TC.Tier.Runtime.AdversarialTests" />
+    <InternalsVisibleTo Include="TC.Tier.Products.Tests" />
     <InternalsVisibleTo Include="TC.Tier.Core.Benchmarks" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
     <!-- ★ 过渡例外：TC.Tier.Runtime 自带 Storage/IO 句柄层仍直调 FileNative/DiskNative
@@ -63,5 +70,11 @@
           Link="runtimes\linux-arm64\native\libatomic128.so"
           CopyToOutputDirectory="PreserveNewest"
           Pack="true" PackagePath="runtimes\linux-arm64\native\" />
+    <!-- ★ osx-arm64：Mach-O 无法从 Linux/Win 交叉编译（build.sh 头注）——CI macos job 原生编出
+         （首验通道）后回填入库， resolver 按 runtimes/osx-arm64/native/ 加载。 -->
+    <None Include="NativeInterop\lib\osx-arm64\libatomic128.dylib"
+          Link="runtimes\osx-arm64\native\libatomic128.dylib"
+          CopyToOutputDirectory="PreserveNewest"
+          Pack="true" PackagePath="runtimes\osx-arm64\native\" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using TC.Tier.Core.IO;
+using TC.Tier.Core.IO.TierVolume;
 using TC.Tier.Products.Wal;
 
 namespace TC.Tier.Products.Tests.Wal;
@@ -23,7 +24,8 @@ public class TierWalVirtualMultiPageTests : IDisposable
     private IFileSystem NewVirtualVolume()
     {
         var vol = Path.Combine(_dir, $"vol-{Guid.NewGuid():N}.tier");
-        var fs = TierFs.New($"virtual:///{vol.Replace('\\', '/')}");
+        var fs = TierFs.New($"virtual:///{vol.Replace('\\', '/')}",
+            new TierVolumeFormatOptions { CarrierWriteThrough = true });   // ★ 契约① 地板验证：virtual 须载体写穿挂载
         _fss.Add(fs);
         return fs;
     }
@@ -93,12 +95,16 @@ public class TierWalVirtualMultiPageTests : IDisposable
             await wal1.CommitAsync(default);
         }
 
-        // 冷节点：导入 → SnapshotIndex 恢复 → 从 N₀+1 重放增量（跨页衔接）
+        // 冷节点：导入 → SnapshotIndex 恢复 → leader 推增量 [N₀+1, 尾]（全局 index 续接）→ 跨页重放衔接
         var seeded = new MemoryAsyncTransferPersistence();
         seeded.Seed(image.CommittedImage!.Value);
         await using var wal2 = await options.Builder(fs).WithSnapshotPersistence(seeded).StartAsync();
         await wal2.ImportSnapshotAsync(default);
         wal2.SnapshotIndex.Should().Be(60_000);
+
+        // ★ 增量推送（AppendEntries 语义——同卷恢复的旧主数据已随导入重锚清除，增量由 leader 重推）
+        await AppendRangeAsync(wal2, 60_001, 6_000);
+        await wal2.CommitAsync(default);
 
         long replayed = 0;
         long first = 0;

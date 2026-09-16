@@ -24,6 +24,8 @@ internal static class DiskNative
     /// <returns>扇区大小（字节）。</returns>
     public static uint GetSectorSize(string path)
     {
+        ArgumentException.ThrowIfNullOrEmpty(path);
+
         // === Windows: GetDiskFreeSpace ===
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {

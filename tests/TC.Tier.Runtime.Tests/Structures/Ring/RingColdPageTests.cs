@@ -11,6 +11,41 @@ namespace TC.Tier.Runtime.Tests.Structures.Ring;
 /// </summary>
 public class RingColdPageTests
 {
+    [Fact]
+    public void Dispose_ReleasesColdPageCache()
+    {
+        // ★ 冷区制造机制（read-protection-tiering v2 判据）：同环内 FlushUntil 不再构成冷区
+        //   （写完即推进 SafeSnapshotTail → 仍判热区页池直读）——真冷读 = 恢复后页池空壳形态
+        //   （safe=dataStart，全量读设备）。
+        var vol = new TestVolume();
+        try
+        {
+            LogicalAddress addr;
+            using (var ring = TestRingSettingsFactory.NewRing<long>(vol,
+                TestRingSettingsFactory.On(vol, "ring", deleteOnClose: false, coldRecordBufferLimit: 64)))
+            {
+                addr = ring.Write(1L, new byte[100]);
+                ring.FlushUntil(ring.TailAddress);   // 设备留权威副本后关闭
+            }
+
+            var ring2 = TestRingSettingsFactory.NewRing<long>(vol,
+                TestRingSettingsFactory.On(vol, "ring", deleteOnClose: false, coldRecordBufferLimit: 64));
+            ring2.GetValue(addr, new byte[100]).Should().Be(100);
+
+            var cache = ring2.ColdPageCacheForTest!;
+            cache.Count.Should().BeGreaterThan(0, "恢复后冷读应填充整页缓存");
+
+            ring2.Dispose();
+
+            cache.Count.Should().Be(0, "Ring Dispose 必须排空冷页缓存并归还全部 native 页");
+            ((Action)(() => cache.TryGet(addr, out _))).Should().Throw<ObjectDisposedException>();
+        }
+        finally
+        {
+            vol.Dispose();
+        }
+    }
+
     /// <summary>GetRecord 冷区返回正确数据——写→flush 制造冷区→GetRecord→数据正确（不再脏读）。</summary>
     [Fact]
     public void GetRecord_ColdRegion_ReturnsCorrectData()

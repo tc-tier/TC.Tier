@@ -26,6 +26,7 @@ public interface IMetaTransport
     /// <summary>写完整 meta block（异步对等版）。</summary>
     /// <param name="block">完整 meta block（[Header][Payload][Footer Crc32C]）</param>
     /// <param name="ct">取消令牌（可选）。</param>
+    /// <returns>写入完成的 <see cref="ValueTask"/>。</returns>
     ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct);
 
     /// <summary>读回最后一条 meta block（<see cref="ReadOnlySpan{T}.IsEmpty"/> = 无）。</summary>

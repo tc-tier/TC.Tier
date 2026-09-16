@@ -15,6 +15,15 @@ public partial class BlittableRing<TKey> : RingBase<TKey>
     /// 外部程序集直接 <c>new BlittableRing&lt;TKey&gt;(...)</c> 即 CS0122 编译错，必须用 [RingKey]
     /// 生成的封闭类型（RingOfLong 等，经 protected 肢调本 ctor）；内核单元测试/基准经 IVT（internal 肢）。
     /// </summary>
+    /// <param name="settings">BlittableRingSettings（页几何/水位/溢出配置，构造时全量校验 fail-fast）。</param>
+    /// <param name="fs">文件系统（组合根注入）。</param>
+    /// <param name="recovery">恢复策略（null = 默认 DefaultRingRecovery）。默认 null。</param>
+    /// <param name="cursorFactory">扫描游标工厂（null = 默认实现）。默认 null。</param>
+    /// <param name="ringSnapshot">快照实现（null = 默认 RingSnapshot）。默认 null。</param>
+    /// <param name="metaPolicyFactory">meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。默认 null。</param>
+    /// <param name="metaTransport">Transport 模式的外部 meta 传输（null = 非 Transport 模式或由 settings 决定）。默认 null。</param>
+    /// <param name="epoch">epoch 保护（null = 自建 LightEpoch）。默认 null。</param>
+    /// <param name="logger">日志记录器（可选）。默认 null。</param>
     protected internal BlittableRing(BlittableRingSettings settings,
         IFileSystem fs,
         IRecovery<RingRecoveryHints>? recovery = null,
@@ -35,6 +44,15 @@ public partial class BlittableRing<TKey> : RingBase<TKey>
     /// <summary>★ 工厂方法（protected internal 同 ctor 闸门）——外部消费面用封闭类型的同名工厂
     /// （[RingKey] 生成物）；直接 <c>BlittableRing&lt;TKey&gt;.Create(...)</c> 是开放泛型泄漏、CS0122 编译期拒绝
     /// （internal 不可见时绑定器会误绑 IO 扩展同名方法，报错误导——保护级别与 ctor 一致即得清晰 CS0122）。</summary>
+    /// <param name="settings">BlittableRingSettings（页几何/水位/溢出配置，构造时全量校验 fail-fast）。</param>
+    /// <param name="fs">文件系统（组合根注入）。</param>
+    /// <param name="recovery">恢复策略（null = 默认 DefaultRingRecovery）。默认 null。</param>
+    /// <param name="cursorFactory">扫描游标工厂（null = 默认实现）。默认 null。</param>
+    /// <param name="ringSnapshot">快照实现（null = 默认 RingSnapshot）。默认 null。</param>
+    /// <param name="metaPolicyFactory">meta 策略工厂（null = 按 settings.MetaPolicyKind 默认装配）。默认 null。</param>
+    /// <param name="metaTransport">Transport 模式的外部 meta 传输。默认 null。</param>
+    /// <param name="epoch">epoch 保护（null = 自建 LightEpoch）。默认 null。</param>
+    /// <returns>已完成 Initialize 与 WaitForReady 的 <see cref="BlittableRing{TKey}"/> 实例（就绪可读写）。</returns>
     protected internal static BlittableRing<TKey> Create(BlittableRingSettings settings,
         IFileSystem fs,
         IRecovery<RingRecoveryHints>? recovery = null,

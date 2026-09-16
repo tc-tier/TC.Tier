@@ -55,19 +55,20 @@ internal sealed partial class StorageEngine
     /// <param name="ct">外部取消令牌（同步 Append/Allocate 传 default——仅超时；异步 AppendAsync 传调用方 ct）。</param>
     private void EnsureCpuCapacity(CancellationToken ct)
     {
-        if (CpuSampler.ThrottleFactor <= 0.0) return; // 正常——放行
+        // ★ 节流有效系数——故障注入 ThrottleSaturated 窗强制饱和（拒绝/自旋路径的确定性触发）
+        if (EffectiveThrottleFactor <= 0.0) return; // 正常——放行
         var deadline = ct.CanBeCanceled
             ? long.MaxValue
-            : Environment.TickCount64 + _options.Optimization.SpinMilliseconds;
+            : _clock.GetMsTimestamp() + _options.Optimization.SpinMilliseconds;
         var spinner = new SpinWait();
         long attempts = 0;
         while (true)
         {
             ct.ThrowIfCancellationRequested();
-            if (!ct.CanBeCanceled && Environment.TickCount64 > deadline)
+            if (!ct.CanBeCanceled && _clock.GetMsTimestamp() > deadline)
                 throw new TimeoutException(
-                    $"CPU 限流自旋超时 factor={CpuSampler.ThrottleFactor} attempts={attempts}");
-            if (CpuSampler.ThrottleFactor <= 0.0) return; // CPU 回落——放行
+                    $"CPU 限流自旋超时 factor={EffectiveThrottleFactor} attempts={attempts}");
+            if (EffectiveThrottleFactor <= 0.0) return; // CPU 回落——放行
             if (++attempts % _options.Optimization.WarnEvery == 0)
                 Logger?.LogWarning("CPU 限流退避 factor={factor} util={util} attempts={attempts}",
                     CpuSampler.ThrottleFactor, CpuSampler.CpuUtilization, attempts);

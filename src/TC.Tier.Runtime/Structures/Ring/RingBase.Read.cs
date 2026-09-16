@@ -30,7 +30,12 @@ public abstract partial class RingBase<TKey>
             return cached;   // 缓存命中
 
         var pageMem = _pagePool.RentAligned(PageSize, SectorSize);
-        ReadDevicePage(pageAddr, pageMem.GetSpan(0, PageSize));
+        var got = ReadDevicePage(pageAddr, pageMem.GetSpan(0, PageSize));
+        // ★ 短读清零页尾：租借 native 页含残留垃圾，不 Clear 会被解析误读为有效 record（幻影条目），
+        //   且随缓存驻留放大；got<=0 同样清零后入缓存（EOF 语义=全零页）。
+        var valid = got < 0 ? 0 : got;
+        if (valid < PageSize)
+            pageMem.GetSpan(valid, PageSize - valid).Clear();
         _coldPageCache.Put(pageAddr, pageMem);
         return pageMem;
     }
@@ -42,7 +47,11 @@ public abstract partial class RingBase<TKey>
             return cached;
 
         var pageMem = _pagePool.RentAligned(PageSize, SectorSize);
-        await ReadDevicePageAsync(pageAddr, pageMem.Memory, ct).ConfigureAwait(false);
+        var got = await ReadDevicePageAsync(pageAddr, pageMem.Memory, ct).ConfigureAwait(false);
+        // ★ 短读清零页尾（同步轨同构）
+        var valid = got < 0 ? 0 : got;
+        if (valid < PageSize)
+            pageMem.GetSpan(valid, PageSize - valid).Clear();
         _coldPageCache.Put(pageAddr, pageMem);
         return pageMem;
     }
@@ -81,45 +90,5 @@ public abstract partial class RingBase<TKey>
         var buf2 = RentColdRecordBuf(totalLen);
         ReadDevicePage(addr, buf2.AsSpan(0, totalLen));
         return buf2.AsSpan(0, totalLen);
-    }
-
-    /// <summary>★ 读冷区 record header 字段（codec 解析）。</summary>
-    private protected unsafe RingRecordFields ReadFieldsCold(LogicalAddress addr)
-    {
-        long pageIntra = addr.Offset & PageSizeMask;
-        LogicalAddress pageAddr = pageIntra == 0
-            ? addr
-            : _engine.CalculationAddress(addr, -pageIntra);
-        var pageMem = LoadColdPage(pageAddr);
-        int offset = (int)(addr.Offset & PageSizeMask);
-        var headerSpan = new ReadOnlySpan<byte>(pageMem.BytePtr + offset, RingCodec.HeaderSize);
-        RingCodec.TryReadHeader(headerSpan, out var fields);
-        return fields;
-    }
-
-    /// <summary>★ 读冷区 record header 字段（部分页回源版）。</summary>
-    private protected RingRecordFields ReadFieldsColdPartial(LogicalAddress addr)
-    {
-        int hdrSize = RingCodec.HeaderSize;
-        var span = LoadColdRecord(addr, hdrSize);
-        RingCodec.TryReadHeader(span, out var fields);
-        return fields;
-    }
-
-    /// <summary>★ 按地址+偏移读 unmanaged T（热冷透明）。</summary>
-    private protected unsafe T ReadUnmanagedAt<T>(LogicalAddress addr, int offset) where T : unmanaged
-    {
-        if (addr >= FlushedUntilAddress)
-        {
-            long phys = GetPhysicalAddress(addr);
-            return Unsafe.ReadUnaligned<T>(ref Unsafe.AsRef<byte>((byte*)phys + offset));
-        }
-        long pageIntra = addr.Offset & PageSizeMask;
-        LogicalAddress pageAddr = pageIntra == 0
-            ? addr
-            : _engine.CalculationAddress(addr, -pageIntra);
-        var pageMem = LoadColdPage(pageAddr);
-        int pageOff = (int)(addr.Offset & PageSizeMask);
-        return Unsafe.ReadUnaligned<T>(ref Unsafe.AsRef<byte>(pageMem.BytePtr + pageOff + offset));
     }
 }

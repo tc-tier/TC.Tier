@@ -8,11 +8,17 @@ using TC.Tier.Core.IO.Shared;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
+/// <summary>TierVolumeFs partial——施工入口（New 格式化 / Open 装载）。</summary>
 public sealed partial class TierVolumeFs
 {
     // ═══════════════ 施工入口（§3.6）═══════════════
 
     /// <summary>New（原 Format 终态改名）——在载体上创建空虚拟卷根空间（显式语义：已格式化载体抛 AlreadyExists）。</summary>
+    /// <param name="carrier">目标载体（文件或设备）。</param>
+    /// <param name="options">格式化选项（BlockSize/Preallocation 等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>格式化完成的新卷实例。</returns>
+    /// <exception cref="FileIOException">载体已格式化（AlreadyExists）。</exception>
     public static TierVolumeFs New(TierVolumeCarrier carrier, TierVolumeFormatOptions? options = null, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(carrier);
@@ -46,6 +52,10 @@ public sealed partial class TierVolumeFs
     /// <summary>打开已格式化载体为根空间（唯一性检查在此——§2.4）。
     /// 快照挂载（V2 §1.1）：<see cref="TierVolumeOpenOptions.SnapshotName"/> 非空 → 只读冻结态视图
     /// （快照镜像 + 冻结位图；变异全拒；与活卷同载体并发安全——冻结块永不复用/打洞）。</summary>
+    /// <param name="carrier">主载体（文件或设备）。</param>
+    /// <param name="options">打开选项（Access/SnapshotName/Label 校验等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>打开的卷实例（快照挂载 = 只读冻结视图）。</returns>
     public static TierVolumeFs Open(TierVolumeCarrier carrier, TierVolumeOpenOptions? options = null, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(carrier);
@@ -57,6 +67,11 @@ public sealed partial class TierVolumeFs
 
     /// <summary>多载体卷打开（RM-04 §3.8）：全量成员清单（成员 0 = 主载体），UUID/索引装配匹配。
     /// 降级打开（v2b）：options.AllowDegraded 时缺失成员以 null 占位（只读形态）。</summary>
+    /// <param name="carriers">全量成员清单（成员 0 = 主载体；缺失成员为 null 占位需 AllowDegraded）。</param>
+    /// <param name="options">打开选项（AllowDegraded/QuotaBytes 等；null = 类型缺省）。</param>
+    /// <param name="logger">日志记录器（可选）。</param>
+    /// <returns>打开的卷实例（降级打开 = 只读形态）。</returns>
+    /// <exception cref="ArgumentException">清单为空或主载体缺失。</exception>
     public static TierVolumeFs Open(TierVolumeCarrier?[] carriers, TierVolumeOpenOptions? options = null, ILogger? logger = null)
     {
         ArgumentNullException.ThrowIfNull(carriers);

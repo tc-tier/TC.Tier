@@ -16,6 +16,8 @@ public abstract partial class MirrorBase
     {
         /// <summary>层间 join——主引擎 + meta 引擎（Managed 模式）双 await，全异步轨。
         /// <para>两引擎在 OnInitializeBegin 已并行启动，此处只 join——零同步阻塞。</para></summary>
+        /// <param name="ct">取消令牌（透传引擎 <c>WaitForReadyAsync</c>）。</param>
+        /// <returns>表示主引擎 + meta 引擎全部就绪的任务。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await owner._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
@@ -26,6 +28,9 @@ public abstract partial class MirrorBase
         /// <summary>
         /// ★ 恢复核心（模板唯一必 override）——装配 MetaPolicy → meta.Load → 三级回退 → 悬干裁决 → 重建链头。
         /// </summary>
+        /// <param name="hints">恢复提示（外部注入水位；缺省时走 meta / 扫描定位）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>表示恢复核心完成的任务；完成后水位已裁决、悬干帧已截断、链头已重建。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(MirrorRecoveryHints hints, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();

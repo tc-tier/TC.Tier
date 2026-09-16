@@ -96,6 +96,7 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
             }
             if (options.PreallocateSize > _staging.Length)
             {
+                fs.QuotaProject(_path, options.PreallocateSize);   // ★ IO-06：open 预分配同属消费面
                 _staging.SetLength(options.PreallocateSize);
                 _contentDirty = true;
             }
@@ -127,6 +128,8 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     // ═════════════════════════════ 位置读写（pread/pread 铁律）═════════════════════════════
 
     /// <inheritdoc/>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="source">源数据（空则 no-op）。</param>
     public void Write(long offset, ReadOnlySpan<byte> source)
     {
         ThrowIfDisposed();
@@ -153,6 +156,10 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <param name="offset">写入起始偏移（字节，≥0）。</param>
+    /// <param name="source">源数据（空则 no-op）。</param>
+    /// <param name="ct">取消令牌（传播至补集物化的网络 IO）。</param>
+    /// <returns>staging 写入完成后即完成（持久化仍须 Flush）。</returns>
     /// <remarks>异步族直通对象层异步（真异步 IO——非 Task.Run 假异步）。</remarks>
     public async ValueTask WriteAsync(long offset, ReadOnlyMemory<byte> source, CancellationToken ct)
     {
@@ -164,6 +171,8 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         await _flushGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+            // ★ IO-06：异步写原缺投影（同步 Write 有）——配 QuotaBytes 的卷异步写静默绕过配额
+            _fs.QuotaProject(_path, Math.Max(_staging!.Length, offset + source.Length));
             await MaterializeComplementAsync(offset, source.Length, punch: false, ct).ConfigureAwait(false);
             _staging!.Write(offset, source.Span);
             _contentDirty = true;
@@ -176,16 +185,32 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即单次最多读取字节数）。</param>
+    /// <returns>实际读取的字节数（0 = offset 已到文件末尾——读句柄按 Open 时缓存长度判 EOF）。</returns>
     public int Read(long offset, Span<byte> destination)
     {
         ThrowIfDisposed();
-        var buf = destination.ToArray();
-        var n = SyncAsyncBridge.Run(ct => ReadCoreAsync(offset, buf, ct), s_readOpts);
-        buf.AsSpan(0, n).CopyTo(destination);
-        return n;
+        // ★ IO-P2：ArrayPool 租用替代 ToArray（读热路径每次堆分配 + GC 压力；桥接的一次拷贝不可免）
+        var buf = System.Buffers.ArrayPool<byte>.Shared.Rent(destination.Length);
+        var want = destination.Length;   // Span 不可进 lambda——长度先取出
+        try
+        {
+            var n = SyncAsyncBridge.Run(ct => ReadCoreAsync(offset, buf.AsMemory(0, want), ct), s_readOpts);
+            buf.AsSpan(0, n).CopyTo(destination);
+            return n;
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(buf);
+        }
     }
 
     /// <inheritdoc/>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即单次最多读取字节数）。</param>
+    /// <param name="ct">取消令牌（传播至网络 IO）。</param>
+    /// <returns>完成后得到实际读取的字节数（0 = offset 已到文件末尾）。</returns>
     public ValueTask<int> ReadAsync(long offset, Memory<byte> destination, CancellationToken ct)
         => ReadCoreAsync(offset, destination, ct);
 
@@ -299,6 +324,9 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     public long Position => Volatile.Read(ref _position);
 
     /// <inheritdoc/>
+    /// <param name="source">要追加的数据（空则原样返回当前游标位置）。</param>
+    /// <returns>本次数据被预留到的起始偏移（字节）。</returns>
+    /// <exception cref="FileIOException">写入失败——<see cref="FileIOException.ReservedOffset"/> 携带已预留区间起点（D7 失败语义）。</exception>
     public long Append(ReadOnlySpan<byte> source)
     {
         ThrowIfDisposed();
@@ -331,11 +359,16 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     /// <remarks>★ CORE-18：async 方法体持维护门闩到 await 结束（原非 async 返回 + 内部 async——
     /// using 在返回即释放，网络写仍在前行 = 维护方可与在途写并发；状态机分配原在
     /// AppendReservedAsync——挪至此处零额外分配）。</remarks>
+    /// <param name="source">要追加的数据（空则原样返回当前游标位置）。</param>
+    /// <param name="ct">取消令牌（传播至写路径的网络 IO）。</param>
+    /// <returns>完成后得到本次数据被预留到的起始偏移（字节）。</returns>
+    /// <exception cref="FileIOException">写入失败——<see cref="FileIOException.ReservedOffset"/> 携带已预留区间起点（D7 失败语义）。</exception>
     public async ValueTask<long> AppendAsync(ReadOnlyMemory<byte> source, CancellationToken ct)
     {
         // 预留后走异步写——门闩覆盖预留 + await 全程
         ThrowIfDisposed();
         using var _gate = _fs.Maintenance.BeginMutation(nameof(AppendAsync), _path);
+        if (!_writable) throw new InvalidOperationException("只读句柄不接受 Append。");   // ★ IO-20：预留前拒——原绕到 WriteAsync 才炸，游标已推进留洞且误分类 IOFailure
         if (source.IsEmpty) return Position;
         var reserved = _appendCursor is { } cursor
             ? Interlocked.Add(ref cursor.Value, source.Length) - source.Length
@@ -360,6 +393,10 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <param name="offset">相对 <paramref name="origin"/> 的偏移（字节，可为负）。</param>
+    /// <param name="origin">基准位置（Begin/Current/End）。</param>
+    /// <returns>移动后的绝对位置（字节）。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">origin 非 Begin/Current/End。</exception>
     public long Seek(long offset, SeekOrigin origin)
     {
         ThrowIfDisposed();
@@ -385,6 +422,7 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         {
             if (_writable)
             {
+                _fs.QuotaProject(_path, _options.PreallocateSize);   // ★ IO-06：预分配扩长同属配额消费面
                 _staging!.SetLength(_options.PreallocateSize);
                 _contentDirty = true;
             }
@@ -404,41 +442,66 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
 
     /// <inheritdoc/>
     /// <remarks>★ AllocationUnit=1——未对齐 offset/length <b>不抛</b> AlignmentError（staging memset 无物理对齐约束）。</remarks>
+    /// <param name="length">目标逻辑长度（字节，≥0；收缩后扩展读零——不复活旧数据）。</param>
+    /// <exception cref="ArgumentOutOfRangeException">length 为负。</exception>
     public void SetLength(long length)
     {
         ThrowIfDisposed();
         using var _gate = _fs.Maintenance.BeginMutation(nameof(SetLength), _path);
         ArgumentOutOfRangeException.ThrowIfNegative(length);
         if (!_writable) throw new InvalidOperationException("只读句柄不接受 SetLength。");
-        _fs.QuotaProject(_path, Math.Max(_staging!.Length, length));   // G3 写前拒（截断不增——max 兜）
-        _staging.SetLength(length);
-        if (length < _backfillLimit)
-            _backfillLimit = length;   // 截断降界——扩展回来读零（POSIX truncate-extend），不复活旧数据
-        for (var i = _holes.Count - 1; i >= 0; i--)
+        // ★ IO-07：与 Flush 互斥（CORE-06 同款屏障——原绕过 gate 并发改 _holes/_staging/_contentDirty，
+        //   Flush 的分类/MarkAllClean/BuildMetadata 与之竞态 = 上传旧内容/枚举异常/脏标被擦）
+        _flushGate.Wait();
+        try
         {
-            var (hs, he) = _holes[i];
-            if (hs >= length) { _holes.RemoveAt(i); continue; }           // 洞整体被截掉
-            if (he > length) _holes[i] = (hs, length);                     // 洞被截尾
+            _fs.QuotaProject(_path, Math.Max(_staging!.Length, length));   // G3 写前拒（截断不增——max 兜）
+            _staging.SetLength(length);
+            if (length < _backfillLimit)
+                _backfillLimit = length;   // 截断降界——扩展回来读零（POSIX truncate-extend），不复活旧数据
+            for (var i = _holes.Count - 1; i >= 0; i--)
+            {
+                var (hs, he) = _holes[i];
+                if (hs >= length) { _holes.RemoveAt(i); continue; }           // 洞整体被截掉
+                if (he > length) _holes[i] = (hs, length);                     // 洞被截尾
+            }
+            _contentDirty = true;
+            _fs.OnFileLengthChanged(_path, length);   // AppendCursor 权威复位
         }
-        _contentDirty = true;
-        _fs.OnFileLengthChanged(_path, length);   // AppendCursor 权威复位
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     /// <inheritdoc/>
     /// <remarks>仅 staging 内 memset 模拟（读零语义由 staging/对象内容保证；文件长度不变）。
     /// Flush 全量上传所有 part——★ 跳 part = 对象缩短 + 偏移错位（正确性 bug，禁止）。</remarks>
+    /// <param name="offset">洞起始偏移（字节，≥0）。</param>
+    /// <param name="length">洞长度（字节，≤0 时 no-op）。</param>
+    /// <exception cref="FileIOException">区间超出文件长度。</exception>
     public void PunchHole(long offset, long length)
     {
         ThrowIfDisposed();
         using var _gate = _fs.Maintenance.BeginMutation(nameof(PunchHole), _path);
         if (length <= 0) return;
         if (offset + length > LengthInternal())
-            throw new FileIOException(IOError.IOFailure, "PunchHole 区间超出文件长度。", _path, "PunchHole");
+            throw new FileIOException(IOError.IOFailure,
+                $"PunchHole 区间 [{offset}, {offset + length}) 超出文件长度 {LengthInternal()}。", _path, "PunchHole");
         if (!_writable) throw new InvalidOperationException("只读句柄不接受 PunchHole。");
-        SyncAsyncBridge.Run(ct => MaterializeComplementAsync(offset, length, punch: true, ct), s_materializeOpts);
-        _staging!.Write(offset, new byte[length]);   // 全零覆写（页已物化——补集数据已在）
-        _contentDirty = true;
-        AddHole(offset, offset + length);   // 读路径加速簿记（内容即真相——元数据仅加速）
+        // ★ IO-07：与 Flush 互斥（零写 + 洞簿记对 Flush 屏障可见）
+        _flushGate.Wait();
+        try
+        {
+            SyncAsyncBridge.Run(ct => MaterializeComplementAsync(offset, length, punch: true, ct), s_materializeOpts);
+            _staging!.Write(offset, new byte[length]);   // 全零覆写（页已物化——补集数据已在）
+            _contentDirty = true;
+            AddHole(offset, offset + length);   // 读路径加速簿记（内容即真相——元数据仅加速）
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     /// <inheritdoc/>
@@ -451,10 +514,16 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <summary>折叠/插入区间——远程介质能力位未置位，恒抛 <see cref="FileIOException"/>（Unsupported）。</summary>
+    /// <param name="offset">区间起始偏移（字节）。</param>
+    /// <param name="length">区间长度（字节）。</param>
     public void CollapseRange(long offset, long length)
         => throw Unsupported("CollapseRange");
 
     /// <inheritdoc/>
+    /// <summary>折叠/插入区间——远程介质能力位未置位，恒抛 <see cref="FileIOException"/>（Unsupported）。</summary>
+    /// <param name="offset">区间起始偏移（字节）。</param>
+    /// <param name="length">区间长度（字节）。</param>
     public void InsertRange(long offset, long length)
         => throw Unsupported("InsertRange");
 
@@ -463,6 +532,14 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     /// <inheritdoc/>
     /// <remarks>能力位恒置位（静态实例属性）；快路径 = 目标全新 + 同 store + ≤5GB → 服务端零流量；
     /// 其余回退本地读写循环（性能≈本地拷贝）。</remarks>
+    /// <param name="destination">目标句柄（须为同 fs 的远程句柄，否则抛 <see cref="ArgumentException"/>）。</param>
+    /// <param name="sourceOffset">源起始偏移（字节，≥0）。</param>
+    /// <param name="destinationOffset">目标起始偏移（字节，≥0）。</param>
+    /// <param name="length">计划拷贝字节数（≥0；超出源剩余部分按实际可得截取）。</param>
+    /// <returns>实际拷贝的字节数（字节）。</returns>
+    /// <exception cref="ArgumentException">目标不是同 fs 远程句柄。</exception>
+    /// <exception cref="ArgumentOutOfRangeException">偏移/长度为负。</exception>
+    /// <exception cref="FileIOException">回退路径失败——<see cref="FileIOException.CompletedLength"/> 携带已完成字节数。</exception>
     public long CopyRange(IFileHandle destination, long sourceOffset, long destinationOffset, long length)
     {
         ThrowIfDisposed();
@@ -480,6 +557,8 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
             && !_contentDirty && (_staging is null || !_staging.HasDirtyPage(0, (int)((available - 1) / _pageSize)))
             && available > 0 && available <= 5L * 1024 * 1024 * 1024)
         {
+            // ★ IO-06：服务端拷贝同属目标文件配额消费面——写前拒（拷贝后投影 = 无执法）
+            dest._fs.QuotaProject(dest._path, Math.Max(dest.LengthInternal(), destinationOffset + available));
             var copied = SyncAsyncBridge.Run(
                 ct => _fs.Store.CopyRangeAsync(_key, dest._key, sourceOffset, available, metadata: null, ct),
                 s_copyOpts);
@@ -515,20 +594,32 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <returns>实际拷贝的字节数（字节，通常等于本文件逻辑长度）。</returns>
     public long CloneRange(IFileHandle destination) => CopyRange(destination, 0, 0, LengthInternal());
 
     /// <summary>服务端拷贝后接管长度（目标句柄基线 = 已存在的对象）。</summary>
     internal void AdoptServerSideLength(long length)
     {
-        _baseLength = length;
-        _backfillLimit = length;
-        _staging!.SetLength(length);
-        _contentDirty = false;
+        // ★ IO-07：基线/staging/脏标三态对 Flush 屏障可见——与 Flush 互斥
+        _flushGate.Wait();
+        try
+        {
+            _baseLength = length;
+            _backfillLimit = length;
+            _staging!.SetLength(length);
+            _contentDirty = false;
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     // ═════════════════════════════ 向量化 IO（回退逐段——能力位不置）═════════════════════════════
 
-    /// <inheritdoc/>
+    /// <summary>向量写——把 sources 各片按序连续写到 offset 起始位置（空片推进偏移但不写数据；逐片回退）。</summary>
+    /// <param name="offset">写入起始偏移（字节）。</param>
+    /// <param name="sources">写入片段序列（逻辑上首尾相接）。</param>
     public void WriteVector(long offset, ReadOnlySpan<ReadOnlyMemory<byte>> sources)
     {
         long pos = offset;
@@ -539,7 +630,11 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         }
     }
 
-    /// <inheritdoc/>
+    /// <summary>向量写（异步形态）——把 sources 各片按序连续写到 offset 起始位置（逐片回退）。</summary>
+    /// <param name="offset">写入起始偏移（字节）。</param>
+    /// <param name="sources">写入片段序列（逻辑上首尾相接）。</param>
+    /// <param name="ct">取消令牌（传播至各片写路径）。</param>
+    /// <returns>全部片段写完后即完成的 <see cref="ValueTask"/>。</returns>
     public ValueTask WriteVectorAsync(long offset, ReadOnlyMemory<ReadOnlyMemory<byte>> sources, CancellationToken ct)
     {
         long pos = offset;
@@ -551,7 +646,10 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         return ValueTask.CompletedTask;
     }
 
-    /// <inheritdoc/>
+    /// <summary>向量读——从 offset 起按序填入 destinations 各片，读到文件末尾或某片未读满即停（逐片回退）。</summary>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destinations">接收片段序列（逻辑上首尾相接）。</param>
+    /// <returns>实际读取的总字节数（字节）。</returns>
     public int ReadVector(long offset, ReadOnlySpan<Memory<byte>> destinations)
     {
         int got = 0;
@@ -567,7 +665,11 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         return got;
     }
 
-    /// <inheritdoc/>
+    /// <summary>向量读（异步形态）——从 offset 起按序填入 destinations 各片（逐片回退）。</summary>
+    /// <param name="offset">读取起始偏移（字节，≥0）。</param>
+    /// <param name="destinations">接收片段序列（逻辑上首尾相接）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到实际读取的总字节数（字节）。</returns>
     public ValueTask<int> ReadVectorAsync(long offset, Memory<Memory<byte>> destinations, CancellationToken ct)
         => new(ReadVector(offset, destinations.Span));
 
@@ -592,6 +694,8 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     /// <remarks>读句柄 Flush = no-op（无持久化义务——与 mem 平权）。
     /// ★ 真异步实现（P2 改造）：内部全 await（异步门 + 物化 + 上传），异步调用方不再被伪异步阻塞；
     ///   同步 <see cref="Flush"/> 外壳经 <see cref="SyncAsyncBridge"/> 桥接（独立池 + 有界等待）。</remarks>
+    /// <param name="ct">取消令牌（传播至 multipart/上传网络 IO）。</param>
+    /// <returns>上传完成后即完成（读句柄 no-op 立即完成）。</returns>
     public async ValueTask FlushAsync(CancellationToken ct)
     {
         ThrowIfDisposed();
@@ -703,6 +807,7 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
 
     /// <inheritdoc/>
     /// <remarks>桥级预取模拟：Sequential → 预取窗口放大（能力位 Advise 置位）；其余 no-op。</remarks>
+    /// <param name="advise">访问提示：Sequential = 读预取窗口放大 4×；其余 no-op。</param>
     public void Advise(FileAdvise advise)
     {
         ThrowIfDisposed();
@@ -714,6 +819,10 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     /// <inheritdoc/>
     /// <remarks>G8：fs 级进程内区间表（同 owner 重叠允许 / 他 owner 排他冲突）——
     /// 仅约束同进程同 fs 实例句柄（advisory，与 FileSharing 同一诚实等级——差异声明管辖）。</remarks>
+    /// <param name="offset">锁区间起始偏移（字节，≥0）。</param>
+    /// <param name="length">锁区间长度（字节，&gt;0）。</param>
+    /// <param name="mode">锁模式（Shared/Exclusive）。</param>
+    /// <exception cref="ArgumentOutOfRangeException">offset 为负或 length ≤0。</exception>
     public void Lock(long offset, long length, FileLockMode mode)
     {
         ThrowIfDisposed();
@@ -722,6 +831,11 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <summary>尝试获取进程内字节范围锁（冲突立即返回失败，不阻塞）。</summary>
+    /// <param name="offset">锁区间起始偏移（字节，≥0）。</param>
+    /// <param name="length">锁区间长度（字节，&gt;0）。</param>
+    /// <param name="mode">锁模式（Shared/Exclusive）。</param>
+    /// <returns>true = 获取成功；false = 与其他 owner 的重叠排他冲突。</returns>
     public bool TryLock(long offset, long length, FileLockMode mode)
     {
         ThrowIfDisposed();
@@ -730,6 +844,9 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <summary>释放本句柄此前获取的字节范围锁。</summary>
+    /// <param name="offset">锁区间起始偏移（字节，须与获锁时一致）。</param>
+    /// <param name="length">锁区间长度（字节，须与获锁时一致）。</param>
     public void Unlock(long offset, long length)
     {
         ThrowIfDisposed();
@@ -751,6 +868,14 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     /// ReadWrite = staging 视图（含未 Flush 写）——视图写在 Flush/Dispose 无条件写回 staging，
     /// 持久化仍由句柄 <see cref="Flush"/> 上传承担（写穿透契约与 mem Sparse 一致）。映射无只写。
     /// ★ 悬崖声明：物化成本 = 区间全量下载（GB 级 = 秒级 + 下行流量计费）——大对象随机小改经 Map 是最差姿势。</remarks>
+    /// <summary>物化映射——Read = 整段 Range GET 快照；ReadWrite = staging 视图写回（大对象物化成本见 remarks）。</summary>
+    /// <param name="offset">映射起始偏移（字节，≥0）。</param>
+    /// <param name="length">映射长度（字节，&gt;0 且 ≤2GB）。</param>
+    /// <param name="access">映射访问模式（ReadWrite 须写句柄；无只写映射）。</param>
+    /// <returns>映射区段（<see cref="IMappedSection"/>）。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">offset 为负、length ≤0 或 &gt;2GB。</exception>
+    /// <exception cref="ArgumentException">映射区间超出文件长度。</exception>
+    /// <exception cref="FileIOException">ReadWrite 映射用于只读句柄。</exception>
     public IMappedSection Map(long offset, long length, AccessMode access)
     {
         ThrowIfDisposed();
@@ -789,10 +914,19 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         ThrowIfDisposed();
         using var _gate = _fs.Maintenance.BeginMutation(nameof(Map), _path);
         if (!_writable) throw new InvalidOperationException("只读映射无写回。");
-        _fs.QuotaProject(_path, Math.Max(_staging!.Length, offset + data.Length));
-        _staging.Write(offset, data);
-        _contentDirty = true;
-        RemoveHole(offset, offset + data.Length);
+        // ★ IO-07：与 Flush 互斥（映射写回 = 普通写语义）
+        _flushGate.Wait();
+        try
+        {
+            _fs.QuotaProject(_path, Math.Max(_staging!.Length, offset + data.Length));
+            _staging.Write(offset, data);
+            _contentDirty = true;
+            RemoveHole(offset, offset + data.Length);
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     // ═════════════════════════════ 扩展属性（PUT 原子快照语义）═════════════════════════════
@@ -832,6 +966,10 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <summary>读取 FileExtra（对象用户元数据承载）片段。</summary>
+    /// <param name="offset">FileExtra 内起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲。</param>
+    /// <returns>实际读取的字节数（0 = 缓冲为空、FileExtra 未设或 offset 已达末尾，pread EOF 契约）。</returns>
     public int ReadFileExtra(long offset, Span<byte> destination)
     {
         ThrowIfDisposed();
@@ -846,6 +984,10 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
 
     /// <inheritdoc/>
     /// <remarks>staging RMW：读当前 → patch/零扩展 → 重入 staging（即时对句柄可见，随 Flush 提交）。</remarks>
+    /// <summary>按偏移写入 FileExtra——staging 读改写（超出现有长度零扩展），随 Flush 提交。</summary>
+    /// <param name="offset">FileExtra 内起始偏移（字节，≥0）。</param>
+    /// <param name="data">写入数据。</param>
+    /// <exception cref="ArgumentException">offset + data.Length 超出 MaxFileExtraBytes 上限。</exception>
     public void WriteFileExtra(long offset, ReadOnlySpan<byte> data)
     {
         ThrowIfDisposed();
@@ -854,16 +996,28 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         ArgumentOutOfRangeException.ThrowIfNegative(offset);
         if (offset + data.Length > IFileSystem.MaxFileExtraBytes)
             throw new ArgumentException($"FileExtra 超限（{offset + data.Length} > {IFileSystem.MaxFileExtraBytes}）。");
-        var cur = GetExtraBytes();
-        var newLen = (int)Math.Max(cur?.Length ?? 0, offset + data.Length);
-        var blob = new byte[newLen];
-        cur?.AsSpan().CopyTo(blob);
-        data.CopyTo(blob.AsSpan((int)offset));
-        StageExtra(blob);
-        _metaDirty = true;
+        // ★ IO-07：与 Flush 互斥（_xattrs 被 FlushAsync→BuildMetadata 枚举——并发修改即 InvalidOperationException）
+        _flushGate.Wait();
+        try
+        {
+            var cur = GetExtraBytes();
+            var newLen = (int)Math.Max(cur?.Length ?? 0, offset + data.Length);
+            var blob = new byte[newLen];
+            cur?.AsSpan().CopyTo(blob);
+            data.CopyTo(blob.AsSpan((int)offset));
+            StageExtra(blob);
+            _metaDirty = true;
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     /// <inheritdoc/>
+    /// <summary>整体替换 FileExtra 内容（上限 MaxFileExtraBytes）。</summary>
+    /// <param name="extra">新 FileExtra 内容。</param>
+    /// <exception cref="ArgumentException">extra.Length 超出 MaxFileExtraBytes 上限。</exception>
     public void SetFileExtra(ReadOnlyMemory<byte> extra)
     {
         ThrowIfDisposed();
@@ -871,8 +1025,17 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
         if (!_writable) throw new InvalidOperationException("只读句柄不接受 SetFileExtra。");
         if (extra.Length > IFileSystem.MaxFileExtraBytes)
             throw new ArgumentException($"FileExtra 超限（{extra.Length} > {IFileSystem.MaxFileExtraBytes}）。", nameof(extra));
-        StageExtra(extra.Span);
-        _metaDirty = true;
+        // ★ IO-07：与 Flush 互斥（同 WriteFileExtra——_xattrs 枚举竞态）
+        _flushGate.Wait();
+        try
+        {
+            StageExtra(extra.Span);
+            _metaDirty = true;
+        }
+        finally
+        {
+            _flushGate.Release();
+        }
     }
 
     /// <inheritdoc/>
@@ -1052,6 +1215,7 @@ internal sealed class RemoteFileHandle : IFileHandle, IPoolAttachable
     }
 
     /// <inheritdoc/>
+    /// <returns>释放完成后即完成的 <see cref="ValueTask"/>（与 <see cref="Dispose"/> 同步等价）。</returns>
     public ValueTask DisposeAsync()
     {
         Dispose();

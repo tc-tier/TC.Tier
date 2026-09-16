@@ -30,6 +30,11 @@ internal sealed class SharingRegistry
     /// 检查并注册（原子——check-then-register 同步块内，无竞态窗口）。
     /// 与任何已注册句柄双向不兼容时抛 <see cref="FileIOException"/>（SharingViolation）。
     /// </summary>
+    /// <param name="path">文件路径。</param>
+    /// <param name="access">新句柄请求的访问模式。</param>
+    /// <param name="sharing">新句柄声明的共享模式。</param>
+    /// <returns>登记项（引用身份——注销时须传回同一条目）。</returns>
+    /// <exception cref="FileIOException">与任何已注册句柄双向不兼容（SharingViolation）。</exception>
     public Entry Register(string path, AccessMode access, FileSharing sharing)
     {
         var entry = new Entry(access, sharing);
@@ -62,6 +67,9 @@ internal sealed class SharingRegistry
     }
 
     /// <summary>注销句柄（Dispose 路径——按登记项引用精确移除；幂等）。</summary>
+    /// <summary>注销句柄（Dispose 路径——按登记项引用精确移除；幂等）。</summary>
+    /// <param name="path">文件路径（须与注册时一致）。</param>
+    /// <param name="entry"><see cref="Register"/> 返回的登记项（同引用）。</param>
     public void Unregister(string path, Entry entry)
     {
         lock (_gate)
@@ -75,6 +83,8 @@ internal sealed class SharingRegistry
 
     /// <summary>该路径是否有打开句柄在档（Raw 介质 Delete/Move-overwrite 的前置检查——
     /// 条目摘除即时回收物理块，打开句柄在档 = 锁外快照读者可能访问已回收块，拒绝是唯一安全语义）。</summary>
+    /// <param name="path">文件路径。</param>
+    /// <returns>true = 该路径有句柄在档；false = 无。</returns>
     public bool HasOpenHandles(string path)
     {
         lock (_gate)

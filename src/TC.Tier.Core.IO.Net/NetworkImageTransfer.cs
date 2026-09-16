@@ -1,9 +1,9 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
 using System.Net;
 using System.Net.Sockets;
 using TC.Tier.Core.IO;
 using TC.Tier.Core.IO.Image;
+using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Core.IO.Net;
 
@@ -19,6 +19,10 @@ public enum TransferMode : byte
 }
 
 /// <summary>传送结果（接收端回执 + 双端一致的摘要对账）。</summary>
+/// <param name="EntryCount">传送的根空间条目总数。</param>
+/// <param name="FrameCount">传送的 TCA1 帧总数。</param>
+/// <param name="RawBytes">传送的原始字节总数。</param>
+/// <param name="Verified">true=接收端校验通过（CRC + 对账一致）；false=校验失败。</param>
 public sealed record NetworkTransferResult(long EntryCount, long FrameCount, long RawBytes, bool Verified);
 
 /// <summary>
@@ -38,9 +42,16 @@ public static class NetworkImageTransfer
     private const ushort ProtocolVersion = 1;
 
     /// <summary>
-    /// 发送端：采集本地根空间 → TCP 流推送（对端须先以 <see cref="ReceiveTo"/> 监听）。
+    /// 发送端：采集本地根空间 → TCP 流推送（对端须先以 ReceiveTo 监听）。
     /// 阻塞至对端回执并对账（回执摘要 ≠ 本端摘要 = 传送失败抛异常）。
     /// </summary>
+    /// <param name="source">本地根空间文件系统（被采集方）。</param>
+    /// <param name="host">对端监听地址。</param>
+    /// <param name="port">对端监听端口。</param>
+    /// <param name="options">采集选项（过滤/进度回调）；null=默认全量。</param>
+    /// <param name="ct">取消令牌（取消时中断发送——已发送部分不可恢复）。</param>
+    /// <returns>发送端视角的传送摘要（Verified=true=对端回执确认一致）。</returns>
+    /// <exception cref="IOException">对端回执报告校验失败，或回执对账不符（条目/字节数不匹配）。</exception>
     public static NetworkTransferResult Send(IFileSystem source, string host, int port,
         ImageOptions? options = null, CancellationToken ct = default)
     {
@@ -67,12 +78,35 @@ public static class NetworkImageTransfer
     /// 接收端：监听单连接 → TCA1 载荷还原到目标根空间（必须为空）→ 回执回传摘要。
     /// 返回监听所用的实际端口（port=0 时由系统分配——测试友好）。
     /// </summary>
+    /// <param name="destination">目标根空间文件系统（必须为空——还原方）。</param>
+    /// <param name="port">监听端口；0=系统分配（返回实际端口）。</param>
+    /// <param name="options">还原选项（过滤/进度回调）；null=默认全量。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>接收端视角的传送摘要（Verified=true=本地校验通过，回执已回传）。</returns>
+    /// <exception cref="IOException">握手 magic 不符、协议版本不支持、传送模式非 Structural（Raw 预留值拒读）。</exception>
     public static NetworkTransferResult ReceiveTo(IFileSystem destination, int port,
         ImageOptions? options = null, CancellationToken ct = default)
     {
-        ArgumentNullException.ThrowIfNull(destination);
         var listener = new TcpListener(IPAddress.Loopback, port);
-        listener.Start();
+        listener.Start();   // 绑定同步完成——调用方先取 LocalEndPoint 端口再启动发送方，无绑定竞速
+        return ReceiveTo(destination, listener, options, ct);
+    }
+
+    /// <summary>
+    /// 接收端（预绑定形态）：调用方自建并 <c>Start()</c> 的监听器——绑定先于发送方存在，
+    /// 结构性消除"接收端未就绪"竞速（测试与多监听编排的确定性形态；慢 runner 上 Sleep 赌绑定必输）。
+    /// </summary>
+    /// <param name="destination">目标根空间文件系统（必须为空——还原方）。</param>
+    /// <param name="listener">已 <c>Start()</c> 的监听器（本方法结束即 Stop——生命周期由本方法收口）。</param>
+    /// <param name="options">还原选项（过滤/进度回调）；null=默认全量。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>接收端视角的传送摘要（Verified=true=本地校验通过，回执已回传）。</returns>
+    /// <exception cref="IOException">握手 magic 不符、协议版本不支持、传送模式非 Structural（Raw 预留值拒读）。</exception>
+    public static NetworkTransferResult ReceiveTo(IFileSystem destination, TcpListener listener,
+        ImageOptions? options = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ArgumentNullException.ThrowIfNull(listener);
         try
         {
             using var client = listener.AcceptTcpClient();
@@ -100,6 +134,9 @@ public static class NetworkImageTransfer
 
     // ═══════════════ 帧编解码 ═══════════════
 
+    /// <summary>写入 TIN1 握手帧（magic | 版本 u16 | mode u8 = 7 字节）。</summary>
+    /// <param name="s">网络流。</param>
+    /// <param name="mode">传送模式（v1 仅 Structural）。</param>
     private static void WriteHandshake(Stream s, TransferMode mode)
     {
         Span<byte> frame = stackalloc byte[7];
@@ -109,6 +146,10 @@ public static class NetworkImageTransfer
         s.Write(frame);
     }
 
+    /// <summary>读取并校验 TIN1 握手帧。</summary>
+    /// <param name="s">网络流。</param>
+    /// <returns>对端声明的传送模式。</returns>
+    /// <exception cref="IOException">magic 不符、协议版本不支持、或未知传送模式（保留值拒读）。</exception>
     private static TransferMode ReadHandshake(Stream s)
     {
         Span<byte> frame = stackalloc byte[7];
@@ -124,18 +165,25 @@ public static class NetworkImageTransfer
         return (TransferMode)mode;
     }
 
+    /// <summary>写入 TIN2 回执帧（magic | EntryCount u64 | RawBytes u64 | 聚合CRC u32 | 状态 u8 = 25 字节）。</summary>
+    /// <param name="s">网络流。</param>
+    /// <param name="r">接收端校验摘要（FrameCount 不传输——对账用 RawBytes）。</param>
     private static void WriteReceipt(Stream s, NetworkTransferResult r)
     {
         Span<byte> frame = stackalloc byte[25];
         ReceiptMagic.CopyTo(frame);
         BinaryPrimitives.WriteInt64LittleEndian(frame[4..], r.EntryCount);
         BinaryPrimitives.WriteInt64LittleEndian(frame[12..], r.RawBytes);
-        BinaryPrimitives.WriteUInt32LittleEndian(frame[20..], Crc32.HashToUInt32(
+        BinaryPrimitives.WriteUInt32LittleEndian(frame[20..], UnifiedCrc.ComputeCrc32(
             [.. BitConverter.GetBytes(r.FrameCount), .. BitConverter.GetBytes(r.RawBytes)]));
         frame[24] = r.Verified ? (byte)1 : (byte)0;
         s.Write(frame);
     }
 
+    /// <summary>读取并校验 TIN2 回执帧。</summary>
+    /// <param name="s">网络流。</param>
+    /// <returns>对端回执摘要（FrameCount 固定 0——回执不携带，对账用 RawBytes）。</returns>
+    /// <exception cref="IOException">回执 magic 不符（流不完整）。</exception>
     private static NetworkTransferResult ReadReceipt(Stream s)
     {
         Span<byte> frame = stackalloc byte[25];
@@ -149,6 +197,10 @@ public static class NetworkImageTransfer
             frame[24] != 0);                                         // Verified
     }
 
+    /// <summary>从流精确读取指定字节数（不足抛异常——帧完整性守卫）。</summary>
+    /// <param name="s">网络流。</param>
+    /// <param name="buffer">填充目标缓冲区（读满为止）。</param>
+    /// <exception cref="IOException">连接中断（流提前结束，帧不完整）。</exception>
     private static void ReadExactly(Stream s, Span<byte> buffer)
     {
         var got = 0;

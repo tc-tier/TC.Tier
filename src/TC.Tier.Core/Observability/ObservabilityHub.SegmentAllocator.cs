@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Core.Observability;
 
+/// <summary>可观测 hub——本部分定义 <see cref="SegmentAllocatorView"/>（段表 Segment 分配器维度视图）。</summary>
 public sealed partial class ObservabilityHub
 {
     /// <summary>
@@ -22,6 +23,7 @@ public sealed partial class ObservabilityHub
         public bool IsEnabled => _enabled;
 
         /// <summary>Alloc 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleAlloc() => _enabled && ShouldSample(ref _allocCtr, _rate);
 

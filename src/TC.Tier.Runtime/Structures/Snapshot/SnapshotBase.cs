@@ -158,6 +158,7 @@ public abstract partial class SnapshotBase : LifecycleBase<SnapshotRecoveryHints
     /// <summary>
     /// ★ 恢复算法工厂——默认 DefaultSnapshotRecovery。在 Initialize 的 CAS 闸门内被调一次
     /// （基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</summary>
+    /// <returns>默认恢复器（三级回退：hints → meta O(1) 水位 → Backward 扫描兜底）。</returns>
     protected override IRecovery<SnapshotRecoveryHints> CreateRecovery()
         => new DefaultSnapshotRecovery(this);
 }

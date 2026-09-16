@@ -1,5 +1,9 @@
 namespace TC.Tier.Runtime.Structures.Log;
 
+/// <summary>
+/// LogBase 元数据 partial——meta 写入/构造与 Meta 策略装配（<see cref="MetaLayout"/> / <see cref="MetaHost"/>）。
+/// <para>★ <see cref="AppendMeta"/>：水位 + opaque 同块原子落盘（提交链统一入口）。</para>
+/// </summary>
 public abstract partial class LogBase
 {
     // ═══════════════════════════════════════════════════════════════════
@@ -200,6 +204,7 @@ public abstract partial class LogBase
         /// <summary>写完整 meta block（异步对等版）。</summary>
         /// <param name="block">完整 meta 块字节。</param>
         /// <param name="ct">取消令牌。</param>
+        /// <returns>表示异步写入完成的任务；完成后 meta block 已作为 IsMeta entry 写入 log 流。</returns>
         public async ValueTask WriteBlockAsync(ReadOnlyMemory<byte> block, CancellationToken ct)
             => await owner.WriteMetaPayloadAsync(block, ct).ConfigureAwait(false);
 

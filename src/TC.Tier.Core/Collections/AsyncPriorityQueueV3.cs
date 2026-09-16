@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using TC.Tier.Core.Epochs;
 using TC.Tier.Core.NativeInterop;
 using TC.Tier.Core.Primitives;
-using Int128 = TC.Tier.Core.NativeInterop.Int128;
+using UInt128Pair = TC.Tier.Core.NativeInterop.UInt128Pair;
 
 namespace TC.Tier.Core.Collections;
 
@@ -196,8 +196,8 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private unsafe ref Int128 EdgeAt(int slot, int level) =>
-        ref _edgeMem.GetRefUnsafe<Int128>((slot * _edgeStride + level) * EdgeSize);
+    private unsafe ref UInt128Pair EdgeAt(int slot, int level) =>
+        ref _edgeMem.GetRefUnsafe<UInt128Pair>((slot * _edgeStride + level) * EdgeSize);
 
     /// <summary>读 16B 边。★ 分两次 Volatile.Read 逐 8B——mark 仅改 flags（ref 不变）、
     /// link/splice 仅改 ref（flags 不变），撕裂组合必然仍为合法状态。</summary>
@@ -214,7 +214,7 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private bool CasEdge(int slot, int level, long expRef, ulong expFlags, long newRef, ulong newFlags) =>
         NativeAtomic128.CompareExchange(ref EdgeAt(slot, level),
-            new Int128((ulong)expRef, expFlags), new Int128((ulong)newRef, newFlags));
+            new UInt128Pair((ulong)expRef, expFlags), new UInt128Pair((ulong)newRef, newFlags));
 
     /// <summary>splice CAS + <b>入边计数</b>（C2 承重墙）：移除 pred 边上的 expRef 并接上 nextRef——
     /// 边 pred→X 与 X→nextRef 被换成 pred→nextRef：<b>nextRef 的入边数不变</b>（仍是每层一条，
@@ -579,6 +579,8 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>入队元素。</summary>
+    /// <param name="item">要入队的元素。</param>
+    /// <param name="priority">元素的优先级（值小者先出；同优先级按入队序 FIFO）。</param>
     /// <exception cref="ObjectDisposedException">队列已释放。</exception>
     /// <exception cref="InvalidOperationException">槽位池耗尽（容量不足）。</exception>
     public void Enqueue(T item, int priority)
@@ -620,7 +622,7 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
                 var ownFlags = GenFlags(_gen[nodeIdx]);
 
                 // ── level-0（必选）──
-                EdgeAt(nodeIdx, 0) = new Int128((ulong)succs[0], ownFlags);
+                EdgeAt(nodeIdx, 0) = new UInt128Pair((ulong)succs[0], ownFlags);
                 Interlocked.Increment(ref _linkCount[nodeIdx]);   // 边 pred→N（C2；pred→succ 被换源，succ 入边数不变）
 #if DEBUG
                 TraceSlot(6, nodeIdx);
@@ -646,7 +648,7 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
                 // 高层加速层：尽力链接（level-0 已发布，节点完全可达；失败仅少一条捷径，补偿 --）
                 for (var i = 1; i <= topLevel; i++)
                 {
-                    EdgeAt(nodeIdx, i) = new Int128((ulong)succs[i], ownFlags);
+                    EdgeAt(nodeIdx, i) = new UInt128Pair((ulong)succs[i], ownFlags);
                     Interlocked.Increment(ref _linkCount[nodeIdx]);   // 边 pred→N（C2）
 #if DEBUG
                     TraceSlot(6, nodeIdx);
@@ -678,6 +680,9 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>尝试出队最小元素。</summary>
+    /// <param name="item">成功时接收出队元素；失败时为 <c>default</c>。</param>
+    /// <returns>true 表示成功出队当前 key 最小的元素（priority 值小者先出，同优先级 FIFO）；
+    /// false 表示队列已释放或当前为空。</returns>
     public bool TryDequeue(out T item)
     {
         item = default!;
@@ -854,6 +859,8 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>查看队首元素而不移除。</summary>
+    /// <param name="item">成功时接收队首（key 最小）元素；失败时为 <c>default</c>。</param>
+    /// <returns>true 表示查看成功；false 表示队列已释放或当前为空。</returns>
     public bool TryPeek(out T item)
     {
         item = default!;
@@ -885,6 +892,8 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     // ════════════════════════════════════════════════════════════
 
     /// <summary>异步出队；队列为空则等待入队或取消。</summary>
+    /// <param name="ct">取消令牌；等待期间被取消则以 <see cref="OperationCanceledException"/> 完成。默认 <c>default</c>。</param>
+    /// <returns>完成后返回出队的最小元素；队列为空时异步等待新元素入队。</returns>
     public ValueTask<T> DequeueAsync(CancellationToken ct = default)
     {
         ct.ThrowIfCancellationRequested();
@@ -905,6 +914,7 @@ internal sealed class AsyncPriorityQueueV3<T> : IDisposable
     /// <summary>近似元素数（并发下仅诊断用）。</summary>
     public int Count { get { var c = Interlocked.Read(ref _count); return c < 0 ? 0 : (int)c; } }
 
+    /// <summary>释放队列：唤醒所有等待者并归还原生槽位与边表内存；调用方须保证无并发操作。</summary>
     public void Dispose()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;

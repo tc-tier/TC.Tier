@@ -46,6 +46,10 @@ internal static class NativeConstants
     /// <summary>FSCTL_DISMOUNT_VOLUME（卸载卷——本实现不用：危险操作，锁定失败由调用方手动卸载）。</summary>
     public const uint FsctlDismountVolume = 0x00090020;
 
+    /// <summary>IOCTL_DISK_GET_LENGTH_INFO（设备容量字节——对 disk/volume/partition 设备句柄统一有效；
+    /// 设备句柄上 GetFileSizeEx 报 ERROR_INVALID_FUNCTION，不能用）。</summary>
+    public const uint IoctlDiskGetLengthInfo = 0x0007405C;
+
     /// <summary>关闭时删除文件标志。</summary>
     public const uint FileFlagDeleteOnClose = 0x04000000;
 
@@ -93,6 +97,10 @@ internal static class NativeConstants
 
     /// <summary>F_NOCACHE = 48：不缓存文件数据（绕过页缓存的 hint，等价 Linux O_DIRECT 的弱化版）。</summary>
     public const int FNocache = 48;
+
+    /// <summary>F_RDAHEAD = 44：读预读开关（arg 1=开 / 0=关）——F_NOCACHE 不覆盖此项，
+    /// 不关则读路径仍按预读窗口把额外数据拉进缓存，BestEffort 档与 DIO 形态偏离。</summary>
+    public const int FRdahead = 44;
 
     /// <summary>★ Spec 26：F_FULLFSYNC = 51：fsync + 强制设备刷缓存到永久存储（macOS 唯一的真落盘保证）。</summary>
     public const int FFullfsync = 51;

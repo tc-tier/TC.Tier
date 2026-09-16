@@ -54,6 +54,10 @@ internal sealed partial class StorageEngine
     {
         private readonly ILogger? _logger = logger;
 
+        /// <summary>处理单条段事件——Create 建物理段、Full 记段元组脏（Compact 范围内跳过）、Background 执行低频任务。</summary>
+        /// <param name="item">工作项（携带事件类型与段参数）。</param>
+        /// <param name="ct">取消令牌（Create 建段路径使用）。</param>
+        /// <returns>处理完成（事件内异常均已就地捕获记录）。</returns>
         protected override ValueTask ProcessItemAsync(WorkLoopItemTask item, CancellationToken ct)
         {
             switch (item.Event)
@@ -64,18 +68,17 @@ internal sealed partial class StorageEngine
                     owner.EnsureSegmentPhysical(item.SegId, item.GrowthLimit, ct);
                     break;
                 case SegmentWorkEvent.Full:
-                    // ★ 段满：更新段 meta（Compact 范围内的段 OnSegmentFullCoreAsync 内部自跳过）。
+                    // ★ 段满：元组记脏（零 IO 零等待——耐久化由元组泵批量落盘，段锁+墓碑在泵落盘时点）。
                     try
                     {
-                        // ★ Compact 范围内的段跳过——避免遗留 Full 任务占用 Compact 正在 rename 的文件。
+                        // ★ Compact 范围内的段跳过——避免遗留 Full 任务为 Compact 正在 rename 的文件记脏。
                         //   底层地址分配器/worker 完全正常，这里只是 ISegmentLifecycle 实现做业务上下文区分。
                         if (owner.IsSegmentUnderCompact(item.SegId))
                         {
                             _logger?.LogDebug("OnSegmentFullAsync seg#{SegId} 跳过：段在 Compact 范围内（遗留 Full 任务，Compact 负责新段 meta）", item.SegId);
                             return ValueTask.CompletedTask;
                         }
-                        // ★ 段元组内联直写（FileExtra 同步强一致）——extension 携带段区间摘要（VII-3 保真，预算化编码）。
-                        owner.WriteSegmentTuple(item.SegId, StableState.Full, maxOffset: item.FinalSize, growthLimit: item.GrowthLimit,
+                        owner.MarkSegmentTupleDirty(item.SegId, StableState.Full, maxOffset: item.FinalSize, growthLimit: item.GrowthLimit,
                             realSize: item.FinalSize, owner.EncodeExtentSummary(item.SegId));
                     }
                     catch (Exception ex)

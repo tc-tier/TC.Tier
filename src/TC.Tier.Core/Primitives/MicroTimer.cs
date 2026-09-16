@@ -31,6 +31,8 @@ public readonly struct MicroTimer
     }
 
     /// <summary>开始计时（active=true 时记时间戳，active=false 时返回空 timer）。</summary>
+    /// <param name="active">采样门控开关，默认 true；false = 完全零开销（所有 Elapsed* 返回 0/空，JIT 自动消除计时逻辑）。</param>
+    /// <returns>已激活的计时器实例（inactive 时返回 default 的空 timer）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static MicroTimer Start(bool active = true)
         => active
@@ -38,24 +40,30 @@ public readonly struct MicroTimer
             : default;
 
     /// <summary>获取已流逝的原始tick数。</summary>
+    /// <returns>自 <see cref="Start"/> 起流逝的 <see cref="Stopwatch"/> tick 数（单位：tick，换算依赖 <see cref="Stopwatch.Frequency"/>）；未激活返回 0。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public long ElapsedTicks()
         => IsActive ? Stopwatch.GetTimestamp() - _startTimestamp : 0;
 
     /// <summary>计算并返回已流逝时间（微秒）。</summary>
+    /// <returns>已流逝时间，单位微秒（整数换算，长 uptime 不溢出）；未激活返回 0。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public long ElapsedMicros()
     {
         var ticks = ElapsedTicks();
-        return ticks == 0 ? 0 : ticks * 1_000_000 / Frequency;
+        if (ticks == 0) return 0;
+        // 先除后余：ticks*1_000_000 在长 uptime（10MHz 下 >~10.7 天）会溢出为负
+        return unchecked(ticks / Frequency * 1_000_000 + ticks % Frequency * 1_000_000 / Frequency);
     }
 
     /// <summary>计算并返回已流逝时间（毫秒）。</summary>
+    /// <returns>已流逝时间，单位毫秒（整数换算）；未激活返回 0。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public long ElapsedMillis()
     {
         var ticks = ElapsedTicks();
-        return ticks == 0 ? 0 : ticks * 1_000 / Frequency;
+        if (ticks == 0) return 0;
+        return unchecked(ticks / Frequency * 1_000 + ticks % Frequency * 1_000 / Frequency);
     }
 
     /// <summary>
@@ -63,6 +71,7 @@ public readonly struct MicroTimer
     /// <para>注意：该方法会产生字符串分配，热路径请使用 <see cref="TryFormat"/> 零分配版本。</para>
     /// <para>示例：3μs / 12.5ms / 1.23s / 2m05s / 1h30m</para>
     /// </summary>
+    /// <returns>自动适配单位（μs/ms/s/m+s/h+m）的可读时长字符串；未激活返回 "0"。</returns>
     public string ElapsedReadable()
     {
         if (!IsActive) return "0";

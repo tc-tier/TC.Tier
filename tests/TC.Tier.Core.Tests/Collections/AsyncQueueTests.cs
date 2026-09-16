@@ -181,6 +181,91 @@ public class AsyncQueueTests
     }
 
     [Fact]
+    public async Task SlowPath_ReusesWaitNodeAcrossCycles()
+    {
+        var q = new AsyncQueue<int>();
+
+        for (int i = 0; i < 100; i++)
+        {
+            var dequeue = q.DequeueAsync().AsTask();
+            q.Enqueue(i);
+            (await dequeue).Should().Be(i);
+        }
+
+        q.WaitNodeAllocationCountForTest.Should().Be(
+            1,
+            "顺序慢路径应复用同一个 WaitNode，而不是每次等待产生 GC 对象");
+    }
+
+    [Fact]
+    public async Task CancelledSlowPath_ReturnsWaitNodeToPool()
+    {
+        var q = new AsyncQueue<int>();
+        using (var cts = new CancellationTokenSource())
+        {
+            var cancelled = q.DequeueAsync(cts.Token).AsTask();
+            cts.Cancel();
+            await FluentActions.Awaiting(() => cancelled).Should().ThrowAsync<OperationCanceledException>();
+        }
+
+        var dequeue = q.DequeueAsync().AsTask();
+        q.Enqueue(7);
+        (await dequeue).Should().Be(7);
+        q.WaitNodeAllocationCountForTest.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ConcurrentWaiters_ReusePeakNodeCount()
+    {
+        const int waiterCount = 32;
+        var q = new AsyncQueue<int>();
+
+        await RunWave();
+        int peakAllocations = q.WaitNodeAllocationCountForTest;
+        peakAllocations.Should().Be(waiterCount);
+
+        await RunWave();
+        q.WaitNodeAllocationCountForTest.Should().Be(
+            peakAllocations,
+            "第二波同等并发等待应完全复用第一波节点");
+
+        async Task RunWave()
+        {
+            var waiters = Enumerable.Range(0, waiterCount)
+                .Select(_ => q.DequeueAsync().AsTask())
+                .ToArray();
+            for (int item = 0; item < waiterCount; item++)
+                q.Enqueue(item);
+            (await Task.WhenAll(waiters)).Should().HaveCount(waiterCount);
+        }
+    }
+
+    [Fact]
+    public async Task CancelEnqueueRace_ReusedNodeNeverGetsStaleCompletion()
+    {
+        var q = new AsyncQueue<int>();
+        for (int iteration = 0; iteration < 200; iteration++)
+        {
+            using var cts = new CancellationTokenSource();
+            var pending = q.DequeueAsync(cts.Token).AsTask();
+
+            Parallel.Invoke(cts.Cancel, () => q.Enqueue(iteration));
+            try
+            {
+                await pending;
+            }
+            catch (OperationCanceledException)
+            {
+                q.TryDequeue(out _).Should().BeTrue("取消胜出时入队项应留在队列");
+            }
+
+            var probe = q.DequeueAsync().AsTask();
+            q.Enqueue(iteration);
+            (await probe).Should().Be(iteration);
+        }
+    }
+
+    [Fact]
     public async Task ProducerConsumer_HighVolume_NoLoss()
     {
         var q = new AsyncQueue<int>();

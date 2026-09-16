@@ -18,7 +18,7 @@ internal struct FileStandardInfo
     /// <summary>硬链接数。</summary>
     public uint NumberOfLinks;
     /// <summary>是否标记删除（待关闭句柄后删）。</summary>
-    public int DeletePending;
+    public byte DeletePending;
     /// <summary>是否目录。</summary>
-    public int Directory;
+    public byte Directory;
 }

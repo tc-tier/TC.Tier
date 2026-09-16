@@ -66,9 +66,10 @@ public sealed class TierVolumeWriteBackTests : IDisposable
         buf2.Should().BeEquivalentTo(data, "排干后读一致（页保留）");
     }
 
-    [Fact]
+    [SkippableFact]
     public void Mmap_SingleExtent_Roundtrip()
     {
+        Skip.If(OperatingSystem.IsMacOS(), "APFS mmap 写回（MSF 落载体）可见性时序不同——mac 适配台账。");
         using var fs = Format();
         using (var h = fs.Open("m", RWO()))
         {

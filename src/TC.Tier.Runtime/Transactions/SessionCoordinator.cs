@@ -74,6 +74,8 @@ internal sealed class InProcessCoordinator : ICommitCoordinator
         _resolution = resolution;
     }
 
+    /// <summary>TxRound 批提交——分配新 seq → Prepare-all → Confirm-all（Prepare 失败自动 Abort 已 Prepare 者后重抛）。</summary>
+    /// <returns>本批共享的域 seq。</returns>
     public long CommitBatch()
     {
         long seq = Interlocked.Increment(ref _seq);
@@ -96,6 +98,8 @@ internal sealed class InProcessCoordinator : ICommitCoordinator
         return seq;
     }
 
+    /// <summary>ReplicatedRound 分段驱动①——分配候选 seq 并 Prepare-all（失败自动 Abort 已 Prepare 者后重抛）。</summary>
+    /// <returns>候选 seq（决策 true 则随后 Confirm）。</returns>
     public long PrepareCandidate()
     {
         long seq = Interlocked.Increment(ref _seq);
@@ -116,12 +120,16 @@ internal sealed class InProcessCoordinator : ICommitCoordinator
         return seq;
     }
 
+    /// <summary>ReplicatedRound 分段驱动②——Confirm-all（不可回退点，使候选 seq 成为已提交水位）。</summary>
+    /// <param name="seq">PrepareCandidate 返回的候选 seq。</param>
     public void ConfirmCandidate(long seq)
     {
         foreach (var (_, p) in _participants)
             p.ConfirmCommitted(seq);
     }
 
+    /// <summary>ReplicatedRound 回滚——全量 Abort（吞次级异常）。</summary>
+    /// <param name="seq">PrepareCandidate 返回的候选 seq。</param>
     public void AbortPrepared(long seq)
     {
         // PrepareCandidate 全员已 Prepare（成功返回才有决策阶段）——全量 Abort
@@ -132,6 +140,8 @@ internal sealed class InProcessCoordinator : ICommitCoordinator
         }
     }
 
+    /// <summary>启动恢复裁决——按域声明处理悬干（ForwardCommit 前推 / DropTail 丢尾），以参与者裁决终态 max 为起始水位。</summary>
+    /// <returns>裁决后的起始已提交水位（参与者 -1 折算 0；域 seq 从此继续）。</returns>
     public long ReconcileStartup()
     {
         foreach (var (_, p) in _participants)
@@ -177,17 +187,29 @@ internal sealed class TransactionLogCoordinator : ICommitCoordinator
 
     public long LastCommittedSeq => _txn.LastCommittedSeq;
 
+    /// <summary>TxRound 批提交——直接委托事务日志提交。</summary>
+    /// <returns>本批共享的域 seq。</returns>
     public long CommitBatch() => _txn.Commit();
 
+    /// <summary>不支持——注入档 seq 真源在事务日志内部，无法分段预订。</summary>
+    /// <returns>无返回值——恒抛异常。</returns>
+    /// <exception cref="NotSupportedException">注入档不支持 ReplicatedRound。</exception>
     public long PrepareCandidate()
         => throw new NotSupportedException(
             "注入档（ITransactionLog 协调器）不支持 ReplicatedRound——seq 真源在注入协调器内部，无法分段预订；" +
             "复制回合域请用默认档 SessionManager.Create(fs, …)。");
 
+    /// <summary>不支持——注入档不支持 ReplicatedRound。</summary>
+    /// <param name="seq">候选 seq（忽略）。</param>
+    /// <exception cref="NotSupportedException">注入档不支持 ReplicatedRound。</exception>
     public void ConfirmCandidate(long seq)
         => throw new NotSupportedException("注入档不支持 ReplicatedRound（见 PrepareCandidate）。");
 
+    /// <summary>回滚——委托事务日志回滚当前未决事务。</summary>
+    /// <param name="seq">候选 seq（日志按当前未决事务回滚，此参数仅作接口对齐）。</param>
     public void AbortPrepared(long seq) => _txn.Abort();
 
+    /// <summary>启动恢复裁决——委托事务日志加载并对账悬干。</summary>
+    /// <returns>对账后的起始已提交水位。</returns>
     public long ReconcileStartup() => _txn.LoadAndReconcile();
 }

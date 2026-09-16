@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.IO.Hashing;
 using System.Text;
 using TC.Tier.Core.IO.Remote;
 
@@ -32,11 +31,19 @@ internal sealed class MemoryObjectStore : IObjectStore
         public required string Key;
         public required string UploadId;             // 会话治理原语的句柄（Guid）
         public DateTimeOffset InitiatedUtc;          // 孤儿判定基准（测试仪器可回拨）
+        /// <summary>回拨会话发起时间（孤儿清理场景注入）。</summary>
+        /// <param name="utc">回拨后的发起时刻（UTC）。</param>
         public void BackdateForTest(DateTimeOffset utc) => InitiatedUtc = utc;
         public ObjectMetadata? Metadata;
         public readonly Dictionary<int, byte[]> Parts = new();
         public bool Terminated;   // Complete 或 Abort 之后失效（NoSuchUpload 归一）
 
+        /// <summary>上传一个分片（会话内缓存——Complete 时按 PartNumber 拼接）。</summary>
+        /// <param name="partNumber">分片号（≥1）。</param>
+        /// <param name="data">分片数据。</param>
+        /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+        /// <returns>完成后得到分片结果（分片号 + 内容 ETag）。</returns>
+        /// <exception cref="ArgumentOutOfRangeException">partNumber &lt;1。</exception>
         public ValueTask<UploadPartResult> UploadPartAsync(int partNumber, ReadOnlyMemory<byte> data,
                                                            CancellationToken ct = default)
         {
@@ -51,6 +58,14 @@ internal sealed class MemoryObjectStore : IObjectStore
             }
         }
 
+        /// <summary>从既有对象服务端拷贝一个分片（内存切片）。</summary>
+        /// <param name="partNumber">分片号（≥1）。</param>
+        /// <param name="sourceKey">源对象键。</param>
+        /// <param name="sourceOffset">源对象内起始偏移（字节，≥0）。</param>
+        /// <param name="length">拷贝字节数（超出源剩余部分按实际可得截取）。</param>
+        /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+        /// <returns>完成后得到分片结果（分片号 + 内容 ETag）。</returns>
+        /// <exception cref="FileIOException">源对象不存在。</exception>
         public ValueTask<UploadPartResult> UploadPartCopyAsync(int partNumber, string sourceKey,
                                                                long sourceOffset, long length,
                                                                CancellationToken ct = default)
@@ -70,6 +85,11 @@ internal sealed class MemoryObjectStore : IObjectStore
             }
         }
 
+        /// <summary>提交会话——按 PartNumber 升序拼接分片落对象，会话失效。</summary>
+        /// <param name="parts">分片结果清单（至少一项；须与已上传分片一致）。</param>
+        /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+        /// <returns>对象落档完成后即完成。</returns>
+        /// <exception cref="ArgumentException">parts 为空。</exception>
         public ValueTask CompleteAsync(IReadOnlyList<UploadPartResult> parts, CancellationToken ct = default)
         {
             ArgumentNullException.ThrowIfNull(parts);
@@ -101,6 +121,9 @@ internal sealed class MemoryObjectStore : IObjectStore
             return ValueTask.CompletedTask;
         }
 
+        /// <summary>中止会话——丢弃全部分片并失效（幂等）。</summary>
+        /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+        /// <returns>会话终止后即完成。</returns>
         public async ValueTask AbortAsync(CancellationToken ct = default)
         {
             lock (Owner._lock)
@@ -111,6 +134,8 @@ internal sealed class MemoryObjectStore : IObjectStore
             await ValueTask.CompletedTask.ConfigureAwait(false);
         }
 
+        /// <summary>释放会话——异常安全兜底，语义 ≡ <see cref="AbortAsync"/>。</summary>
+        /// <returns>中止完成后即完成。</returns>
         public async ValueTask DisposeAsync()
         {
             await AbortAsync(ct: default).ConfigureAwait(false);   // 异常安全兜底 ≡ Abort
@@ -170,6 +195,14 @@ internal sealed class MemoryObjectStore : IObjectStore
     // ═════════════════════════════ 六件套 ═════════════════════════════
 
     /// <inheritdoc/>
+    /// <summary>写入对象（整体替换；条件写失配抛 PreconditionFailed）。</summary>
+    /// <param name="key">对象键。</param>
+    /// <param name="data">对象数据。</param>
+    /// <param name="metadata">用户元数据快照（null = 空）。</param>
+    /// <param name="condition">写入条件（null = 无条件）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>落档完成后即完成。</returns>
+    /// <exception cref="FileIOException">条件失配（PreconditionFailed/NotFound）。</exception>
     public ValueTask PutAsync(string key, ReadOnlyMemory<byte> data, ObjectMetadata? metadata = null,
                               PutCondition? condition = null, CancellationToken ct = default)
     {
@@ -193,6 +226,15 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>从流写入对象（长度已知契约——流提前结束抛 IOFailure；不可寻零长按未知处理）。</summary>
+    /// <param name="key">对象键。</param>
+    /// <param name="data">对象数据流（从当前位置读尽 length 字节）。</param>
+    /// <param name="length">期望字节数（-1 = 未知长度——读尽流）。</param>
+    /// <param name="metadata">用户元数据快照（null = 空）。</param>
+    /// <param name="condition">写入条件（null = 无条件）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>落档完成后即完成。</returns>
+    /// <exception cref="FileIOException">流提前结束。</exception>
     public ValueTask PutAsync(string key, Stream data, long length, ObjectMetadata? metadata = null,
                               PutCondition? condition = null, CancellationToken ct = default)
     {
@@ -207,9 +249,9 @@ internal sealed class MemoryObjectStore : IObjectStore
             mem.SetLength(0);
             data.CopyTo(mem);
             var bytes = mem.ToArray();
-#pragma warning disable TCSG031 // 设计必需：同步写 API 契约（同步体内部调异步实现）
+#pragma warning disable TCSG137 // 设计必需：同步写 API 契约（同步体内部调异步实现）
             PutAsync(key, bytes, metadata, condition, ct).AsTask().GetAwaiter().GetResult();
-#pragma warning restore TCSG031
+#pragma warning restore TCSG137
             return default;
         }
         if (data.CanSeek && data.Length - data.Position < length)
@@ -229,6 +271,13 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>范围读取对象（RangeGet；EOF 归一返回 0 不抛——416 语义）。</summary>
+    /// <param name="key">对象键。</param>
+    /// <param name="offset">对象内起始偏移（字节，≥0）。</param>
+    /// <param name="destination">接收缓冲（长度即单次最多读取字节数）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到实际读取的字节数（0 = offset 已到对象末尾）。</returns>
+    /// <exception cref="FileIOException">对象不存在（NotFound）。</exception>
     public ValueTask<int> GetAsync(string key, long offset, Memory<byte> destination, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -263,6 +312,12 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>删除对象（幂等——不存在仍成功；条件删除失配抛）。</summary>
+    /// <param name="key">对象键。</param>
+    /// <param name="condition">删除条件（IfMatch——null = 无条件）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>删除完成后即完成。</returns>
+    /// <exception cref="FileIOException">条件失配（PreconditionFailed/NotFound）。</exception>
     public ValueTask DeleteAsync(string key, DeleteCondition? condition = null, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -284,6 +339,10 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>列举对象（强一致快照）。</summary>
+    /// <param name="prefix">键前缀过滤（null/空 = 全量）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到匹配条目清单。</returns>
     public ValueTask<IReadOnlyList<ObjectEntry>> ListAsync(string? prefix = null, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -301,6 +360,13 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>整对象拷贝（深拷贝——源后续修改不影响目标；目标是新建对象取新时间戳）。</summary>
+    /// <param name="sourceKey">源对象键。</param>
+    /// <param name="destKey">目标对象键。</param>
+    /// <param name="metadata">目标元数据处理（null = 继承源）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>拷贝完成后即完成。</returns>
+    /// <exception cref="FileIOException">源对象不存在（NotFound）。</exception>
     public ValueTask CopyAsync(string sourceKey, string destKey, CopyMetadata? metadata = null,
                                CancellationToken ct = default)
     {
@@ -324,6 +390,12 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>仅复制/替换元数据（数据不动；元数据更新 = 修改——刷新时间戳）。</summary>
+    /// <param name="sourceKey">对象键。</param>
+    /// <param name="replace">替换用元数据（null = 仅复制现有元数据）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到写入目标后的元数据。</returns>
+    /// <exception cref="FileIOException">对象不存在（NotFound）。</exception>
     public ValueTask<ObjectMetadata> CopyMetadataAsync(string sourceKey, ObjectMetadata? replace = null,
                                                        CancellationToken ct = default)
     {
@@ -344,6 +416,10 @@ internal sealed class MemoryObjectStore : IObjectStore
     // ═════════════════════════════ multipart / 范围拷贝 ═════════════════════════════
 
     /// <inheritdoc/>
+    /// <summary>创建 multipart 会话（Complete/Abort 前对象不可见）。</summary>
+    /// <param name="key">目标对象键。</param>
+    /// <param name="metadata">目标用户元数据（null = 空）。</param>
+    /// <returns>会话句柄（Complete 后失效——后续操作 NotFound）。</returns>
     public IMultipartUpload CreateMultipartUpload(string key, ObjectMetadata? metadata = null)
     {
         ThrowIfDisposed();
@@ -365,6 +441,15 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>范围拷贝——源对象切片为新对象（默认不带源元数据——目标语义独立）。</summary>
+    /// <param name="sourceKey">源对象键。</param>
+    /// <param name="destKey">目标对象键。</param>
+    /// <param name="sourceOffset">源对象内起始偏移（字节，≥0）。</param>
+    /// <param name="length">拷贝字节数（≥0；超出源剩余部分按实际可得截取）。</param>
+    /// <param name="metadata">目标元数据处理（null = 空，不继承源）。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到服务端实际拷贝的字节数（字节）。</returns>
+    /// <exception cref="FileIOException">源对象不存在（NotFound）。</exception>
     public ValueTask<long> CopyRangeAsync(string sourceKey, string destKey, long sourceOffset, long length,
                                           CopyMetadata? metadata = null, CancellationToken ct = default)
     {
@@ -393,6 +478,9 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>列举进行中 multipart 会话（孤儿清理扫描面）。</summary>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>完成后得到活跃会话清单（键/UploadId/发起时刻）。</returns>
     public ValueTask<IReadOnlyList<MultipartUploadSession>> ListMultipartUploadsAsync(CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -404,6 +492,11 @@ internal sealed class MemoryObjectStore : IObjectStore
     }
 
     /// <inheritdoc/>
+    /// <summary>中止 multipart 会话（幂等——不存在/已终结静默成功）。</summary>
+    /// <param name="key">目标对象键。</param>
+    /// <param name="uploadId">会话 UploadId。</param>
+    /// <param name="ct">取消令牌（本实现同步完成，不响应取消）。</param>
+    /// <returns>会话终止后即完成。</returns>
     public ValueTask AbortMultipartUploadAsync(string key, string uploadId, CancellationToken ct = default)
     {
         ThrowIfDisposed();
@@ -469,7 +562,8 @@ internal sealed class MemoryObjectStore : IObjectStore
 
     private static string ETagOf(ReadOnlySpan<byte> data)
     {
-        var hash = XxHash128.Hash(data);
+        Span<byte> hash = stackalloc byte[UnifiedXxHash.Hash128Len];
+        UnifiedXxHash.Hash128(data, hash);
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 

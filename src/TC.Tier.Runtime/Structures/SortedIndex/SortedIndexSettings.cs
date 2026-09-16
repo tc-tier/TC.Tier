@@ -22,6 +22,9 @@ public sealed record SortedIndexPersistencePolicy
     public long EntryDeltaThreshold { get; init; } = 10_000;
 
     /// <summary>判定是否触发（elapsed=距上次 dump 时长；entryDelta=距上次 dump 新增条目数）。</summary>
+    /// <param name="elapsed">距上次 dump 的时长（任一阈值命中即触发）。</param>
+    /// <param name="entryDelta">距上次 dump 新增的条目数。</param>
+    /// <returns>true = 达到时间间隔或条目增量阈值，应触发 dump；false = 未达任一阈值。</returns>
     public bool IsTriggered(TimeSpan elapsed, long entryDelta)
         => elapsed >= Interval || entryDelta >= EntryDeltaThreshold;
 }

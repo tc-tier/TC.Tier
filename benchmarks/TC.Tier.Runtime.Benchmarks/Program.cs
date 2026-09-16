@@ -2,6 +2,7 @@ using BenchmarkDotNet.Running;
 using TC.Tier.Runtime.Benchmarks.Kv;
 using TC.Tier.Runtime.Benchmarks.Storage.AddressSpace;
 using TC.Tier.Runtime.Benchmarks.Storage.Engine;
+using TC.Tier.Runtime.Benchmarks.LogBase;
 
 namespace TC.Tier.Runtime.Benchmarks;
 
@@ -24,6 +25,9 @@ public class Program
             WmProbe.Run();
             return 0;
         }
+        // ★ LogBase 批追加性能基线（页满 FlushPage 阻塞形态——异步化改造 A/B 基线仪）
+        if (args.Length > 0 && args[0] == "--logbase-append-probe")
+            return LogBase.LogBaseAppendProbe.Run(args);
         // ★ 临时取证：恢复重放/写路径托管分配分解探针
         if (args.Length > 0 && args[0] == "--replay-alloc-probe")
         {
@@ -46,6 +50,12 @@ public class Program
         if (args.Length > 0 && args[0] == "--fs-flush-probe")
         {
             FsFlushProbe.Run(args.Length > 1 ? args[1] : "local");
+            return 0;
+        }
+        // ★ W1.1 溢出写基准探针（docs/design/ring-overflow-chunked-write-design.md §8——先测后改前置）
+        if (args.Length > 0 && args[0] == "--overflow-write-probe")
+        {
+            OverflowWriteProbe.Run(args.Length > 1 ? args[1] : "mem");
             return 0;
         }
         // ★ Ring 并发写吞吐探针（多写者无锁窗口改造前后对照）

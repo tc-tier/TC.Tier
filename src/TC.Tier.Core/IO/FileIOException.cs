@@ -44,6 +44,7 @@ public sealed class FileIOException : IOException
     public long? CompletedLength { get; init; }
 
     /// <inheritdoc/>
+    /// <returns>含错误码、消息及（如适用）ReservedOffset/CompletedLength 的诊断字符串。</returns>
     public override string ToString()
     {
         var s = $"{GetType().Name}[{Error}] {Message}";

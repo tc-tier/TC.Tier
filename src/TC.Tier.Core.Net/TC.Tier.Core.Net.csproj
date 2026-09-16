@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>12.0</LangVersion>
+    <RootNamespace>TC.Tier.Core.Net</RootNamespace>
+    <IsPackable>true</IsPackable>
+    <PackageId>TC.Tier.Core.Net</PackageId>
+    <Description>TC.Tier Core/Net 集群传输协议标准库——统一帧格式（16B 帧头介质无关）+ 握手 + 节点对单长连接通道复用；raft/p2p 及产品复制的协议域传输底座（spec-11）</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- ★ W-QUIC：System.Net.Quic（net8.0 预览特性标记——MsQuic 运行时依赖，QuicListener.IsSupported 探测） -->
+    <EnablePreviewFeatures>true</EnablePreviewFeatures>
+    <!-- net8.0 System.Net.Quic 引用程序集遗留 RequiresPreviewFeatures 标记（API 本身可用）——.NET 9+ 升级后移除 -->
+    <NoWarn>$(NoWarn);CA2252</NoWarn>
+    <!-- ★ 零外部依赖铁律：仅引用 TC.Tier.Core（与 Core.IO.Net/Core.IO.S3 同构——节点身份/并发原语宿主 Core） -->
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\TC.Tier.Core\TC.Tier.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- TC.Tier.Net 过渡可见：引擎迁入 Core.Net/Raft·P2P（D4-T2/T3）前，组装层接线走内部注册口——迁入后移除 -->
+    <!-- 测试白名单：单元 + 对抗性（故障注入矩阵独立项目——Runtime.AdversarialTests 同款惯例）+ 性能探针（夹具装配同源） -->
+    <InternalsVisibleTo Include="TC.Tier.Core.Net.Tests" />
+    <InternalsVisibleTo Include="TC.Tier.Core.Net.AdversarialTests" />
+    <InternalsVisibleTo Include="TC.Tier.Net" />
+    <InternalsVisibleTo Include="RaftPerfProbe" />
+    <InternalsVisibleTo Include="TC.Tier.Products.Tests" />
+  </ItemGroup>
+
+</Project>

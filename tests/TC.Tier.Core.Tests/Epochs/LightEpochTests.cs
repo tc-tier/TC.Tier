@@ -390,4 +390,5 @@ public class LightEpochTests
 #endif
         epoch.ThisInstanceProtected().Should().BeFalse();
     }
+
 }

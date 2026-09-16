@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <LangVersion>12.0</LangVersion>
+    <IsPackable>false</IsPackable>
+    <!-- 与 Core.Tests 同款豁免集（测试命名/断言风格类分析器） -->
+    <NoWarn>CA1707,CA1716,CA1852,CA2201,xUnit1000,xUnit1031,CS0618,NU1507</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="FluentAssertions" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\TC.Tier.Core\TC.Tier.Core.csproj" />
+  </ItemGroup>
+  <!-- ★ 对抗性测试独立项目（§4.1 拆分纪律同 Core.Net/Runtime 对抗形态）：并发压测/墙钟敏感
+       场景以慢时序为常态，不与 TC.Tier.Core.Tests 单测套件混跑；本项目进 CI 门禁串行尾步
+       （功能套件之后单独执行，不与任何套件并行争抢）。 -->
+  <!-- ★ xunit.runner.json 复制到输出目录（压测时序敏感——禁并行）。 -->
+  <ItemGroup>
+    <None Update="xunit.runner.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

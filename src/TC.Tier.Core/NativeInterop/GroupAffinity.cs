@@ -16,20 +16,20 @@ internal struct GroupAffinity
     /// <summary>
     /// 处理器组号（NUMA 插槽索引，0..N-1）。
     /// </summary>
-    public uint Group;
+    public ushort Group;
 
     /// <summary>
     /// 保留字段（必须为 0）。
     /// </summary>
-    public uint Reserved1;
+    public ushort Reserved1;
 
     /// <summary>
     /// 保留字段（必须为 0）。
     /// </summary>
-    public uint Reserved2;
+    public ushort Reserved2;
 
     /// <summary>
     /// 保留字段（必须为 0）。
     /// </summary>
-    public uint Reserved3;
+    public ushort Reserved3;
 }

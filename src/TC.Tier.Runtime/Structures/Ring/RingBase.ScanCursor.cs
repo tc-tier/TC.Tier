@@ -14,6 +14,9 @@ namespace TC.Tier.Runtime.Structures.Ring;
 public abstract partial class RingBase<TKey>
 {
     /// <summary>★ 打开扫描游标（工厂注入或默认 SequentialRingScanCursor）。</summary>
+    /// <param name="begin">扫描起点（default = 从 BeginAddress 开始）。默认 default。</param>
+    /// <param name="end">扫描终点（default = 到当前尾）。默认 default。</param>
+    /// <returns>覆盖 [begin, end) 区间的 <see cref="IRingScanCursor"/> 实例（整段持 epoch 扫描）。</returns>
     public IRingScanCursor OpenScanCursor(LogicalAddress begin = default, LogicalAddress end = default)
     {
         EnsureReady();
@@ -35,6 +38,10 @@ public abstract partial class RingBase<TKey>
         private readonly int _pageSizeBits;
         private LogicalAddress _currentAddress;
         private LogicalAddress _nextAddress;
+        // ★ 冷热判据 = SafeSnapshotTail 构造快照：addr < 快照 → 热读页池（写者写完 header 即推进
+        //   SafeSnapshotTail ⇒ 页池有完整数据）；addr ≥ 快照 → 冷读设备帧（写穿后的数据）。不能用
+        //   FlushedUntilAddress（写穿水位动态推进，扫描中途翻转冷热读设备旧快照 → 漏，压强实锤）、
+        //   HeadAddress（恢复场景未定义 → NRE）、页槽分配状态（预分配形态恒非空 → 误判热）。
         // ★ 读帧当前装载的冷页起始。_frameLoaded=false 表示未装载（不可用 Empty 作哨兵：
         //   Empty == seg#0@0x0 恰是数据区第一页地址，会让第一页的冷加载被错误跳过，帧内存全零导致扫描返回 0 条）。
         private LogicalAddress _framePageStart = LogicalAddress.Empty;
@@ -57,6 +64,7 @@ public abstract partial class RingBase<TKey>
             EndAddress = endAddress == default ? owner.TailAddress : endAddress;
             _currentAddress = begin;
             _nextAddress = begin;
+            _safeTailAtOpen = owner.TakeSafeSnapshotTail();
             _frame = new AlignedMemoryManager(_pageSize, (int)owner.SectorSize);
         }
 
@@ -71,12 +79,21 @@ public abstract partial class RingBase<TKey>
         /// <summary>当前 record 对齐后的占用字节数（header + payload + padding 向上取整到 codec 对齐粒度）。</summary>
         public int CurrentRecordSize => _currentRecordSize;
 
+        private readonly LogicalAddress _safeTailAtOpen;
+
+        /// <summary>★ 热判据（head 守卫 + 构造期 safe 快照）：addr &lt; head ⇒ 页已回收/排队回收
+        /// （同形记录同偏移复用 = 内容校验全通过的别名假数据）——强制冷读设备。MoveNext 已持 epoch，
+        /// 检查→读取窗口内 head 不可推进（drain 等 epoch），窗口语义闭合。</summary>
+        private bool IsHot(LogicalAddress addr)
+            => Owner.DistanceFromDataStart(addr) >= Volatile.Read(ref Owner._headDist)
+            && addr < _safeTailAtOpen;
+
         /// <summary>读当前 record 的 header 字段：热区直读 native 页，冷区从读帧读。</summary>
         /// <returns>当前 record 的 header 字段（Flags/PayloadLength/PaddingLength/PreviousAddress）。</returns>
         public RingRecordFields GetFields()
         {
             int headerSize = Owner.RingCodec.HeaderSize;
-            long phys = GetRecordPhys(_currentAddress, Owner.FlushedUntilAddress);
+            long phys = GetRecordPhys(_currentAddress, IsHot(_currentAddress));
             unsafe
             {
                 var span = new ReadOnlySpan<byte>((void*)phys, headerSize);
@@ -105,22 +122,23 @@ public abstract partial class RingBase<TKey>
         [MethodImpl(MethodImplOptions.NoInlining)]
         private unsafe bool MoveNextCore()
         {
+
             while (true)
             {
                 if (_nextAddress >= EndAddress) return false;
 
-                LogicalAddress flushedUntil = Owner.FlushedUntilAddress;
+                bool hot = IsHot(_nextAddress);
                 long nextIntra = _nextAddress.Offset & _pageSizeMask;
                 LogicalAddress currentPage = nextIntra == 0
                     ? _nextAddress
                     : Owner._engine.CalculationAddress(_nextAddress, -nextIntra);
 
-                if (_nextAddress < flushedUntil && (!_frameLoaded || _framePageStart != currentPage))
+                if (!hot && (!_frameLoaded || _framePageStart != currentPage))
                 {
                     if (!LoadColdPage(_nextAddress)) return false;
                 }
 
-                long phys = GetRecordPhys(_nextAddress, flushedUntil);
+                long phys = GetRecordPhys(_nextAddress, hot);
                 int offsetInPage = (int)(_nextAddress.Offset & _pageSizeMask);
                 int headerSize = Owner.RingCodec.HeaderSize;
 
@@ -158,12 +176,12 @@ public abstract partial class RingBase<TKey>
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private unsafe long GetRecordPhys(LogicalAddress addr, LogicalAddress flushedUntil)
+        private unsafe long GetRecordPhys(LogicalAddress addr, bool hot)
         {
-            if (addr >= flushedUntil)
-                return Owner.GetPhysicalAddress(addr);   // 热区
+            if (hot)
+                return Owner.GetPhysicalAddress(addr);   // 热区：页池最新真源
             int offset = (int)(addr.Offset & _pageSizeMask);
-            return (long)(_frame.BytePtr + offset);   // 冷区：读帧
+            return (long)(_frame.BytePtr + offset);   // 冷区：设备帧（槽未分配=已驱逐/未加载）
         }
 
         private bool LoadColdPage(LogicalAddress address)
@@ -172,6 +190,11 @@ public abstract partial class RingBase<TKey>
             LogicalAddress pageStart = intra == 0 ? address : Owner._engine.CalculationAddress(address, -intra);
             int got = Owner.ReadDevicePage(pageStart, _frame.GetSpan(0, _pageSize));
             if (got <= 0) return false;
+            // ★ 短读清零帧尾：_frame 是未初始化 native 分配——[got, PageSize) 是堆残留，
+            //   解析越界即"幻影 record"（跨实例 count 多读实锤——恢复水位盖到预分配窗口时必现）。
+            //   残留清零后解析见零 = 空 record，确定性停。
+            if (got < _pageSize)
+                _frame.GetSpan(got, _pageSize - got).Clear();
             _framePageStart = pageStart;
             _frameLoaded = true;
             return true;
@@ -185,8 +208,8 @@ public abstract partial class RingBase<TKey>
         /// <returns>推进成功返回 true；到达 EndAddress 返回 false。</returns>
         public override ValueTask<bool> MoveNextAsync(CancellationToken cancellationToken = default)
         {
-            if (_nextAddress >= Owner.FlushedUntilAddress)
-                return new ValueTask<bool>(MoveNext());
+            if (_nextAddress >= _safeTailAtOpen)
+                return new ValueTask<bool>(MoveNext());   // ≥ 快照尾=数据只在设备——冷区异步路径
             return MoveNextSlowAsync(cancellationToken);
         }
 
@@ -195,9 +218,9 @@ public abstract partial class RingBase<TKey>
             while (true)
             {
                 ct.ThrowIfCancellationRequested();
-                LogicalAddress flushedUntil = Owner.FlushedUntilAddress;
+                bool hot = IsHot(_nextAddress);
 
-                if (_nextAddress < flushedUntil)
+                if (!hot)
                 {
                     long intra = _nextAddress.Offset & _pageSizeMask;
                     LogicalAddress currentPage = intra == 0 ? _nextAddress : Owner._engine.CalculationAddress(_nextAddress, -intra);
@@ -211,7 +234,7 @@ public abstract partial class RingBase<TKey>
                 bool moved = MoveNext();
                 if (moved) return true;
                 if (_nextAddress >= EndAddress) return false;
-                if (_nextAddress >= Owner.FlushedUntilAddress) return false;
+                if (_nextAddress >= _safeTailAtOpen) return false;   // 越出快照热窗——冷区已到头
             }
         }
 
@@ -221,6 +244,9 @@ public abstract partial class RingBase<TKey>
             LogicalAddress pageStart = intra == 0 ? address : Owner._engine.CalculationAddress(address, -intra);
             int got = await Owner.ReadDevicePageAsync(pageStart, _frame.Memory, ct).ConfigureAwait(false);
             if (got <= 0) return false;
+            // ★ 短读清零帧尾（同步轨同构——未初始化 native 残留禁入解析视野）
+            if (got < _pageSize)
+                _frame.GetSpan(got, _pageSize - got).Clear();
             _framePageStart = pageStart;
             _frameLoaded = true;
             return true;

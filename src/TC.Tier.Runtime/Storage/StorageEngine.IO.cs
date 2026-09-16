@@ -17,6 +17,7 @@ internal sealed partial class StorageEngine
     public LogicalAddress Append(ReadOnlySpan<byte> source)
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("Append");
         EnsureReady();
         EnsureCpuCapacity(CancellationToken.None);   // CPU 限流（同步路径——仅超时，无外部 ct）
         using var lease = _segmentTable.AppendLease(source.Length);
@@ -34,6 +35,7 @@ internal sealed partial class StorageEngine
     public async ValueTask<LogicalAddress> AppendAsync(ReadOnlyMemory<byte> source, CancellationToken ct)
     {
         ThrowIfDisposed();
+        if (_faults is { } faults) await faults.OnOpEnterAsync("AppendAsync", ct).ConfigureAwait(false);
         EnsureReady();
         EnsureCpuCapacity(ct);   // CPU 限流（异步路径——传调用方 ct，外部可取消）
         using var lease = _segmentTable.AppendLease(source.Length, ct);
@@ -53,6 +55,7 @@ internal sealed partial class StorageEngine
         if (length <= 0)
             throw new ArgumentOutOfRangeException(nameof(length), length, "Allocate length must be positive.");
         ThrowIfDisposed();
+        _faults?.OnOpEnter("Allocate");
         EnsureReady();
         EnsureCpuCapacity(CancellationToken.None);   // CPU 限流（同步路径——仅超时，无外部 ct）
        var lease = _segmentTable.AllocateLease(length);
@@ -108,6 +111,7 @@ internal sealed partial class StorageEngine
     public LogicalAddress Write(LogicalAddress destination, ReadOnlySpan<byte> source)
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("Write");
         EnsureReady();
         using var lease = _segmentTable.WriteLease(destination, source.Length);
         CopyChunks(lease, source);
@@ -121,6 +125,7 @@ internal sealed partial class StorageEngine
         CancellationToken ct)
     {
         ThrowIfDisposed();
+        if (_faults is { } faults) await faults.OnOpEnterAsync("WriteAsync", ct).ConfigureAwait(false);
         EnsureReady();
         using var lease = _segmentTable.WriteLease(destination, source.Length, ct);
         await CopyChunksAsync(lease, source, ct).ConfigureAwait(false);
@@ -137,6 +142,7 @@ internal sealed partial class StorageEngine
     public void Flush()
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("Flush");
         EnsureReady();
         // ★ WriteThrough + Win/Linux：每次写已落盘（内核同步写），Flush 是 no-op。
         //   macOS 无原生写透，仍需 F_FULLFSYNC 兜底（平台判断收口到 FileNative）。
@@ -149,6 +155,7 @@ internal sealed partial class StorageEngine
     public void Flush(LogicalAddress upTo)
     {
         ThrowIfDisposed();
+        _faults?.OnOpEnter("Flush");
         EnsureReady();
         // ★ 同 Flush()：WriteThrough + Win/Linux 时 no-op
         if (Hints.HasFlag(FileOpenHints.WriteThrough) && FileNative.WriteThroughImpliesFlushed) return;
@@ -231,7 +238,7 @@ internal sealed partial class StorageEngine
     {
         for (var attempt = 0; ; attempt++)
         {
-            using var handle = GetWriteHandleForChunk(segId, offset, data.Length);
+            using var handle = GetWriteHandle(segId);
             try
             {
                 handle.Write(offset, data);
@@ -250,7 +257,7 @@ internal sealed partial class StorageEngine
     {
         for (var attempt = 0; ; attempt++)
         {
-            await using var handle = GetWriteHandleForChunk(segId, offset, data.Length);
+            await using var handle = GetWriteHandle(segId);
             try
             {
                 await handle.WriteAsync(offset, data, ct).ConfigureAwait(false);

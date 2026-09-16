@@ -52,6 +52,7 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="hints">恢复 hints（注入已知水位）；default 让引擎自扫。</param>
     /// <exception cref="InvalidOperationException">已成功启动过。</exception>
+    /// <returns>初始化完成并进入就绪状态的引擎实例。</returns>
     public IStorageEngine Start(EngineRecoveryHints hints = default)
     {
         // ★ CAS 抢启动权（并发安全）：首个线程 0→1 成功；并发第二个 CAS 失败即抛——
@@ -90,6 +91,7 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="hints">恢复 hints（注入已知水位）；default 让引擎自扫。</param>
     /// <exception cref="InvalidOperationException">已成功启动过。</exception>
+    /// <returns>完成后得到初始化完成并进入就绪状态的引擎实例。</returns>
     public async ValueTask<IStorageEngine> StartAsync(EngineRecoveryHints hints = default)
     {
         // ★ CAS 抢启动权（同 Start——并发安全，启动中=不可并发启动）

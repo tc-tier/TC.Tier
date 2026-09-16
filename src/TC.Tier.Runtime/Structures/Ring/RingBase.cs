@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using TC.Tier.Core.NativeInterop;
 using TC.Tier.Core.Primitives;
 
 namespace TC.Tier.Runtime.Structures.Ring;
@@ -50,18 +51,13 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
     // === 8 地址指针（base.md §2.3 三层分层，全程 LogicalAddress）===
     // ★ 新模型（engine-migration §2/§5）：水位全部 LogicalAddress——大小不参与地址，根除位打包毒点。
     //   BeginAddress 读引擎 MinAddress（照 LogBase.cs:112）；TailAddress 读引擎 AllocatedTail；
-    //   其余 6 指针是 Ring 自管的内存页池语义层（mutable→readonly→flushed→evicted 状态机）。
-    // 持久化层（meta 必存）
-    private  LogicalAddress _beginAddress;
-    private  LogicalAddress _flushedUntilAddress;
-    private  LogicalAddress _safeReadOnlyAddress;
-    private  LogicalAddress _readOnlyAddress;
-    // 内存水位层（meta 可选存，恢复时从 Begin 重建）
-    private  LogicalAddress _headAddress;
-    private  LogicalAddress _safeHeadAddress;
-    // 内存簿记层（永不落盘，恢复时初始化为 SafeHeadAddress）
-    private  LogicalAddress _closedUntilAddress;
-    // ★ 关页/驱逐协调游标（LogicalAddress）
+    //   其余指针是 Ring 自管的内存页池语义层（mutable→readonly→flushed→evicted 状态机）。
+    // ★ 持久化层/内存层/簿记层 7 个水位字段升级为同名属性（读写走 16B 对齐水位块的
+    //   CAS128 原子基座，见 RingBase.Watermarks.cs——#163 水位回退根除），声明在彼处。
+    // 持久化层（meta 必存）——_beginAddress/_flushedUntilAddress/_safeReadOnlyAddress/_readOnlyAddress
+    // 内存水位层（meta 可选存，恢复时从 Begin 重建）——_headAddress/_safeHeadAddress
+    // 内存簿记层（永不落盘，恢复时初始化为 SafeHeadAddress）——_closedUntilAddress
+    // ★ 关页/驱逐协调游标（LogicalAddress）——关页单飞锁（_ongoingCloseLock）内串行，普通字段足够
     private  LogicalAddress _ongoingCloseUntilAddress;
 
     // === 环形满背压 + 自动驱逐协调协议（lag 用字节计数，非地址）===
@@ -122,7 +118,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
     private readonly int _minOverflowSize;
 
     /// <summary>溢出写游标（绝对地址），写入时自动递增。</summary>
-    internal LogicalAddress OverflowTailAddress => _overflowTailAddress;
+    internal LogicalAddress OverflowTailAddress => SnapshotOverflowTailAddress();
 
     // 溢出引擎访问器（实现类溢出读写用）
     /// <summary>溢出引擎（OverflowPolicy=Enabled 时非 null，实现类溢出读写用）。</summary>
@@ -230,6 +226,9 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
 
         // ★ 页池初始化推迟到 Initialize()（需要引擎已 Initialize）
 
+        // ★ 水位块（#163 CAS128 基座）必须在任何水位赋值前分配（属性 setter 落块）
+        AllocateWatermarkBlock();
+
         // ★ 水位初始化（全程 LogicalAddress，照 Log）：
         //   引擎 Initialize 时自己恢复 MinAddress/AllocatedTail。
         //   Ring 的 8 指针初始值 = 引擎 MinAddress（空盘 = Empty，新文件首条 record 落在引擎首个 Allocate 处）。
@@ -313,10 +312,10 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
         if (s.MutableFraction is <= 0 or >= 1)
             throw new ArgumentException($"MutableFraction {s.MutableFraction} 须在 (0,1) 开区间");
 
-        // (8) ColdRecordBufferLimit >= HeaderSize (28 bytes)
-        if (s.ColdRecordBufferLimit < 28)
+        // (8) ColdRecordBufferLimit >= HeaderSize（BlittableRingHeader v2.0 = 40B）
+        if (s.ColdRecordBufferLimit < BlittableRingHeaderCodec.StructSize)
             throw new ArgumentException(
-                $"ColdRecordBufferLimit {s.ColdRecordBufferLimit} 须 >= 28 (HeaderSize)");
+                $"ColdRecordBufferLimit {s.ColdRecordBufferLimit} 须 >= {BlittableRingHeaderCodec.StructSize} (HeaderSize)");
     }
 
     /// <summary>派生类初始化钩子：装配冷页缓存（ClockCache 容量 = ClockCacheCapacity 或 ColdReadRatio 派生）并恢复溢出尾水位。</summary>
@@ -336,7 +335,10 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
             cap = 4; while (cap < _coldCacheCapacity) cap <<= 1;
             cap = Math.Max(4, cap);
         }
-        _coldPageCache = new ClockCache<LogicalAddress, AlignedMemoryManager>(cap, (_, amm) => _pagePool.ReturnAligned(amm));
+        // ★ 淘汰页先进隔离池（#165/#177：延迟可复用/可释放，关闭读者 span 的 UAF/别名窗口），
+        //   隔离溢出回落 freePageCache（再满才真 Dispose）
+        _coldPageCache = new ClockCache<LogicalAddress, AlignedMemoryManager>(cap,
+            (_, amm) => _evictionQuarantine!.TryAdd(amm));
         RecoverOverflowTail(null);
     }
 
@@ -355,6 +357,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
 
     /// <summary>★ 恢复算法工厂——默认 DefaultRingRecovery。在 Initialize 的 CAS 闸门内被调一次
     /// （基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</summary>
+    /// <returns>新建的 <see cref="DefaultRingRecovery"/> 恢复策略实例。</returns>
     protected override IRecovery<RingRecoveryHints> CreateRecovery()
         => new DefaultRingRecovery(this);
 
@@ -395,6 +398,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
     private protected void EnsureNotDisposed() => ThrowIfDisposed();
 
     /// <summary>★ 创建默认恢复策略（实现类可 override 提供专属恢复）。</summary>
+    /// <returns>默认恢复策略实例（<see cref="DefaultRingRecovery"/>）。</returns>
     protected virtual IRecovery<RingRecoveryHints> CreateDefaultRecovery() => new DefaultRingRecovery(this);
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -421,7 +425,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
 
     /// <summary>
     /// ★ 写 meta record 到 ring 流末尾（Transport 策略 MetaHost 传输写入）。
-    /// <para>★ 独立于 <see cref="WriteRecordCore"/>——不复用用户 record 写入路径。
+    /// <para>★ 独立于 <c>WriteRecordCore</c>——不复用用户 record 写入路径。
     ///   meta record 作为带 <see cref="RecordFlags.FLAG_ENTRY_IS_META"/> 的特殊 record 追加到 TailAddress 之后，
     ///   payload = 内层 [RingMetaHeader][RingMetaPayload][Crc32Footer] meta block。</para>
     /// <para>★ 对齐 <c>LogBase.WriteMetaPayload</c>（LogBase.LogMeta.cs:47）——独立 private protected 写流原语。</para>
@@ -449,21 +453,43 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
         _epoch.Resume();
         try
         {
-            LogicalAddress addr = Allocate(aligned);
-            long phys = GetPhysicalAddress(addr);
+            while (true)
+            {
+                LogicalAddress addr;
+                // ★ 分配+完整写入同一临界区（分配原子化——安全快照尾推进，同 WriteRecordCore）
+                lock (_tailLock)
+                {
+                    addr = TryAllocateLocked(aligned);
+                    if (addr.IsValid)
+                    {
+                        long phys = GetPhysicalAddress(addr);
 
-            var fields = new RingRecordFields(
-                (ushort)(RecordFlags.FLAG_ENTRY_IS_META | RecordFlags.FLAG_RINGRECORD_VALID | RecordFlags.FLAG_RINGRECORD_SEALED),
-                (uint)blockSize, paddingLen, LogicalAddress.Empty);
-            var headerSpan = new Span<byte>((void*)phys, hdrSize);
-            RingCodec.WriteHeader(headerSpan, in fields);
-            metaBlock.CopyTo(new Span<byte>((void*)(phys + hdrSize), blockSize));
-            if (paddingLen > 0)
-                new Span<byte>((void*)(phys + unaligned), paddingLen).Clear();
-            var recordSpan = new Span<byte>((void*)phys, hdrSize + blockSize);
-            RingCodec.FillCrc(recordSpan, hdrSize, blockSize);
-            Seal(addr, aligned);
-            return addr;
+                        var fields = new RingRecordFields(
+                            (ushort)(RecordFlags.FLAG_ENTRY_IS_META | RecordFlags.FLAG_RINGRECORD_VALID | RecordFlags.FLAG_RINGRECORD_SEALED),
+                            (uint)blockSize, paddingLen, LogicalAddress.Empty);
+                        var headerSpan = new Span<byte>((void*)phys, hdrSize);
+                        RingCodec.WriteHeader(headerSpan, in fields);
+                        metaBlock.CopyTo(new Span<byte>((void*)(phys + hdrSize), blockSize));
+                        if (paddingLen > 0)
+                            new Span<byte>((void*)(phys + unaligned), paddingLen).Clear();
+                        var recordSpan = new Span<byte>((void*)phys, hdrSize + blockSize);
+                        RingCodec.FillCrc(recordSpan, hdrSize, blockSize);
+                        Seal(addr, aligned);
+                        // ★ meta 写不推进 _safeSnapshotTail：该水位语义=「用户记录的页池完整上界」——
+                        //   meta 写（恢复期/泵周期）会把它推高，掩盖用户记录区页池空壳的事实，
+                        //   重放/恢复扫描误判热区读到空壳垃圾（跨实例恢复 0 条实锤）。
+                    }
+                }
+
+                if (addr.IsValid)
+                    return addr;
+
+                // ★ 背压：环形满——锁外腾页（同 WriteRecordCore）
+                var ro = ReadOnlyAddress;
+                var flushed = FlushedUntilAddress;
+                if (ro > flushed) WriteThroughUntil(ro);
+                else Thread.Yield();
+            }
         }
         finally { _epoch.Suspend(); }
     }
@@ -475,29 +501,11 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
         return new ValueTask<LogicalAddress>(addr);
     }
 
-    // === ★ LogicalAddress 原子操作 helper（16B struct，Volatile/Interlocked 不直接支持）===
-    // LogicalAddress(int SegId@0 + int Extension@4 + long Offset@8) = 16B，与 NativeInt128(Lo@0+Hi@8) 同内存布局，
-    // Unsafe.As reinterpret 后用 NativeAtomic128.CompareExchange（cmpxchg16b，~5ns）。
-    // Ring 水位推进多在单写者上下文（epoch drain / _tailLock），CAS-loop 单调推进足够。
-    /// <summary>原子读 LogicalAddress（经 NativeInt128 reinterpret，16B 原子）。</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private protected static LogicalAddress VolatileRead(ref LogicalAddress location)
-        => location;   // 单写者上下文，普通读足够（推进方负责可见性，epoch drain/lock 串行化）
-
-    /// <summary>原子写 LogicalAddress。</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private protected static void VolatileWriteAddr(ref LogicalAddress location, LogicalAddress value)
-        => location = value;
-
-    /// <summary>★ CAS 单调推进 LogicalAddress 水位（仅 newValue &gt; 当前值才推进，不回退，同 <see cref="Utility.MonotonicUpdate(ref long, long, out long)"/> 语义；LogicalAddress 版因 16 字节复合结构不能直接复用 long 版）。</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private protected static bool MonotonicUpdateAddr(ref LogicalAddress variable, LogicalAddress newValue, out LogicalAddress oldValue)
-    {
-        oldValue = variable;
-        if (newValue.CompareTo(oldValue) <= 0) return false;
-        variable = newValue;   // 单写者上下文（epoch drain / lock）——直接赋值
-        return true;
-    }
+    // === ★ LogicalAddress 原子操作 helper ===
+    // （历史注：MonotonicUpdateAddr/VolatileRead/VolatileWriteAddr 已随 #163 水位原子化基座
+    //   （RingBase.Watermarks.cs，CAS128 对齐块）退役——推进走 MonotonicUpdateAddr(slot, ...)，
+    //   读走同名水位属性。LogicalAddress 16B 与 NativeInt128 同布局，Unsafe.As reinterpret 为
+    //   水位块的标准转换路径。）
 
 
 }

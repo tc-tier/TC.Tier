@@ -26,6 +26,9 @@ public sealed class ObjectMetadata
     }
 
     /// <summary>构造并校验（非法键/超限抛 <see cref="ArgumentException"/>）。</summary>
+    /// <param name="userMetadata">用户元数据键值对（null/空 = <see cref="Empty"/>）。</param>
+    /// <returns>校验通过的对象元数据快照（不可变）。</returns>
+    /// <exception cref="ArgumentException">键含 [A-Za-z0-9_.-] 外字符，或键+值 UTF-8 总量（含 x-amz-meta- 前缀开销）超 MaxTotalBytes。</exception>
     public static ObjectMetadata Create(IReadOnlyDictionary<string, string>? userMetadata)
         => userMetadata is null or { Count: 0 } ? Empty : new ObjectMetadata(userMetadata);
 
@@ -33,6 +36,9 @@ public sealed class ObjectMetadata
     public IReadOnlyDictionary<string, string> UserMetadata { get; }
 
     /// <summary>单键写入校验（桥层 xattr 早失败路径复用——WriteExtendedAttribute 即抛，不待 Flush）。</summary>
+    /// <param name="key">元数据键（仅允许 [A-Za-z0-9_.-]，非空）。</param>
+    /// <param name="value">元数据值（本方法不单独校验——总量随构造期校验）。</param>
+    /// <exception cref="ArgumentException">键为空或含非法字符。</exception>
     public static void ValidateUserMetadataEntry(string key, string value)
     {
         if (string.IsNullOrEmpty(key))

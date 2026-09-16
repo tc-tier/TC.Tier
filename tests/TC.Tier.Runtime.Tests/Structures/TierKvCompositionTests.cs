@@ -82,28 +82,28 @@ public class TierKvCompositionTests
     // ═══ KV 语义矩阵（三族同测：写/点查/覆盖/删除/未命中）═══
 
     [Fact]
-    public void Kv_Semantics_HashIndex()
+    public async Task Kv_Semantics_HashIndex()
     {
         using var vol = new TestVolume();
-        using var ring = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         using var index = NewHash(vol, ring);
         AssertKvSemantics(ring, index);
     }
 
     [Fact]
-    public void Kv_Semantics_BTreeIndex()
+    public async Task Kv_Semantics_BTreeIndex()
     {
         using var vol = new TestVolume();
-        using var ring = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         using var index = NewBTree(vol, ring);
         AssertKvSemantics(ring, index);
     }
 
     [Fact]
-    public void Kv_Semantics_SkipListIndex()
+    public async Task Kv_Semantics_SkipListIndex()
     {
         using var vol = new TestVolume();
-        using var ring = RingOfLong.Create(RingSettings(vol), vol.Fs);
+        using var ring = await RingOfLong.CreateAsync(RingSettings(vol), vol.Fs);
         using var index = NewSkipList(vol, ring);
         AssertKvSemantics(ring, index);
     }
@@ -146,13 +146,13 @@ public class TierKvCompositionTests
     // ═══ §4 跨实例恢复：ring meta 恢复 → 锚点解析 → index 拉流重放自建 ═══
 
     [Fact]
-    public void Kv_Reopen_RebuildsFromBegin_HashIndex()
+    public async Task Kv_Reopen_RebuildsFromBegin_HashIndex()
     {
         using var vol = new TestVolume();
         const int count = 50;
 
         // 实例 1：写 KV + Prepare（FlushUntil + WriteMeta——数据+水位+（无）opaque 落盘）
-        using (var ring1 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs))
+        using (var ring1 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs))
         {
             using var idx1 = NewHash(vol, ring1);
             for (long k = 1; k <= count; k++)
@@ -161,7 +161,7 @@ public class TierKvCompositionTests
         }
 
         // 实例 2：Ring 恢复（Managed meta）→ 锚点解析（未登记 → Begin）→ index 全量重放
-        using var ring2 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs);
         ResolveAnchor(ring2).Should().Be(ring2.BeginAddress, "未登记锚点 → W=Begin 全量重建同一条路");
         using var idx2 = NewHash(vol, ring2,
             hints: new ProbingIndexRecoveryHints(ResolveAnchor(ring2), ring2.TailAddress));
@@ -176,12 +176,12 @@ public class TierKvCompositionTests
     }
 
     [Fact]
-    public void Kv_Reopen_RebuildsFromBegin_BTreeIndex_AndOverwriteReplaysLatest()
+    public async Task Kv_Reopen_RebuildsFromBegin_BTreeIndex_AndOverwriteReplaysLatest()
     {
         using var vol = new TestVolume();
         const int count = 60;
 
-        using (var ring1 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs))
+        using (var ring1 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs))
         {
             using var idx1 = NewBTree(vol, ring1);
             for (long k = 1; k <= count; k++)
@@ -191,7 +191,7 @@ public class TierKvCompositionTests
             ring1.Prepare(seq: 1);
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs);
         using var idx2 = NewBTree(vol, ring2,
             hints: new SortedIndexRecoveryHints(ResolveAnchor(ring2), ring2.TailAddress));
 
@@ -206,12 +206,12 @@ public class TierKvCompositionTests
     }
 
     [Fact]
-    public void Kv_Reopen_RebuildsFromBegin_SkipListIndex()
+    public async Task Kv_Reopen_RebuildsFromBegin_SkipListIndex()
     {
         using var vol = new TestVolume();
         const int count = 40;
 
-        using (var ring1 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs))
+        using (var ring1 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs))
         {
             using var idx1 = NewSkipList(vol, ring1);
             for (long k = 1; k <= count; k++)
@@ -219,7 +219,7 @@ public class TierKvCompositionTests
             ring1.Prepare(seq: 1);
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs);
         using var idx2 = NewSkipList(vol, ring2,
             hints: new SortedIndexRecoveryHints(ResolveAnchor(ring2), ring2.TailAddress));
 
@@ -235,33 +235,37 @@ public class TierKvCompositionTests
     // ═══ 水位锚点一致性（§4：锚点搭 Ring 水位同 meta 块原子提交）═══
 
     [Fact]
-    public void Anchor_SetOpaqueMeta_RidesRingWatermark_AcrossReopen()
+    public async Task Anchor_SetOpaqueMeta_RidesRingWatermark_AcrossReopen()
     {
         using var vol = new TestVolume();
 
         LogicalAddress anchor;
-        using (var ring1 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs))
+        using (var ring1 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs))
         {
             ring1.Write(1L, new byte[] { 1 });
             ring1.Write(2L, new byte[] { 2 });
             anchor = ring1.TailAddress;
-            ring1.SetOpaqueMeta(MemoryMarshal.Cast<LogicalAddressWire, byte>(stackalloc[] { LogicalAddressWire.From(anchor) }));
+            // async 方法禁 stackalloc/ref struct 局部——堆数组序列化 LogicalAddressWire（等价原栈形态）
+            var wire = LogicalAddressWire.From(anchor);
+            var wireBytes = new byte[WireSize];
+            MemoryMarshal.Write(wireBytes, in wire);
+            ring1.SetOpaqueMeta(wireBytes);
             ring1.Prepare(seq: 1);   // 水位 + staged opaque 同块原子落盘
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs);
-        var opaque = ring2.ReadOpaqueMeta();
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs);
+        var opaque = ring2.ReadOpaqueMeta().ToArray();   // async 禁 Span 局部——堆快照
         opaque.Length.Should().BeGreaterOrEqualTo(WireSize, "锚点应随 Ring 水位落盘并可跨实例读回");
         MemoryMarshal.Read<LogicalAddressWire>(opaque).ToAddress().Should().Be(anchor);
         ResolveAnchor(ring2).Should().Be(anchor, "有效锚点（≤尾）解析为 W");
     }
 
     [Fact]
-    public void Anchor_BeyondRecoveredTail_IsCorrupt_FallsBackToBegin()
+    public async Task Anchor_BeyondRecoveredTail_IsCorrupt_FallsBackToBegin()
     {
         using var vol = new TestVolume();
 
-        using (var ring1 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs))
+        using (var ring1 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs))
         {
             ring1.Write(1L, new byte[] { 1 });
             // 伪造"未来锚点"（越过尾——违反不变量的形态）：解析侧必须守卫宁可回退全量，不重放错起点
@@ -270,7 +274,7 @@ public class TierKvCompositionTests
             ring1.Prepare(seq: 1);
         }
 
-        using var ring2 = RingOfLong.Create(RingSettings(vol, deleteOnClose: false), vol.Fs);
+        using var ring2 = await RingOfLong.CreateAsync(RingSettings(vol, deleteOnClose: false), vol.Fs);
         ResolveAnchor(ring2).Should().Be(ring2.BeginAddress, "锚点越过恢复尾=损坏 → 回退 Begin（宁可旧多重放）");
 
         // 回退后全量重建数据完整
@@ -283,10 +287,10 @@ public class TierKvCompositionTests
     }
 
     [Fact]
-    public void Anchor_DisabledMeta_SetOpaqueMeta_FailsFast()
+    public async Task Anchor_DisabledMeta_SetOpaqueMeta_FailsFast()
     {
         using var vol = new TestVolume();
-        using var ring = RingOfLong.Create(
+        using var ring = await RingOfLong.CreateAsync(
             TestRingSettingsFactory.On(vol, "kv-ring", deleteOnClose: false, metaKind: MetaPolicyKind.Disabled),
             vol.Fs);
 

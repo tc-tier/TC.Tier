@@ -57,20 +57,6 @@ internal sealed partial class StorageEngine
     private int _supportProbed;
 
     /// <summary>
-    /// ★ 按本次写几何选句柄——DIO 激活且 (offset,length) 满足对齐地板时走 DIO 写句柄；
-    /// 否则走缓冲写句柄（Core Win DIO 地板 = max(扇区, 4096)（㉙），引擎 chunk 是 512 粒度 +
-    /// 任意 payload 尾——非对齐尾走页缓存是 Core io.md 指定的消费纪律，性能主体（对齐大块）仍 DIO）。
-    /// </summary>
-    private IFileHandle GetWriteHandleForChunk(int segId, long offset, int length)
-    {
-        if (!DioActive) return GetWriteHandle(segId);
-        var align = Math.Max((int)SectorSize, 4096);
-        return offset % align == 0 && length % align == 0
-            ? GetWriteHandle(segId)
-            : _pool.Acquire(SegmentFileName(segId), _writeOptionsBuffer);   // ★ M1：固化缓冲形态（零分配）
-    }
-
-    /// <summary>
     /// 拿读句柄（借——调用方 using 归还）。usePageCache=false 时 NoBuffering（DIO 读，须对齐）。
     /// <para>★ 调用方：跨段 Read、SequentialReader、Recovery 扫描读。</para>
     /// <para>★ 读选项实例记忆化：FileOpenOptions 是 record 类——每读 new 即热路径堆分配；
@@ -95,9 +81,11 @@ internal sealed partial class StorageEngine
     {
         var path = SegmentFileName(segId);
         if (_fs.Exists(path)) return;
-        _fs.CreateFile(path, PreallocateFile ? growthLimit : 0,
-            SegmentTupleCodec.Encode(StableState.Ready, maxOffset: 0, growthLimit: growthLimit,
-                realSize: growthLimit, ReadOnlySpan<byte>.Empty));
+        // ★ 初始元组入耐久化泵（零 fsync 建段——文件先立，元组随泵落盘；崩溃窗口内恢复走
+        //   fileSize 权威回退；interval=Zero 时 Mark 内部退化为同步直写）。
+        _fs.CreateFile(path, PreallocateFile ? growthLimit : 0, ReadOnlyMemory<byte>.Empty);
+        MarkSegmentTupleDirty(segId, StableState.Ready, maxOffset: 0, growthLimit: growthLimit,
+            realSize: growthLimit, ReadOnlySpan<byte>.Empty);
     }
 
     /// <summary>

@@ -3,6 +3,9 @@ using System.Runtime.InteropServices;
 
 namespace TC.Tier.Runtime.Structures.Ring;
 
+/// <summary>
+/// RingBase 批量写 partial——<see cref="WriteBatch"/> 独占窗口批量追加（窗口领取 + 批内无锁写）。
+/// </summary>
 public abstract partial class RingBase<TKey>
 {
     /// <summary>
@@ -14,6 +17,7 @@ public abstract partial class RingBase<TKey>
     /// <para>★ 窗口 = 整页（record 超页尾 → 领下一页）；未写满的窗口尾 = 预留空白（无 Seal 不可读，
     ///   驱逐按页 flush 零填充无碍）。地址语义与单条 Write 完全一致（批独占连续段）。</para>
     /// </summary>
+    /// <returns>新开的 <see cref="WriteBatch"/> 批窗口（ref struct，须 Dispose 释放 epoch）。</returns>
     public WriteBatch BeginWriteBatch()
     {
         EnsureNotDisposed();
@@ -54,12 +58,26 @@ public abstract partial class RingBase<TKey>
         /// <summary>批内已写 record 数。</summary>
         public int Count => _count;
 
-        /// <summary>批量追加单条 record（窗口内无锁推进；窗口耗尽自动领新窗口）。</summary>
+        /// <summary>批量追加单条 record（窗口内无锁推进；窗口耗尽自动领新窗口）。
+        /// 同一 WriteBatch 实例不可并发调用；不同批各持窗口可并发。</summary>
+        /// <param name="key">待写 key（TKey 定长 blittable，按 sizeof(TKey) 原样写入）。</param>
+        /// <param name="value">payload 字节（与 key 拼为同一条 record 的负载）。</param>
+        /// <returns>本条 record 的逻辑地址（写完即在页池完整可见）。</returns>
         public unsafe LogicalAddress Append(TKey key, ReadOnlySpan<byte> value)
+            => Append(key, value, []);
+
+        /// <summary>分段追加单条 record；prefix/value 直接写入 Ring，避免调用方拼接临时数组。
+        /// 同一 WriteBatch 实例不可并发调用；不同批各持窗口可并发。</summary>
+        /// <param name="key">待写 key（TKey 定长 blittable，按 sizeof(TKey) 原样写入）。</param>
+        /// <param name="prefix">payload 前段字节（与 value 顺序拼接，免临时数组）。</param>
+        /// <param name="value">payload 后段字节。</param>
+        /// <returns>本条 record 的逻辑地址（写完即在页池完整可见）。</returns>
+        public unsafe LogicalAddress Append(TKey key, scoped ReadOnlySpan<byte> prefix,
+            scoped ReadOnlySpan<byte> value)
         {
             if (!_open) throw new ObjectDisposedException(nameof(WriteBatch));
 
-            int keyLen = RingBase<TKey>.KeySize, payloadLen = value.Length;
+            int keyLen = RingBase<TKey>.KeySize, payloadLen = checked(prefix.Length + value.Length);
             uint totalPayload = (uint)(keyLen + payloadLen);
             int unaligned = _owner.RingCodec.HeaderSize + (int)totalPayload;
             int aligned = (unaligned + _owner.RingCodec.Alignment - 1) & ~(_owner.RingCodec.Alignment - 1);
@@ -78,12 +96,20 @@ public abstract partial class RingBase<TKey>
             var headerSpan = new Span<byte>((void*)phys, _owner.RingCodec.HeaderSize);
             _owner.RingCodec.WriteHeader(headerSpan, in fields);
             Unsafe.WriteUnaligned((void*)(phys + _owner.RingCodec.HeaderSize), key);
-            value.CopyTo(new Span<byte>((void*)(phys + _owner.RingCodec.HeaderSize + keyLen), payloadLen));
+            var payloadSpan = new Span<byte>((void*)(phys + _owner.RingCodec.HeaderSize + keyLen), payloadLen);
+            prefix.CopyTo(payloadSpan);
+            value.CopyTo(payloadSpan[prefix.Length..]);
             if (paddingLen > 0)
                 new Span<byte>((void*)(phys + unaligned), paddingLen).Clear();
             var recordSpan = new Span<byte>((void*)phys, _owner.RingCodec.HeaderSize + (int)totalPayload);
             _owner.RingCodec.FillCrc(recordSpan, _owner.RingCodec.HeaderSize, (int)totalPayload);
             _owner.RingCodec.OrFlags(headerSpan, RecordFlags.FLAG_RINGRECORD_VALID | RecordFlags.FLAG_RINGRECORD_SEALED);
+
+            // ★ header+payload+CRC 完整——推进安全快照尾（与 WriteRecordCore 同规）：batch 消息
+            //   写完即在页池完整可见，消费扫描/点查按此判热直读页池（不推则判冷读设备滞后快照 → 漏投递）。
+            //   AdvanceSafeSnapshotTail 的 8B 判据水位 CAS-max——多 batch 并发推进无撕裂。
+            //   AdvanceSafeSnapshotTail 经 _owner 调（实例方法）；8B 判据水位 CAS-max——多 batch 并发无撕裂。
+            _owner.AdvanceSafeSnapshotTail(_owner._engine.CalculationAddress(addr, aligned));
 
             _pageIntra += aligned;
             _count++;

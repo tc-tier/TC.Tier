@@ -31,6 +31,7 @@ public sealed partial class TierVolumeFs : IFileSystem, IContiguousVolume
     /// <summary>进程内实例登记表（一卷一实例——载体身份键 + UUID 双查）。</summary>
     private static readonly ConcurrentDictionary<string, TierVolumeFs> SInstances = new();
 
+    private readonly TimeProvider _clock;   // 时钟供给源（时钟缝 件一 P2）
     private readonly TierVolumeCarrier _carrier;                   // 主载体（成员 0）
     private readonly ILogger? _logger;
     private readonly bool _readOnly;
@@ -87,6 +88,7 @@ public sealed partial class TierVolumeFs : IFileSystem, IContiguousVolume
     {
         _carrier = carrier;
         _logger = logger;
+        _clock = options.Clock;   // 时钟供给源（时钟缝 件一 P2——flusher 检查点节奏）
         _readOnly = options.Access == AccessMode.Read;
         _mountAccess = options.Access;
         _pageBudget = options.PageCacheBytes;

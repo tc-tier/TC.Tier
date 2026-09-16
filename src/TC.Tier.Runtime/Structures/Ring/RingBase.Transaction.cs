@@ -36,46 +36,67 @@ public abstract partial class RingBase<TKey>
     ///   WriteMeta 必须在 FlushUntil 之后才能记真实的 FlushedUntilAddress（否则崩溃在 Commit 后 FlushUntil 前，
     ///   meta 说刷到 X 但数据没真刷到，恢复丢数据），<b>2 次 fsync</b>。</para>
     /// </summary>
+    /// <summary>★ Prepare 单飞门（#169）：双事务协调器并发 Prepare 曾致 meta 交错写 + 跨水位
+    /// 快照不一致——Prepare 冷路径，串行化零热路径代价。</summary>
+    private readonly SemaphoreSlim _prepareGate = new(1, 1);
+
+    /// <summary>Prepare（2PC 事务准备）：落盘数据 + meta 至"悬干"状态——数据 flush 到尾、meta 持久化
+    /// （崩溃在 ConfirmCommitted 前恢复即丢弃）；meta 策略分路径（Transport 回落 MetaHost = meta 随数据
+    /// 同页 1 次 fsync；Managed/注入 Transport/Disabled = FlushUntil 先 + WriteMeta 独立 fsync）。
+    /// 经排他门串行（并发 Prepare 防交错）。</summary>
     /// <param name="seq">准备提交的序号。</param>
     public void Prepare(long seq)
     {
         Volatile.Write(ref _lastPreparedSeq, seq);
-        // ★ Transport 策略且未注入传输（回落 MetaHost 宿主流嵌入）= 旧 Embedded 语义，走 1-fsync 优化路径
-        if (MetaPolicy is TransportMetaPolicy<RingMetaHeader,RingMetaPayload> && _metaTransport is null)
+        EnsureReady();
+        _prepareGate.Wait();
+        try
         {
-            // ★ 宿主流嵌入优化：1 次 fsync。meta record 随数据同页 flush 原子落盘。
-            LogicalAddress dataTail = TailAddress;
-            WriteMeta(flushedUntilOverride: dataTail);   // Commit 写页池（纯内存，TailAddress 推进过 meta record）
-                                                          // ★ meta 同块持久化当前提交边界（CommittedTailAddress）
-            FlushUntil(TailAddress);                      // 1 次 fsync：刷 [oldFlushedUntil, newTail)，含数据+meta
+            // ★ Transport 策略且未注入传输（回落 MetaHost 宿主流嵌入）= 旧 Embedded 语义，走 1-fsync 优化路径
+            if (MetaPolicy is TransportMetaPolicy<RingMetaHeader,RingMetaPayload> && _metaTransport is null)
+            {
+                // ★ 宿主流嵌入优化：1 次 fsync。meta record 随数据同页 flush 原子落盘。
+                LogicalAddress dataTail = TailAddress;
+                WriteMeta(flushedUntilOverride: dataTail);   // Commit 写页池（纯内存，TailAddress 推进过 meta record）
+                                                              // ★ meta 同块持久化当前提交边界（CommittedTailAddress）
+                FlushUntilTail();                             // 1 次 fsync：刷 [oldFlushedUntil, 快照尾)，含数据+meta（#197/#207 原子快照）
+            }
+            else
+            {
+                // Managed/注入传输 Transport/Disabled 原路径：FlushUntil 先（记真实已刷边界）→ WriteMeta 独立 fsync
+                FlushUntilTail();
+                WriteMeta();
+            }
         }
-        else
-        {
-            // Managed/注入传输 Transport/Disabled 原路径：FlushUntil 先（记真实已刷边界）→ WriteMeta 独立 fsync
-            FlushUntil(TailAddress);
-            WriteMeta();
-        }
+        finally { _prepareGate.Release(); }
     }
 
     /// <summary>
     /// ★ PrepareAsync（事务准备）：落盘数据 + meta。对等 <see cref="Prepare"/> 的分路径逻辑。
     /// </summary>
     /// <param name="seq">准备提交的序号。</param>
-    /// <param name="ct">取消令牌。</param>
+    /// <param name="ct">取消令牌——数据 flush / meta 落盘途中响应取消。</param>
+    /// <returns>完成后数据已 flush 到尾且 meta 已落盘（"悬空"状态，等待 ConfirmCommitted）。</returns>
     public async ValueTask PrepareAsync(long seq, CancellationToken ct)
     {
         Volatile.Write(ref _lastPreparedSeq, seq);
-        if (MetaPolicy is TransportMetaPolicy<RingMetaHeader,RingMetaPayload> && _metaTransport is null)
+        EnsureReady();
+        await _prepareGate.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            LogicalAddress dataTail = TailAddress;
-            await WriteMetaAsync(flushedUntilOverride: dataTail, ct: ct).ConfigureAwait(false);
-            await FlushUntilAsync(TailAddress, ct).ConfigureAwait(false);
+            if (MetaPolicy is TransportMetaPolicy<RingMetaHeader,RingMetaPayload> && _metaTransport is null)
+            {
+                LogicalAddress dataTail = TailAddress;
+                await WriteMetaAsync(flushedUntilOverride: dataTail, ct: ct).ConfigureAwait(false);
+                await FlushUntilTailAsync(ct).ConfigureAwait(false);   // #197/#207：tail 原子快照（含 meta record）
+            }
+            else
+            {
+                await FlushUntilTailAsync(ct).ConfigureAwait(false);   // #197/#207：tail 原子快照
+                await WriteMetaAsync(ct: ct).ConfigureAwait(false);
+            }
         }
-        else
-        {
-            await FlushUntilAsync(TailAddress, ct).ConfigureAwait(false);
-            await WriteMetaAsync(ct: ct).ConfigureAwait(false);
-        }
+        finally { _prepareGate.Release(); }
     }
 
     /// <summary>
@@ -110,6 +131,7 @@ public abstract partial class RingBase<TKey>
     /// <para>⚠️ 调用契约：与并发 Write 串行（事务终态点调用，TransactionLog 协议天然满足）；
     /// 回退点不可落入已驱逐区（TruncateSuffix fail-fast 守卫）。</para>
     /// </summary>
+    /// <param name="seq">要回滚的 Prepare 序号。</param>
     public void Abort(long seq)
     {
         EnsureReady();

@@ -22,6 +22,7 @@ public interface IMetaPolicy<THeader, TPayload> : IDisposable, IAsyncDisposable
     where TPayload : struct
 {
     /// <summary>Payload 区总容量（结构化首部 + opaque 扩展）。</summary>
+    /// <returns>Payload 区总容量（结构化首部 + opaque 扩展）。</returns>
     int PayloadSize { get; }
 
     /// <summary>从存储加载 meta（false = 空/无数据/损坏）。</summary>

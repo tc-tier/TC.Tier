@@ -45,4 +45,8 @@ public sealed class TierVolumeOpenOptions : FileSystemOptions
     /// 变异全拒 ReadOnlyVolume 语义；与活卷同载体并发安全——冻结块永不复用/打洞）。
     /// </summary>
     public string? SnapshotName { get; init; }
+
+    /// <summary>时钟供给源（故障注入面 件一——时钟缝 P2 落点；缺省 <see cref="TimeProvider.System"/> 行为零变化）。
+    /// <para>flusher 检查点衰减 cadence 经本源计量——假钟下由跳变/快进确定性驱动。</para></summary>
+    public TimeProvider Clock { get; init; } = TimeProvider.System;
 }

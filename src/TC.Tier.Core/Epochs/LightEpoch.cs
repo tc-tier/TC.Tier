@@ -119,7 +119,10 @@ public sealed unsafe class LightEpoch : IDisposable
     /// <summary>
     /// 默认 drain 列表大小。
     /// </summary>
-    private const int kDrainListSize = 16;
+    // ★ #219：16 → 128——Ring 多 writer 交错 Resume/推进时可同时挂起 ≥2 个 OnPagesClosed（#161 实证），
+    //   高并发 BumpCurrentEpoch 超 16 并发时溢出线程 spinning ProtectAndDrain+Yield。128 槽内存代价
+    //   128×16B=2KB/实例，换高并发无自旋。
+    private const int kDrainListSize = 128;
 
     // ★ pinned 数组必须持有强引用——GC.AllocateArray(pinned:true) 只保证不移动（POH），
     //   不保证不回收。若仅存裸指针（_tableAligned/ThreadIndexAligned）而丢弃数组引用，
@@ -722,6 +725,8 @@ public sealed unsafe class LightEpoch : IDisposable
         [FieldOffset(16)]
         public fixed long markers[6];
 
+        /// <summary>调试字符串：本地当前 epoch、线程 ID 与重入计数。</summary>
+        /// <returns>形如 <c>lce = {localCurrentEpoch}, tid = {threadId}, re-ent {reentrant}</c> 的字符串。</returns>
         public override string ToString() => $"lce = {localCurrentEpoch}, tid = {threadId}, re-ent {reentrant}";
     }
 
@@ -739,6 +744,8 @@ public sealed unsafe class LightEpoch : IDisposable
         /// </summary>
         public Action? Action;
 
+        /// <summary>调试字符串：epoch 值与待执行 action（无 action 显示 n/a）。</summary>
+        /// <returns>形如 <c>epoch = {Epoch}, action = {Action 或 n/a}</c> 的字符串。</returns>
         public override string ToString() => $"epoch = {Epoch}, action = {(Action is null ? "n/a" : Action.Method.ToString())}";
     }
 }

@@ -42,6 +42,7 @@ public sealed partial class StreamSnapshot : SnapshotBase
     /// 打开帧写入器：WriteAsync(data) × N（自动 EntryCount+1）→ CompleteAsync 写帧尾。
     /// 首次写自动加帧头；Complete 写帧尾 + flush；只 using 不 Complete 也会自动闭环。
     /// </summary>
+    /// <returns>帧写入器（封装双 buffer 写会话；Dispose 等价 Complete 闭环）。</returns>
     public StreamFrameWriter OpenWrite()
     {
         var physStart = _physicalWriteAddress;
@@ -58,6 +59,10 @@ public sealed partial class StreamSnapshot : SnapshotBase
     }
 
     /// <summary>指定逻辑区间打开帧写入器（物理地址续接，logical 不推进）。</summary>
+    /// <param name="start">区间逻辑起点（写入 checkpoint 记录为 [start, physStart) 映射）。</param>
+    /// <param name="end">区间逻辑终点（须 &gt; start，否则抛 ArgumentException）。</param>
+    /// <returns>帧写入器（写帧数据；flush 回调只推进物理尾）。</returns>
+    /// <exception cref="ArgumentException">end ≤ start 时抛出。</exception>
     public StreamFrameWriter OpenWriteRange(LogicalAddress start, LogicalAddress end)
     {
         if (end.CompareTo(start) <= 0) throw new ArgumentException("end must be > start");
@@ -76,6 +81,7 @@ public sealed partial class StreamSnapshot : SnapshotBase
     // ════════════════════════════════════════════════════════════
 
     /// <summary>打开帧读取器（从截断点读到写尾）：ReadDataAsync 读 data 至 EOF（footer 校验 CRC64）。</summary>
+    /// <returns>帧读取器（逻辑区间 [截断点, 写尾)；剩余可读字节数 = 区间长度）。</returns>
     public StreamFrameReader OpenRead()
     {
         var start = _truncatedAddress;
@@ -87,6 +93,9 @@ public sealed partial class StreamSnapshot : SnapshotBase
     }
 
     /// <summary>指定逻辑区间打开帧读取器。</summary>
+    /// <param name="start">区间逻辑起点。</param>
+    /// <param name="end">区间逻辑终点。</param>
+    /// <returns>帧读取器（逻辑区间 [start, end)；剩余可读字节数 = 区间长度）。</returns>
     public StreamFrameReader OpenReadRange(LogicalAddress start, LogicalAddress end)
     {
         var physStart = AlignDownAddress(LogicalToPhysical(start));

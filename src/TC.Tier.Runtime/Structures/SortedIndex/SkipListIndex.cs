@@ -8,6 +8,10 @@ using TC.Tier.Contracts.Structures;
 
 namespace TC.Tier.Runtime.Structures.SortedIndex;
 
+/// <summary>
+/// SkipListIndex 主 partial——跳表内核（arena 驻留变长节点、addr→指针缓存、脏节点延迟写回、
+/// head 哨兵与层高生成）。
+/// </summary>
 public partial class SkipListIndex<TKey> : SortedIndexBase<TKey> where TKey : unmanaged, IEquatable<TKey>
 {
     /// <summary>
@@ -74,7 +78,6 @@ public partial class SkipListIndex<TKey> : SortedIndexBase<TKey> where TKey : un
     private readonly Random _rng = new();
     private int _currentLevel;
     private long _entryCount;
-    private readonly Dictionary<TKey, LogicalAddress> _reclaimedNodes = new();
 
     /// <summary>
     /// ★ 脏节点集合（链/值变更延迟写回——插入路径零额外引擎写；dump 时批量写回）。
@@ -85,10 +88,16 @@ public partial class SkipListIndex<TKey> : SortedIndexBase<TKey> where TKey : un
     private readonly HashSet<LogicalAddress> _dirtyNodes = new();
 
     /// <summary>ctor 收 protected internal——开放泛型不落消费面闸门（同 BlittableRing）：外部用 [RingKey] 封闭类型。</summary>
+    /// <param name="fileSystem">文件系统（组合根注入）。</param>
+    /// <param name="settings">SkipListIndexSettings（MaxLevel/重试/缓存容量等）。</param>
+    /// <param name="epoch">epoch 保护（null = 自建 LightEpoch）。默认 null。</param>
+    /// <param name="keyResolver">恢复重放数据面（null = 默认，重放窗口期需要——缺失时恢复 fail-fast）。默认 null。</param>
+    /// <param name="keyComparer">key 比较器（null = 默认 <c>KeyComparer&lt;TKey&gt;</c>）。默认 null。</param>
     protected internal SkipListIndex(IFileSystem fileSystem, SkipListIndexSettings settings,
         LightEpoch? epoch = null,
-        IKeyResolver<TKey>? keyResolver = null)
-        : base(SkipListIndexCodec.Instance, fileSystem, settings, epoch, keyResolver: keyResolver)
+        IKeyResolver<TKey>? keyResolver = null,
+        IKeyComparer<TKey>? keyComparer = null)
+        : base(SkipListIndexCodec.Instance, fileSystem, settings, epoch, keyComparer, keyResolver: keyResolver)
     {
         _maxLevel = settings.MaxLevel;
         _highLevelCacheThreshold = settings.HighLevelCacheThreshold;

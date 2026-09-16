@@ -118,6 +118,7 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
     }
 
     /// <inheritdoc/>
+    /// <returns>形如 <c>[Phase,Version]</c> 的状态字符串。</returns>
     public override string ToString()
     {
         return $"[{Phase},{Version}]";
@@ -133,6 +134,7 @@ public struct VersionSchemeState : IEquatable<VersionSchemeState>
     }
 
     /// <inheritdoc/>
+    /// <returns>内部整字（Phase+Version 打包）的哈希码。</returns>
     public override int GetHashCode()
     {
         return Word.GetHashCode();

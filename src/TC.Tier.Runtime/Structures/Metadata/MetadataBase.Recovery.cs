@@ -13,6 +13,8 @@ public abstract partial class MetadataBase
     private protected class DefaultMetadataRecovery(MetadataBase owner) : RecoveryBase<MetadataRecoveryHints>
     {
         /// <summary>层间 join——主引擎 + meta 引擎（Managed 模式）双 await，全异步轨（OnInitializeBegin 已并行启动）。</summary>
+        /// <param name="ct">取消令牌（透传引擎 <c>WaitForReadyAsync</c>）。</param>
+        /// <returns>表示主引擎 + meta 引擎全部就绪的任务。</returns>
         protected override async ValueTask WaitForDependenciesAsync(CancellationToken ct)
         {
             await owner._engine.WaitForReadyAsync(ct).ConfigureAwait(false);
@@ -25,6 +27,9 @@ public abstract partial class MetadataBase
         /// <para>★ 不用地址值（== Empty）判断"有没有找到"——Empty 是合法地址（地址空间起点），
         ///   用 headFound 布尔标志表示"已获得有效链头"。</para>
         /// </summary>
+        /// <param name="hints">恢复提示（外部注入水位；缺省时走 meta / 扫盘定位链头）。</param>
+        /// <param name="ct">取消令牌。</param>
+        /// <returns>表示恢复核心完成的任务；完成后链头已定位、内存镜像已加载。</returns>
         protected override async ValueTask OnRecoveryCoreAsync(MetadataRecoveryHints hints, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();

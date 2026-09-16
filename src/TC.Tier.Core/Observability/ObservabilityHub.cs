@@ -38,6 +38,12 @@ public sealed partial class ObservabilityHub
     /// <remarks>★ SegmentAllocatorView 仅封装段表的 Segment 分配器相关指标，避免与 Storage/Log/Index 指标混杂。</remarks>
     public SegmentAllocatorView SegmentAllocator { get; }
 
+    /// <summary>Net 传输维度视图（spec-12 §9.1——帧量采样/错误全采/per-protocol tag）。</summary>
+    public NetView Net { get; }
+
+    /// <summary>Raft 共识维度视图（二期-I2）。</summary>
+    public RaftView Raft { get; }
+
     /// <summary>指标总开关（Options.Metrics.Enabled &amp;&amp; sink.IsEnabled）。</summary>
     /// <remarks>★ MetricsEnabled 仅封装总开关，避免各维度视图重复短路。</remarks>
     public bool MetricsEnabled { get; }
@@ -45,6 +51,9 @@ public sealed partial class ObservabilityHub
     /// <summary>链路追踪总开关（Options.Tracing.Enabled &amp;&amp; tracer.IsEnabled）。</summary>
     /// <remarks>★ TracingEnabled 仅封装总开关，避免各 Span 重复短路。</remarks>
     public bool TracingEnabled => _options.Tracing.Enabled && _tracer.IsEnabled;
+
+    /// <summary>注入的追踪器（诊断/装配自证面——传播入口见 CaptureTraceContext，Net 不直调）。</summary>
+    public ITracer Tracer => _tracer;
 
     private ObservabilityHub(IMetricsSink metrics, ITracer tracer, ObservabilityOptions options)
     {
@@ -61,6 +70,9 @@ public sealed partial class ObservabilityHub
             metricsEnabled && options.Metrics.EnableIndexMetrics);
         SegmentAllocator = new SegmentAllocatorView(metrics, options.Metrics.SampleRate,
             metricsEnabled && options.Metrics.EnableSegmentAllocatorMetrics);
+        Net = new NetView(metrics, options.Metrics.SampleRate,
+            metricsEnabled && options.Metrics.EnableNetMetrics);
+        Raft = new RaftView(metrics, metricsEnabled && options.Metrics.EnableRaftMetrics);
     }
 
     // === 工厂 ===
@@ -153,6 +165,24 @@ public sealed partial class ObservabilityHub
         => TracingEnabled ? _tracer.BeginSpan(name, kind) : null;
 
     /// <summary>
+    /// 开始一个 Span，以跨进程父上下文为父（二期-I4——未启用返回 null）。
+    /// <para>线格式归 Net 层（26B 定长——SpanContextCodec）；tracer 只解语义。
+    /// 外部 tracer 覆写 <see cref="ITracer.BeginSpan(string, SpanKind, ReadOnlySpan{byte})"/>
+    /// 与 <see cref="ITracer.CaptureContext"/> 即得跨节点串联能力。</para>
+    /// </summary>
+    /// <param name="name">Span 的名称。</param>
+    /// <param name="kind">Span 的类型。</param>
+    /// <param name="parentWireContext">线上传播的父上下文（缺长/畸形按无父处理——tracer 职责）。</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public ISpan? BeginSpan(string name, SpanKind kind, ReadOnlySpan<byte> parentWireContext)
+        => TracingEnabled ? _tracer.BeginSpan(name, kind, parentWireContext) : null;
+
+    /// <summary>当前上下文线序列化（二期-I4——未启用/无活跃 span 返回 null = 无传播）。</summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte[]? CaptureTraceContext()
+        => TracingEnabled ? _tracer.CaptureContext() : null;
+
+    /// <summary>
     /// 上报错误指标（Counter）。如果 MetricsEnabled=false 则不上报。
     /// </summary>
     /// <param name="component">组件名称。</param>
@@ -166,6 +196,9 @@ public sealed partial class ObservabilityHub
     }
 
     /// <summary>零分配 tag 构造辅助。</summary>
+    /// <param name="k">标签键。</param>
+    /// <param name="v">标签值。</param>
+    /// <returns>由 <paramref name="k"/> / <paramref name="v"/> 组成的键值对。</returns>
     // ReSharper disable once MemberCanBePrivate.Global
     public static KeyValuePair<string, string> Kv(string k, string v) => new(k, v);
 }

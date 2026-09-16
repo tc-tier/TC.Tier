@@ -62,6 +62,8 @@ public interface ILifecycle<in THints> where THints : struct
     /// </summary>
     /// <param name="ct">取消令牌——取消等待时本方法抛 <see cref="OperationCanceledException"/>。</param>
     /// <exception cref="OperationCanceledException">等待被取消（如 <see cref="CancelRecovery"/> 触发）。</exception>
+    /// <exception cref="Exception">恢复失败（后台恢复 task 抛异常）。</exception>
+    /// <returns>异步等待恢复完成的 Task。</returns>
     Task WaitForReadyAsync(CancellationToken ct = default);
 
     /// <summary>

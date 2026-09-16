@@ -1,21 +1,68 @@
 root = true
 
 # ════════════════════════════════════════════════════════════════
-# TC.Tier 代码规范分析器（TC.Tier.CodeGen.Analyzers）
-#   TCSG030：禁止运行时反射（生产代码反射零必要——白盒走 InternalsVisibleTo）
-#   TCSG031：禁止同步强制等待异步（sync-over-async——死锁 + 线程池耗尽）
-# 生产代码（src）严格禁止（Error）；测试豁免（同步测试等 Task 完成 / 反射契约验证是测试惯用法，
-# xunit 无同步上下文无死锁风险）。
+# TC.Tier 代码规范分析器（TC.Tier.Analyzers 配置化分析器包——Tier 仓 = 消费者 0 号）
+#
+# 规则声明（全局节，tier_layer.* / tier_forbidden.* 键——零默认诊断，声明即启用）：
+#   TCSG130 禁用引用（forbidden_reference——元数据引用/using 双形态）：
+#     第一条 = Core.Net 禁依赖产品（依赖单向铁律，spec-12 §1/E4）
+#     后五条 = 基础四面 Wire/Transport/Channels/Hosting/Ports 禁机制面 Raft/P2P/Swarm
+#              （机制单向依赖形态，四面零机制知识，spec-12 §1/E4）
+#   TCSG136 禁止运行时反射（pack=reflection）——反射破坏 AOT/裁剪/性能，白盒走 InternalsVisibleTo
+#   TCSG137 禁 sync-over-async（pack=sync_over_async）——同步阻塞死锁 + 线程池耗尽
+#   TCSG138 禁 fire-and-forget 丢弃（pack=fire_and_forget）——异常未观测/无背压/生命周期失控，走 TaskSink
+#   TCSG139 配置非法 fail-fast（未知键/坏语法 = Error，绝静默）
+# 生产代码（src）Error；测试/探针/基准豁免（同步测试等 Task 完成 / 反射契约验证是测试惯用法，
+# xunit 无同步上下文无死锁风险；依赖锁的触发式验证走测试内编译样例）。
 # ════════════════════════════════════════════════════════════════
 
+tier_layer.forbidden_reference = TC.Tier.Core.Net => TC.Tier.Products ; TC.Tier.Core.Net.Wire => TC.Tier.Core.Net.Raft | TC.Tier.Core.Net.P2P | TC.Tier.Core.Net.Swarm ; TC.Tier.Core.Net.Transport => TC.Tier.Core.Net.Raft | TC.Tier.Core.Net.P2P | TC.Tier.Core.Net.Swarm ; TC.Tier.Core.Net.Channels => TC.Tier.Core.Net.Raft | TC.Tier.Core.Net.P2P | TC.Tier.Core.Net.Swarm ; TC.Tier.Core.Net.Hosting => TC.Tier.Core.Net.Raft | TC.Tier.Core.Net.P2P | TC.Tier.Core.Net.Swarm ; TC.Tier.Core.Net.Ports => TC.Tier.Core.Net.Raft | TC.Tier.Core.Net.P2P | TC.Tier.Core.Net.Swarm
+tier_forbidden.pack = reflection | sync_over_async | fire_and_forget
+
 [src/**/*.cs]
-dotnet_diagnostic.TCSG030.severity = error
-dotnet_diagnostic.TCSG031.severity = error
+dotnet_diagnostic.TCSG130.severity = error
+dotnet_diagnostic.TCSG131.severity = error
+dotnet_diagnostic.TCSG132.severity = error
+dotnet_diagnostic.TCSG133.severity = error
+dotnet_diagnostic.TCSG134.severity = error
+dotnet_diagnostic.TCSG135.severity = error
+dotnet_diagnostic.TCSG136.severity = error
+dotnet_diagnostic.TCSG137.severity = error
+dotnet_diagnostic.TCSG138.severity = error
+dotnet_diagnostic.TCSG139.severity = error
 
 [tests/**/*.cs]
-dotnet_diagnostic.TCSG030.severity = none
-dotnet_diagnostic.TCSG031.severity = none
+dotnet_diagnostic.TCSG130.severity = none
+dotnet_diagnostic.TCSG131.severity = none
+dotnet_diagnostic.TCSG132.severity = none
+dotnet_diagnostic.TCSG133.severity = none
+dotnet_diagnostic.TCSG134.severity = none
+dotnet_diagnostic.TCSG135.severity = none
+dotnet_diagnostic.TCSG136.severity = none
+dotnet_diagnostic.TCSG137.severity = none
+dotnet_diagnostic.TCSG138.severity = none
+dotnet_diagnostic.TCSG139.severity = none
+
+[probes/**/*.cs]
+dotnet_diagnostic.TCSG130.severity = none
+dotnet_diagnostic.TCSG131.severity = none
+dotnet_diagnostic.TCSG132.severity = none
+dotnet_diagnostic.TCSG133.severity = none
+dotnet_diagnostic.TCSG134.severity = none
+dotnet_diagnostic.TCSG135.severity = none
+dotnet_diagnostic.TCSG136.severity = none
+dotnet_diagnostic.TCSG137.severity = none
+dotnet_diagnostic.TCSG138.severity = none
+dotnet_diagnostic.TCSG139.severity = none
 
 [benchmarks/**/*.cs]
-dotnet_diagnostic.TCSG030.severity = none
-dotnet_diagnostic.TCSG031.severity = none
+dotnet_diagnostic.TCSG130.severity = none
+dotnet_diagnostic.TCSG131.severity = none
+dotnet_diagnostic.TCSG132.severity = none
+dotnet_diagnostic.TCSG133.severity = none
+dotnet_diagnostic.TCSG134.severity = none
+dotnet_diagnostic.TCSG135.severity = none
+dotnet_diagnostic.TCSG136.severity = none
+dotnet_diagnostic.TCSG137.severity = none
+dotnet_diagnostic.TCSG138.severity = none
+dotnet_diagnostic.TCSG139.severity = none

@@ -1,4 +1,5 @@
 using System.Buffers;
+using TC.Tier.Contracts.Storage;
 using TC.Tier.Runtime.Structures.Log.Contracts;
 
 namespace TC.Tier.Runtime.Structures.Log;
@@ -8,19 +9,38 @@ namespace TC.Tier.Runtime.Structures.Log;
 /// <para>★ PageFrame 让扫描器整页 CRC 跳逐条 entry 校验（~10-50× 加速）。</para>
 /// <para>★ 同步/异步分轨——两种都支持真实 I/O。</para>
 /// <para>★ 零地址算术违规：所有地址推进经 engine.CalculationAddress，比较用 LogicalAddress 运算符，
-///   页内偏移是纯内存缓冲索引（int），不参与地址运算。</para>
+/// 页内偏移是纯内存缓冲索引（int），不参与地址运算。</para>
+/// <para>★ snapshotMode（spec-10 根治）：旧形态硬编码 Consistent——复制读的区间段共享锁全程持有
+/// （end=committed 尾，区间随日志增长），与写侧段排他（ReclaimTail drain/TruncateSuffix）互斥，
+/// 读写在多线程并发形态（WAL 直排）下互锁。复制读等高频路径应传 DirtyRead（逐段游标锁）。</para>
 /// </summary>
 public abstract partial class LogBase
 {
-    /// <summary>打开扫描游标——引擎 OpenSequentialReader + PageFrame 校验。</summary>
-    public ILogCursor OpenCursor(LogicalAddress startAddress = default, LogicalAddress endAddress = default, bool verifyCrc = false)
-        => _cursorFactory?.Invoke(startAddress, endAddress, verifyCrc) ?? new PageFrameCursor(this, startAddress, endAddress, verifyCrc);
+    /// <summary>★ 页缓冲专用池：默认 ArrayPool 最大桶 1MB——PageSize（默认 4MB）级请求不进池。
+    /// 桶上限 16MB（覆盖任意 LogPageSizeBits 配置），每桶 8 实例。</summary>
+    private static readonly ArrayPool<byte> PageBufPool = ArrayPool<byte>.Create(1 << 24, 8);
+    /// <summary>打开扫描游标——引擎 OpenSequentialReader + PageFrame 校验。
+    /// <paramref name="snapshotMode"/>：Consistent（默认，快照隔离）/ DirtyRead（游标锁，读写并发）。
+    /// <paramref name="leasePages"/>：true = 页租借——换页不还池（游标持有全部已读页至 Dispose，
+    /// <see cref="ILogCursor.CurrentPayloadMemory"/> 有效至 Dispose，批读零拷贝直用）；false = 换页即还池
+    /// （视图禁跨 MoveNext 持有）。</summary>
+    /// <param name="startAddress">扫描起点 LogicalAddress（默认 default = 从 data 区头开始；可为 entry 地址——游标自动跳过其前字节）。</param>
+    /// <param name="endAddress">扫描终点 LogicalAddress（默认 default = 当前已落盘水位 FlushedTail——内存页未 flush 的 entry 不可读）。</param>
+    /// <param name="verifyCrc">true = 逐条校验记录 CRC；false（默认）= 仅整页 PageFrame CRC 校验（约 10-50× 加速）。</param>
+    /// <param name="snapshotMode">一致性模式：Consistent（快照隔离）/ DirtyRead（逐段游标锁，读写可并发）。默认 Consistent。</param>
+    /// <param name="leasePages">true = 页租借（换页不还池）；false = 换页即还池。默认 false。</param>
+    /// <returns>打开的扫描游标（注入工厂优先；否则默认 PageFrameCursor）。</returns>
+    public ILogCursor OpenCursor(LogicalAddress startAddress = default, LogicalAddress endAddress = default,
+        bool verifyCrc = false, SnapshotMode snapshotMode = SnapshotMode.Consistent, bool leasePages = false)
+        => _cursorFactory?.Invoke(startAddress, endAddress, verifyCrc, snapshotMode, leasePages)
+           ?? new PageFrameCursor(this, startAddress, endAddress, verifyCrc, snapshotMode, leasePages);
 
     private sealed class PageFrameCursor : ILogCursor
     {
         private readonly LogBase _owner;
         private readonly bool _verifyCrc;
         private readonly int _headerSize;
+        private readonly bool _leasePages;   // ★ 页租借（零拷贝读——2026-08-29）：换页不还池，Dispose 统一归还
 
         private readonly ISequentialReader _reader;
 
@@ -29,6 +49,7 @@ public abstract partial class LogBase
         private LogicalAddress _pageStartAddr;   // data 区起点（frameStart + headerSize）
         private LogicalAddress _pageEndAddr;     // data 区尾（CalculationAddress 计算）
         private int _pageDataLen;                // 页内有效字节数（hdr.DataLength）
+        private List<byte[]>? _leased;           // ★ lease 模式已读页持有（懒分配——Dispose 统一还池）
 
         // 扫描游标（总指向下一个待读 entry 起点）
         private LogicalAddress _currentAddress;
@@ -51,19 +72,21 @@ public abstract partial class LogBase
         private bool _initialized;
         private bool _frameless;
 
-        public PageFrameCursor(LogBase owner, LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc)
+        public PageFrameCursor(LogBase owner, LogicalAddress startAddress, LogicalAddress endAddress, bool verifyCrc,
+            SnapshotMode snapshotMode = SnapshotMode.Consistent, bool leasePages = false)
         {
             _owner = owner;
             _verifyCrc = verifyCrc;
             _headerSize = owner.LogCodec.HeaderSize;
+            _leasePages = leasePages;
 
             // ★ 默认扫描终点 = 已落盘水位 FlushedTail（TailAddress 含内存页未 flush entry，不可读）
             var actualEnd = endAddress == default ? owner.FlushedTail : endAddress;
             // ★ startAddress 直接当 reader 起点（不再段首重扫）——首次加载分流：
-            //   帧头 → 正常页解析；entry 头 → 无帧头模式（cursor 内跳过 < startAddress 的 entry）。
+            // 帧头 → 正常页解析；entry 头 → 无帧头模式（cursor 内跳过 < startAddress 的 entry）。
             _skipUntil = startAddress;
             _reader = owner._engine.OpenSequentialReader(startAddress, actualEnd,
-                ReadDirection.Forward, usePageCache: true, SnapshotMode.Consistent);
+                ReadDirection.Forward, usePageCache: true, snapshotMode);
         }
 
         public ReadDirection Direction => ReadDirection.Forward;
@@ -82,10 +105,23 @@ public abstract partial class LogBase
             }
         }
 
+        /// <summary>★ 当前 entry payload 的 Memory 视图（页缓冲切片——零拷贝；生命周期见
+        /// <see cref="ILogCursor.CurrentPayloadMemory"/>：lease 模式有效至 Dispose，非 lease 禁跨 MoveNext 持有）。</summary>
+        public ReadOnlyMemory<byte> CurrentPayloadMemory
+        {
+            get
+            {
+                int payloadOff = _currentEntryOff + _headerSize;
+                return _pageBuf.AsMemory(payloadOff, _currentEntryLength);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════
         // 同步轨
         // ═══════════════════════════════════════════════════════════════
 
+        /// <summary>同步推进到下一条 entry：优先消费当前页缓冲剩余 entry，页耗尽时同步加载新页并整页校验。</summary>
+        /// <returns>true = 已推进，CurrentAddress/CurrentPayload/CurrentIsMeta 等视图有效；false = 已到扫描终点（EOF）。</returns>
         public bool MoveNext()
         {
             while (true)
@@ -122,7 +158,7 @@ public abstract partial class LogBase
                         {
                             _rewindTo = _currentAddress;
                             _currentAddress = _pageEndAddr;
-                            _pageBuf = null;
+                            DropPageBuf();
                             continue;
                         }
                         // ★ 无帧头模式：解析失败处 = 页数据尾（CRC+padding 区）或坏 entry——扇区对齐
@@ -141,7 +177,7 @@ public abstract partial class LogBase
                     }
                     // 当前页无更多有效 entry——换页
                     _currentAddress = _pageEndAddr;
-                    _pageBuf = null;
+                    DropPageBuf();
                 }
 
                 // 需要加载新页：先看 reader 是否还有数据
@@ -205,9 +241,11 @@ public abstract partial class LogBase
             //   满页帧 padding 4,084B > 512，帧头落在缓冲外，页界探测断链（契约③ virtual 增量重放 0 条根因）。
             int cap = _owner.PageSize + LogPageFrameHeaderCodec.StructSize + Crc32FooterCodec.StructSize
                       + (int)_owner.SectorSize;
-            EnsurePageBuf(cap);
+            var want = ClampToRemaining(cap);
+            if (want <= 0) return false;
+            EnsurePageBuf(want);
             var pos = _reader.Position;
-            int got = _reader.Read(_pageBuf.AsSpan(0, cap));
+            int got = _reader.Read(_pageBuf.AsSpan(0, want));
             if (got <= 0) return false;
             _pageStartAddr = pos;
             _currentAddress = pos;
@@ -232,7 +270,7 @@ public abstract partial class LogBase
             {
                 _reader.Seek(pos);
                 _frameless = false;
-                _pageBuf = null;
+                DropPageBuf();
                 return LoadNextPage();
             }
             _reader.Seek(pos);
@@ -258,7 +296,7 @@ public abstract partial class LogBase
                 if (fh.DataLength <= 0 || fh.DataLength > _owner.PageSize) continue;
                 _reader.Seek(new LogicalAddress(segId, probeOff));
                 _frameless = false;
-                _pageBuf = null;
+                DropPageBuf();
                 return LoadNextPage();
             }
             return false;   // 缓冲内无帧头（真 EOF/截断点）——安静停止
@@ -344,6 +382,9 @@ public abstract partial class LogBase
         // 异步轨：真异步 I/O + Span 抽同步 helper
         // ═══════════════════════════════════════════════════════════════
 
+        /// <summary>异步推进到下一条 entry（真异步 I/O，语义同同步 <see cref="MoveNext"/>）。</summary>
+        /// <param name="ct">取消令牌（每次循环检查；取消抛 OperationCanceledException）。默认 default。</param>
+        /// <returns>true = 已推进，当前 entry 视图有效；false = 已到扫描终点（EOF）。</returns>
         public async ValueTask<bool> MoveNextAsync(CancellationToken ct = default)
         {
             while (true)
@@ -369,7 +410,7 @@ public abstract partial class LogBase
                     {
                         _rewindTo = _currentAddress;
                         _currentAddress = _pageEndAddr;
-                        _pageBuf = null;
+                        DropPageBuf();
                     }
                     else if (_frameless)
                     {
@@ -380,7 +421,7 @@ public abstract partial class LogBase
                     else
                     {
                         _currentAddress = _pageEndAddr;
-                        _pageBuf = null;
+                        DropPageBuf();
                     }
                 }
 
@@ -433,9 +474,13 @@ public abstract partial class LogBase
         {
             int cap = _owner.PageSize + LogPageFrameHeaderCodec.StructSize + Crc32FooterCodec.StructSize
                       + (int)_owner.SectorSize;
-            EnsurePageBuf(cap);
+            // ★ 超读钳制（热路径）：cap 按 PageSize 最坏情况，实际读取钳到 [Position, End) 真实
+            //    剩余——ReadSparse 对未分配页按请求长度逐段 Clear 补零（4MB memset/次主源）。
+            var want = ClampToRemaining(cap);
+            if (want <= 0) return false;
+            EnsurePageBuf(want);
             var pos = _reader.Position;
-            int got = await _reader.ReadAsync(_pageBuf.AsMemory(0, cap), ct).ConfigureAwait(false);
+            int got = await _reader.ReadAsync(_pageBuf.AsMemory(0, want), ct).ConfigureAwait(false);
             if (got <= 0) return false;
             _pageStartAddr = pos;
             _currentAddress = pos;
@@ -458,7 +503,7 @@ public abstract partial class LogBase
             {
                 _reader.Seek(pos);
                 _frameless = false;
-                _pageBuf = null;
+                DropPageBuf();
                 return await LoadNextPageAsync(ct).ConfigureAwait(false);
             }
             _reader.Seek(pos);
@@ -481,7 +526,7 @@ public abstract partial class LogBase
                 if (fh.DataLength <= 0 || fh.DataLength > _owner.PageSize) continue;
                 _reader.Seek(new LogicalAddress(segId, probeOff));
                 _frameless = false;
-                _pageBuf = null;
+                DropPageBuf();
                 return await LoadNextPageAsync(ct).ConfigureAwait(false);
             }
             return false;
@@ -592,10 +637,32 @@ public abstract partial class LogBase
         // 共享 helper
         // ═══════════════════════════════════════════════════════════════
 
+        /// <summary>超读钳制：min(len, Position→End 真实距离)。</summary>
+        private int ClampToRemaining(int len)
+        {
+            var dist = _owner._engine.GetDistance(_reader.Position, _reader.End);
+            return dist <= 0 ? 0 : (int)Math.Min((long)len, dist);
+        }
+
         private void EnsurePageBuf(int len)
         {
-            if (_pageBuf is null || _pageBuf.Length < len)
-                _pageBuf = new byte[len];
+            if (_pageBuf is not null && _pageBuf.Length >= len) return;
+            // ★ 页缓冲池化（热路径）：每次游标打开 new byte[PageSize 级]（4MB LOH）用完即弃——
+            //   复制读/apply 读每开一次烧一个（实测读 1 条 p50 3.4ms 的主成本之一）。
+            //   安全前提 = ILogCursor 契约：CurrentPayload Span 禁止跨 MoveNext/Dispose 持有
+            //   （lease 模式除外——旧页不还池，Dispose 统一归还，CurrentPayloadMemory 跨 MoveNext 有效）。
+            DropPageBuf();
+            _pageBuf = PageBufPool.Rent(len);
+        }
+
+        /// <summary>换页/扩容置空前调用：lease 模式旧页入租约（Dispose 统一还池——跨 MoveNext 视图有效前提）；
+        /// 非 lease 立即还池（frameless 转 framed 的旧页归还——原置 null 直丢引用 = 池泄漏的收敛）。</summary>
+        private void DropPageBuf()
+        {
+            if (_pageBuf is null) return;
+            if (_leasePages) (_leased ??= []).Add(_pageBuf);
+            else PageBufPool.Return(_pageBuf);
+            _pageBuf = null;
         }
 
         private static TempBuffer RentTemp(int size) => new(size);
@@ -607,22 +674,37 @@ public abstract partial class LogBase
             // ★ Memory 必须按请求大小切片——ArrayPool.Rent 返回的数组可能更大，
             //   直接返回 _buf.Length 会让 ReadAsync 多读字节，吞掉后续 frame 数据。
             public Memory<byte> Memory => _buf.AsMemory(0, size);
+            /// <summary>归还租借的池化缓冲到 <see cref="ArrayPool{Byte}"/>.Shared。</summary>
             public void Dispose() { ArrayPool<byte>.Shared.Return(_buf); }
         }
 
+        /// <summary>释放游标：关闭底层顺序 reader、丢弃当前页缓冲并归还租借页（lease 模式持有的全部已读页）。</summary>
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
             _reader.Dispose();
+            DropPageBuf();
+            ReturnLeasedPages();
         }
 
+        /// <summary>异步释放游标（语义同 <see cref="Dispose"/>：关 reader + 还页缓冲/租借页）。</summary>
+        /// <returns>表示释放完成的任务。</returns>
         public async ValueTask DisposeAsync()
         {
             if (_disposed) return;
             _disposed = true;
             _reader.Dispose();
+            DropPageBuf();
+            ReturnLeasedPages();
             await ValueTask.CompletedTask;
+        }
+
+        private void ReturnLeasedPages()
+        {
+            if (_leased is null) return;
+            foreach (var p in _leased) PageBufPool.Return(p);
+            _leased = null;
         }
     }
 }

@@ -13,6 +13,9 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
     /// </summary>
     private readonly StorageEngineOptions _options;
 
+    /// <summary>时钟供给源（时钟缝 件一 P1——引擎侧时间统一；缺省 System）。</summary>
+    private readonly TimeProvider _clock;
+
     /// <summary>
     ///  <see cref="LightEpoch"/>——纳秒级 epoch 保护（spec 15 §0.2 确认接近理论极限）。
     /// <para>★ 私有——外部（含测试）需要 epoch 协调时经构造注入实例（Create(..., epoch:)），
@@ -92,6 +95,9 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         : base(logger: logger)
     {
         _options = options ??= StorageEngineOptions.Default;
+        _clock = options.Clock;   // 时钟供给源（时钟缝 件一 P1——节流自旋窗/元组泵周期）
+        // ★ 引擎故障注入面（件二）——显式开启（WithFaults）才创建，缺省 null 零开销
+        if (options.EnableFaultInjection) _faults = new FaultInjector(this);
         // ★ 生命周期参数构造传入（构造=配置，启动=双尾）——不再经 Initialize hints
         _fs = root;
         _hub = hub;
@@ -195,12 +201,14 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
     public LogicalAddress MinAddress => _segmentTable.MinAddress;
 
 
+    /// <summary>初始化前置——创建引擎子目录（mkdir -p，幂等），扫盘/建段的前置。</summary>
     protected override void OnInitializeBegin()
     {
         // ★ 引擎子目录 mkdir -p（幂等，Core CreateDirectory 内建父目录耐久）——扫盘/建段的前置。
         _fs.CreateDirectory(EngineName);
     }
 
+    /// <summary>初始化完成——装配后台 worker loop、启动 IO 层段预备池（lookahead）与 CPU 采样。</summary>
     protected override void OnInitializeComplete()
     {
         ConfigureBackgroundWorker(_workerLoop);

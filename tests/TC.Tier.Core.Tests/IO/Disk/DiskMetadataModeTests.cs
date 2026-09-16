@@ -64,9 +64,10 @@ public sealed class DiskMetadataModeTests : IDisposable
         fs.Stat("m1").FileExtra.ToArray().Should().Equal(9);
     }
 
-    [Fact]
+    [SkippableFact]
     public void ExtendedAttr_Mode_WorksWithChannel()
     {
+        Skip.If(OperatingSystem.IsMacOS(), "macOS 无 xattr/ADS 支持声明——ExtendedAttr 模式语义跳过（fail-fast 路径本身正确）。");
         // NTFS ADS / Linux xattr 可用环境：写入走通道（无 sidecar 物理文件），读回一致
         using var fs = NewFs(DiskMetadataMode.ExtendedAttr);
         var meta = new byte[] { 0x0A, 0x0B };

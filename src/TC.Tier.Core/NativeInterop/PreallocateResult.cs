@@ -11,4 +11,6 @@ public enum PreallocateResult
     SparseFallback,
     /// <summary>完全失败（预分配 best-effort，调用方应继续运行）。</summary>
     Failed,
+    /// <summary>无需预分配（size ≤ 0——显式禁用/零尺寸，不构成分配语义）。</summary>
+    Skipped,
 }

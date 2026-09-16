@@ -3,7 +3,7 @@
 > 本文件是 **Core 层协调积木的"正确拼装"指南**：每个公共组件的职责、正确用法、以及反模式。
 > 它不重复每个类的 XML 注释，而是回答"**遇到 X 该用哪个积木、怎么用、什么绝对不要做**"。
 >
-> **Core 的范围**（五层架构的第三层）：`LifecycleBase`/`RecoveryBase`（实现 `TC.Tier.Contracts` 的 `ILifecycle`/`IRecovery`——依赖倒置）+ 基础设施目录（Epochs/NativeInterop/Logging/Metrics/Tracing/Observability）+ `Primitives/`（底层叶子积木：`SpinRWLock`/`FairGate`/`Atomic128`/`SectorAlignment`/`AlignmentConst`/`SpinLockScope`/`IKeyComparer`/`KeyComparer` + 原生内存/异步同步原语/计算计时叶子）+ `Collections/`（容器型复合体：队列/缓存/池）+ `Shared/` 非业务积木（`ResourceGroup`/`BackgroundWorkerLoop` 等）。接口/数据契约在 Contracts，源生成器特性在 `TC.Tier.CodeGen.Abstractions`。
+> **Core 的范围**（五层架构的第三层）：`LifecycleBase`/`RecoveryBase`（实现 `TC.Tier.Contracts` 的 `ILifecycle`/`IRecovery`——依赖倒置）+ 基础设施目录（Epochs/NativeInterop/Logging/Metrics/Tracing/Observability）+ `Primitives/`（底层叶子积木：`SpinRWLock`/`FairGate`/`Atomic128`/`SectorAlignment`/`AlignmentConst`/`SpinLockScope`/`IKeyComparer`/`KeyComparer` + 原生内存/异步同步原语/计算计时叶子）+ `Collections/`（容器型复合体：队列/缓存/池）+ `Execution/`（执行模型：TaskSink/SyncAsyncBridge/IsolatedTaskScheduler/BackgroundWorkerLoop/AsyncPump/CpuSampler）+ `Lifecycle/`（生命周期骨架）+ `Resources/`（资源治理：ResourceGroup/InstanceTracker）。接口/数据契约在 Contracts，源生成器特性在 `TC.Tier.CodeGen.Abstractions`。
 >
 > 配合阅读（项目内深读）：
 > - [`docs/lifecycle.md`](docs/lifecycle.md) —— 生命周期 前→中→后 三阶段正确拼装（`LifecycleBase`/`RecoveryBase`）
@@ -19,6 +19,7 @@
 > - [`docs/io.md`](docs/io.md) —— 文件 IO 原语层（`IFileSystem`/`IFileHandle`/`FileHandlePool`/`MemoryFileSystem`/`FaultInjectingFileSystem`，两平面×四介质×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）
 > - [`docs/virtual-file-system.md`](docs/virtual-file-system.md) —— **第四介质 TierVolume**（`TierVolumeFs`：`.tier` 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 [docs/perf/io-performance.md](docs/perf/io-performance.md) §8）
 > - [`../TC.Tier.Core.IO.S3/COORDINATION.md`](../TC.Tier.Core.IO.S3/COORDINATION.md) —— S3 兼容对象存储客户端层（`S3ObjectStore`：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；使用指南 [`../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md`](../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md)）
+> - [`../TC.Tier.Core.Net/COORDINATION.md`](../TC.Tier.Core.Net/COORDINATION.md) —— 网络与共识层（`IProtocolTransport` 三形态 × 三介质、`RaftStateMachine` 共识引擎、HyParView/Swarm、ClusterBuilder 装配；使用指南 [`../TC.Tier.Core.Net/docs/net.md`](../TC.Tier.Core.Net/docs/net.md)——Net 层的执行/日志/可观测全部消费本层积木）
 > - [`docs/observability.md`](docs/observability.md) —— 可观测（`ObservabilityHub`/`IMetricsSink`/`ITracer`：视图全景/采样/零开销契约/测试场景）
 > - [`docs/logging.md`](docs/logging.md) —— 日志（`ILogger`/`LoggerExtensions`：重载矩阵/热路径规则/与 Hub 的边界）
 > - [`docs/dedicated-task-scheduler.md`](docs/dedicated-task-scheduler.md) —— 专用线程调度器（`IsolatedTaskScheduler`；性能实测见 [`docs/perf/dedicated-task-scheduler-perf.md`](docs/perf/dedicated-task-scheduler-perf.md)）
@@ -37,10 +38,10 @@
 
 | 积木 | 位置 | 职责 | 何时用 |
 |------|------|------|--------|
-| `LifecycleBase<THints>` | `Shared/LifecycleBase.cs` | 生命周期骨架：Initialize/Dispose 模板、worker 启停编排、状态查询 | **所有**有生命周期的对象（IO 引擎、数据结构）都继承它 |
-| `RecoveryBase<THints>` | `Shared/RecoveryBase.cs` | 恢复模板：RecoverAsync 编排 + CAS 状态机 + 进度上报 | 需要"启动恢复"的对象；继承后只 override `OnRecoveryCoreAsync` |
-| `ResourceGroup` | `Shared/ResourceGroup.cs` | 资源统一释放：按名注册、逆序释放、聚合异常 | `LifecycleBase.Resources` 已内建一个；子类 `Resources.Add(...)` |
-| `BackgroundWorkerLoop` / `BackgroundWorkerLoop<T>` | `Shared/BackgroundWorkerLoop.cs` | 后台执行：循环骨架（公共池/隔离调度器注入 + 多消费者）+ 内建优先级队列 | **所有**后台循环/队列消费者——禁止 `new Thread` 自建 |
+| `LifecycleBase<THints>` | `Lifecycle/LifecycleBase.cs` | 生命周期骨架：Initialize/Dispose 模板、worker 启停编排、状态查询 | **所有**有生命周期的对象（IO 引擎、数据结构）都继承它 |
+| `RecoveryBase<THints>` | `Lifecycle/RecoveryBase.cs` | 恢复模板：RecoverAsync 编排 + CAS 状态机 + 进度上报 | 需要"启动恢复"的对象；继承后只 override `OnRecoveryCoreAsync` |
+| `ResourceGroup` | `Resources/ResourceGroup.cs` | 资源统一释放：按名注册、逆序释放、聚合异常 | `LifecycleBase.Resources` 已内建一个；子类 `Resources.Add(...)` |
+| `BackgroundWorkerLoop` / `BackgroundWorkerLoop<T>` | `Execution/BackgroundWorkerLoop.cs` | 后台执行：循环骨架（公共池/隔离调度器注入 + 多消费者）+ 内建优先级队列 | **所有**后台循环/队列消费者——禁止 `new Thread` 自建 |
 | `LightEpoch` | `Epochs/LightEpoch.cs` | RCU 式延迟回收：epoch 保护 + 协作 drain | **上层结构组件**（index/metadata 回收）；存储读写互斥**用 SpinRWLock** |
 | `NativeAtomic128` | `NativeInterop/NativeAtomic128.cs` | **128 位 CAS**（x86 `lock cmpxchg16b` / ARM64 `ldaxp-stlxp`），解决 >64 位载荷无 `Interlocked` | 大载荷原子更新（指针+标志 / 水位+ABA version）；⚠️ `location` 须 **16B 对齐**；底层原语 |
 | `DiskNative`/`FileNative`/`MemoryNative` | `NativeInterop/` | 跨平台 syscall facade（扇区探测/无缓冲 IO/预分配/打洞/刷盘/内存锁/扩展属性） | 🔒 **`internal`（编译期封堵，仅 Core.IO 消费）**；需要 IO 的组件用 `TC.Tier.Core.IO`（[`docs/io.md`](docs/io.md)），外部业务经 `IStorageEngine`；syscall→Core.IO 映射表与仓内过渡 IVT 例外见 [`docs/native-interop.md`](docs/native-interop.md) |
@@ -48,9 +49,12 @@
 | `Atomic128<T>` | `Primitives/Atomic128.cs` | **标准 128 位 CAS 单槽封装**（16B 对齐背板 + 探测降级 + 裸读不撕裂）——`NativeAtomic128` 之上的易用层 | **优先用它**（别裸调 `NativeAtomic128`）；`T` 须 16B blittable struct；标准范式见 [`docs/locking-and-epoch.md`](docs/locking-and-epoch.md) §3 |
 | `SpinRWLock` | `Primitives/SpinRWLock.cs` | **写偏向** CAS 自旋 RW 锁原语（bit63 写持有 + **bit62 写等待挡新读者** + 读计数递增；下溢绊线 + Debug 值示波器）。任何需要 RW 互斥的对象挂一个 `SpinRWLock` 字段即获得协调锁——写者不被持续读者流饿死（2026-08-20 自 LockWord 重构，读优先→写偏向，Monitor 等待-通知职责删除） | 对象读写互斥：读 `AcquireShared`，写/销毁 `AcquireExclusive`（标准范式见 [`docs/locking-and-epoch.md`](docs/locking-and-epoch.md) §1） |
 | `FairGate` | `Primitives/FairGate.cs` | **到达顺序公平门**——重试循环获取资源的协调器：fast path 查 `HasWaiters` 让位、慢路径 `TryAcquireSlow`、资源可获取后 `Wake`（PulseAll + 5ms 让渡先手） | 多写者竞争同资源不插队（现使用方：AcquireExtent 区间占用）；见 [`docs/locking-and-epoch.md`](docs/locking-and-epoch.md) §1.5 |
-| `CpuSampler` | `Shared/CpuSampler.cs` | CPU 采样限流（进程口径 EMA + 三档 `ThrottleFactor`） | 写热路径 CPU 背压；用法见 [`docs/worker-loop.md`](docs/worker-loop.md) §7 |
-| `IsolatedTaskScheduler` | `Shared/IsolatedTaskScheduler.cs` | 隔离线程 Task 调度器（M 私有线程 + watchdog + 死亡重启 + 指标） | 高频/关键 worker 的执行器（引擎 own 实例）；见 [`docs/dedicated-task-scheduler.md`](docs/dedicated-task-scheduler.md) |
-| `InstanceTracker` | `Shared/InstanceTracker.cs` | 实例级泄漏跟踪 | `LifecycleBase` 构造自动注册，无需手动 |
+| `CpuSampler` | `Execution/CpuSampler.cs` | CPU 采样限流（进程口径 EMA + 三档 `ThrottleFactor`） | 写热路径 CPU 背压；用法见 [`docs/worker-loop.md`](docs/worker-loop.md) §7 |
+| `IsolatedTaskScheduler` | `Execution/IsolatedTaskScheduler.cs` | 隔离线程 Task 调度器（M 私有线程 + watchdog + 死亡重启 + 指标） | 高频/关键 worker 的执行器（引擎 own 实例）；见 [`docs/dedicated-task-scheduler.md`](docs/dedicated-task-scheduler.md) |
+| `TaskSink` | `Execution/TaskSink.cs` | **受控 fire-and-forget**（提交即放手——保证异常收口/drain 排水/在途计数；不保证执行/完成通知/顺序）：SubmitFast 快路径零堆分配 + Submit 池上通用 | 一切轻量高频后台任务提交（替代 `_ = Task.Run`）；长稳定循环走 AsyncPump 泵域；性能数字见 `probes/TaskGroupProbe` |
+| `SyncAsyncBridge` | `Execution/SyncAsyncBridge.cs` | **同步 API 桥接异步实现**：独立池推进 + 有界等待 + 再入防护（"Start 早、Wait 晚"高级形态） | 同步面必须调异步的唯一出口（Remote/S3 IO）；设计见 [`docs/sync-async-bridge.md`](docs/sync-async-bridge.md) |
+| `AsyncPump` | `Execution/AsyncPump.cs` | **单线程异步泵**：调用线程驱动 async 状态机（续体 Post 回泵队列同线程执行——单线程亲和无锁；空转段 park 双信号唤醒；域内再入快速失败） | 单线程亲和的异步管线（域内不写 ConfigureAwait(false)——回流即语义）；执行原语谱系补全 |
+| `InstanceTracker` | `Resources/InstanceTracker.cs` | 实例级泄漏跟踪 | `LifecycleBase` 构造自动注册，无需手动 |
 | **— 可观测（见 §3）—** | | | |
 | `ILogger` / `ILoggerFactory` | `Logging/` | 极简日志（去掉 M.E.Logging 的 `TState`/`formatter`）；全 36 重载 null 安全 + `IsEnabled` 短路；`NullLogger` 零开销默认 | 上层注入 factory；用法见 [`docs/logging.md`](docs/logging.md) |
 | `IMetricsSink` | `Metrics/` | 指标三原语 Counter/Histogram/Gauge（`ReadOnlySpan<KeyValuePair>` tags 零分配热路径） | 经 `ObservabilityHub` 视图走，**不直接调** |

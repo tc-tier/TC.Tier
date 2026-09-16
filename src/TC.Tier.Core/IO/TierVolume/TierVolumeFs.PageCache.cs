@@ -38,6 +38,7 @@ public sealed partial class TierVolumeFs
     private long _carrierWritePendingBytes;
     private readonly long _pageBudget;             // 预算上限（构造注入；0 = 禁用=直达档）
     private const long FlushThresholdBytes = 1L << 20;   // 压力排干阈值（滞后——防 O(n²)）
+    private const long BackgroundFlushBudgetBytes = 8L << 20;   // ★ IO-P1：压力排干单次预算（50ms 轮询 × 8MB = 160MB/s 排干能力上限）
 
     // ═══ 后台 flusher（RM-02——kernel writeback 模型：写路径只 copy+标脏+记账，回写归后台）═══
     private Thread? _flusher;
@@ -51,6 +52,8 @@ public sealed partial class TierVolumeFs
     {
         if (_flusherStop || _pageBudget <= 0 || _readOnly || _flusher is not null) return;
         if (Interlocked.CompareExchange(ref _flusherGate, 1, 0) != 0) return;
+        // ★ IO-09：检查→CAS 窗口内 StopFlusher 可能已跑完（事件已释放）——回退，避免对已释放事件 WaitOne
+        if (_flusherStop) { Interlocked.Exchange(ref _flusherGate, 0); return; }
         _flusher = new Thread(FlusherLoop) { IsBackground = true, Name = "tier-raw-flusher" };
         _flusher.Start();
     }
@@ -62,10 +65,13 @@ public sealed partial class TierVolumeFs
     /// 错误由显式 Flush/提交路径承担）。</summary>
     private void FlusherLoop()
     {
-        var lastCheckpoint = DateTime.UtcNow;
+        var lastCheckpoint = _clock.GetUtcNow();
         while (!_flusherStop)
         {
-            _flushWake.WaitOne(50);
+            // ★ IO-09：StopFlusher Join(3000) 超时后仍 Dispose 事件——慢排干存活的线程在此静默退出
+            //（ODE 不捕获 = 后台线程未观测异常 = 进程终止）
+            try { _flushWake.WaitOne(50); }
+            catch (ObjectDisposedException) { return; }
             if (_flusherStop) return;
             if (_maintenance.IsUnderMaintenance) { Thread.Sleep(10); continue; }
             try
@@ -75,20 +81,20 @@ public sealed partial class TierVolumeFs
                     TryFreeRetiredLocked();   // D1b：周期推进安全批次回收（无新分配路径时不积压）
                     // W3 检查点衰减：30s 无检查点且结构/时间戳脏 → 周期检查点
                     //（镜像含最新态——重放尾有界；JournalCommit 内 75% 衰减仍为快速路径）
-                    if (_journalOn && (DateTime.UtcNow - lastCheckpoint).TotalSeconds >= 30
+                    if (_journalOn && (_clock.GetUtcNow() - lastCheckpoint).TotalSeconds >= 30
                         && (MetadataDirty || _timestampsDirty))
                     {
                         CommitMetadata();
-                        lastCheckpoint = DateTime.UtcNow;
+                        lastCheckpoint = _clock.GetUtcNow();
                     }
-                    else if ((DateTime.UtcNow - lastCheckpoint).TotalSeconds >= 30)
-                        lastCheckpoint = DateTime.UtcNow;   // 干净窗口滑动（防连续补账）
+                    else if ((_clock.GetUtcNow() - lastCheckpoint).TotalSeconds >= 30)
+                        lastCheckpoint = _clock.GetUtcNow();   // 干净窗口滑动（防连续补账）
                 }
                 // 排干/提交在锁外（O_DIRECT 写排干不可阻塞数据面——页门拴并发安全，W2 同款哲学）
                 if (_journalOn && (Volatile.Read(ref _dirtyBytes) > 0 || _pendingRecords.Count > 0))
                     JournalCommit(holdLock: false);   // W2 两段式（记录 + 数据同屏障）
                 else if (Volatile.Read(ref _dirtyBytes) > 0)
-                    FlushDirtyPages(sync: false);
+                    FlushDirtyPages(sync: false, maxBytes: BackgroundFlushBudgetBytes);   // ★ IO-P1：预算排干
             }
             catch { /* 见注释——不上抛 */ }
         }
@@ -98,7 +104,7 @@ public sealed partial class TierVolumeFs
     private void StopFlusher()
     {
         _flusherStop = true;
-        _flushWake.Set();
+        try { _flushWake.Set(); } catch (ObjectDisposedException) { }   // ★ IO-09：与并发 Set 竞态防护
         _flusher?.Join(3000);
         _flushWake.Dispose();
     }
@@ -120,6 +126,8 @@ public sealed partial class TierVolumeFs
     {
         if (_prefetcherStop || _pageBudget <= 0 || _prefetcher is not null) return;
         if (Interlocked.CompareExchange(ref _prefetcherGate, 1, 0) != 0) return;
+        // ★ IO-09：检查→CAS 窗口内 StopPrefetcher 可能已跑完——回退（同 EnsureFlusher）
+        if (_prefetcherStop) { Interlocked.Exchange(ref _prefetcherGate, 0); return; }
         _prefetcher = new Thread(PrefetcherLoop) { IsBackground = true, Name = "tier-raw-prefetcher" };
         _prefetcher.Start();
     }
@@ -129,7 +137,9 @@ public sealed partial class TierVolumeFs
     {
         while (!_prefetcherStop)
         {
-            _prefetchWake.WaitOne(20);
+            // ★ IO-09：StopPrefetcher Join 超时后仍 Dispose 事件——静默退出（同 FlusherLoop）
+            try { _prefetchWake.WaitOne(20); }
+            catch (ObjectDisposedException) { return; }
             if (_prefetcherStop) return;
             if (_maintenance.IsUnderMaintenance) { Thread.Sleep(5); continue; }
             var budget = 0;
@@ -157,7 +167,7 @@ public sealed partial class TierVolumeFs
     private void StopPrefetcher()
     {
         _prefetcherStop = true;
-        _prefetchWake.Set();
+        try { _prefetchWake.Set(); } catch (ObjectDisposedException) { }   // ★ IO-09：与并发 Set 竞态防护
         _prefetcher?.Join(2000);
         _prefetchWake.Dispose();
     }
@@ -194,7 +204,7 @@ public sealed partial class TierVolumeFs
             cursor = b + 1;
         }
         EnsurePrefetcher();
-        _prefetchWake.Set();
+        try { _prefetchWake.Set(); } catch (ObjectDisposedException) { }   // ★ IO-09：与 StopPrefetcher 竞态
     }
 
     /// <summary>
@@ -315,7 +325,7 @@ public sealed partial class TierVolumeFs
     {
         if (Volatile.Read(ref _pageBytes) <= _pageBudget || Volatile.Read(ref _dirtyBytes) < FlushThresholdBytes)
             return;
-        try { FlushDirtyPages(sync: false); }
+        try { FlushDirtyPages(sync: false, maxBytes: BackgroundFlushBudgetBytes); }   // ★ IO-P1：预算排干
         catch { /* best-effort——见注释 */ }
     }
 
@@ -346,24 +356,42 @@ public sealed partial class TierVolumeFs
         if (Volatile.Read(ref _dirtyBytes) >= _backgroundDirtyThreshold)
         {
             EnsureFlusher();   // RM-02：过阈值唤醒后台排干——写路径免内联回写
-            _flushWake.Set();
+            try { _flushWake.Set(); } catch (ObjectDisposedException) { }   // ★ IO-09：与 StopFlusher 竞态——事件已释放 = 排干已无意义
         }
     }
 
     /// <summary>
-    /// 排干全部脏页（物理连续 run 合并写）。<paramref name="sync"/>=true 追加载体 fsync——
+    /// 排干脏页（物理连续 run 合并写）。<paramref name="sync"/>=true 追加载体 fsync——
     /// 提交序首步与显式 Flush 使用（数据先于元数据）；压力排干用 false（仅入 OS 缓存——
     /// fsync 由提交序/显式 Flush 兜底，防每 MB 一次 fsync 吃光吞吐）。
+    /// <para>★ IO-P1：<paramref name="maxBytes"/> 预算——压力路径（后台 flusher/阈值）限量排干
+    ///   防大脏集单次全排的长尾尖刺（kernel writeback 数值积分同构；50ms 轮询自然续排）；
+    ///   提交/显式 Flush 恒全量（屏障语义：全部脏数据先于日志屏障落盘）。预算选取为任意序
+    ///   （无脏序结构——全量最终排净，仅顺序非最老优先）。</para>
     /// </summary>
-    internal void FlushDirtyPages(bool sync = true)
+    internal void FlushDirtyPages(bool sync = true, long maxBytes = long.MaxValue)
     {
         if (_dirtyPages.IsEmpty)
         {
             if (sync) JournalBarrier();   // 无脏页仍需屏障（fsync 语义——写绕数据在内核缓存；写穿档 = 写穿完成即达盘）
             return;
         }
-        var dirty = _dirtyPages.Select(kv => (kv.Key, kv.Value)).ToList();
-        _dirtyPages.Clear();
+        // ★ IO-02：不做整表 Clear——原 Select→Clear 窗口会清掉并发 StorePage 新插入的脏页（该页 Dirty=true
+        //   已置、`if (!page.Dirty)` 永不重入索引），后续 Flush 走空快道只打屏障 = 数据未落盘即返回成功。
+        //   改为快照后逐页在页 gate 内摘除（与清脏标同 gate 原子——逐出者同款协议），失败恢复现场（IO-03）。
+        var budgetLeft = maxBytes;
+        var dirty = new List<(ulong Block, Page Page)>();
+        foreach (var kv in _dirtyPages)
+        {
+            dirty.Add((kv.Key, kv.Value));
+            budgetLeft -= _pageSize;
+            if (budgetLeft <= 0) break;
+        }
+        if (dirty.Count == 0)
+        {
+            if (sync) JournalBarrier();
+            return;
+        }
         WritePagesCoalesced(dirty);
         if (sync) JournalBarrier();
     }
@@ -388,6 +416,7 @@ public sealed partial class TierVolumeFs
                 {
                     var take = Math.Min(chunkPages, runLen - k);
                     long gapLo = 0, gapHi = 0;   // 逐出缺口位图（chunk ≤ 128 页全覆盖）
+                    var cleared = new List<(ulong Block, Page Page)>(take);   // ★ IO-03：本 chunk 已清脏待写页（载体写失败恢复现场用）
                     for (var j = 0; j < take; j++)
                     {
                         var pg = pages[runStart + k + j].Page;
@@ -405,26 +434,55 @@ public sealed partial class TierVolumeFs
                             pg.Bytes.AsSpan(0, _pageSize).CopyTo(chunkSpan.Slice(j * _pageSize, _pageSize));
                             if (pg.Dirty) Interlocked.Add(ref _dirtyBytes, -_pageSize);
                             pg.Dirty = false;
+                            // ★ IO-02：锁内摘除脏页索引（与清脏标同 gate 原子——逐出者同款协议）；
+                            //   摘除后并发 StorePage 重插 = 下一轮 Flush 重写（内容不丢）
+                            if (_dirtyPages.TryGetValue(block, out var indexed) && ReferenceEquals(indexed, pg))
+                                _dirtyPages.TryRemove(block, out _);
+                            cleared.Add((block, pg));
                         }
                     }
                     var startBlock = pages[runStart + k].Block;
-                    if (gapLo == 0 && gapHi == 0)
+                    try
                     {
-                        WriteCarrier((long)(startBlock * (ulong)_pageSize), chunkSpan.Slice(0, take * _pageSize));
-                    }
-                    else
-                    {
-                        // 稀有路径（逐出与排干并发）：按连续无缺口段写（缺口页由逐出者写过）
-                        var segStart = 0;
-                        for (var j = 0; j <= take; j++)
+                        if (gapLo == 0 && gapHi == 0)
                         {
-                            var gap = j < take && ((j < 64 ? gapLo & (1L << j) : gapHi & (1L << (j - 64))) != 0);
-                            if (j < take && !gap) continue;
-                            if (j > segStart)
-                                WriteCarrier((long)((startBlock + (ulong)segStart) * (ulong)_pageSize),
-                                    chunkSpan.Slice(segStart * _pageSize, (j - segStart) * _pageSize));
-                            segStart = j + 1;
+                            WriteCarrier((long)(startBlock * (ulong)_pageSize), chunkSpan.Slice(0, take * _pageSize));
                         }
+                        else
+                        {
+                            // 稀有路径（逐出与排干并发）：按连续无缺口段写（缺口页由逐出者写过）
+                            var segStart = 0;
+                            for (var j = 0; j <= take; j++)
+                            {
+                                var gap = j < take && ((j < 64 ? gapLo & (1L << j) : gapHi & (1L << (j - 64))) != 0);
+                                if (j < take && !gap) continue;
+                                if (j > segStart)
+                                    WriteCarrier((long)((startBlock + (ulong)segStart) * (ulong)_pageSize),
+                                        chunkSpan.Slice(segStart * _pageSize, (j - segStart) * _pageSize));
+                                segStart = j + 1;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // ★ IO-03：载体写失败——恢复本 chunk 已清脏页现场（Dirty + 索引 + 计数），
+                        //   重试 Flush 可见（原实现先清后写 = 失败页既不在索引也无脏标，重试 no-op = 数据丢失）。
+                        //   已成功写盘的更早 chunk 不恢复（内容已在载体）；缺口页由逐出者写过，不在 cleared。
+                        foreach (var (block, pg) in cleared)
+                        {
+                            lock (pg.Gate)
+                            {
+                                if (!_pages.TryGetValue(block, out var current) || !ReferenceEquals(current, pg))
+                                    continue;   // 恢复前已被逐出写盘
+                                if (!pg.Dirty)
+                                {
+                                    pg.Dirty = true;
+                                    Interlocked.Add(ref _dirtyBytes, _pageSize);
+                                }
+                                _dirtyPages[block] = pg;
+                            }
+                        }
+                        throw;
                     }
                 }
                 i++;
@@ -741,6 +799,11 @@ public sealed partial class TierVolumeFs
                     done += take;
                 }
             }
+            // ★ IO-08：写者计数在 gate 释放前建立——原在数据段自增（Parallel 档 gate 已释放），
+            //   窗口内并发截断/打洞的 WaitWritersIdle 判 0 → FreePhysical 释放计划即将写入的物理块
+            //   （写者不进 read epoch，epoch 回收不覆盖）→ 向已释放块落数据 = 跨文件损坏。
+            //   Serial 档在 gate 内原本即安全，统一前置无成本。
+            Interlocked.Increment(ref e.WritersInFlight);
             if (!parallel)
             {
                 // Serial 档（缺省——现状行为）：数据段在 gate 内——同文件全串行（强序、零争用）
@@ -774,6 +837,7 @@ public sealed partial class TierVolumeFs
 
     /// <summary>数据段执行（Serial/Parallel 两档共用）——零基先行、数据后写（v1 顺序）；
     /// per-Entry 在途写者计数钉块（删除/截断/打洞锁内自旋等归零；写者数据段不碰锁，无死锁环）。
+    /// ★ IO-08：计数由 WriteDataPlanned 在 gate 释放前建立——本方法只减不增。
     /// 失败语义：先减计数再补发布（防互等）——区间补发布（含已写部分数据，块随区间有主），
     /// 长度不推（v1 同）；异常照抛。</summary>
     private void ExecuteWriteDataSection(Entry e, long offset, ReadOnlySpan<byte> source, bool direct,
@@ -782,7 +846,6 @@ public sealed partial class TierVolumeFs
         ref List<(Extent X, ulong FirstTouched, ulong LastTouched)>? converts,
         List<Extent> baseRef, List<Extent> working, long mutStart, long mutEnd, ref bool metaChanged)
     {
-        Interlocked.Increment(ref e.WritersInFlight);
         try
         {
             if (zeroOps is not null)

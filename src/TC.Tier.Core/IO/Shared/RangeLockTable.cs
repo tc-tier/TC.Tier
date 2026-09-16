@@ -22,10 +22,19 @@ internal sealed class RangeLockTable
         public readonly FileLockMode Mode = mode;
         public readonly object Owner = owner;
 
+        /// <summary>区间重叠判定。</summary>
+        /// <param name="start">待检区间起始偏移（字节）。</param>
+        /// <param name="length">待检区间长度（字节）。</param>
+        /// <returns>true = 本条目与 [start, start+length) 有重叠。</returns>
         public bool Overlaps(long start, long length) => Start < start + length && start < Start + Length;
     }
 
     /// <summary>尝试获取——同 owner 重叠=允许（POSIX OFD 转换语义）；他 owner 重叠且任一排他=冲突。</summary>
+    /// <param name="offset">锁区间起始偏移（字节）。</param>
+    /// <param name="length">锁区间长度（字节）。</param>
+    /// <param name="mode">锁模式（Shared/Exclusive）。</param>
+    /// <param name="owner">锁持有者标识（同引用视为同一持有者）。</param>
+    /// <returns>true = 获取成功；false = 与其他 owner 的重叠排他冲突。</returns>
     public bool TryAcquire(long offset, long length, FileLockMode mode, object owner)
     {
         foreach (var e in _entries)
@@ -40,6 +49,9 @@ internal sealed class RangeLockTable
 
     /// <summary>★ CORE-29：按 (offset, length, owner) 精确释放**一个**同型条目（原删除全部同型——
     /// 同 owner 同区间双持（不同 mode 合法——TryAcquire 同 owner 重叠放行）时一次释放两条 = 锁泄漏）。</summary>
+    /// <param name="offset">获锁区间起始偏移（字节，须与获锁时一致）。</param>
+    /// <param name="length">获锁区间长度（字节，须与获锁时一致）。</param>
+    /// <param name="owner">锁持有者标识。</param>
     public void Release(long offset, long length, object owner)
     {
         var released = false;
@@ -58,6 +70,8 @@ internal sealed class RangeLockTable
         if (released) lock (ChangedGate) Monitor.PulseAll(ChangedGate);
     }
 
+    /// <summary>释放 owner 持有的全部范围锁（并唤醒阻塞等待者）。</summary>
+    /// <param name="owner">锁持有者标识。</param>
     public void ReleaseAll(object owner)
     {
         var released = _entries.RemoveAll(e => ReferenceEquals(e.Owner, owner)) > 0;

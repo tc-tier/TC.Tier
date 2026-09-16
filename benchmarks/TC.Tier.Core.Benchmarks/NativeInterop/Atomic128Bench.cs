@@ -5,7 +5,7 @@ using System.Runtime.InteropServices;
 using TC.Tier.Core.NativeInterop;
 // AlignedMemoryManager 虽在 System.Buffers 命名空间，但属于 TC.Tier 内部类（InternalsVisibleTo）
 using AlignedMemoryManager = TC.Tier.Core.Primitives.AlignedMemoryManager;
-using NativeInt128 = TC.Tier.Core.NativeInterop.Int128;
+using NativeInt128 = TC.Tier.Core.NativeInterop.UInt128Pair;
 
 namespace TC.Tier.Core.Benchmarks.NativeInterop;
 

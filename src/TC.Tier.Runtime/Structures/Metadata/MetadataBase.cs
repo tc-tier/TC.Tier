@@ -38,8 +38,10 @@ public abstract partial class MetadataBase
     // === 配置 ===
     private readonly MetadataSettings _settings;
     private readonly int _payloadSize;
-    private readonly int _paddingLength;
-    private readonly int _recordSize; // HeaderSize + payloadSize + padding（每版本块总长）
+    private readonly int _hotCapacity; // 热区槽容量上限（= MaxPayloadSize ?? PayloadSize；变长档 > 固定档）
+    private int _hotSlotSize;          // 当前热区槽实际分配尺寸（固定档恒 = _payloadSize；变长档按需增长）
+    private readonly int[] _hotLengths; // 各热区槽当前内容长度（固定档恒 _payloadSize；变长档 = 实际长度）
+    private int _lastAppendedRecordSize; // 最近一次 AppendVersionToDisk 的 record 总长（Abort 尾截断回退几何）
     private readonly int _maxMemoryVersions; // 内存多版本保留窗口（底线 2）
 
     // === 落盘策略（Sync 立即落盘 / Async 后台批量落盘）===
@@ -59,8 +61,9 @@ public abstract partial class MetadataBase
     // === 热数据：内存多版本工作副本（Abort 零 IO 的关键，对齐内存对象）===
     // 最近 N 个版本的对齐内存对象（N = _maxMemoryVersions）。[0] = 当前。
     // ★ 用 AlignedMemoryManager（pinned native，零 GC）而非 byte[]——对齐 Ring 页池模式。
-    // ★ 本次生命周期的 PayloadSize 固定（每个热区对象大小 = _payloadSize）。
-    private readonly AlignedMemoryManager[] _hotVersions;
+    // ★ 槽尺寸 = _hotSlotSize（固定档恒 _payloadSize；变长档按 Write 需求增长，上限 _hotCapacity——
+    //   增长时整组重分配并搬移既有镜像，见 EnsureHotSlotSize）。
+    private AlignedMemoryManager[] _hotVersions;
     private int _hotVersionCount;
 
     // === 历史版本只读缓冲（恢复载入）——设计决策：不能无条件截断用户数据 ===
@@ -126,6 +129,9 @@ public abstract partial class MetadataBase
         _metaTransport = metaTransport;
         _payloadSize = (settings as VersionedMetadataSettings)?.PayloadSize
                        ?? throw new ArgumentException("VersionedMetadataSettings.PayloadSize 必须指定", nameof(settings));
+        var maxPayload = (settings as VersionedMetadataSettings)?.MaxPayloadSize;
+        _hotCapacity = maxPayload is { } mp && mp > _payloadSize ? mp : _payloadSize;
+        _hotSlotSize = _payloadSize;
         _maxMemoryVersions = Math.Max(2, settings.MaxMemoryVersions);
         _persistencePolicy = persistencePolicy;
 
@@ -138,15 +144,12 @@ public abstract partial class MetadataBase
         Resources.Add(_epoch, ownership: epoch is null ? ResourceOwnership.Owned : ResourceOwnership.Referenced);
         // 历史版本只读缓冲池进资源组（Dispose 统一释放；加载版本先由 DisposeOverride 归还）
         Resources.Add(_bufferPool, "bufferPool");
-        // padding 对齐到扇区
-        var sectorSize = (int)_engine.SectorSize;
-        _paddingLength = (codec.HeaderSize + _payloadSize).AlignUp(sectorSize)
-                         - codec.HeaderSize - _payloadSize;
-        _recordSize = codec.HeaderSize + _payloadSize + _paddingLength;
-        // 热区：N 个对齐内存对象（当前 PayloadSize 固定大小）
+        // 热区：N 个对齐内存对象（初始 _payloadSize；变长档 Write 按需增长，上限 _hotCapacity）
+        var sectorSize0 = (int)_engine.SectorSize;
+        _hotLengths = new int[_maxMemoryVersions];
         _hotVersions = new AlignedMemoryManager[_maxMemoryVersions];
         for (var i = 0; i < _maxMemoryVersions; i++)
-            _hotVersions[i] = new AlignedMemoryManager(_payloadSize, sectorSize, zeroed: true);
+            _hotVersions[i] = new AlignedMemoryManager(_hotSlotSize, sectorSize0, zeroed: true);
         _hotVersionCount = 0;
         // ★ Managed meta 引擎构造期内联构建（纯 Create 零 IO——启动在 OnInitializeBegin，与主引擎并行）。
         if (settings.MetaPolicyKind == MetaPolicyKind.Managed)
@@ -221,6 +224,7 @@ public abstract partial class MetadataBase
     /// <summary>
     /// ★ 恢复算法工厂——默认 DefaultMetadataRecovery。在 Initialize 的 CAS 闸门内被调一次
     /// （基类单一创建点）；注入实例经构造函数直接赋 _recovery，不经本工厂。</summary>
+    /// <returns>默认恢复器（三级回退：hints → meta O(1) 水位 → 扫盘按版本号定位链头）。</returns>
     protected override IRecovery<MetadataRecoveryHints> CreateRecovery()
         => new DefaultMetadataRecovery(this);
 }

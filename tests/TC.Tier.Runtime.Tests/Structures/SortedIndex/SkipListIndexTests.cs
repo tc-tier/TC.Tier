@@ -188,4 +188,103 @@ public class SkipListIndexTests : IDisposable
         index.Delete(7);
         index.EntryCount.Should().Be(8);
     }
+
+    // ══════════════════════════════════════════════════════════
+    // TruncatePrefix（键序前缀批量删——retention trim 契约，与 BTree 同矩阵）
+    // ══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TruncatePrefix_EmptyTable_ReturnsZero()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        index.TruncatePrefix(100).Should().Be(0);
+    }
+
+    [Fact]
+    public void TruncatePrefix_BelowMin_ReturnsZero()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        foreach (var k in new long[] { 10, 20, 30 })
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(5).Should().Be(0);
+        index.EntryCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void TruncatePrefix_PartialRemoval_KeepsBoundaryAndRest()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        foreach (var k in new long[] { 10, 20, 30, 40, 50 })
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(30).Should().Be(2, "删除 key < 30 的 {10, 20}");
+        index.EntryCount.Should().Be(3);
+        index.Find(10).Should().Be(LogicalAddress.Empty);
+        index.Find(30).Should().Be(MakeAddr(30), "边界键本身不删（严格 <）");
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(50);
+    }
+
+    [Fact]
+    public void TruncatePrefix_MultiNode_DeletesPrefixRegionOnly()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        const long count = 200;
+        var rng = new Random(42);
+        var keys = Enumerable.Range(0, (int)count).Select(k => (long)k).OrderBy(_ => rng.Next()).ToList();
+        foreach (var k in keys)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(120).Should().Be(120);
+        index.EntryCount.Should().Be(80);
+
+        for (long k = 0; k < 120; k++)
+            index.Find(k).Should().Be(LogicalAddress.Empty, $"key {k} 应已删");
+        for (long k = 120; k < count; k++)
+            index.Find(k).Should().Be(MakeAddr(k), $"key {k} 应存活");
+
+        // 查询面全量一致：扫描 / Max / Floor
+        using var cursor = index.CreateScanCursor(ReadDirection.Forward);
+        var delivered = new List<long>();
+        while (cursor.MoveNext())
+            delivered.Add(cursor.CurrentKey);
+        delivered.Should().Equal(Enumerable.Range(120, 80).Select(k => (long)k));
+        index.TryGetFloor(119, out _, out _).Should().BeFalse("前驱区全删");
+        index.TryGetFloor(120, out var floorKey, out _).Should().BeTrue();
+        floorKey.Should().Be(120);
+    }
+
+    [Fact]
+    public void TruncatePrefix_EntireRange_EmptiesTable()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 30; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(long.MaxValue).Should().Be(30);
+        index.EntryCount.Should().Be(0);
+        index.TryGetMax(out _, out _).Should().BeFalse();
+        using var cursor = index.CreateScanCursor(ReadDirection.Forward);
+        cursor.MoveNext().Should().BeFalse();
+    }
+
+    [Fact]
+    public void TruncatePrefix_RepeatedRetentionLoop_Converges()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 100; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(20).Should().Be(20);
+        index.TruncatePrefix(20).Should().Be(0, "重复同界幂等");
+        index.TruncatePrefix(60).Should().Be(40);
+        index.EntryCount.Should().Be(40);
+
+        // 截断后再插入（跨塔层混合——新节点可能高于既有塔）
+        index.Insert(150, MakeAddr(150), LogicalAddress.Empty);
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(150);
+        index.EntryCount.Should().Be(41);
+    }
 }

@@ -146,6 +146,7 @@ internal sealed partial class StorageEngine
             if (!_segmentTable.TryGetSegment(segId, out var view) || view is not { IsValid: true } v) return;
             WriteSegmentTuple(segId, v.StableState, maxOffset: v.MaxOffset, growthLimit: v.GrowthLimit,
                 realSize: v.RealSize, EncodeExtentSummary(segId));
+            DropPendingSegmentTuple(segId);   // ★ 同步刷新已含最新状态——清脏项（Compact 换段后防泵回写 stale）
         }
         catch
         {

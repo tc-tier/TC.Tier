@@ -1,0 +1,282 @@
+// ══ 移植自 dotnet/runtime System.IO.Hashing (XxHash128.cs, v8.0.0, MIT)——
+//    自研化收编：算法/字节序/性能与官方逐位一致。下行为原版权头（MIT 要求保留）。
+// Licensed to the .NET Foundation under one or more agreements.
+// The .NET Foundation licenses this file to you under the MIT license.
+//
+// 说明：仅保留本仓库需要的静态一次性路径（官方 XxHash128.Hash 语义，seed=0）；
+//    官方实例（NonCryptographicHashAlgorithm 基类）API 未移植。
+//    输出字节序与官方一致（Big Endian，见 WriteBigEndian128）。
+
+using System.Buffers.Binary;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using static TC.Tier.Core.Primitives.XxHashShared;
+
+namespace TC.Tier.Core.Primitives;
+
+[SkipLocalsInit]
+internal static unsafe class XxHash128
+{
+    /// <summary>XXH128 输出字节数。</summary>
+    private const int HashLengthInBytes = 16;
+
+    /// <summary>
+    /// 一次性 XXH128（seed 默认 0）——写入 <paramref name="destination"/>（需 ≥16B，Big Endian 字节序）。
+    /// <para>与官方 <c>XxHash128.Hash(source, destination)</c> 输出逐位一致。</para>
+    /// </summary>
+    public static int Hash(ReadOnlySpan<byte> source, Span<byte> destination, long seed = 0)
+    {
+        if (destination.Length < HashLengthInBytes)
+        {
+            throw new ArgumentException("destination 过短（XXH128 输出 16 字节）。", nameof(destination));
+        }
+
+        Hash128 hash = HashToHash128(source, seed);
+        WriteBigEndian128(hash, destination);
+        return HashLengthInBytes;
+    }
+
+    private static Hash128 HashToHash128(ReadOnlySpan<byte> source, long seed = 0)
+    {
+        uint length = (uint)source.Length;
+        fixed (byte* sourcePtr = &MemoryMarshal.GetReference(source))
+        {
+            if (length <= 16)
+            {
+                return HashLength0To16(sourcePtr, length, (ulong)seed);
+            }
+
+            if (length <= 128)
+            {
+                return HashLength17To128(sourcePtr, length, (ulong)seed);
+            }
+
+            if (length <= MidSizeMaxBytes)
+            {
+                return HashLength129To240(sourcePtr, length, (ulong)seed);
+            }
+
+            return HashLengthOver240(sourcePtr, length, (ulong)seed);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void WriteBigEndian128(in Hash128 hash, Span<byte> destination)
+    {
+        ulong low = hash.Low64;
+        ulong high = hash.High64;
+        if (BitConverter.IsLittleEndian)
+        {
+            low = BinaryPrimitives.ReverseEndianness(low);
+            high = BinaryPrimitives.ReverseEndianness(high);
+        }
+
+        ref byte dest0 = ref MemoryMarshal.GetReference(destination);
+        Unsafe.WriteUnaligned(ref dest0, high);
+        Unsafe.WriteUnaligned(ref Unsafe.AddByteOffset(ref dest0, new IntPtr(sizeof(ulong))), low);
+    }
+
+    private static Hash128 HashLength0To16(byte* source, uint length, ulong seed)
+    {
+        if (length > 8)
+        {
+            return HashLength9To16(source, length, seed);
+        }
+
+        if (length >= 4)
+        {
+            return HashLength4To8(source, length, seed);
+        }
+
+        if (length != 0)
+        {
+            return HashLength1To3(source, length, seed);
+        }
+
+        const ulong BitFlipL = DefaultSecretUInt64_8 ^ DefaultSecretUInt64_9;
+        const ulong BitFlipH = DefaultSecretUInt64_10 ^ DefaultSecretUInt64_11;
+        return new Hash128(XxHash64.Avalanche(seed ^ BitFlipL), XxHash64.Avalanche(seed ^ BitFlipH));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Hash128 HashLength1To3(byte* source, uint length, ulong seed)
+    {
+        byte c1 = *source;
+        byte c2 = source[length >> 1];
+        byte c3 = source[length - 1];
+
+        uint combinedl = ((uint)c1 << 16) | ((uint)c2 << 24) | c3 | (length << 8);
+
+        uint combinedh = BitOperations.RotateLeft(BinaryPrimitives.ReverseEndianness(combinedl), 13);
+        const uint SecretXorL = (unchecked((uint)DefaultSecretUInt64_0) ^ (uint)(DefaultSecretUInt64_0 >> 32));
+        const uint SecretXorH = (unchecked((uint)DefaultSecretUInt64_1) ^ (uint)(DefaultSecretUInt64_1 >> 32));
+        ulong bitflipl = SecretXorL + seed;
+        ulong bitfliph = SecretXorH - seed;
+        ulong keyedLo = combinedl ^ bitflipl;
+        ulong keyedHi = combinedh ^ bitfliph;
+
+        return new Hash128(XxHash64.Avalanche(keyedLo), XxHash64.Avalanche(keyedHi));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Hash128 HashLength4To8(byte* source, uint length, ulong seed)
+    {
+        seed ^= (ulong)BinaryPrimitives.ReverseEndianness((uint)seed) << 32;
+
+        uint inputLo = ReadUInt32LE(source);
+        uint inputHi = ReadUInt32LE(source + length - 4);
+        ulong input64 = inputLo + ((ulong)inputHi << 32);
+        ulong bitflip = (DefaultSecretUInt64_2 ^ DefaultSecretUInt64_3) + seed;
+        ulong keyed = input64 ^ bitflip;
+
+        ulong m128High = Multiply64To128(keyed, Prime64_1 + (length << 2), out ulong m128Low);
+
+        m128High += (m128Low << 1);
+        m128Low ^= (m128High >> 3);
+
+        m128Low = XorShift(m128Low, 35);
+        m128Low *= 0x9FB21C651E98DF25UL;
+        m128Low = XorShift(m128Low, 28);
+        m128High = Avalanche(m128High);
+
+        return new Hash128(m128Low, m128High);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Hash128 HashLength9To16(byte* source, uint length, ulong seed)
+    {
+        ulong bitflipl = (DefaultSecretUInt64_4 ^ DefaultSecretUInt64_5) - seed;
+        ulong bitfliph = (DefaultSecretUInt64_6 ^ DefaultSecretUInt64_7) + seed;
+        ulong inputLo = ReadUInt64LE(source);
+        ulong inputHi = ReadUInt64LE(source + length - 8);
+        ulong m128High = Multiply64To128(inputLo ^ inputHi ^ bitflipl, Prime64_1, out ulong m128Low);
+
+        m128Low += (ulong)(length - 1) << 54;
+        inputHi ^= bitfliph;
+
+        m128High += sizeof(void*) < sizeof(ulong) ?
+            (inputHi & 0xFFFFFFFF00000000UL) + Multiply32To64((uint)inputHi, Prime32_2) :
+            inputHi + Multiply32To64((uint)inputHi, Prime32_2 - 1);
+
+        m128Low ^= BinaryPrimitives.ReverseEndianness(m128High);
+
+        ulong h128High = Multiply64To128(m128Low, Prime64_2, out ulong h128Low);
+        h128High += m128High * (ulong)Prime64_2;
+
+        h128Low = Avalanche(h128Low);
+        h128High = Avalanche(h128High);
+        return new Hash128(h128Low, h128High);
+    }
+
+    private static Hash128 HashLength17To128(byte* source, uint length, ulong seed)
+    {
+        ulong accLow = length * Prime64_1;
+        ulong accHigh = 0;
+
+        switch ((length - 1) / 32)
+        {
+            default: // case 3
+                Mix32Bytes(ref accLow, ref accHigh, source + 48, source + length - 64, DefaultSecretUInt64_12, DefaultSecretUInt64_13, DefaultSecretUInt64_14, DefaultSecretUInt64_15, seed);
+                goto case 2;
+            case 2:
+                Mix32Bytes(ref accLow, ref accHigh, source + 32, source + length - 48, DefaultSecretUInt64_8, DefaultSecretUInt64_9, DefaultSecretUInt64_10, DefaultSecretUInt64_11, seed);
+                goto case 1;
+            case 1:
+                Mix32Bytes(ref accLow, ref accHigh, source + 16, source + length - 32, DefaultSecretUInt64_4, DefaultSecretUInt64_5, DefaultSecretUInt64_6, DefaultSecretUInt64_7, seed);
+                goto case 0;
+            case 0:
+                Mix32Bytes(ref accLow, ref accHigh, source, source + length - 16, DefaultSecretUInt64_0, DefaultSecretUInt64_1, DefaultSecretUInt64_2, DefaultSecretUInt64_3, seed);
+                break;
+        }
+
+        return AvalancheHash(accLow, accHigh, length, seed);
+    }
+
+    private static Hash128 HashLength129To240(byte* source, uint length, ulong seed)
+    {
+        ulong accLow = length * Prime64_1;
+        ulong accHigh = 0;
+
+        Mix32Bytes(ref accLow, ref accHigh, source + (32 * 0), source + (32 * 0) + 16, DefaultSecretUInt64_0, DefaultSecretUInt64_1, DefaultSecretUInt64_2, DefaultSecretUInt64_3, seed);
+        Mix32Bytes(ref accLow, ref accHigh, source + (32 * 1), source + (32 * 1) + 16, DefaultSecretUInt64_4, DefaultSecretUInt64_5, DefaultSecretUInt64_6, DefaultSecretUInt64_7, seed);
+        Mix32Bytes(ref accLow, ref accHigh, source + (32 * 2), source + (32 * 2) + 16, DefaultSecretUInt64_8, DefaultSecretUInt64_9, DefaultSecretUInt64_10, DefaultSecretUInt64_11, seed);
+        Mix32Bytes(ref accLow, ref accHigh, source + (32 * 3), source + (32 * 3) + 16, DefaultSecretUInt64_12, DefaultSecretUInt64_13, DefaultSecretUInt64_14, DefaultSecretUInt64_15, seed);
+
+        accLow = Avalanche(accLow);
+        accHigh = Avalanche(accHigh);
+
+        uint bound = ((length - (32 * 4)) / 32);
+        if (bound != 0)
+        {
+            Mix32Bytes(ref accLow, ref accHigh, source + (32 * 4), source + (32 * 4) + 16, DefaultSecret3UInt64_0, DefaultSecret3UInt64_1, DefaultSecret3UInt64_2, DefaultSecret3UInt64_3, seed);
+            if (bound >= 2)
+            {
+                Mix32Bytes(ref accLow, ref accHigh, source + (32 * 5), source + (32 * 5) + 16, DefaultSecret3UInt64_4, DefaultSecret3UInt64_5, DefaultSecret3UInt64_6, DefaultSecret3UInt64_7, seed);
+                if (bound == 3)
+                {
+                    Mix32Bytes(ref accLow, ref accHigh, source + (32 * 6), source + (32 * 6) + 16, DefaultSecret3UInt64_8, DefaultSecret3UInt64_9, DefaultSecret3UInt64_10, DefaultSecret3UInt64_11, seed);
+                }
+            }
+        }
+        Mix32Bytes(ref accLow, ref accHigh, source + length - 16, source + length - 32, 0x4F0BC7C7BBDCF93F, 0x59B4CD4BE0518A1D, 0x7378D9C97E9FC831, 0xEBD33483ACC5EA64, 0 - seed);
+
+        return AvalancheHash(accLow, accHigh, length, seed);
+    }
+
+    private static Hash128 HashLengthOver240(byte* source, uint length, ulong seed)
+    {
+        fixed (byte* defaultSecret = &MemoryMarshal.GetReference(DefaultSecret))
+        {
+            byte* secret = defaultSecret;
+            if (seed != 0)
+            {
+                byte* customSecret = stackalloc byte[SecretLengthBytes];
+                DeriveSecretFromSeed(customSecret, seed);
+                secret = customSecret;
+            }
+
+            ulong* accumulators = stackalloc ulong[AccumulatorCount];
+            InitializeAccumulators(accumulators);
+
+            HashInternalLoop(accumulators, source, length, secret);
+
+            return new Hash128(
+                low64: MergeAccumulators(accumulators, secret + SecretMergeAccsStartBytes, length * Prime64_1),
+                high64: MergeAccumulators(accumulators, secret + SecretLengthBytes - AccumulatorCount * sizeof(ulong) - SecretMergeAccsStartBytes, ~(length * Prime64_2)));
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Hash128 AvalancheHash(ulong accLow, ulong accHigh, uint length, ulong seed)
+    {
+        ulong h128Low = accLow + accHigh;
+        ulong h128High = (accLow * Prime64_1)
+                      + (accHigh * Prime64_4)
+                      + ((length - seed) * Prime64_2);
+        h128Low = Avalanche(h128Low);
+        h128High = 0ul - Avalanche(h128High);
+        return new Hash128(h128Low, h128High);
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void Mix32Bytes(ref ulong accLow, ref ulong accHigh, byte* input1, byte* input2, ulong secret1, ulong secret2, ulong secret3, ulong secret4, ulong seed)
+    {
+        accLow += Mix16Bytes(input1, secret1, secret2, seed);
+        accLow ^= ReadUInt64LE(input2) + ReadUInt64LE(input2 + 8);
+        accHigh += Mix16Bytes(input2, secret3, secret4, seed);
+        accHigh ^= ReadUInt64LE(input1) + ReadUInt64LE(input1 + 8);
+    }
+
+    private readonly struct Hash128
+    {
+        public readonly ulong Low64;
+        public readonly ulong High64;
+
+        public Hash128(ulong low64, ulong high64)
+        {
+            Low64 = low64;
+            High64 = high64;
+        }
+    }
+}

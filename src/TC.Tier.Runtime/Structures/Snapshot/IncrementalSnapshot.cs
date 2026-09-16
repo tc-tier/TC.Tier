@@ -1,8 +1,7 @@
 using System.Buffers.Binary;
-using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using TC.Tier.Core.Logging;
-using TC.Tier.Core.Shared;
+using TC.Tier.Core.Lifecycle;
 
 namespace TC.Tier.Runtime.Structures.Snapshot;
 
@@ -51,6 +50,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     }
 
     /// <summary>★ 恢复核心 = IncrementalRecovery（RecoveryBase 模板派生——meta 段表 + 尾部检查）。</summary>
+    /// <returns>IncrementalRecovery 实例（恢复期加载 opaque 段表 + 段尾/引擎尾一致性检查）。</returns>
     protected override IRecovery<SnapshotRecoveryHints> CreateRecovery()
         => new IncrementalRecovery(this);
 
@@ -61,6 +61,9 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     public long LatestN0 => Volatile.Read(ref _latestN0);
 
     /// <summary>段 i 的覆盖点（越界抛）。</summary>
+    /// <param name="index">段下标（0..SegmentCount-1）。</param>
+    /// <returns>段 i 的快照覆盖点 N₀（单调递增——段追加序）。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">下标越界时抛出。</exception>
     public long GetSegmentN0(int index)
     {
         lock (_segmentLock)
@@ -78,6 +81,11 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     /// <para>★ 事务语义（会话模式——底层 2PC）：写帧 → Prepare(seq) → ConfirmCommitted(seq) → 段表注册；
     ///   chunk 流异常 = Abort(seq)——尾截断回滚到上次提交点（新段物理清除，旧段完好）。</para>
     /// </summary>
+    /// <param name="n0">本段快照覆盖点 N₀（作为段自描述前缀持久化；通常为 raft apply 序号）。</param>
+    /// <param name="chunks">快照条目流（GB/TB 级边写边 CRC 增量累积，不驻内存）。</param>
+    /// <param name="ct">取消令牌（取消/流异常 = Abort 回滚到上次提交点后抛出）。默认 default。</param>
+    /// <returns>完成后结果 = 本段覆盖点 N₀（等于入参 n0）；段数达阈值时已自触发合并。</returns>
+    /// <exception cref="InvalidOperationException">并发/重入调用（单写者闸门）时抛出。</exception>
     public async ValueTask<long> AppendSegmentAsync(long n0,
         IAsyncEnumerable<ReadOnlyMemory<byte>> chunks, CancellationToken ct = default)
     {
@@ -99,6 +107,11 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     /// （旧段内容被新镜像包含）+ 旧段物理回收。chunk 流异常（如外部 Footer 校验失败）= Abort 回滚——
     /// 新段物理清除、旧快照完好（失败即清理，会话模式）。
     /// </summary>
+    /// <param name="n0">新段快照覆盖点 N₀（作为段自描述前缀持久化）。</param>
+    /// <param name="chunks">完整镜像条目流（边写边 CRC 增量累积，不驻内存）。</param>
+    /// <param name="ct">取消令牌（取消/流异常 = Abort 回滚后抛出）。默认 default。</param>
+    /// <returns>完成后结果 = 新段覆盖点 N₀（等于入参 n0）；段表已替换为单段、旧段已物理回收。</returns>
+    /// <exception cref="InvalidOperationException">并发/重入调用（单写者闸门）时抛出。</exception>
     public async ValueTask<long> ImportSegmentAsync(long n0,
         IAsyncEnumerable<ReadOnlyMemory<byte>> chunks, CancellationToken ct = default)
     {
@@ -143,7 +156,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
                 var h = StreamFrameHeaderCodec.Create();
                 StreamFrameHeaderCodec.Write(header, in h);
 
-                var hash = new Crc64();
+                var hash = new UnifiedCrc64();
                 hash.Append(header);
                 session.WriteSmall(header);
 
@@ -220,6 +233,9 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     /// 顺序流式读回全部段（跳过段内 N₀ 前缀）= 最新快照的条目流——GB/TB 级不驻内存，
     /// 段级帧 CRC64 增量校验（读多少验多少——校验失败抛 InvalidDataException）。
     /// </summary>
+    /// <param name="ct">取消令牌（枚举时逐段检查）。默认 default。</param>
+    /// <returns>最新快照条目流的异步枚举（枚举时逐段顺序拼接、跳过 N₀ 前缀；帧头/帧尾 magic 或 CRC64
+    /// 校验失败抛 <see cref="InvalidDataException"/>）。</returns>
     public async IAsyncEnumerable<ReadOnlyMemory<byte>> ReadAllChunksAsync(
         [EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -234,6 +250,11 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     }
 
     /// <summary>段 i 的数据流（测试/诊断——同上校验语义；越界抛）。</summary>
+    /// <param name="index">段下标（0..SegmentCount-1）。</param>
+    /// <param name="ct">取消令牌（枚举时检查）。默认 default。</param>
+    /// <returns>段 i 条目流的异步枚举（跳过 N₀ 前缀；帧头/帧尾 magic 或 CRC64 校验失败抛
+    /// <see cref="InvalidDataException"/>）。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">下标越界时抛出。</exception>
     public IAsyncEnumerable<ReadOnlyMemory<byte>> ReadSegmentDataAsync(int index, CancellationToken ct = default)
     {
         SegmentInfo seg;
@@ -250,6 +271,9 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     /// 合并全部段为新基线段（读全段拼接 → 写新帧 → 截旧段 → 段表 = 单段 + meta 落盘）。
     /// 低频（阈值触发/显式调）——成本 = 一次全量写（基准对照 B 单次快照）。
     /// </summary>
+    /// <param name="ct">取消令牌。默认 default。</param>
+    /// <returns>表示合并完成的任务；完成后段表 = 单一新基线段（覆盖点 N₀ 不变）+ meta 原子落盘，旧段已物理回收。</returns>
+    /// <exception cref="InvalidOperationException">与 AppendSegmentAsync/ImportSegmentAsync/ClearAsync 并发（单写者闸门）时抛出。</exception>
     public async ValueTask CompactSegmentsAsync(CancellationToken ct = default)
     {
         EnsureReady();
@@ -268,6 +292,9 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     /// <summary>
     /// 清空全部段（快照替换语义用——导入新快照前清旧；截断全量 + 段表空 + meta 落盘）。
     /// </summary>
+    /// <param name="ct">保留兼容（当前实现同步完成，不检查取消）。默认 default。</param>
+    /// <returns>表示清空完成的任务（已空时同步完成）。</returns>
+    /// <exception cref="InvalidOperationException">与其他写操作并发（单写者闸门）时抛出。</exception>
     public ValueTask ClearAsync(CancellationToken ct = default)
     {
         EnsureReady();
@@ -325,7 +352,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
                 var header = new byte[StreamFrameHeaderCodec.StructSize];
                 var h = StreamFrameHeaderCodec.Create();
                 StreamFrameHeaderCodec.Write(header, in h);
-                var hash = new Crc64();
+                var hash = new UnifiedCrc64();
                 hash.Append(header);
                 session.WriteSmall(header);
 
@@ -392,7 +419,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
                 : AlignUpToSector(_physicalWriteAddress);
         }
 
-        var hash = new Crc64();
+        var hash = new UnifiedCrc64();
         var session = OpenReadSession(seg.LogicalStart, end, seg.PhysStart, physEnd);
         await using var _ = session.ConfigureAwait(false);
 

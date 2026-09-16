@@ -17,12 +17,17 @@ public sealed class AsyncQueue<T>
 
     // 等待者链表（LIFO 栈式）。每个等待者一个独立的 PooledValueTaskSource。
     private WaitNode? _waitHead;
+    private WaitNode? _nodePoolHead;
+    private int _pooledNodeCount;
+    private int _waitNodeAllocations;
     private readonly object _waitLock = new();
+    private const int MaxPooledWaitNodes = 256;
 
     private sealed class WaitNode
     {
         public PooledValueTaskSource Source = null!;
         public WaitNode? Next;
+        public int Owners; // waiter + 已摘链但尚未完成信号的 Enqueue
     }
 
     /// <summary>队列中当前元素数量。</summary>
@@ -44,10 +49,21 @@ public sealed class AsyncQueue<T>
             {
                 toWake = _waitHead;
                 _waitHead = toWake.Next;
+                toWake.Next = null;
             }
         }
 
-        toWake?.Source.SetResult();
+        if (toWake is not null)
+        {
+            try
+            {
+                toWake.Source.MarkOrComplete();
+            }
+            finally
+            {
+                ReleaseWaitNode(toWake);
+            }
+        }
     }
 
     /// <summary>
@@ -74,7 +90,7 @@ public sealed class AsyncQueue<T>
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var node = new WaitNode { Source = PooledValueTaskSource.Rent() };
+            var node = RentWaitNode();
             if (cancellationToken.CanBeCanceled)
                 node.Source.AttachCancellation(cancellationToken);
 
@@ -83,10 +99,11 @@ public sealed class AsyncQueue<T>
                 // double-check：拿到锁后可能已有 Enqueue
                 if (_queue.TryDequeue(out var item))
                 {
-                    PooledValueTaskSource.Return(node.Source);
+                    ReleaseWaitNode(node);
                     return item;
                 }
                 // 入等待链（LIFO）
+                node.Owners = 2;
                 node.Next = _waitHead;
                 _waitHead = node;
             }
@@ -97,9 +114,10 @@ public sealed class AsyncQueue<T>
             }
             finally
             {
-                // 被唤醒（Enqueue 的 SetResult 或取消回调）后，归还 source + 从链摘除
-                RemoveWaitNode(node);
-                PooledValueTaskSource.Return(node.Source);
+                // 被取消且仍在链中时，本方同时释放链所有权；Enqueue 已摘链时由完成方释放。
+                if (RemoveWaitNode(node))
+                    ReleaseWaitNode(node);
+                ReleaseWaitNode(node);
             }
 
             // 被唤醒后重试出队（可能被 spurious 唤醒或被其他消费者抢先）
@@ -123,12 +141,14 @@ public sealed class AsyncQueue<T>
     /// 异步等待队列有至少一个元素（不取出）。若队列非空，立即返回；否则挂起直到有元素入队或取消。
     /// </summary>
     /// <param name="cancellationToken">用于取消等待的 <see cref="CancellationToken"/>。</param>
+    /// <returns>任务在队列有至少一个元素时完成（不取出元素）；<paramref name="cancellationToken"/> 取消时以
+    /// <see cref="OperationCanceledException"/> 完成。</returns>
     public async ValueTask WaitForEntryAsync(CancellationToken cancellationToken = default)
     {
         if (!_queue.IsEmpty) return;
 
         // 复用 DequeueAsync 的等待机制，但不实际取走元素
-        var node = new WaitNode { Source = PooledValueTaskSource.Rent() };
+        var node = RentWaitNode();
         if (cancellationToken.CanBeCanceled)
             node.Source.AttachCancellation(cancellationToken);
 
@@ -136,9 +156,10 @@ public sealed class AsyncQueue<T>
         {
             if (!_queue.IsEmpty)
             {
-                PooledValueTaskSource.Return(node.Source);
+                ReleaseWaitNode(node);
                 return;
             }
+            node.Owners = 2;
             node.Next = _waitHead;
             _waitHead = node;
         }
@@ -149,8 +170,9 @@ public sealed class AsyncQueue<T>
         }
         finally
         {
-            RemoveWaitNode(node);
-            PooledValueTaskSource.Return(node.Source);
+            if (RemoveWaitNode(node))
+                ReleaseWaitNode(node);
+            ReleaseWaitNode(node);
         }
     }
 
@@ -163,15 +185,16 @@ public sealed class AsyncQueue<T>
 
     /// <summary>从等待链中摘除指定节点（被唤醒或取消后调用）。</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private void RemoveWaitNode(WaitNode target)
+    private bool RemoveWaitNode(WaitNode target)
     {
         lock (_waitLock)
         {
-            if (_waitHead is null) return;
+            if (_waitHead is null) return false;
             if (ReferenceEquals(_waitHead, target))
             {
                 _waitHead = target.Next;
-                return;
+                target.Next = null;
+                return true;
             }
             var prev = _waitHead;
             while (prev.Next is not null)
@@ -179,10 +202,63 @@ public sealed class AsyncQueue<T>
                 if (ReferenceEquals(prev.Next, target))
                 {
                     prev.Next = target.Next;
-                    return;
+                    target.Next = null;
+                    return true;
                 }
                 prev = prev.Next;
             }
+            return false;
         }
     }
+
+    private WaitNode RentWaitNode()
+    {
+        WaitNode node;
+        lock (_waitLock)
+        {
+            if (_nodePoolHead is { } pooled)
+            {
+                _nodePoolHead = pooled.Next;
+                _pooledNodeCount--;
+                node = pooled;
+            }
+            else
+            {
+                node = new WaitNode();
+                _waitNodeAllocations++;
+            }
+        }
+
+        node.Next = null;
+        node.Owners = 1;
+        node.Source = PooledValueTaskSource.Rent();
+        return node;
+    }
+
+    private void ReleaseWaitNode(WaitNode node)
+    {
+        if (Interlocked.Decrement(ref node.Owners) != 0)
+            return;
+
+        PooledValueTaskSource.Return(node.Source);
+        lock (_waitLock)
+            ReturnWaitNodeLocked(node);
+    }
+
+    private void ReturnWaitNodeLocked(WaitNode node)
+    {
+        node.Source = null!;
+        node.Owners = 0;
+        if (_pooledNodeCount >= MaxPooledWaitNodes)
+        {
+            node.Next = null;
+            return;
+        }
+
+        node.Next = _nodePoolHead;
+        _nodePoolHead = node;
+        _pooledNodeCount++;
+    }
+
+    internal int WaitNodeAllocationCountForTest => Volatile.Read(ref _waitNodeAllocations);
 }

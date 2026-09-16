@@ -32,6 +32,11 @@ internal sealed class MaintenanceGate
     /// 进入维护态——闭门（CAS）→ 等待在途变异归零（1ms 轮询，ct 可取消）→ 返回租约（Dispose 开门）。
     /// 已在维护态 → 抛 <see cref="IOError.UnderMaintenance"/>（非重入）。
     /// </summary>
+    /// <param name="reason">维护原因（诊断/Reason 观测用）。</param>
+    /// <param name="scope">维护范围（AllOperations 连读也拒 / WriteOperations 只拒写）。</param>
+    /// <param name="ct">取消令牌——等待在途变异归零期间生效（取消即回滚闭门）。</param>
+    /// <returns>维护租约（Dispose 开门，幂等）。</returns>
+    /// <exception cref="FileIOException">已在维护态（UnderMaintenance——非重入）。</exception>
     public IDisposable Enter(string reason, MaintenanceScope scope, CancellationToken ct)
     {
         var target = scope == MaintenanceScope.AllOperations ? AllRejected : WritesRejected;
@@ -65,6 +70,10 @@ internal sealed class MaintenanceGate
     /// 变异操作入口——通过则登记在途计数（Dispose 退出）；门已闭则抛 <see cref="IOError.UnderMaintenance"/>。
     /// 双检：登记后复查状态，封闭"初检通过 → Enter 闭门 → 迟到计数"竞态。
     /// </summary>
+    /// <param name="operation">变异操作名（诊断）。</param>
+    /// <param name="path">相关路径（诊断，可选）。</param>
+    /// <returns>在途登记句柄（Dispose 退出计数）。</returns>
+    /// <exception cref="FileIOException">门已闭（UnderMaintenance）。</exception>
     public MutationScope BeginMutation(string operation, string? path)
     {
         if (Volatile.Read(ref _state) != OpenState)
@@ -79,6 +88,9 @@ internal sealed class MaintenanceGate
     }
 
     /// <summary>读操作入口（scope=All 时拒绝；WriteOperations 档放行）——不计数，不等待。</summary>
+    /// <param name="operation">读操作名（诊断）。</param>
+    /// <param name="path">相关路径（诊断，可选）。</param>
+    /// <exception cref="FileIOException">scope=AllOperations 维护中（UnderMaintenance）。</exception>
     public void ThrowIfReadsRejected(string operation, string? path)
     {
         if (Volatile.Read(ref _state) == AllRejected)
@@ -107,6 +119,7 @@ internal sealed class MaintenanceGate
         internal MutationScope(MaintenanceGate gate) => _gate = gate;
 
         /// <summary>退出在途计数。</summary>
+        /// <summary>退出在途计数（using 作用域收尾——与 BeginMutation 严格配对）。</summary>
         public void Dispose() => Interlocked.Decrement(ref _gate._inFlightMutations);
     }
 
@@ -117,6 +130,7 @@ internal sealed class MaintenanceGate
 
         internal Lease(MaintenanceGate gate) => _gate = gate;
 
+        /// <summary>开门（幂等——双重 Dispose 只释放一次；释放后再次调用为 no-op）。</summary>
         public void Dispose()
         {
             var gate = Interlocked.Exchange(ref _gate, null);

@@ -17,26 +17,31 @@ public interface IStorageInfo
 
     /// <summary>引擎名（= 根空间下子目录路径，可多级 <c>"a/b"</c>，'/' 唯一分隔符）。
     /// <para>段文件名前缀等均派生自此。</para></summary>
+    /// <returns>引擎名（= 根空间下子目录路径，可多级 <c>"a/b"</c>，'/' 唯一分隔符）。</returns>
     string EngineName { get; }
 
     // === 规模配置 ===
 
     /// <summary>活跃段生长上限（字节）；段真实大小见地址表 RealSize。
     /// <para>★ 决定单段最大字节数，跨段时按此切分。</para></summary>
+    /// <returns>活跃段生长上限（字节）；段真实大小见地址表 RealSize。</returns>
     long SegmentGrowthLimit { get; }
 
     // === IO 能力/模式 ===
 
     /// <summary>卷扇区大小（字节），I/O 对齐计算的基准（来自注入根空间的卷几何）。</summary>
+    /// <returns>卷扇区大小（字节），I/O 对齐计算的基准（来自注入根空间的卷几何）。</returns>
     uint SectorSize { get; }
 
     // === 分段/分配策略 ===
 
     /// <summary>是否启用分段模式（true = 每段独立文件，false = 单文件平铺）。
     /// <para>★ 决定 <see cref="SegmentFileName"/> 的路径格式。</para></summary>
+    /// <returns>是否启用分段模式（true = 每段独立文件，false = 单文件平铺）。</returns>
     bool EnableSegmentation { get; }
 
     /// <summary>新段创建时是否真实预分配（构造固定，生命周期不变）。</summary>
+    /// <returns>新段创建时是否真实预分配（构造固定，生命周期不变）。</returns>
     bool PreallocateFile { get; }
 
     // === 路径解析（纯方法，无 IO）===

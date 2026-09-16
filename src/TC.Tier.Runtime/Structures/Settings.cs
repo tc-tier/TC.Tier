@@ -3,6 +3,7 @@ namespace TC.Tier.Runtime.Structures;
 /// <summary>
 /// 设置基类——提供通用配置项和主存储引擎选项访问。
 /// </summary>
+/// <param name="mainEngine">主存储引擎选项（引擎名/段几何/预分配/关闭行为），不可为 <c>null</c>。</param>
 public abstract class Settings(StorageEngineOptions mainEngine)
 {
     /// <summary>

@@ -8,6 +8,7 @@ using TC.Tier.Core.IO.Shared;
 
 namespace TC.Tier.Core.IO.TierVolume;
 
+/// <summary>TierVolumeFs partial——载体访问（实例内唯一通道：成员开口/读写对齐通道/缓存回收）。</summary>
 public sealed partial class TierVolumeFs
 {
     // ═══════════════ 载体访问（实例内唯一通道——§2.4 无侧门）═══════════════
@@ -247,26 +248,30 @@ public sealed partial class TierVolumeFs
     private static void EncodeMemberHeader(Span<byte> buffer, MemberEntry info, Guid volumeUuid, int carrierIndex, int pageSize)
     {
         buffer.Clear();
-        "RAWC"u8.CopyTo(buffer);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt16LittleEndian(buffer.Slice(4), TierVolumeLayoutVersion);
-        volumeUuid.TryWriteBytes(buffer.Slice(8));
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(24), (uint)carrierIndex);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(28), info.BitmapStartLocal);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(36), info.BitmapBlocksLocal);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(buffer.Slice(44), info.CapacityBlocks);
-        System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(buffer.Slice(508),
-            System.IO.Hashing.Crc32.HashToUInt32(buffer.Slice(0, 508)));
+        var hdr = new CarrierMemberHeader
+        {
+            Magic = CarrierMemberHeader.MagicValue,
+            Version = TierVolumeLayoutVersion,
+            CarrierIndex = (uint)carrierIndex,
+            BitmapStartLocal = info.BitmapStartLocal,
+            BitmapBlocksLocal = info.BitmapBlocksLocal,
+            Capacity = info.CapacityBlocks,
+        };
+        CarrierMemberHeaderCodec.Write(buffer, in hdr);   // 全字段（Crc=0）
+        volumeUuid.TryWriteBytes(buffer.Slice(CarrierMemberHeader.UuidOffset, CarrierMemberHeader.UuidBytes));   // uuid 裸区——范围自常量推导
+        hdr.Crc = UnifiedCrc.ComputeCrc32C(buffer[..CarrierMemberHeaderCodec.Offset_Crc]);           // CRC 覆盖 [0..crc 字段首)——字段已就位
+        CarrierMemberHeaderCodec.Write_Crc(buffer, hdr.Crc);                                                     // 生成单值写——只覆写 crc 区
     }
 
     private void VerifyMemberHeader(CarrierMember m, int expectedIndex)
     {
-        var header = new byte[512];
+        var header = new byte[CarrierMemberHeaderCodec.StructSize];
         ReadMemberLocal(m, 0, header);
-        if (!header.AsSpan(0, 4).SequenceEqual("RAWC"u8)
-            || System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(24)) != (uint)expectedIndex
-            || new Guid(header.AsSpan(8, 16).ToArray()) != _sb.Uuid
-            || System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(header.AsSpan(508))
-               != System.IO.Hashing.Crc32.HashToUInt32(header.AsSpan(0, 508)))
+        var hdr = CarrierMemberHeaderCodec.Read(header);
+        if (hdr.Magic != CarrierMemberHeader.MagicValue
+            || hdr.CarrierIndex != (uint)expectedIndex
+            || new Guid(header.AsSpan(CarrierMemberHeader.UuidOffset, CarrierMemberHeader.UuidBytes).ToArray()) != _sb.Uuid
+            || hdr.Crc != UnifiedCrc.ComputeCrc32C(header.AsSpan()[..CarrierMemberHeaderCodec.Offset_Crc]))
             throw new FileIOException(IOError.IOFailure,
                 $"成员载体身份不符（UUID/索引/CRC）：{m.Carrier.Path}——期望成员 {expectedIndex}", m.Carrier.Path, "Open");
     }
@@ -333,7 +338,8 @@ public sealed partial class TierVolumeFs
         return buf;
     }
 
-    /// <summary>设备容量（字节）——Linux BLKGETSIZE64 ioctl；非 Linux/失败回退 fstat 长度。</summary>
+    /// <summary>设备容量（字节）——Linux BLKGETSIZE64 ioctl；Windows IOCTL_DISK_GET_LENGTH_INFO
+    /// （设备/卷句柄上 <c>GetFileSizeEx</c> 报"函数不正确"）；其余/失败回退 fstat 长度。</summary>
     private unsafe long QueryDeviceCapacityBytes(SafeFileHandle handle)
     {
         if (OperatingSystem.IsLinux())
@@ -351,6 +357,13 @@ public sealed partial class TierVolumeFs
             {
                 if (borrowed) handle.DangerousRelease();
             }
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            long size = 0;
+            if (Kernel32.DeviceIoControlSimple(handle, NativeConstants.IoctlDiskGetLengthInfo,
+                    IntPtr.Zero, 0, (IntPtr)(&size), sizeof(long), out _, IntPtr.Zero) && size > 0)
+                return size;
         }
         return RandomAccess.GetLength(handle);
     }

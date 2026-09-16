@@ -89,7 +89,7 @@ internal static unsafe class FileNative
     /// <returns>预分配结果（见返回值语义）。</returns>
     public static PreallocateResult PreallocateFile(SafeFileHandle handle, long size, ILogger? logger = null)
     {
-        if (size <= 0) return PreallocateResult.RealAlloc;  // 无需预分配
+        if (size <= 0) return PreallocateResult.Skipped;  // 无需预分配（显式禁用/零尺寸）——不谎报 RealAlloc
 
         // === Windows: SetFileSize（SetFileValidData，真实分配，需特权） ===
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -962,6 +962,12 @@ internal static unsafe class FileNative
     private const uint AdsCreateAlways = 2;          // CREATE_ALWAYS
     private const uint AdsOpenExisting = 3;          // OPEN_EXISTING
 
+    /// <summary>Windows ADS 元数据写+flush 进程级串行门——并发 FlushFileBuffers（不同文件的 ADS 流、
+    /// 同卷同目录）在 NTFS 上经"文件 FCB → 目录资源"的获取序互等，磁盘零 IO 也可无限期停滞
+    /// （实锤：双引擎工作线程停于本方法 flush，磁盘 100% idle，数分钟自愈）。元数据写微小且冷，
+    /// 串行化零代价，并发 flush 触发条件直接消除。</summary>
+    private static readonly SemaphoreSlim AdsMetaGate = new(1, 1);
+
     /// <summary>Linux/macOS xattr 名字补命名空间前缀（user.）——已带前缀则原样返回。
     /// Windows ADS 无命名空间概念，不走本方法。</summary>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -977,8 +983,12 @@ internal static unsafe class FileNative
     /// <param name="data">元数据字节。</param>
     /// <param name="attName">属性名称（默认 <c>XattrName</c>）。</param>
     /// <param name="logger">可选日志——写入失败时记录警告。</param>
+    /// <param name="flush">是否 FlushFileBuffers 强持久化。默认 true（读己写+掉电耐久）；
+    ///   false = 仅缓存写（缓存管理器读己写恒成立；耐久化由调用方锚点显式刷盘）——
+    ///   ★ 运行期高频元数据写必须 false：churn 卷上 FlushFileBuffers 等 NTFS 元数据静默窗
+    ///   无界停滞（磁盘全闲也可数分钟，2026-09-08 栈实锤）。</param>
     /// <returns>true = 原生写入成功。</returns>
-    public static bool WriteFileMeta(string filePath, ReadOnlySpan<byte> data, string attName = XattrName, ILogger? logger = null)
+    public static bool WriteFileMeta(string filePath, ReadOnlySpan<byte> data, string attName = XattrName, ILogger? logger = null, bool flush = true)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
             || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -987,7 +997,11 @@ internal static unsafe class FileNative
             {
                 fixed (byte* ptr = data)
                 {
-                    return LibC.Setxattr(filePath, ToSystemXattrName(attName), ptr, (ulong)data.Length, 0) == 0;
+                    // ★ macOS setxattr 是 6 参 ABI（position+options）——按 Linux 5 参调用会把寄存器
+                    //   垃圾当 options（行为随 JIT 漂移），必须走 mac 专用声明。
+                    return OperatingSystem.IsMacOS()
+                        ? LibC.SetxattrMac(filePath, ToSystemXattrName(attName), ptr, (uint)data.Length, 0, 0) == 0
+                        : LibC.Setxattr(filePath, ToSystemXattrName(attName), ptr, (ulong)data.Length, 0) == 0;
                 }
             }
             catch (Exception ex) { logger?.LogWarning(ex, "Setxattr failed on {Path}", filePath); return false; }
@@ -997,6 +1011,7 @@ internal static unsafe class FileNative
         {
             var adsPath = filePath + ":" + attName;
             SafeFileHandle? h = null;
+            AdsMetaGate.Wait();
             try
             {
                 h = Kernel32.CreateFile(adsPath, NativeConstants.GenericWrite, 0,
@@ -1017,13 +1032,17 @@ internal static unsafe class FileNative
                         return false;
                     }
                 }
-                // ★ CreateAlways 重写 ADS 后立即读可能因缓存未刷读到 null——FlushFileBuffers 强制持久化
-                try { RandomAccess.FlushToDisk(h); }
-                catch (Exception fex) { logger?.LogWarning(fex, "ADS FlushToDisk failed on {Path}", adsPath); }
+                // ★ CreateAlways 重写 ADS 后立即读：缓存管理器同流读己写恒成立（无需 flush）；
+                //   flush = true 时额外 FlushFileBuffers 掉电耐久（churn 卷上无界停滞——调用方慎选）。
+                if (flush)
+                {
+                    try { RandomAccess.FlushToDisk(h); }
+                    catch (Exception fex) { logger?.LogWarning(fex, "ADS FlushToDisk failed on {Path}", adsPath); }
+                }
                 return true;
             }
             catch (Exception ex) { logger?.LogWarning(ex, "ADS write threw on {Path}", adsPath); return false; }
-            finally { h?.Dispose(); }
+            finally { h?.Dispose(); AdsMetaGate.Release(); }
         }
 
         return false;
@@ -1047,14 +1066,19 @@ internal static unsafe class FileNative
             try
             {
                 var xname = ToSystemXattrName(attName);
-                var size = LibC.Getxattr(filePath, xname, (byte[]?)null, 0);
+                // ★ macOS getxattr 6 参 ABI（同步轨声明——同 WriteFileMeta 注）
+                var size = OperatingSystem.IsMacOS()
+                    ? LibC.GetxattrMac(filePath, xname, (byte[]?)null, 0, 0, 0)
+                    : LibC.Getxattr(filePath, xname, (byte[]?)null, 0);
                 if (size <= 0) return 0;
                 if (size > destination.Length) return -1;
                 unsafe
                 {
                     fixed (byte* ptr = destination)
                     {
-                        var actual = LibC.Getxattr(filePath, xname, ptr, (ulong)size);
+                        var actual = OperatingSystem.IsMacOS()
+                            ? LibC.GetxattrMac(filePath, xname, ptr, (ulong)size, 0, 0)
+                            : LibC.Getxattr(filePath, xname, ptr, (ulong)size);
                         return actual == size ? (int)size : -1;
                     }
                 }
@@ -1112,10 +1136,15 @@ internal static unsafe class FileNative
             try
             {
                 var xname = ToSystemXattrName(attName);
-                long size = LibC.Getxattr(filePath, xname, (byte[]?)null, 0);
+                // ★ macOS getxattr 6 参 ABI（同 span 形态注）
+                long size = OperatingSystem.IsMacOS()
+                    ? LibC.GetxattrMac(filePath, xname, (byte[]?)null, 0, 0, 0)
+                    : LibC.Getxattr(filePath, xname, (byte[]?)null, 0);
                 if (size <= 0) return null;
                 byte[] buf = new byte[size];
-                long actual = LibC.Getxattr(filePath, xname, buf, (ulong)size);
+                long actual = OperatingSystem.IsMacOS()
+                    ? LibC.GetxattrMac(filePath, xname, buf, (ulong)size, 0, 0)
+                    : LibC.Getxattr(filePath, xname, buf, (ulong)size);
                 return actual == size ? buf : null;
             }
             catch (Exception ex) { logger?.LogWarning(ex, "Getxattr failed on {Path}", filePath); return null; }
@@ -1170,7 +1199,20 @@ internal static unsafe class FileNative
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux)
             || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
-            try { LibC.Removexattr(filePath, ToSystemXattrName(attName)); }
+            try
+            {
+                // ★ macOS removexattr 3 参 ABI（options）；返回码不得静默吞——清除失败=旧元数据复活
+                var rc = OperatingSystem.IsMacOS()
+                    ? LibC.RemovexattrMac(filePath, ToSystemXattrName(attName), 0)
+                    : LibC.Removexattr(filePath, ToSystemXattrName(attName));
+                if (rc != 0)
+                {
+                    var err = Marshal.GetLastPInvokeError();
+                    // ENOENT(2)=宿主路径缺失 / Linux ENODATA(61)、macOS ENOATTR(93)=本就无属性——清除语义下属正常
+                    if (err is not (2 or 61 or 93))
+                        logger?.LogWarning("Removexattr failed (rc={Rc}, errno={Err}) on {Path}", rc, err, filePath);
+                }
+            }
             catch (Exception ex) { logger?.LogWarning(ex, "Removexattr failed on {Path}", filePath); }
             return;
         }

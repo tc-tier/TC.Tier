@@ -2,7 +2,7 @@ using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using TC.Tier.Core.NativeInterop;
-using NativeInt128 = TC.Tier.Core.NativeInterop.Int128;
+using NativeInt128 = TC.Tier.Core.NativeInterop.UInt128Pair;
 
 namespace TC.Tier.Runtime.Structures.ProbingIndex;
 
@@ -41,11 +41,16 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     {
         var table = _table;                                   // ★ 单引用捕获（表+溢出池同代原子对）
 
-        // 几何（32B——表骨架，恢复直接物化）
+        // 几何（32B——表骨架，恢复直接物化）。[24..32) = 溢出池 bump 指针（审计 #411：
+        //   恢复后 OverflowCount 不还原 → 再分配溢出桶从 0 重新 bump，别名覆盖已恢复的链桶）。
         Span<byte> geo = stackalloc byte[PersistGeometrySize];
-        BinaryPrimitives.WriteInt64LittleEndian(geo, table.Size);
-        BinaryPrimitives.WriteInt64LittleEndian(geo.Slice(8), table.OverflowPool.LongLength);
-        BinaryPrimitives.WriteInt64LittleEndian(geo.Slice(16), Volatile.Read(ref _entryCount));
+        HashIndexGeometryCodec.Write(geo, new HashIndexGeometry
+        {
+            TableSize = table.Size,
+            OverflowCapacity = table.OverflowPool.LongLength,
+            EntryCount = Volatile.Read(ref _entryCount),
+            OverflowCount = Volatile.Read(ref table.OverflowCount),
+        });
         WriteBodyChunk(geo);
 
         // 桶区 + 溢出池（fuzzy 逐槽 128bit 原子读——跳 Tentative，只收 Occupied/链指针）
@@ -87,19 +92,6 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
             WriteBodyChunk(chunk[..chunkFill]);
     }
 
-    /// <summary>128bit 原子读（CAS 环：compare-exchange 同值——成功=读到一致快照；失败=槽被写者触碰，重读）。</summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static LogicalAddress ReadSlotAtomic(ref LogicalAddress slot)
-    {
-        ref var loc = ref Unsafe.As<LogicalAddress, NativeInt128>(ref slot);
-        while (true)
-        {
-            var v = Unsafe.As<LogicalAddress, NativeInt128>(ref slot);
-            if (NativeAtomic128.CompareExchange(ref loc, v, v))
-                return Unsafe.As<NativeInt128, LogicalAddress>(ref v);
-        }
-    }
-
     // ════════════════════════════════════════════════════════════
     // === 帧物化（基类帧走链定位后调——读几何 → 重建表+溢出池 → 重数实收）===
     // ════════════════════════════════════════════════════════════
@@ -121,8 +113,10 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 
         Span<byte> geo = stackalloc byte[PersistGeometrySize];
         if (_engine.Read(_engine.CalculationAddress(head, headerSize), geo) < PersistGeometrySize) return false;
-        long size = BinaryPrimitives.ReadInt64LittleEndian(geo);
-        long ofbCap = BinaryPrimitives.ReadInt64LittleEndian(geo.Slice(8));
+        var geometry = HashIndexGeometryCodec.Read(geo);
+        long size = geometry.TableSize;
+        long ofbCap = geometry.OverflowCapacity;
+        long persistedOverflowCount = geometry.OverflowCount;
         if (size <= 0 || (size & (size - 1)) != 0) return false;          // 2 的幂校验
         if (ofbCap < 0) return false;
         long expectBody = PersistGeometrySize + size * PersistBucketSize + ofbCap * PersistBucketSize;
@@ -137,6 +131,19 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
         if (!ReadBodyExact(_engine.CalculationAddress(bodyAt, size * PersistBucketSize),
                 MemoryMarshal.AsBytes(pool.AsSpan()))) return false;
 
+        // ★ 还原溢出池 bump 指针（审计 #411）：取 max(帧值, 扫池重算)——
+        //   帧值是 dump 瞬时读（fuzzy 窗口内可能落后于桶写入）；扫池取"最后非全零桶 index+1"
+        //   是安全上界（已分配全零桶被再次 bump 别名无数据可损）。旧帧（无字段=0）也由扫池兜住。
+        var overflowCount = persistedOverflowCount;
+        for (long b = pool.LongLength - 1; b >= 0; b--)
+        {
+            if (!IsBucketEmpty(ref pool[b]))
+            {
+                overflowCount = Math.Max(overflowCount, b + 1);
+                break;
+            }
+        }
+
         _table = new InternalHashTable
         {
             Size = size,
@@ -144,6 +151,7 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
             SizeBits = System.Numerics.BitOperations.Log2((ulong)size),
             TableRaw = tableRaw,
             OverflowPool = pool,
+            OverflowCount = (int)Math.Min(overflowCount, ofbCap),
         };
 
         // ★ 重数实收（fuzzy 帧内可能混入 dump 期间新插入条目——计数以实收为准）
@@ -159,6 +167,16 @@ public partial class HashIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     /// <summary>物化后回调——重数实收结果写回写者维护的条目计数（fuzzy 帧实收为准）。</summary>
     /// <param name="entryCount">物化实收条目数。</param>
     protected override void OnMaterialized(long entryCount) => _entryCount = entryCount;
+
+    /// <summary>桶全空判定（8 槽全 Empty——物化兜底扫池用：链指针槽非全零即"已分配/有数据"）。</summary>
+    private static bool IsBucketEmpty(ref HashBucket bucket)
+    {
+        var slots = bucket.AsSpan();
+        for (int i = 0; i < slots.Length; i++)
+            if (!HashEntry.IsEmpty(slots[i]))
+                return false;
+        return true;
+    }
 
     /// <summary>当前条目数（Volatile 读写者计数——后台 dump 策略触发用）。</summary>
     protected override long CurrentEntryCount => Volatile.Read(ref _entryCount);

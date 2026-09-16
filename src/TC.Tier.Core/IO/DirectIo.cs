@@ -12,6 +12,8 @@ namespace TC.Tier.Core.IO;
 public static class DirectIo
 {
     /// <summary>DIO 缓冲对齐地板（给定卷扇区大小）。非对齐模式句柄不校验，本值为安全上界。</summary>
+    /// <param name="volumeSectorSize">卷扇区大小，单位字节（如 512/4096）。</param>
+    /// <returns>缓冲地址/长度须满足的最小对齐（字节）：Windows 取 max(扇区, 系统页大小)，Linux 取 max(扇区, 1)。</returns>
     public static int BufferAlignmentFloor(int volumeSectorSize)
         => OperatingSystem.IsWindows()
             ? Math.Max(volumeSectorSize, Environment.SystemPageSize)

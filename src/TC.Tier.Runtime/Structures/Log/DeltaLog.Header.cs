@@ -2,6 +2,9 @@ using System.Runtime.InteropServices;
 
 namespace TC.Tier.Runtime.Structures.Log;
 
+/// <summary>
+/// DeltaLog 头部布局 partial——嵌套 <see cref="DeltaLogHeader"/>（unified-binary-layout.md §5.1）。
+/// </summary>
 public sealed partial class DeltaLog
 {
     /// <summary>

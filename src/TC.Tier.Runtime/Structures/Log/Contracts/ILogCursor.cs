@@ -22,6 +22,14 @@ public interface ILogCursor : IStructureScanCursor
     /// </summary>
     ReadOnlySpan<byte> CurrentPayload { get; }
 
+    /// <summary>
+    /// ★ 当前 entry payload 的 Memory 视图（零拷贝——指向游标页缓冲，同 <see cref="CurrentPayload"/>）。
+    /// <para>生命周期契约：<b>非 lease 游标</b>禁跨 MoveNext/Dispose 持有（换页即还池）；
+    /// <b>lease 游标</b>（<see cref="LogBase.OpenCursor"/> leasePages=true）有效至游标 Dispose
+    /// （换页不还池——游标持有全部已读页）。</para>
+    /// </summary>
+    ReadOnlyMemory<byte> CurrentPayloadMemory { get; }
+
     /// <summary>当前 entry payload 字节数。MoveNext 成功后有效。</summary>
     int CurrentEntryLength { get; }
 

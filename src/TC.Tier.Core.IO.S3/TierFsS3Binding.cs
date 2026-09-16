@@ -115,6 +115,9 @@ public sealed class S3ProtocolBuilder : ITierProtocolBuilder
     }
 
     /// <summary>env:NAME → 环境变量 NAME（值格式 accessKey:secretKey）——缺失/畸形即抛（fail-fast）。</summary>
+    /// <param name="credentialRef">凭证引用（"env:NAME" 格式）；null=未配置（抛 NotSupportedException）。</param>
+    /// <returns>解析出的静态凭证（accessKey + secretKey）。</returns>
+    /// <exception cref="NotSupportedException">credentialRef 为 null、环境变量未设置、或值格式非 accessKey:secretKey。</exception>
     private static StaticCredentials ResolveCredentials(string? credentialRef)   // CA1859：返回具体形（唯一构造产物）
     {
         if (credentialRef is null)
@@ -130,10 +133,5 @@ public sealed class S3ProtocolBuilder : ITierProtocolBuilder
             throw new NotSupportedException($"凭证环境变量 '{name}' 值格式须为 accessKey:secretKey。");
         return new StaticCredentials(value[..sep], value[(sep + 1)..]);
     }
-
-    private static void NotYet(string what, string phase)
-        => throw new NotSupportedException(
-            $"spec 参数已解析校验但介质能力尚未落地：{what}——{phase}。当前为 P1 工厂骨架：" +
-            "参数不静默忽略，落地后自动生效、无需改 spec。");
 }
 

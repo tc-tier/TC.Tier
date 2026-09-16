@@ -16,6 +16,7 @@ namespace TC.Tier.Runtime.Tests.Storage;
 public sealed class CompactorFaultInjectionTests : StorageEngineTestBase
 {
     private const string EngineName = "fault";
+    private const string MarkerPath = $"{EngineName}/{EngineName}.compact.marker";
 
     private static (IStorageEngine Dev, FaultInjectingFileSystem Fi) NewEngine(
         FaultInjectingFileSystem? fi = null)
@@ -165,5 +166,39 @@ public sealed class CompactorFaultInjectionTests : StorageEngineTestBase
         using var __ = reopened;
         AssertIntact(reopened, records);
         reopened.Append(MakePattern(512, 0x99)).Should().BeGreaterThan(reopened.MinAddress, "重开后引擎继续可用");
+    }
+
+    [Fact]
+    public void Recovery_MarkerReadIoFailure_TreatsMarkerAsCorrupt()
+    {
+        using var fi = CreateFileSystemWithMarker();
+        fi.AddRule(MarkerPath, "Open", IOError.IOFailure, failAtCallIndex: 1);
+
+        var options = new StorageEngineOptions(EngineName, segmentGrowthLimit: 1024).WithPreallocateFile(false);
+        using var dev = options.Builder(fi).Start();
+
+        fi.Exists(MarkerPath).Should().BeFalse("marker I/O 失败按损坏现场清理");
+    }
+
+    [Fact]
+    public void Recovery_MarkerFatalException_Propagates()
+    {
+        using var fi = CreateFileSystemWithMarker();
+        fi.AddExceptionRule(MarkerPath, "Open",
+            static () => new OutOfMemoryException("fatal marker allocation"), failAtCallIndex: 1);
+        var options = new StorageEngineOptions(EngineName, segmentGrowthLimit: 1024).WithPreallocateFile(false);
+
+        var start = () => options.Builder(fi).Start();
+
+        start.Should().Throw<OutOfMemoryException>().WithMessage("fatal marker allocation");
+    }
+
+    private static FaultInjectingFileSystem CreateFileSystemWithMarker()
+    {
+        var fi = new FaultInjectingFileSystem(TierFs.New("memory:"));
+        fi.EnsureRoot();
+        fi.CreateDirectory(EngineName);
+        fi.CreateFile(MarkerPath);
+        return fi;
     }
 }

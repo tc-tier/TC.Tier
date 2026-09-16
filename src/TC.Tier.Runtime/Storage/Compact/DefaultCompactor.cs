@@ -168,13 +168,24 @@ internal sealed partial class DefaultCompactor(
             catch (Exception ex) { _logger?.LogWarning(ex, "DeleteAllTemps: 删 {path} 失败", file.Name); }
         }
 
-        // ★ marker tmp 残留清理（L4 取证，）：marker 写失败路径遗留空 .marker.tmp——
-        //   虽不再砖死后续 Compact（WriteCommitMarker 改 Truncate 覆写），失败路径仍应清理干净。
+        // ★ marker tmp 残留清理（L4 取证）：marker 写失败路径遗留空 .marker.*.tmp——
+        //   虽不再砖死后续 Compact（WriteCommitMarker 覆写），失败路径仍应清理干净。
+        //   ★ S1 多文件形态：枚举 {name}.marker.*.tmp 全删（崩溃残留数量无上界假设）。
         if (SupportsMarker)
         {
-            var markerTmp = MarkerPath + ".tmp";
-            try { if (_fileSystem.Exists(markerTmp)) _fileSystem.Delete(markerTmp); }
-            catch (Exception ex) { _logger?.LogWarning(ex, "DeleteAllTemps: 删 marker tmp 失败"); }
+            try
+            {
+                string markerPrefix = $"{LastComponent(DeviceName)}{MarkerFileNameSuffix}.";
+                foreach (var entry in _fileSystem.EnumerateFiles(DeviceName, "*"))
+                    if (entry.Name.StartsWith(markerPrefix, StringComparison.Ordinal)
+                        && entry.Name.EndsWith(".tmp", StringComparison.Ordinal))
+                        _fileSystem.Delete($"{DeviceName}/{entry.Name}");
+            }
+            catch (FileIOException ex) when (ex.Error == IOError.NotFound) { }
+            catch (Exception ex)
+            {
+                _logger?.LogWarning(ex, "DeleteAllTemps: 删 marker tmp 失败");
+            }
         }
     }
 

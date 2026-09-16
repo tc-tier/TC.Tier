@@ -3,7 +3,7 @@ using BenchmarkDotNet.Jobs;
 using System.Runtime.CompilerServices;
 using TC.Tier.Core.Primitives;
 using TC.Tier.Core.NativeInterop;
-using NativeInt128 = TC.Tier.Core.NativeInterop.Int128;
+using NativeInt128 = TC.Tier.Core.NativeInterop.UInt128Pair;
 
 namespace TC.Tier.Core.Benchmarks.NativeInterop;
 

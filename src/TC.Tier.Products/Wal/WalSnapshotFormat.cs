@@ -21,6 +21,9 @@ internal static class WalSnapshotFormat
 
     // ═══ Header ═══
 
+    /// <summary>序列化 Header 帧到 dst（magic/version + 一致性点 N₀）。</summary>
+    /// <param name="dst">写入目标缓冲区，长度不小于 HeaderSize。</param>
+    /// <param name="snapshotIndex">快照一致性点 N₀（快照覆盖到的最大 index）。</param>
     public static void WriteHeader(Span<byte> dst, long snapshotIndex)
     {
         var header = new WalSnapshotHeader
@@ -33,6 +36,9 @@ internal static class WalSnapshotFormat
     }
 
     /// <summary>解析 Header；失败（magic/长度非法）= 非本格式快照。</summary>
+    /// <param name="src">快照字节（≥ HeaderSize）。</param>
+    /// <param name="snapshotIndex">输出：一致性点 N₀（失败 = 0）。</param>
+    /// <returns>true = 解析成功；false = 魔数/版本/长度非法。</returns>
     public static bool TryReadHeader(ReadOnlySpan<byte> src, out long snapshotIndex)
     {
         snapshotIndex = 0;
@@ -45,6 +51,9 @@ internal static class WalSnapshotFormat
 
     // ═══ Payload 帧 ═══
 
+    /// <summary>写一条 payload 帧（帧头 [len 4B] + payload 字节）到 dst。</summary>
+    /// <param name="dst">写入目标缓冲区，长度不小于 FrameHeaderSize + payload.Length。</param>
+    /// <param name="payload">该条 entry 的原始字节（非空帧——len ∈ (0, MaxPayloadLength]）。</param>
     public static void WritePayloadFrame(Span<byte> dst, ReadOnlySpan<byte> payload)
     {
         var header = new WalSnapshotFrameHeader { PayloadLength = payload.Length };
@@ -53,10 +62,17 @@ internal static class WalSnapshotFormat
     }
 
     /// <summary>判定帧头长度合法（len ∈ (0, MaxPayloadLength]）——非法 = Footer 区开始。</summary>
+    /// <param name="len">帧头读出的 payload 长度。</param>
+    /// <returns>true = 合法帧；false = 进入 Footer 相位。</returns>
     public static bool IsValidFrameLength(int len) => len > 0 && len <= MaxPayloadLength;
 
     // ═══ Footer ═══
 
+    /// <summary>序列化 Footer 帧（magic + 条数 + payload 总长 + CRC）到 dst。</summary>
+    /// <param name="dst">写入目标缓冲区，长度不小于 FooterSize。</param>
+    /// <param name="entryCount">快照 entry 总条数（导入侧校验基准）。</param>
+    /// <param name="totalPayload">全部 payload 帧的字节总数（导入侧校验基准）。</param>
+    /// <param name="crc">覆盖 Header + 全部 payload 帧字节的 CRC32（footer 自身不参与）。</param>
     public static void WriteFooter(Span<byte> dst, long entryCount, long totalPayload, uint crc)
     {
         var footer = new WalSnapshotFooter
@@ -70,6 +86,11 @@ internal static class WalSnapshotFormat
     }
 
     /// <summary>校验 Footer（magic/条数/总长/CRC——CRC 由调用方对 Header+Payload 字节增量计算）。</summary>
+    /// <param name="src">Footer 字节（≥ FooterSize）。</param>
+    /// <param name="entryCount">期望的 entry 条数。</param>
+    /// <param name="totalPayload">期望的 payload 总字节数。</param>
+    /// <param name="crc">调用方增量计算的 CRC32。</param>
+    /// <returns>true = Footer 全部校验通过；false = 魔数/条数/总长/CRC 不符。</returns>
     public static bool TryValidateFooter(ReadOnlySpan<byte> src, long entryCount, long totalPayload, uint crc)
     {
         if (src.Length < FooterSize) return false;

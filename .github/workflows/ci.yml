@@ -2,20 +2,37 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+  workflow_dispatch:   # 手动触发——main/dev 之外的功能分支全走手动（gh workflow run ci --ref <branch>）
 
 jobs:
   build-test-pack:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 1   # ★ 双腿串行错峰（2026-09-16 裁定）：win-ci VM 与 pve-ci LXC 同宿 PVE 主机
+                        #   （8 物理核——dev VM 另占 12 vCPU 配额），并行=三方分蛋糕，墙钟阈值
+                        #   测试轮转红（实锤多轮）；串行后任意时刻宿主上只有一条腿在烧。
+      matrix:
+        # ubuntu 腿走 PVE 自建 runner（pve-ci——6C VM，本地化裕度治理：#424/#426 flaky 族）
+        # ★ macOS 腿已移除（2026-09-14 成本裁定：macOS 托管分钟 10× 计价，额度烧穿 #427）——
+        #   macOS 平台验证（NativeCAS128 dylib 重编/mTLS 平台行为 #422）转本地/开发机按需，
+        #   不做常设 CI 腿；build.sh 构建配方与入库 dylib 保留
+        # ★ ARM 腿同步移除（2026-09-14 同日裁定）——CI 常设面 = windows/pve-ci 双腿（均 x64）；
+        #   ARM（linux-arm64）验证降级为 **main 发布时手动**：按量起 SR1.LARGE8（¥0.51/时，
+        #   广州 Ampere Altra 2.8GHz——鲲鹏 MA 官方界面不可购）跑全套测试后销毁（几小时 ≈¥2）
+        # windows 腿走阿里云杭州自建 runner（win-ci——阿里云 ECS e 4C8G Windows Server 2022，
+        #   云助手 + COS 中转装机：#427 托管腿额度烧穿后退役，成本归零）
+        os: [win-ci, pve-ci]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 8.0.x
-
+      # ★ 不用 actions/setup-dotnet（2026-09-16 裁定）：两台自建 runner 均已预装 SDK 8.0.x，
+      #   而该步骤的基线 runtime 下载（builds.dotnet.microsoft.com）在中国网络下会随机停滞
+      #   数十分钟乃至卡死（curl 无总时长上限 + 重试 20 次——实锤多轮 /tmp 残尸）；SDK 升级
+      #   归 runner 维护（pve-ci LXC / win-ci 机器各自从装），不走工作流。
       - name: Build
         run: dotnet build -c Release --nologo
 
@@ -58,10 +75,90 @@ jobs:
           done
           exit 1
 
+      # ★ 功能性产品套件进门禁（用户裁定：功能性单元测试全进 CI，性能类不进）——
+      #   Kv/Queue/Wal/Net 产品级功能面（含 raft×TierWAL 存储/装配/管理/备份/快照档）。
+      #   已知时序敏感抖动尾（Backup_Restore/Deprovision 等）立案在案：红了=修复信号，不做白名单隔离。
+      - name: Test Products
+        shell: bash
+        run: |
+          for attempt in 1 2; do
+            if dotnet test tests/TC.Tier.Products.Tests/TC.Tier.Products.Tests.csproj -c Release --no-build --nologo; then
+              exit 0
+            fi
+            echo "== Test Products 第 $attempt 次失败（runner 时段性慢）——重试 =="
+          done
+          exit 1
+
+      # ★ Core.Net 全量单测（raft/p2p/传输协议族 490 项——loopback 全内存态，三腿可跑）
+      - name: Test Core.Net
+        shell: bash
+        run: |
+          for attempt in 1 2; do
+            if dotnet test tests/TC.Tier.Core.Net.Tests/TC.Tier.Core.Net.Tests.csproj -c Release --no-build --nologo; then
+              exit 0
+            fi
+            echo "== Test Core.Net 第 $attempt 次失败（runner 时段性慢）——重试 =="
+          done
+          exit 1
+
+      # ★ 轻量三件套（CodeGen 分析器 18 / Core.IO.Net 3 / S3 假服务器+黄金向量 46——
+      #   MinIO 真端点契约自带 TIER_S3_TEST_ENDPOINT 门禁自动 skip）
+      - name: Test CodeGen + IO.Net + S3
+        shell: bash
+        run: |
+          set -e
+          dotnet test tests/TC.Tier.CodeGen.Tests/TC.Tier.CodeGen.Tests.csproj -c Release --no-build --nologo
+          dotnet test tests/TC.Tier.Core.IO.Net.Tests/NetworkImageTransferTests.csproj -c Release --no-build --nologo
+          dotnet test tests/TC.Tier.Core.IO.S3.Tests/TC.Tier.Core.IO.S3.Tests.csproj -c Release --no-build --nologo
+
+      # ★ 对抗项目进门禁——串行尾步（2026-09-16：压测/故障注入/慢时序场景从功能套件拆出后
+      #   的执行面，§4.1 拆分 + 本裁定；在全部功能套件之后单独执行，不与任何套件并行争抢）。
+      #   仅 Linux 腿：Windows 侧 raft/net 对抗家族存量场景环境性失败（本地实锤 dev 干净树
+      #   同挂——修复后纳 win 腿）。Core.AdversarialTests（OverflowPool 压测）为本轮新立项目。
+      #   !~FaultMatrix!~RaftSoak 过滤 = #446（复制故障注入收敛族五场景双平台确定性失败——
+      #   dev 既有缺陷非回归，e7669749 干净树复现；修复后移除过滤）。
+      - name: Test Adversarial (serial tail)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          for attempt in 1 2; do
+            if dotnet test tests/TC.Tier.Core.AdversarialTests/TC.Tier.Core.AdversarialTests.csproj -c Release --no-build --nologo \
+               && dotnet test tests/TC.Tier.Core.Net.AdversarialTests/TC.Tier.Core.Net.AdversarialTests.csproj -c Release --no-build --nologo \
+                  --filter "FullyQualifiedName!~FaultMatrix&FullyQualifiedName!~RaftSoak"; then
+              exit 0
+            fi
+            echo "== Test Adversarial 第 $attempt 次失败（对抗时序常态——重试）=="
+          done
+          exit 1
+
+      # ★ COS 真端点契约（Linux 腿——真腾讯云 SigV4 互操作；凭据走 repo secrets，
+      #   未配置则软跳过不挡 PR——fork PR 拿不到 secrets 属常态。脚本自述见 scripts/run-cos-tests.sh）
+      - name: Test S3 against real COS
+        if: runner.os == 'Linux'
+        shell: bash
+        env:
+          TENCENTCLOUD_SECRET_ID: ${{ secrets.TENCENTCLOUD_SECRET_ID }}
+          TENCENTCLOUD_SECRET_KEY: ${{ secrets.TENCENTCLOUD_SECRET_KEY }}
+        run: |
+          if [ -z "${TENCENTCLOUD_SECRET_ID:-}" ]; then
+            echo "secrets TENCENTCLOUD_SECRET_ID/KEY 未配置——COS 契约软跳过（本地：scripts/run-cos-tests.sh）"
+            exit 0
+          fi
+          for attempt in 1 2; do
+            if scripts/run-cos-tests.sh -c Release --no-build --nologo; then
+              exit 0
+            fi
+            echo "== COS 契约第 $attempt 次失败（公网抖动——重试）=="
+          done
+          exit 1
+
+      # ★ 发布面单源：NuGet 包仅从 Windows 产（与 publish 流水线一致），矩阵其余平台只做验证
       - name: Pack
+        if: runner.os == 'Windows'
         run: dotnet pack src/TC.Tier.Runtime/TC.Tier.Runtime.csproj -c Release --no-build --nologo -o artifacts
 
       - name: Upload packages
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
           name: nupkg

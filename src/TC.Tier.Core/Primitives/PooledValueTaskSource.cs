@@ -74,6 +74,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     /// ★ 异常版的 MarkOrComplete（取消路径）：先标记再按注册状态完成——未注册时暂存异常，
     /// 注册（OnCompleted 转发处）即补完。与 MarkOrComplete 竞争同一标记，先到者胜（单次完成语义）。
     /// </summary>
+    /// <param name="error">完成源携带的异常（取消路径传 <see cref="OperationCanceledException"/>）；等待者 GetResult 时重抛。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void MarkOrFault(Exception error)
     {
@@ -97,6 +98,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     /// <summary>
     /// 完成源（异常）。单次完成：已完成后/已归还后再调为 no-op（防取消/Set 竞态双触发）。
     /// </summary>
+    /// <param name="exception">完成源携带的异常；等待者 GetResult 时重抛。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SetException(Exception exception)
     {
@@ -109,6 +111,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     /// 附加 <see cref="CancellationToken"/>：token 触发时以 <see cref="OperationCanceledException"/> 完成源。
     /// <para>必须在构造 <see cref="ValueTask"/> 之前调用。每个实例只能附加一次。</para>
     /// </summary>
+    /// <param name="cancellationToken">要附加的取消令牌；不可取消的令牌（<see cref="CancellationToken.None"/>）为 no-op。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void AttachCancellation(CancellationToken cancellationToken)
     {
@@ -182,6 +185,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     /// 完成时是否异步调度 continuation（默认 true）。false = 内联执行（Set/SetException 调用者线程）
     /// ——对齐 SemaphoreSlim 唤醒语义，省一次线程池往返；代价是完成方栈上执行等待方续体（重入语义自负）。
     /// </param>
+    /// <returns>重置为武装态（待完成）的实例，用 <see cref="Version"/> 构造 <see cref="ValueTask"/> 使用。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static PooledValueTaskSource Rent(bool runContinuationsAsynchronously = true)
     {
@@ -217,6 +221,7 @@ public sealed class PooledValueTaskSource : IValueTaskSource
     /// <para>归还前自动 <see cref="ManualResetValueTaskSourceCore{TResult}.Reset"/>，恢复为可复用状态。
     /// ★ 先置归还态（state=2）再 Reset——之后任何残留的迟到完成（如 Set 广播遍历晚到）被守卫拒绝。</para>
     /// </summary>
+    /// <param name="source">要归还的实例（此前必须已完成消费——GetResult 已触发或已显式处理）。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void Return(PooledValueTaskSource source)
     {

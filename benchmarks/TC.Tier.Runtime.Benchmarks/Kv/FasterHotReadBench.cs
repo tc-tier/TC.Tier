@@ -56,12 +56,7 @@ public class FasterHotReadBench : IDisposable
 
         // TC.Tier：同形组合
         _fs = TierFs.New("memory:");
-        _ring = RingOfLong.Create(new BlittableRingSettings(new StorageEngineOptions("cmp-ring", 64L << 20,
-            enableSegmentation: true, preallocateFile: true, deleteOnClose: false))
-        {
-            PageSize = 8192,
-            MemorySize = 32L << 20,
-        }, _fs);
+        _ring = CreateRing(_fs);
         _index = new HashIndex<long>(_fs,
             new HashIndexSettings(new StorageEngineOptions("cmp-hash", 1L << 24, true, true, true)), null, _ring);
         _index.Initialize();
@@ -88,34 +83,33 @@ public class FasterHotReadBench : IDisposable
         return output.V0;
     }
 
-    [Benchmark(Description = "TierKv.PointRead(find+getvalue,100k hot)")]
+    [Benchmark(Description = "TierKv.PointRead(find+trygetvalue,100k hot)")]
     public long TierKvPointRead()
     {
         var key = _keys[_cursor++ % PrefillCount];
         var addr = _index.Find(key);
-        return addr == LogicalAddress.Empty ? -1 : _ring.GetValue(addr, _readBuf);
+        return addr == LogicalAddress.Empty || !_ring.TryGetValue(addr, _readBuf, out var written) ? -1 : written;
     }
 
-    /// <summary>★ 终态组合形态：scope 持 epoch（index+ring 双 scope）+ 零拷贝值交付（GetValueSpan）。
-    /// 基准体内每次迭代 enter/exit——批量场景摊得更薄，此处为保守口径。</summary>
-    [Benchmark(Description = "TierKv.ScopedZeroCopy(scope+span,100k hot)")]
+    /// <summary>★ 终态组合形态（读 scope 已退役——内容自愈读零保护）：仅 Index 自身 scope + 零拷贝值交付。
+    /// 基准体内每次迭代 enter/exit——批量场景摊得更薄，此处为保守口径。方法名保留 ScopedZeroCopyBatch
+    /// 口径（design §7.1 批口径不回归的对照锚点）。</summary>
+    [Benchmark(Description = "TierKv.ScopedZeroCopy(index-scope+span,100k hot)")]
     public long TierKvScopedZeroCopy()
     {
         var key = _keys[_cursor++ % PrefillCount];
-        using var ringScope = _ring.EnterReadScope();
         using var indexScope = _index.EnterScope();
         var addr = indexScope.Find(key);
         if (addr == LogicalAddress.Empty) return -1;
         return _ring.GetValueSpan(addr).Length;
     }
 
-    /// <summary>★ scope 的正用形态：一次进出摊薄 epoch（256 查/invocation——scope 成本 /256 ≈ 0），
+    /// <summary>★ 批口径：一次进出摊薄 Index scope（256 查/invocation——scope 成本 /256 ≈ 0），
     /// 零拷贝交付。这是组合层缓存地址前的"发现+首读"批口径。</summary>
     [Benchmark(Description = "TierKv.ScopedZeroCopyBatch(256/inv)", OperationsPerInvoke = 256)]
     public long TierKvScopedZeroCopyBatch()
     {
         long total = 0;
-        using var ringScope = _ring.EnterReadScope();
         using var indexScope = _index.EnterScope();
         for (int i = 0; i < 256; i++)
         {
@@ -135,6 +129,20 @@ public class FasterHotReadBench : IDisposable
         _ring?.Dispose();
         _fs?.Dispose();
         GC.SuppressFinalize(this);   // ★ CA1816：派生类型引 finalizer 时不重复 Dispose
+    }
+
+    /// <summary>封闭形态装配（[RingKey] 生成物的公开面 = ctor + Initialize + WaitForReady——同步 Create 已随泛型改版退役）。</summary>
+    private static RingOfLong CreateRing(IFileSystem fs)
+    {
+        var ring = new RingOfLong(new BlittableRingSettings(new StorageEngineOptions("cmp-ring", 64L << 20,
+            enableSegmentation: true, preallocateFile: true, deleteOnClose: false))
+        {
+            PageSize = 8192,
+            MemorySize = 32L << 20,
+        }, fs);
+        ring.Initialize();
+        ring.WaitForReady();
+        return ring;
     }
 
     /// <summary>64B blittable 值（8×long）——零分配读输出。</summary>

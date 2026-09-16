@@ -5,7 +5,7 @@ namespace TC.Tier.Contracts.Storage;
 /// <summary>
 /// 逻辑地址（段号 + 段内偏移 + 扩展字段），用于定位数据在持久化存储中的位置。
 /// </summary>
-[BinaryLayout(Features = BinaryLayoutFeatures.StructSize)]
+[BinaryLayout(Features = BinaryLayoutFeatures.StructSize | BinaryLayoutFeatures.FieldAccessors)]
 [StructLayout(LayoutKind.Explicit, Size = 16)]
 public readonly struct LogicalAddress : IEquatable<LogicalAddress>, IComparable<LogicalAddress>
 {
@@ -58,6 +58,8 @@ public readonly struct LogicalAddress : IEquatable<LogicalAddress>, IComparable<
     }
 
     /// <summary>相等比较（仅基于 SegmentId + FileOffset，extension 不参与）。</summary>
+    /// <param name="other">要比较的逻辑地址。</param>
+    /// <returns>true = SegId 与 Offset 均相等（extension 不参与）；false = 任一字段不等。</returns>
     public bool Equals(LogicalAddress other)
         => SegId == other.SegId && Offset == other.Offset;
 
@@ -65,9 +67,12 @@ public readonly struct LogicalAddress : IEquatable<LogicalAddress>, IComparable<
     public override bool Equals(object? obj) => obj is LogicalAddress other && Equals(other);
 
     /// <summary>哈希码（仅基于 SegmentId + FileOffset，extension 不参与）。</summary>
+    /// <returns>32 位哈希码（由 SegId 与 Offset 组合计算；相等的地址哈希恒相同，extension 不参与）。</returns>
     public override int GetHashCode() => HashCode.Combine(SegId, Offset);
 
     /// <summary>排序——先 SegmentId 后 FileOffset，extension 不参与。</summary>
+    /// <param name="other">要比较的逻辑地址。</param>
+    /// <returns>负数 = 小于 other（SegId 更小，或 SegId 相同且 Offset 更小）；0 = SegId 与 Offset 均相等；正数 = 大于 other。</returns>
     public int CompareTo(LogicalAddress other)
     {
         var segCmp = SegId.CompareTo(other.SegId);
@@ -75,6 +80,7 @@ public readonly struct LogicalAddress : IEquatable<LogicalAddress>, IComparable<
     }
 
     /// <summary>字符串形态：<c>seg#{SegId}@0x{Offset:X}</c>。</summary>
+    /// <returns>形如 <c>seg#3@0x40</c> 的字符串（段号十进制 + 偏移十六进制）。</returns>
     public override string ToString() => $"seg#{SegId}@0x{Offset:X}";
 
     /// <summary>相等（仅基于 SegmentId + FileOffset，extension 不参与）。</summary>

@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Core.Observability;
 
+/// <summary>可观测 hub——本部分定义 <see cref="IndexView"/>（Index 结构维度视图：Find/Insert/Upsert/Delete/Scan）。</summary>
 public sealed partial class ObservabilityHub
 {
     /// <summary>Index 结构维度视图 —— Find/Insert/Upsert/Delete/Scan。</summary>
@@ -19,34 +20,44 @@ public sealed partial class ObservabilityHub
         public bool IsEnabled => _enabled;
 
         /// <summary>Find 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleFind() => _enabled && ShouldSample(ref _findCtr, _rate);
         /// <summary>Insert 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleInsert() => _enabled && ShouldSample(ref _insertCtr, _rate);
         /// <summary>Upsert 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleUpsert() => _enabled && ShouldSample(ref _upsertCtr, _rate);
         /// <summary>Delete 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleDelete() => _enabled && ShouldSample(ref _deleteCtr, _rate);
         /// <summary>Scan 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleScan() => _enabled && ShouldSample(ref _scanCtr, _rate);
 
         /// <summary>开始 Find 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginFindSample() => MicroTimer.Start(ShouldSampleFind());
         /// <summary>开始 Insert 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginInsertSample() => MicroTimer.Start(ShouldSampleInsert());
         /// <summary>开始 Upsert 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginUpsertSample() => MicroTimer.Start(ShouldSampleUpsert());
         /// <summary>开始 Delete 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginDeleteSample() => MicroTimer.Start(ShouldSampleDelete());
         /// <summary>开始 Scan 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginScanSample() => MicroTimer.Start(ShouldSampleScan());
 

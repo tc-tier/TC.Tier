@@ -1,13 +1,13 @@
 using System.Runtime.CompilerServices;
 using TC.Tier.Core.NativeInterop;
-using NativeInt128 = TC.Tier.Core.NativeInterop.Int128;
+using NativeInt128 = TC.Tier.Core.NativeInterop.UInt128Pair;
 
 namespace TC.Tier.Core.Primitives;
 
 /// <summary>
 /// 标准 128 位 CAS 单槽封装——16B 对齐背板 + 能力探测降级 + 裸读不撕裂。
 /// <para>★ 消除各处（<c>TailWatermarkSlot</c>/<c>IndexBase</c>/<c>AsyncPriorityQueue</c>）重写的
-///   128 CAS 样板：16B 对齐分配 + <c>Unsafe.As&lt;T,Int128&gt;</c> reinterpret +
+///   128 CAS 样板：16B 对齐分配 + <c>Unsafe.As&lt;T,UInt128Pair&gt;</c> reinterpret +
 ///   <see cref="NativeAtomic128.CompareExchange"/> + 能力探测 + lock 降级。</para>
 /// <para>★ 统一对齐保证：托管数组（<c>T[]</c>）只保证 8B 对齐，<b>无 16B 对齐保证</b>——
 ///   <c>lock cmpxchg16b</c> 要求 16B 对齐，未对齐会 #GP（硬件异常）。本封装用
@@ -75,6 +75,7 @@ public sealed class Atomic128<T> : IDisposable where T : struct
     /// <para>⚠️ 跨线程可见性靠 cache coherence 最终一致；读到旧值时 CAS 会失败重试（调用方负责循环）。
     ///   不用 <c>Volatile.Read</c>（不支持 struct 泛型）；<c>MemoryBarrier</c> 对热路径开销过大。</para>
     /// </summary>
+    /// <returns>当前 128 位值的快照；已 <see cref="Dispose"/> 后 native 路径返回 <c>default(T)</c>，lock 路径返回最后写入值。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T Read()
     {
@@ -91,6 +92,9 @@ public sealed class Atomic128<T> : IDisposable where T : struct
     /// <para>★ 失败<b>不</b>回写观察值（与 <see cref="NativeAtomic128.CompareExchange"/> 公开语义一致）——
     ///   调用方在 CAS 循环里自己 <see cref="Read"/> 重读。</para>
     /// </summary>
+    /// <param name="expected">期望的当前值（位精确比较，含 ABA version 等全部 16 字节）。</param>
+    /// <param name="value">CAS 成功时写入的新值。</param>
+    /// <returns>true = 当前值与 <paramref name="expected"/> 位精确相等且已写入 <paramref name="value"/>；false = 不等或已释放，槽位值不变（不回写观察值）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryCompareExchange(T expected, T value)
     {
@@ -124,6 +128,9 @@ public sealed class Atomic128<T> : IDisposable where T : struct
     ///   native CAS 一定可用"的场景用本方法。</para>
     /// <para>位精确比较、失败不回写——语义同 <see cref="TryCompareExchange"/>（仅少两个前置检查）。</para>
     /// </summary>
+    /// <param name="expected">期望的当前值（位精确比较，含全部 16 字节）。</param>
+    /// <param name="value">CAS 成功时写入的新值。</param>
+    /// <returns>true = 当前值与 <paramref name="expected"/> 位精确相等且已写入 <paramref name="value"/>；false = 不等（槽位值不变）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool TryCompareExchangeUnsafe(T expected, T value)
     {
@@ -138,6 +145,7 @@ public sealed class Atomic128<T> : IDisposable where T : struct
     /// ★ <b>快路径</b> 裸读——跳过 <see cref="CasEnabled"/>/IsDisposed 检查，直接读背板。
     /// <para>⚠️ 调用方须保证未 <see cref="Dispose"/>（disposed 后 AV）。16B 对齐保证单次读不撕裂。</para>
     /// </summary>
+    /// <returns>当前 128 位值的快照（零检查）。</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public T ReadUnsafe() => _mem.GetRefUnsafe<T>(0);
 
@@ -145,6 +153,7 @@ public sealed class Atomic128<T> : IDisposable where T : struct
     /// ★ 装配期裸写（启动期单线程，无并发写者）。
     /// <para>⚠️ 运行期并发写<b>必须</b>走 <see cref="TryCompareExchange"/>（CAS），不要用本方法。</para>
     /// </summary>
+    /// <param name="value">要写入的 128 位值；已释放时 native 路径静默丢弃。</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Store(T value)
     {

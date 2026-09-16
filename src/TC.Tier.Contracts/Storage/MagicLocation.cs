@@ -15,5 +15,6 @@ public readonly record struct MagicLocation(bool Found, LogicalAddress MagicAddr
 {
     /// <summary>未命中——地址字段 = <see cref="LogicalAddress.Invalid"/>（-1 哨兵：IsValid=false，
     /// 忽略 Found 直接读地址会响亮地错，而非静默指向合法的 seg#0@0x0 = Empty）。</summary>
+    /// <returns>未命中——地址字段 = <see cref="LogicalAddress.Invalid"/>（-1 哨兵：IsValid=false，忽略 Found 直接读地址会响亮地错，而非静默指向合法的 seg#0@0x0 = Empty）。</returns>
     public static readonly MagicLocation NotFound = new(false, LogicalAddress.Invalid, LogicalAddress.Invalid);
 }

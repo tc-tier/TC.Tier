@@ -17,8 +17,8 @@ public abstract partial class RingBase<TKey>
             ? _engine.CalculationAddress(pageAligned, -_readOnlyLagBytes)
             : pageAligned;
         if (desiredReadOnly < BeginAddress) desiredReadOnly = BeginAddress;
-        if (MonotonicUpdateAddr(ref _readOnlyAddress, desiredReadOnly, out _))
-            _epoch.BumpCurrentEpoch(() => MonotonicUpdateAddr(ref _safeReadOnlyAddress, desiredReadOnly, out _));
+        if (MonotonicUpdateAddr(WmReadOnly, desiredReadOnly, out _))
+            _epoch.BumpCurrentEpoch(() => MonotonicUpdateAddr(WmSafeReadOnly, desiredReadOnly, out _));
     }
 
     partial void PageAlignedShiftHeadAddress(LogicalAddress newAddress)
@@ -37,76 +37,96 @@ public abstract partial class RingBase<TKey>
     {
         var flushedUntil = FlushedUntilAddress;
         var newHead = desiredHeadAddress > flushedUntil ? flushedUntil : desiredHeadAddress;
-        if (MonotonicUpdateAddr(ref _headAddress, newHead, out _))
+        if (MonotonicUpdateAddr(WmHead, newHead, out _))
         {
+            AdvanceHeadDist(newHead);   // ★ 读侧 head 守卫水位同点发布（8B CAS-max——别名守卫，先于任何 FreePage）
             _epoch.BumpCurrentEpoch(() => OnPagesClosed(newHead));
         }
         return newHead;
     }
 
-    private void ShiftReadOnlyAddress(LogicalAddress newReadOnlyAddress)
-        => MonotonicUpdateAddr(ref _readOnlyAddress, newReadOnlyAddress, out _);
-
     private void ShiftFlushedUntilAddress(LogicalAddress newFlushedUntil)
-        => MonotonicUpdateAddr(ref _flushedUntilAddress, newFlushedUntil, out _);
+        => MonotonicUpdateAddr(WmFlushedUntil, newFlushedUntil, out _);
+
+    /// <summary>
+    /// ★ 关页单飞排他门（#161 修复）：drain action <b>可在不同线程并发触发</b>——LightEpoch.Drain
+    /// 按槽 CAS 认领执行，不提供跨 action 串行化（旧注释"drain 串行触发"的主张与实现不符；
+    /// 两个 writer 的 Resume/锁窗口交错时可同时挂起两个 OnPagesClosed action）。并发 OnPagesClosed
+    /// 曾可双双进入 worker 对同一 slot 重复 FreePage（native double-free）。排他锁下单飞：
+    /// worker 在锁内跑到当前在途目标；后到的更远目标接续跑（合并语义保留）。
+    /// <para>★ 锁序：_ongoingCloseLock → 页池内部锁（单向，无反路径）；worker 纯内存操作，锁内无 IO。</para>
+    /// </summary>
+    private readonly object _ongoingCloseLock = new();
 
     private void OnPagesClosed(LogicalAddress newSafeHead)
     {
-        if (!MonotonicUpdateAddr(ref _safeHeadAddress, newSafeHead, out _)) return;
-        for (;; Thread.Yield())
+        if (!MonotonicUpdateAddr(WmSafeHead, newSafeHead, out _)) return;
+        lock (_ongoingCloseLock)
         {
-            LogicalAddress ongoing = _ongoingCloseUntilAddress;
-            if (ongoing >= newSafeHead) break;
-            if (InterlockedCasAddr(ref _ongoingCloseUntilAddress, newSafeHead, ongoing) == ongoing)
-            {
-                if (ongoing == LogicalAddress.Empty) OnPagesClosedWorker();
-                return;
-            }
+            if (_ongoingCloseUntilAddress >= newSafeHead) return;   // 在途目标已覆盖本次（safeHead 单调，仅推进触发）
+            _ongoingCloseUntilAddress = newSafeHead;
+            OnPagesClosedWorker();
         }
     }
 
+    /// <summary>关页 worker（调用方须持 _ongoingCloseLock）——每次关一页并重读在途目标
+    /// （对重入/目标推进收敛，闭环由 closeStart ≥ closeEnd 判定）。
+    /// <para>★ STORAGE-087 让位与页尾全覆盖（#427 根治）：① closeEnd 可为页中间的已刷水位
+    ///   （safeHead=min(desiredHead, flushed) 随 flushed 停在页中）——旧判定 <c>addr &lt; closeEnd</c>
+    ///   会把「页尾仍越过已刷水位」的活页整页释放（页尾未落盘数据随回收销毁 + 并发 flush 迭代
+    ///   撞 null fail-fast），改为页尾全覆盖：仅释放完整落在 closeEnd 之下的页，释放只推迟一页。
+    ///   ② 在途 flush 登记（<c>_flushInFlightFromDist</c>）相交的页推迟回收。③ 槽所有权 CAS
+    ///   认领（<see cref="TryClaimSlotForFree"/>）——绝对槽映射下同槽下一圈新页已被写入者接管时
+    ///   不得清除/置空，仅推进关页水位。</para></summary>
     private void OnPagesClosedWorker()
     {
-        for (;; Thread.Yield())
+        while (true)
         {
+            var closeEnd = _ongoingCloseUntilAddress;
             LogicalAddress closeStart = ClosedUntilAddress;
-            LogicalAddress closeEnd = _ongoingCloseUntilAddress;
+            if (closeStart >= closeEnd) return;
+
             long startDist = _engine.GetDistance(_dataStart, closeStart);
             long startIntra = startDist & PageSizeMask;
-            LogicalAddress pageAlignedStart = startIntra == 0
+            LogicalAddress addr = startIntra == 0
                 ? closeStart
                 : _engine.CalculationAddress(closeStart, PageSize - startIntra);
-            LogicalAddress addr = pageAlignedStart;
-            while (addr < closeEnd)
-            {
-                long pageSeq = _engine.GetDistance(_dataStart, addr) >> PageSizeBits;
-                int slot = (int)(pageSeq & PageCountMask);
-                FreePage(slot);
-                addr = _engine.CalculationAddress(addr, PageSize);
-                MonotonicUpdateAddr(ref _closedUntilAddress, addr, out _);
-            }
-            if (InterlockedCasAddr(ref _ongoingCloseUntilAddress, LogicalAddress.Empty, closeEnd) == closeEnd) break;
-        }
-    }
+            if (addr >= closeEnd) return;
 
-    /// <summary>
-    /// ★ _ongoingCloseUntilAddress 的 CAS（read-modify-write 形式）。
-    /// <para>★ STORAGE-008 设计说明：此处刻意用非原子 read-modify-write，而非 NativeAtomic128 真原子 CAS。
-    /// 原因——这是 epoch drain 串行上下文：</para>
-    /// <para>1. OnPagesClosed 是 _epoch.BumpCurrentEpoch(onDrain) 的回调（Shift.cs:42）。</para>
-    /// <para>2. BumpCurrentEpoch(Action) 的 onDrain 仅在 prior epoch 所有线程退出（safeToReclaim）后执行
-    ///   （LightEpoch.cs:255-263），且 drain 机制保证不同线程的 onDrain 串行触发——不会两个 OnPagesClosed 并发。</para>
-    /// <para>3. 因此这里的"CAS"实际无真并发竞争，伪 CAS 只是协调"多个已排队的关页请求只有一个继续触发 worker"
-    ///   的串行协调写法，read-modify-write 在单线程执行下天然原子。</para>
-    /// <para>★ 改用 NativeAtomic128 真原子 CAS 是过度设计：LogicalAddress 是 16B struct，真 CAS 需字段 16B 对齐
-    ///   （RingBase class 字段不保证，强用会 #GP）。drain 串行已保证安全，无需承受对齐复杂度与开销。</para>
-    /// <para>参见 RingBase.cs:77 水位推进"单写者上下文"注释。</para>
-    /// </summary>
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static LogicalAddress InterlockedCasAddr(ref LogicalAddress location, LogicalAddress value, LogicalAddress comparand)
-    {
-        LogicalAddress current = location;
-        if (current == comparand) { location = value; return comparand; }
-        return current;
+            long pageSeq = _engine.GetDistance(_dataStart, addr) >> PageSizeBits;
+            long pageEndDist = (pageSeq + 1) << PageSizeBits;
+
+            long closeEndDist = _engine.GetDistance(_dataStart, closeEnd);
+            if (pageEndDist > closeEndDist) return;   // 页尾越过已刷水位——整页未刷 durable，不得释放
+
+            // ★ 在途 flush 相交即内联等待其完成（有界=单次 flush IO 时长）：worker 全程持
+            //   _ongoingCloseLock，而 flush 的登记/注销中只有「登记」走该锁（早已完成）、注销
+            //   是无锁 Volatile 写——此处自旋等注销不会死锁；换取关闭期无交错窗口且绝不饿死
+            //   （让位 return 会因 safeHead 单调不前进而永不重触发，#427 压测 110min 挂起实锤）。
+            var inFlightFrom = Volatile.Read(ref _flushInFlightFromDist);
+            if (inFlightFrom >= 0 && pageEndDist > inFlightFrom)
+            {
+                var spin = 0;
+                while (Volatile.Read(ref _flushInFlightFromDist) >= 0)
+                {
+                    if (++spin > 1000) Thread.Yield();
+                    Thread.Sleep(1);
+                }
+            }
+
+            // ★ 槽所有权 CAS 认领：绝对槽映射下 pageSeq 与上一圈同槽页共享槽位——写入者可能
+            //   已接管槽写给下一圈页（此刻槽内是活数据）。认领失败=所有权已移交，本页无内存可还
+            //   （其数据早已落盘），仅推进关页水位。
+            int slot = (int)(pageSeq & PageCountMask);
+            if (!TryClaimSlotForFree(slot, pageSeq))
+            {
+                addr = _engine.CalculationAddress(addr, PageSize);
+                MonotonicUpdateAddr(WmClosedUntil, addr, out _);
+                continue;
+            }
+            FreePage(slot);
+            addr = _engine.CalculationAddress(addr, PageSize);
+            MonotonicUpdateAddr(WmClosedUntil, addr, out _);
+        }
     }
 }

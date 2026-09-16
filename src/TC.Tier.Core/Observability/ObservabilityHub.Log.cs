@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 
 namespace TC.Tier.Core.Observability;
 
+/// <summary>可观测 hub——本部分定义 <see cref="LogView"/>（Log 结构维度视图：Append/Commit/Truncate/Recover）。</summary>
 public sealed partial class ObservabilityHub
 {
     /// <summary>Log 结构维度视图 —— Append/Commit/Truncate/Recover。</summary>
@@ -19,16 +20,20 @@ public sealed partial class ObservabilityHub
         public bool IsEnabled => _enabled;
 
         /// <summary>Append 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleAppend() => _enabled && ShouldSample(ref _appendCtr, _rate);
         /// <summary>Commit 本次是否应采样（确定性百分比采样；维度关闭恒 false）。</summary>
+        /// <returns>true 表示本次应采样；false 表示不采样（维度关闭时恒 false）。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool ShouldSampleCommit() => _enabled && ShouldSample(ref _commitCtr, _rate);
 
         /// <summary>开始 Append 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginAppendSample() => MicroTimer.Start(ShouldSampleAppend());
         /// <summary>开始 Commit 计时——采样命中返回激活计时器；未命中返回空计时器（零开销）。</summary>
+        /// <returns>采样命中时为已启动的 <see cref="MicroTimer"/>；未命中时为非激活的空计时器。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public MicroTimer BeginCommitSample() => MicroTimer.Start(ShouldSampleCommit());
 

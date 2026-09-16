@@ -33,20 +33,22 @@ public abstract partial class LogBase
         if (address > TailAddress) return false;
         lock (_writeLock)
         {
-#pragma warning disable TCSG031 // 设计必需：同步截断 API 契约——返回前数据必须已落盘
+#pragma warning disable TCSG137 // 设计必需：同步截断 API 契约——返回前数据必须已落盘
             if (_inFlightFlush is { } task) { task.GetAwaiter().GetResult(); _inFlightFlush = null; }
-#pragma warning restore TCSG031
-        _engine.ReclaimTail(address);
-        _pageA?.GetSpan(0, PageSize).Clear();
-        _pageB?.GetSpan(0, PageSize).Clear();
-        _pageUsedA = 0;
-        _pageUsedB = 0;
-        _activePage = 0;
-        _spaceStart = LogicalAddress.Empty;
-        _spaceWriteOffset = 0;
-        _spaceCapacity = 0;
-        _spaceAllocated = false;
-            _logicalTail = address;
+#pragma warning restore TCSG137
+            // ★ 丢弃在途帧的延迟提交链（截断区数据作废——提交边界由 ResetLogicalTail/OnTailTruncated 夹回）
+            _inFlightCommitTail = LogicalAddress.Empty;
+            _engine.ReclaimTail(address);
+            _pageA?.GetSpan(0, PageSize).Clear();
+            _pageB?.GetSpan(0, PageSize).Clear();
+            _pageUsedA = 0;
+            _pageUsedB = 0;
+            _activePage = 0;
+            _spaceStart = LogicalAddress.Empty;
+            _spaceWriteOffset = 0;
+            _spaceCapacity = 0;
+            _spaceAllocated = false;
+            ResetLogicalTail(address);
         }
 
         // ★ 截断完成钩子——EntryLog override 夹 CommittedOffset（截断后 commit 边界不得越过物理尾，
@@ -57,5 +59,6 @@ public abstract partial class LogBase
     }
 
     /// <summary>尾截断完成回调（默认空——EntryLog 夹 CommittedOffset 用）。</summary>
+    /// <param name="rollbackTail">回退的尾地址（截断边界，含）。</param>
     protected virtual void OnTailTruncated(LogicalAddress rollbackTail) { }
 }

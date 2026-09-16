@@ -276,4 +276,138 @@ public class BTreeIndexTests : IDisposable
         using var cursor = index.CreateScanCursor(ReadDirection.Forward);
         cursor.Direction.Should().Be(ReadDirection.Forward);
     }
+
+    // ══════════════════════════════════════════════════════════
+    // TruncatePrefix（键序前缀批量删——retention trim 契约）
+    // ══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TruncatePrefix_EmptyTree_ReturnsZero()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        index.TruncatePrefix(100).Should().Be(0);
+    }
+
+    [Fact]
+    public void TruncatePrefix_BelowMin_ReturnsZero()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        foreach (var k in new long[] { 10, 20, 30 })
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(5).Should().Be(0);
+        index.EntryCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void TruncatePrefix_SingleLeaf_PartialRemoval()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        foreach (var k in new long[] { 10, 20, 30, 40, 50 })
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(30).Should().Be(2, "删除 key < 30 的 {10, 20}");
+        index.EntryCount.Should().Be(3);
+        index.Find(10).Should().Be(LogicalAddress.Empty);
+        index.Find(20).Should().Be(LogicalAddress.Empty);
+        index.Find(30).Should().Be(MakeAddr(30), "边界键本身不删（严格 <）");
+    }
+
+    [Fact]
+    public void TruncatePrefix_MultiLeaf_DeletesPrefixRegionOnly()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        const long count = 60;   // 多叶多分裂形态
+        for (long k = 0; k < count; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(25).Should().Be(25);
+        index.EntryCount.Should().Be(35);
+
+        for (long k = 0; k < 25; k++)
+            index.Find(k).Should().Be(LogicalAddress.Empty, $"key {k} 应已删");
+        for (long k = 25; k < count; k++)
+            index.Find(k).Should().Be(MakeAddr(k), $"key {k} 应存活");
+
+        // 查询面全量一致：扫描 / Max / Floor
+        using (var cursor = index.CreateScanCursor(ReadDirection.Forward))
+        {
+            var delivered = new List<long>();
+            while (cursor.MoveNext())
+                delivered.Add(cursor.CurrentKey);
+            delivered.Should().Equal(Enumerable.Range(25, 35).Select(k => (long)k),
+                "扫描跨清零叶交付存活后缀");
+        }
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(59);
+        index.TryGetFloor(24, out _, out _).Should().BeFalse("前驱区全空");
+        index.TryGetFloor(25, out var floorKey, out _).Should().BeTrue();
+        floorKey.Should().Be(25);
+    }
+
+    [Fact]
+    public void TruncatePrefix_EntireRange_EmptiesIndex()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        for (long k = 0; k < 30; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncatePrefix(long.MaxValue).Should().Be(30);
+        index.EntryCount.Should().Be(0);
+        index.TryGetMax(out _, out _).Should().BeFalse();
+        using var cursor = index.CreateScanCursor(ReadDirection.Forward);
+        cursor.MoveNext().Should().BeFalse();
+    }
+
+    [Fact]
+    public void TruncatePrefix_RepeatedRetentionLoop_Converges()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        for (long k = 0; k < 100; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        // 模拟 retention 循环：分段推进
+        index.TruncatePrefix(20).Should().Be(20);
+        index.TruncatePrefix(20).Should().Be(0, "重复同界幂等");
+        index.TruncatePrefix(60).Should().Be(40);
+        index.EntryCount.Should().Be(40);
+        index.TryGetFloor(59, out _, out _).Should().BeFalse();
+        index.TryGetFloor(60, out var floorKey, out _).Should().BeTrue();
+        floorKey.Should().Be(60);
+
+        // 截断后再插入新键（时序延迟写场景形态）
+        index.Insert(150, MakeAddr(150), LogicalAddress.Empty);
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(150);
+    }
+
+    [Fact]
+    public void TruncatePrefix_Randomized_MatchesOracle()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        var rng = new Random(7);
+        var keys = new HashSet<long>();
+        while (keys.Count < 200)
+            keys.Add(rng.NextInt64(0, 100_000));
+        foreach (var k in keys)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        for (int round = 0; round < 5; round++)
+        {
+            var bound = rng.NextInt64(0, 100_000);
+            var expected = keys.Count(k => k < bound);
+            index.TruncatePrefix(bound).Should().Be(expected, $"round={round} bound={bound}");
+            keys.RemoveWhere(k => k < bound);
+
+            index.EntryCount.Should().Be(keys.Count);
+            var sorted = keys.OrderBy(k => k).ToList();
+            if (sorted.Count > 0)
+            {
+                index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+                maxKey.Should().Be(sorted[^1]);
+            }
+            foreach (var probe in sorted.Take(10))
+                index.Find(probe).Should().Be(MakeAddr(probe), $"round={round} 存活键 {probe} 可查");
+        }
+    }
 }
