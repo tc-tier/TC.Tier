@@ -75,6 +75,30 @@ public sealed class Membership : IDisposable
     }
 
     /// <summary>
+    /// 加 witness（见证者——投票计入选主/提交多数派，不存日志体不自荐、永不晋级；
+    /// 三期-F2 装配面便捷操作）：提案 [当前配置 ∪ {member(witness)}]。已存在 = 幂等返回。
+    /// </summary>
+    /// <param name="member">新 witness 节点 ID。</param>
+    /// <param name="endPoint">端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>完成时配置条目已 committed 且 applied——活动配置已含新 witness。</returns>
+    /// <exception cref="NotLeaderException">本节点非 Leader（无权提案）。</exception>
+    public async Task AddWitnessAsync(NodeId member, string endPoint = "", CancellationToken cancellationToken = default)
+    {
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var current = _machine.Config;
+            if (current.Contains(member)) return;   // 幂等
+            await ProposeAsync(current.AddWitness(member, endPoint), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
     /// 晋级 voter（learner → voter——引导流追平后转正）：提案角色切换，返回 = 已提交生效。
     /// 缺席或已是 voter = 幂等返回。
     /// </summary>

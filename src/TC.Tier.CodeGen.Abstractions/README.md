@@ -22,5 +22,5 @@ TC.Tier 源生成器的**公共标注面**——全部 generator 特性 attribut
 
 ## 文档
 
-- 生成器实现与模板：[../TC.Tier.CodeGen](../TC.Tier.CodeGen/README.md)
+- 生成器实现与模板：[TC.Tier.CodeGen](https://www.nuget.org/packages/TC.Tier.CodeGen)
 - 在线文档站：https://docs.mytzz.top/

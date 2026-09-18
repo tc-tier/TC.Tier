@@ -54,6 +54,29 @@ public class RaftJoinTests
         return new TestNode(id, raft, machine, new Membership(raft), [raft, pipeline, transport]);
     }
 
+    private sealed record WitnessTestNode(NodeId Id, RaftStateMachine Raft, WitnessHighWaterStore Store, IAsyncDisposable[] Owned);
+
+    private static async Task<WitnessTestNode> CreateWitnessNodeAsync(InProcessTransportHub hub, NodeId id, int seed)
+    {
+        var store = new WitnessHighWaterStore();
+        await store.InitializeAsync();
+        var transport = hub.Register(id);
+        transport.Start();
+        var options = RaftOptions.Default
+            .WithElectionTimeout(TimeSpan.FromMilliseconds(300), TimeSpan.FromMilliseconds(600))
+            .WithRandom(new Random(seed));
+        var raft = new RaftStateMachine(id, store, transport, new WitnessApplySink(), options);
+        await raft.StartAsync(new ClusterConfig([new ClusterMember(id, "", ClusterMemberRole.Witness)]));
+        return new WitnessTestNode(id, raft, store, [raft, transport]);
+    }
+
+    /// <summary>witness 空应用槽（witness 分支不推进 commit——Submit 永不触发）。</summary>
+    private sealed class WitnessApplySink : IApplySink
+    {
+        public void Submit(long commitIndex) { }
+        public event Action<long>? AppliedTo { add { } remove { } }
+    }
+
     private static async Task WaitForAsync(Func<bool> condition, TimeSpan? timeout = null)
     {
         var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(10));
@@ -173,6 +196,105 @@ public class RaftJoinTests
         fx.Owned.AddRange(c.Owned);
 
         var act = () => c.Raft.JoinAsync([new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 9400)]);
-        await act.Should().ThrowAsync<NotSupportedException>("端点拨号需 ClusterTransport——进程内形态用同伴 ID 重载");
+        await act.Should().ThrowAsync<NotSupportedException>("端点拨号需 TCP 介质——进程内形态用同伴 ID 重载");
+    }
+
+    [Fact]
+    public async Task Join_AsWitness_VotesInQuorum_NeverPromotes_NoLogBody()
+    {
+        await using var fx = new Rig(new InProcessTransportHub(), [], []);
+        var idA = NodeId.NewRandom();
+        var idB = NodeId.NewRandom();
+        var voterConfig = new ClusterConfig([new ClusterMember(idA, ""), new ClusterMember(idB, "")]);
+        var a = await CreateNodeAsync(fx.Hub, idA, voterConfig, seed: 1);
+        var b = await CreateNodeAsync(fx.Hub, idB, voterConfig, seed: 2);
+        fx.Nodes.AddRange([a, b]);
+        fx.Owned.AddRange([.. a.Owned, .. b.Owned]);
+        await WaitForAsync(() => a.Raft.IsLeader || b.Raft.IsLeader);
+        var leader = a.Raft.IsLeader ? a : b;
+        var follower = leader == a ? b : a;
+
+        // witness 档引导：[self witness] 本地配置 + 高水位存储——入组完成 = leader 受理
+        var idW = NodeId.NewRandom();
+        var w = await CreateWitnessNodeAsync(fx.Hub, idW, seed: 3);
+        fx.Owned.AddRange(w.Owned);
+
+        await w.Raft.JoinAsync([idA, idB], TimeSpan.FromSeconds(10), autoPromote: false, asWitness: true);
+
+        leader.Raft.Config.IsWitness(idW).Should().BeTrue("leader 侧活动配置已登记 witness 角色");
+        leader.Raft.Config.VoterCount.Should().Be(3, "witness 计入选主/提交多数派");
+        leader.Raft.Config.IsFullVoter(idW).Should().BeFalse("witness 不自荐/不可承接 leader");
+        w.Raft.Config.IsWitness(idW).Should().BeTrue("本地引导配置 witness 门——内容不落盘的依据");
+        w.Store.Should().BeOfType<WitnessHighWaterStore>("witness 高水位存储（无日志体）");
+
+        // 断言流抵达：写数据后 witness 高水位推进（内容丢弃、位置推进）
+        var index = await leader.Raft.ReplicateAsync(new byte[] { 0xEF });
+        await WaitForAsync(() => w.Store.LastLogIndex >= index, TimeSpan.FromSeconds(10));
+        var readEntry = () => w.Store.TryGetEntry(index, out _, out _, out _);
+        readEntry.Should().Throw<NotSupportedException>("witness 无日志体可读");
+
+        // 投票权实证：leader 宕机 → 幸存 voter + witness（2/3 多数派）仍能选出新 leader 并继续提交
+        await leader.Raft.DisposeAsync();
+        var survivor = follower;
+        await WaitForAsync(() => survivor.Raft.IsLeader, TimeSpan.FromSeconds(15));
+        var seq = await survivor.Raft.ReplicateAsync(new byte[] { 0x11 });
+        seq.Should().BeGreaterThan(0, "witness 在多数派域——单 voter 拓扑继续提交");
+    }
+
+    [Fact]
+    public async Task Join_AsWitness_WithAutoPromote_FailsFast()
+    {
+        await using var fx = new Rig(new InProcessTransportHub(), [], []);
+        var idC = NodeId.NewRandom();
+        var c = await CreateNodeAsync(fx.Hub, idC,
+            new ClusterConfig([new ClusterMember(idC, "", ClusterMemberRole.Learner)]), seed: 3);
+        fx.Nodes.Add(c);
+        fx.Owned.AddRange(c.Owned);
+
+        var act = () => c.Raft.JoinAsync([NodeId.NewRandom()], asWitness: true);
+        await act.Should().ThrowAsync<ArgumentException>("witness 永不晋级——与 autoPromote 组合非法");
+    }
+
+    [Fact]
+    public async Task Join_Learner_AnnouncesEndPoint_LeaderRegisters()
+    {
+        await using var fx = new Rig(new InProcessTransportHub(), [], []);
+        var idA = NodeId.NewRandom();
+        var voterConfig = new ClusterConfig([new ClusterMember(idA, "")]);
+        var a = await CreateNodeAsync(fx.Hub, idA, voterConfig, seed: 1);
+        fx.Nodes.Add(a);
+        fx.Owned.AddRange(a.Owned);
+        await WaitForAsync(() => a.Raft.IsLeader);
+
+        // 成员表拨号形态（#480）：NodeId 档 + 显式通告监听地址——leader 配置条目承载端点
+        var idC = NodeId.NewRandom();
+        var c = await CreateNodeAsync(fx.Hub, idC,
+            new ClusterConfig([new ClusterMember(idC, "", ClusterMemberRole.Learner)]), seed: 2);
+        fx.Nodes.Add(c);
+        fx.Owned.AddRange(c.Owned);
+
+        await c.Raft.JoinAsync([idA], TimeSpan.FromSeconds(10), autoPromote: false, listenEndPoint: "10.0.0.9:7001");
+
+        a.Raft.Config.Contains(idC).Should().BeTrue();
+        a.Raft.Config.GetEndPoint(idC).Should().Be("10.0.0.9:7001", "加入方通告端点随配置条目登记（leader 回连复制依据）");
+    }
+
+    [Fact]
+    public async Task AddWitness_SingleOperation_RegistersWitnessRole()
+    {
+        await using var fx = new Rig(new InProcessTransportHub(), [], []);
+        var idA = NodeId.NewRandom();
+        var voterConfig = new ClusterConfig([new ClusterMember(idA, "")]);
+        var a = await CreateNodeAsync(fx.Hub, idA, voterConfig, seed: 1);
+        fx.Nodes.Add(a);
+        fx.Owned.AddRange(a.Owned);
+        await WaitForAsync(() => a.Raft.IsLeader);
+
+        var idW = NodeId.NewRandom();
+        await a.Membership.AddWitnessAsync(idW, "10.0.0.8:7002");
+
+        a.Raft.Config.IsWitness(idW).Should().BeTrue("AddWitness 便捷面——witness 角色登记");
+        a.Raft.Config.VoterCount.Should().Be(2, "witness 计入多数派");
+        a.Raft.Config.GetEndPoint(idW).Should().Be("10.0.0.8:7002");
     }
 }

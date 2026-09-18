@@ -1,3 +1,4 @@
+using System.Net;
 using System.Runtime.CompilerServices;
 using TC.Tier.Core.Logging;
 using TC.Tier.Core.Net.Channels;
@@ -114,8 +115,10 @@ public sealed partial class RaftStateMachine
         _logger?.LogInformation("Raft learner 晋级提案：member={Member}", pl.Member);
     }
 
-    /// <summary>加入集群请求处理（leader 面）：缺席 = 提案 learner 入组（角色切换走
-    /// <see cref="HandlePromoteLearnerAsync"/>）；<see cref="JoinReq.AutoPromote"/> 登记追平晋级意图。
+    /// <summary>加入集群请求处理（leader 面）：缺席按申请档提案入组（learner/witness——端点随
+    /// 配置条目登记，复制链路据此回连）；learner 档 <see cref="JoinReq.AutoPromote"/> 登记追平晋级
+    /// 意图（witness 永不晋级）；TCP 介质下以加入方通告端点动态注册拨号表（回连复制——成员制
+    /// 静态表外的动态成员）。受理以配置提交为先（返回 Accepted = 配置条目已 committed 且 applied）。
     /// 非 leader = 不受理，应答回已知 leader 提示（加入方轮转 bootstrap /// </summary>
     /// <param name="from">加入方节点。</param>
     /// <param name="req">加入请求。</param>
@@ -133,19 +136,41 @@ public sealed partial class RaftStateMachine
         }
 
         var config = Config;
+        var announceEndPoint = System.Text.Encoding.UTF8.GetString(req.EndPointBytes.Span);
         if (!config.Contains(req.CandidateId))
-            await ProposeConfigAsync(config.AddLearner(req.CandidateId), cancellationToken).ConfigureAwait(false);
-        if (req.AutoPromote)
+        {
+            var next = req.AsWitness
+                ? config.AddWitness(req.CandidateId, announceEndPoint)
+                : config.AddLearner(req.CandidateId, announceEndPoint);
+            await ProposeConfigAsync(next, cancellationToken).ConfigureAwait(false);
+        }
+        if (req.AutoPromote && !req.AsWitness)
             lock (_leaseLock)
             {
                 if (_pendingPromote.TryAdd(req.CandidateId, 1))
                     Interlocked.Increment(ref _pendingPromoteCount);
             }
+        RegisterJoinPeer(req.CandidateId, announceEndPoint);
 
-        _logger?.LogInformation("Raft 加入请求受理：candidate={Candidate} autoPromote={AutoPromote}", req.CandidateId,
-            req.AutoPromote);
+        _logger?.LogInformation("Raft 加入请求受理：candidate={Candidate} asWitness={AsWitness} autoPromote={AutoPromote}",
+            req.CandidateId, req.AsWitness, req.AutoPromote);
         await ReplyAsync(reply, new JoinResp { Term = _store.Term, Accepted = true, LeaderId = _self },cancellationToken)
             .ConfigureAwait(false);
+    }
+
+    /// <summary>动态注册加入方拨号表项（TCP 介质——leader 回连复制）：通告端点非空且本端为
+    /// TCP 集群面（直连或内建组装）时生效；进程内/已互联形态无地址概念，通告空串 = 跳过。</summary>
+    private void RegisterJoinPeer(NodeId candidate, string endPoint)
+    {
+        if (string.IsNullOrEmpty(endPoint)) return;
+        if (AsClusterTransport() is not { } tcp) return;
+        if (!IPEndPoint.TryParse(endPoint, out var ep))
+        {
+            _logger?.LogWarning("Raft 加入方通告端点不可解析（跳过拨号注册）：candidate={Candidate} endPoint={EndPoint}",
+                candidate, endPoint);
+            return;
+        }
+        tcp.AddPeer(candidate, ep);
     }
 
     /// <summary>批复制处理（spec-08 §1——一批一次追加；批尾 index 完成 tcs）。

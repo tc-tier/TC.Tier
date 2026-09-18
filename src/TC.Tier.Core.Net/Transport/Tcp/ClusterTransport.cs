@@ -143,7 +143,9 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
     /// <summary>本端节点 ID。</summary>
     public NodeId Self { get; }
 
-    internal TransportOptions Options { get; }
+    /// <summary>生效传输配置（装配自证——显式方法/注入/管道裁决后的最终值，§4.5 诊断面；
+    /// 与 <see cref="Hosting.NodeEndpoint.Options"/> 同语义）。</summary>
+    public TransportOptions Options { get; }
     internal ILogger? Logger { get; }
     internal FaultsImpl Injector => _faultsImpl;
 
@@ -981,6 +983,11 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
 
     /// <summary>成员路由判定（§4.3——仅判定"是否地址表成员"：驱动成员制拨号循环与归属违规检查；连接准入与此无关）。</summary>
     internal bool IsKnownPeer(NodeId peer) => peer != Self && _peers.ContainsKey(peer);   // 二期-C2：动态表
+
+    /// <summary>目标链路已建立（join 引导等消费方在地址制拨号前探测——避免重复握手替换既有链路）。</summary>
+    /// <param name="peer">目标节点。</param>
+    /// <returns>true = 链路已建立（定向发送可用）。</returns>
+    public bool IsConnected(NodeId peer) => _links.TryGetValue(peer, out var link) && link.IsEstablished;
 
     /// <inheritdoc/>
     /// <returns>完成时监听器/UDP/全部链路/循环线程均已关闭（幂等——重复调用立即完成）。</returns>

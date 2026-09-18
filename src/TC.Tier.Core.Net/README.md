@@ -33,9 +33,9 @@ await endpoint.SendRequestAsync(target, protocolId, payload,
 
 ## 文档
 
-- 使用指南：[docs/net.md](docs/net.md)（在线：[docs.mytzz.top](https://docs.mytzz.top/docs/core/net.html)）
-- 性能基线：[docs/perf/loopback-baseline.md](docs/perf/loopback-baseline.md)
-- 积木拼装指南与红线：[COORDINATION.md](COORDINATION.md)
+- 使用指南：[docs/net.md](https://docs.mytzz.top/docs/core/net.html)（在线：[docs.mytzz.top](https://docs.mytzz.top/docs/core/net.html)）
+- 性能基线：[docs/perf/loopback-baseline.md](https://docs.mytzz.top/docs/core/perf/loopback-baseline.html)
+- 积木拼装指南与红线：[COORDINATION.md](https://docs.mytzz.top/docs/coordination/src/TC.Tier.Core.Net/COORDINATION.html)
 
 ## 状态
 

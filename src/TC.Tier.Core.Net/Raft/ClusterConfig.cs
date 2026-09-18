@@ -129,6 +129,16 @@ public sealed class ClusterConfig
         return new ClusterConfig(_members.Concat([new ClusterMember(id, endPoint, ClusterMemberRole.Learner)]));
     }
 
+    /// <summary>加 witness（见证者——投票计入选主/提交多数派，不存日志体不自荐；已存在 = 原样返回）。</summary>
+    /// <param name="id">新 witness 节点 ID。</param>
+    /// <param name="endPoint">端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</param>
+    /// <returns>新配置（已含新成员，角色为 witness）；若已存在则返回原配置。</returns>
+    public ClusterConfig AddWitness(NodeId id, string endPoint = "")
+    {
+        if (Contains(id)) return this;
+        return new ClusterConfig(_members.Concat([new ClusterMember(id, endPoint, ClusterMemberRole.Witness)]));
+    }
+
     /// <summary>晋级 voter（learner → voter——引导流追平后转正；缺席或已是 voter = 原样返回）。</summary>
     /// <param name="id">要晋级的节点 ID。</param>
     /// <returns>新配置（该成员角色切换为 voter）；缺席或已是 voter 则返回原配置。</returns>

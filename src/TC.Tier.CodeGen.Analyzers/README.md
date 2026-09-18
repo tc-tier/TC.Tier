@@ -23,7 +23,7 @@ TC.Tier 仓库专属的**编译期纪律分析器**（Roslyn DiagnosticAnalyzer�
 
 ## 文档
 
-- 使用指南（三规则触发样例/机制/豁免）：[docs/tierfs-spec.md](docs/tierfs-spec.md)
-- 通用纪律族（TCSG130-139）：[../TC.Tier.Analyzers/docs/tier-analyzers.md](../TC.Tier.Analyzers/docs/tier-analyzers.md)
-- 代码规范（TCSG136/137/138 等）：[CONTRIBUTING.md](../../CONTRIBUTING.md)
+- 使用指南（三规则触发样例/机制/豁免）：[docs/tierfs-spec.md](https://docs.mytzz.top/docs/codegen/tierfs-spec.html)
+- 通用纪律族（TCSG130-139）：[../TC.Tier.Analyzers/docs/tier-analyzers.md](https://docs.mytzz.top/docs/codegen/tier-analyzers.html)
+- 代码规范（TCSG136/137/138 等）：[CONTRIBUTING.md](https://docs.mytzz.top/CONTRIBUTING.html)
 - 在线文档站：https://docs.mytzz.top/

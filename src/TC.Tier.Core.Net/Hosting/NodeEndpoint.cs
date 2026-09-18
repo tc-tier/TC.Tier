@@ -137,6 +137,11 @@ public sealed class NodeEndpoint : IProtocolTransport, ICoreProtocolPort
            ?? throw new InvalidOperationException(
                $"机制挂载须内部注册口（ICoreProtocolPort）——介质 {_inner.GetType().Name} 未实现；机制宿主归 Core.Net（spec-12 §3.5）。");
 
+    /// <summary>内层 TCP 集群传输（null = 非 TCP 介质）——join 引导链消费：地址制拨号
+    /// （bootstrap 端点拨号加入）与拨号表动态注册（leader 受理 join 后回连加入方）。</summary>
+    internal Transport.Tcp.ClusterTransport? TryGetClusterTransport()
+        => _inner as Transport.Tcp.ClusterTransport;
+
     /// <summary>释放（逆挂载序机制 → 传输；幂等）。</summary>
     /// <returns>完成时机制与传输均已释放（幂等——重复调用立即完成）。</returns>
     public async ValueTask DisposeAsync()
