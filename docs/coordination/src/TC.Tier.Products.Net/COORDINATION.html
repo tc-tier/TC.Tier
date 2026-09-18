@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TC.Tier.Products.Net 协调文档 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TC.Tier.Products.Net 协调文档 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../../../favicon.ico">
+      <link rel="stylesheet" href="../../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../../toc.html">
+      <meta name="docfx:tocrel" content="../../../../toc.html">
+      
+      <meta name="docfx:rel" content="../../../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/COORDINATION.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../../../index.html">
+            <img id="logo" class="svg" src="../../../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tctierproductsnet-协调文档">TC.Tier.Products.Net 协调文档</h1>
+
+<blockquote>
+<p><strong>raft × Tier 产品组装层</strong>——Core.Net 共识引擎与 Products 存储在产品层的汇合点（spec-12 /
+D6 产品接线收口）：<code>TierRaftNode</code> 一个装配器成完整产品节点（TierWAL 持久化 + raft 共识 +
+apply 管道 + 多源快照分发/反熵 + 宿主调度）。</p>
+<p>配合阅读（项目内深读）：</p>
+<ul>
+<li><a href="../../../products/raft-node.html"><code>docs/raft-node.md</code></a> —— TierRaftNode 使用指南（快速上手/传输形态/配置链/生命周期；示例即测试）</li>
+<li><a href="../TC.Tier.Core.Net/COORDINATION.html"><code>../TC.Tier.Core.Net/COORDINATION.md</code></a> —— raft 引擎语义（复制完成档/ReadIndex/快照安装/IRaftStore 需求面——引擎与存储互不泄露布局）</li>
+<li><a href="../TC.Tier.Products/COORDINATION.html"><code>../TC.Tier.Products/COORDINATION.md</code></a> —— TierWAL 产品（双水位/组提交/opaque 容器/快照——本适配器的被组合方）</li>
+</ul>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>布局知识归适配器（<code>TierWalRaftStore</code>），装配归 <code>TierRaftNodeBuilder</code>，调度归宿主循环
+（<code>TierRaftNode</code>）——引擎与存储互不泄露布局，节点之外零胶水。</strong> 任何一侧变更布局/装配
+路径都从本层单点收口，禁在消费方自拼。</p>
+<h2 id="1-组件全景五件套">1. 组件全景（五件套）</h2>
+<table>
+<thead>
+<tr>
+<th>组件</th>
+<th>职责</th>
+<th>关键契约</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TierRaftNode</code></td>
+<td>完整产品节点（<code>Wal</code>/<code>Raft</code>/<code>Apply</code>/<code>Swarm</code> 句柄暴露）；宿主循环三件调度：①快照压缩（全角色，日志增长 ≥ 阈值 → <code>TierWal.SnapshotAsync</code> 一体快照+截头）②快照发布（Swarm 装配时，N₀ 变更挂源）③反熵（仅 leader 发起、对端轮转）</td>
+<td>换届接线：<code>LeaderChanged</code> → SwarmSync 持有表清空/反熵停发恢复；<code>DisposeAsync</code> 有界分段收尾（宿主→raft→apply→多源→TierWal→内建传输）</td>
+</tr>
+<tr>
+<td><code>TierRaftNodeBuilder</code></td>
+<td>三段式装配收口（Create → 链式 → StartAsync 一次成型）；传输<strong>二选一</strong>：<code>WithTransport</code>（注入现成——嵌入式同进程/调用方自组装）∥ <code>WithClusterTransport</code>（内建经 ClusterBuilder 组装 TCP）——双供给/零供给 fail-fast</td>
+<td><code>WithJoin</code>（learner 引导：本地配置强制 <code>[self learner]</code>，追平自动晋级 voter——<code>Raft.IsVoter</code> 翻真即就绪）；装配失败不残留半启动传输</td>
+</tr>
+<tr>
+<td><code>TierRaftNodeOptions</code></td>
+<td>产品装配选项（全部缺省即产品形态：TierWal 生产默认/raft 默认策略；多源/反熵/宿主压缩缺省<strong>关</strong>）</td>
+<td><code>HighResolutionTimer</code> 缺省 true（Windows timeBeginPeriod(1)——时序敏感路径不被 15.6ms 量子钉住）</td>
+</tr>
+<tr>
+<td><code>TierWalRaftStore</code></td>
+<td><code>IRaftStore</code> 的 TierWAL 适配器——<strong>帧格式知识唯一宿主</strong>：载荷帧 <code>[Term 8B LE][Kind 1B][Content]</code>、opaque meta <code>[ver][term][votedFor][applied][snapshotIndex]</code>（均 <code>[BinaryLayout]</code> 声明式单点）</td>
+<td>语义映射：prevIndex 断言冲突 = <code>TruncateSuffixAsync</code>+<code>AppendBatchAsync</code> 一体；fsync 点 = <code>CommitAsync</code>+<code>WaitForPersistedAsync</code>；<code>TruncatePrefixTo</code> = 仅推快照水位（物理截头延迟至 TierWal 压缩调度）；append/truncate/import 经 <code>_gate</code> 串行</td>
+</tr>
+<tr>
+<td><code>TierFsIdentityStore</code></td>
+<td><code>IIdentitySource</code> 的 TierFs 身份文件适配器（新写一律 v2：<code>[Magic &quot;TCID&quot;][Ver][NodeId 16B][KeyLen 4B][材料][CRC32]</code> ≥29B；v1 25B <code>[Magic][Ver][NodeId][CRC]</code> 仅读兼容）</td>
+<td>首次生成原子保存（temp+rename，半写不可见）；损坏/截断 <strong>fail-fast 抛</strong>——禁静默重生成（重生成=静默换身份）；一个路径 = 一个节点进程</td>
+</tr>
+</tbody>
+</table>
+<p>兼容壳：<code>TierRaftNode.StartAsync</code>（静态）签名不变——内部走 <code>TierRaftNodeBuilder</code>；
+新代码一律走装配器（传输形态显式二选一）。</p>
+<h2 id="2-适配器层语义红线tierwalraftstore">2. 适配器层语义红线（TierWalRaftStore）</h2>
+<ol>
+<li><strong>双水位下限钳制</strong>：<code>AllocatedIndex</code> = max(WAL 真相, 记账视图)、<code>PersistedIndex</code> =
+max(WAL 真相, 快照视图)——快照安装/导入把视图推到 N₀ 后，raft 可见水位<strong>不得低于视图</strong>
+（否则 lane nextIndex 被钳回快照边界之下 → 安装触发与心跳互斥 → follower 选举窗到期 =
+换届风暴；HDD MultiNode 实判例）。</li>
+<li><strong>快照边界 term 必须真 term</strong>：prevLogIndex == N₀ 的 AppendEntries 携带 <code>_snapshotBoundaryTerm</code>
+（entry N₀ 的 term）——发 0 会被无快照 follower 的 term 比对拒绝（hint 走退→安装→换届风暴）。</li>
+<li><strong>TruncatePrefixTo ≠ 物理截头</strong>：只推 opaque 水位，快照区数据保留（spec-03 快照流供给）；
+物理截头归 TierWal 宿主压缩调度（<code>SnapshotGrowthThresholdEntries</code>）。</li>
+<li><strong>串行化域</strong>：append/truncate/import 跨 await 经可等待门串行（prevIndex 断言到落位非原子）；
+读面走 WAL 租约（线程安全）+ 门内状态守卫——改这段先跑对抗套件。</li>
+</ol>
+<h2 id="3-依赖位置">3. 依赖位置</h2>
+<pre><code>Core.Net（raft 引擎/传输/装配） ─┐
+                                ├─→ Products.Net（本层：适配 + 节点收口）→ 使用方
+Products（TierWAL 存储）       ─┘
+</code></pre>
+<p>本层是<strong>唯一的引擎 × 存储汇合点</strong>：Core.Net 零产品知识、Products 零协议知识（各自编译期
+锁死）——布局翻译只许发生在这里。<code>InternalsVisibleTo</code> = <code>TC.Tier.Net.AdversarialTests</code> +
+<code>DynamicProxyGenAssembly2</code>（Moq 代理）。</p>
+<h2 id="4-反模式禁止重蹈">4. 反模式（禁止重蹈）</h2>
+<h3 id="-绕装配器手拼节点">❌ 绕装配器手拼节点</h3>
+<ul>
+<li><strong>症状</strong>：自己 <code>new TierWal(...)</code> + <code>new TierWalRaftStore(...)</code> + <code>new RaftStateMachine(...)</code>
+<ul>
+<li><code>new ApplyPipeline(...)</code> 拼节点。</li>
+</ul>
+</li>
+<li><strong>为什么错</strong>：装配顺序（TierWal 恢复 → 适配 → apply → raft → 宿主调度）、换届接线、
+生命周期收尾（有界分段）全是装配器的职责——手拼必漏，且漏的部分只在故障时暴露。</li>
+<li><strong>正解</strong>：<code>TierRaftNodeBuilder</code>；静态 <code>StartAsync</code> 薄壳仅为存量兼容保留。</li>
+</ul>
+<h3 id="-传输双供给零供给">❌ 传输双供给/零供给</h3>
+<ul>
+<li><strong>症状</strong>：<code>WithTransport</code> 与 <code>WithClusterTransport</code> 同时给（或都不给）期待缺省形态。</li>
+<li><strong>正解</strong>：二选一，fail-fast 教用法（装配形态显式）。</li>
+</ul>
+<h3 id="-在本层之外再造-iraftstore-适配器--解析-wal-帧">❌ 在本层之外再造 IRaftStore 适配器 / 解析 WAL 帧</h3>
+<ul>
+<li><strong>症状</strong>：消费方自写 raft↔WAL 适配，或直接解 <code>[Term][Kind][Content]</code> 帧。</li>
+<li><strong>正解</strong>：帧/meta 布局知识归 <code>TierWalRaftStore</code> 单点；换存储 = 在 Core.Net <code>IRaftStore</code>
+端口另写适配器（不进本层），WAL 侧变动先看本层语义红线 §2。</li>
+</ul>
+<h3 id="-swarm-未装配却期待快照追赶">❌ Swarm 未装配却期待快照追赶</h3>
+<ul>
+<li><strong>症状</strong>：缺省 options 部署集群，follower 落后越过快照边界后卡死无法追平。</li>
+<li><strong>正解</strong>：生产集群 <code>WithSwarm(...)</code>（快照安装传输面 + 发布/反熵的装配前提）。</li>
+</ul>
+<h3 id="-peers-表缺自己--身份文件静默重生成">❌ peers 表缺自己 / 身份文件静默重生成</h3>
+<ul>
+<li><strong>症状</strong>：内建 TCP 形态 peers 漏本节点；身份文件 CRC 损坏后删文件重跑&quot;修复&quot;。</li>
+<li><strong>正解</strong>：peers 表含全体成员；身份断裂 = fail-fast 排查（重生成 = 静默换节点身份，
+votedFor/成员表绑定全毁）。</li>
+</ul>
+<h3 id="-把本层当通用-raft-库二次封装">❌ 把本层当通用 raft 库二次封装</h3>
+<ul>
+<li><strong>症状</strong>：在 TierRaftNode 之上再包一层&quot;更易用&quot;的节点类。</li>
+<li><strong>正解</strong>：装配缺口直接补 <code>TierRaftNodeBuilder</code>/<code>TierRaftNodeOptions</code>（组合而非复制——
+内建形态经 Core.Net 装配器组装，产品层不重写传输拼装样板）。</li>
+</ul>
+<h2 id="5-决策树">5. 决策树</h2>
+<pre><code>我要一个 raft 复制节点（持久化日志 + 状态机）？
+  → TierRaftNodeBuilder.Create(id, fs, config, machine) + 传输二选一 → StartAsync。
+
+我要节点加入既有集群？
+  → WithJoin(引导同伴/端点)——learner 引导，IsVoter 翻真即就绪。
+
+我要快照追赶/反熵对账？
+  → WithSwarm +（可选）WithAntiEntropyInterval / WithSnapshotGrowthThresholdEntries。
+
+我要换掉 TierWAL 存储实现？
+  → 在 Core.Net IRaftStore 端口另写适配器（布局知识归适配器单点——参考本层 TierWalRaftStore）。
+
+我要节点跨重启稳定身份？
+  → TierFsIdentityStore（fs + 路径）→ ClusterBuilder.Create(identitySource)。
+
+我要调持久化/选举时序？
+  → WithWal（TierWalOptions 组提交三维度/hints——磁盘 raft 建议 DIO+WriteThrough）
+    / WithRaft（选举窗/复制攒批）；Windows 定时器分辨率缺省已提至 1ms。
+</code></pre>
+<h2 id="6-产品协议域号分配表">6. 产品协议域号分配表</h2>
+<p>产品协议域 = <code>IProtocolTransport</code> 上的注册面（0x60+ 归产品，TierRaftHost 文档口径）——
+复制档组路由（<code>GroupReplicaRouter.GetOrCreate(transport, protocolId)</code>）按域挂载，一域一表：</p>
+<table>
+<thead>
+<tr>
+<th>域号</th>
+<th>产品</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0x60</code></td>
+<td>TierQueue 复制版（<code>QueueReplicaProtocol.Domain</code>）</td>
+<td>在用</td>
+</tr>
+<tr>
+<td><code>0x61</code></td>
+<td>TierKV 复制档（CasCmd 等）</td>
+<td>预留</td>
+</tr>
+<tr>
+<td><code>0x62+</code></td>
+<td>后续复制档递增</td>
+<td>空闲</td>
+</tr>
+</tbody>
+</table>
+<p><strong>分配纪律</strong>：新复制档取号必须先在本表登记（下一空闲号顺序递增，禁跳号禁复用）；
+组内线格式一经发布即冻结（跨版本升级窗归 Server P0 #2 命令族版本化统一定）。</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/COORDINATION.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
