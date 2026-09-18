@@ -33,6 +33,7 @@ public sealed class TierRaftNodeBuilder
     private NodeId[]? _joinPeers;                      // 引导同伴（进程内形态）
     private IPEndPoint[]? _joinEndpoints;              // 引导端点（TCP 形态）
     private bool _joinAsLearner;                       // learner 永久只读引导（#441——DP 形态：入组不晋级）
+    private bool _joinAsWitness;                       // witness 引导（三期-F2——投票不存数据，永不晋级）
 
     private TierRaftNodeBuilder(NodeId id, IFileSystem fs, ClusterConfig config, IStateMachine machine)
     {
@@ -151,6 +152,28 @@ public sealed class TierRaftNodeBuilder
         return this;
     }
 
+    /// <summary>加入既有集群为 witness（三期-F2——见证者引导形态）：以 witness 入组——投票计入
+    /// 选主/提交多数派，不存全量数据（高水位断言流）、<b>永不晋级 voter、不自荐</b>。
+    /// 启动走 <see cref="StartWitnessAsync"/>（witness 无日志体/状态机——非 <see cref="TierRaftNode"/> 形态）。</summary>
+    /// <param name="bootstrapPeers">引导同伴节点 ID（进程内/已互联传输形态）。</param>
+    /// <returns>本装配器实例（链式）。</returns>
+    public TierRaftNodeBuilder WithJoinAsWitness(params NodeId[] bootstrapPeers)
+    {
+        WithJoin(bootstrapPeers);
+        _joinAsWitness = true;
+        return this;
+    }
+
+    /// <summary>加入既有集群为 witness（TCP 端点形态）——语义同上。</summary>
+    /// <param name="bootstrapEndpoints">引导端点（至少一个当前集群成员的监听地址）。</param>
+    /// <returns>本装配器实例（链式）。</returns>
+    public TierRaftNodeBuilder WithJoinAsWitness(params IPEndPoint[] bootstrapEndpoints)
+    {
+        WithJoin(bootstrapEndpoints);
+        _joinAsWitness = true;
+        return this;
+    }
+
     /// <summary>配置：日志。</summary>
     /// <param name="logger">日志实例。</param>
     /// <returns>本装配器实例（链式）。</returns>
@@ -166,9 +189,13 @@ public sealed class TierRaftNodeBuilder
     /// 随节点（DisposeAsync 一并收尾）。</summary>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <returns>已启动的完整产品节点（装配完毕，宿主调度循环已运行）。</returns>
-    /// <exception cref="InvalidOperationException">传输双供给或零供给（fail-fast——形态须显式二选一）。</exception>
+    /// <exception cref="InvalidOperationException">传输双供给或零供给（fail-fast——形态须显式二选一）；
+    /// witness 引导档（<c>WithJoinAsWitness</c>——须走 <see cref="StartWitnessAsync"/>）。</exception>
     public async Task<TierRaftNode> StartAsync(CancellationToken cancellationToken = default)
     {
+        if (_joinAsWitness)
+            throw new InvalidOperationException(
+                "witness 引导档须走 StartWitnessAsync——witness 无日志体/状态机，非 TierRaftNode 形态。");
         if (_transport is not null && _clusterBuilder is not null)
             throw new InvalidOperationException("传输双供给——WithTransport（注入）与 WithClusterTransport（内建组装）二选一。");
         if (_transport is null && _clusterBuilder is null)
@@ -192,15 +219,101 @@ public sealed class TierRaftNodeBuilder
             var node = await TierRaftNode.StartCoreAsync(_id, _fs, transport, config, _machine, _options, _logger, owned)
                 .ConfigureAwait(false);
             owned = null;   // 所有权移交节点（DisposeAsync 链尾收尾）
+            // TCP 成员表拨号加入：通告本端监听地址（leader 注册拨号表回连复制——不通告则
+            // leader 无法回连，配置不收敛、Join 超时）；进程内/已互联形态解析不出 = 不通告
+            var announce = ResolveAnnounceEndPoint(transport);
             if (_joinPeers is not null)
-                await node.Raft.JoinAsync(_joinPeers, cancellationToken: cancellationToken, autoPromote: !_joinAsLearner).ConfigureAwait(false);
+                await node.Raft.JoinAsync(_joinPeers, cancellationToken: cancellationToken, autoPromote: !_joinAsLearner,
+                    listenEndPoint: announce).ConfigureAwait(false);
             else if (_joinEndpoints is not null)
-                await node.Raft.JoinAsync(_joinEndpoints, cancellationToken: cancellationToken, autoPromote: !_joinAsLearner).ConfigureAwait(false);
+                await node.Raft.JoinAsync(_joinEndpoints, cancellationToken: cancellationToken, autoPromote: !_joinAsLearner,
+                    listenEndPoint: announce).ConfigureAwait(false);
             return node;
         }
         finally
         {
             if (owned is not null) await owned.DisposeAsync().ConfigureAwait(false);   // 装配失败——不残留半启动传输
         }
+    }
+
+    /// <summary>启动 witness 节点（三期-F2——<c>WithJoinAsWitness</c> 引导档或静态
+    /// witness 配置形态）：高水位断言流（<see cref="WitnessHighWaterStore"/>）代替日志体——
+    /// 无 TierWal/apply 管道/Swarm/宿主调度，投票计多数派、永不晋级不自荐。内建 TCP 形态下
+    /// 传输生命周期随节点（DisposeAsync 链尾收尾）。</summary>
+    /// <param name="cancellationToken">取消令牌。</param>
+    /// <returns>已启动的 witness 节点（引导档完成时已入组——leader 活动配置含本端）。</returns>
+    /// <exception cref="InvalidOperationException">传输双供给或零供给；静态配置形态本端非 witness 角色。</exception>
+    public async Task<TierRaftWitnessNode> StartWitnessAsync(CancellationToken cancellationToken = default)
+    {
+        if (!_joinAsWitness && (_joinPeers is not null || _joinEndpoints is not null))
+            throw new InvalidOperationException("join 引导档与 witness 节点不匹配——witness 引导用 WithJoinAsWitness。");
+        if (_transport is not null && _clusterBuilder is not null)
+            throw new InvalidOperationException("传输双供给——WithTransport（注入）与 WithClusterTransport（内建组装）二选一。");
+        if (_transport is null && _clusterBuilder is null)
+            throw new InvalidOperationException(
+                "传输未供给——WithTransport（注入现成传输，嵌入式同进程）或 WithClusterTransport（内建 TCP 组装）二选一。");
+
+        NodeEndpoint? owned = null;
+        try
+        {
+            var transport = _transport;
+            if (transport is null)
+            {
+                owned = await _clusterBuilder!.StartAsync(cancellationToken).ConfigureAwait(false);
+                transport = owned;
+            }
+            // 引导档——本地配置强制 [self witness]（引擎 witness 门依据：内容不落盘/投票不自荐）；
+            // 静态配置形态——本端须已以 witness 角色登记（校验 fail-fast，防误装配成全量节点口径）
+            var config = _joinPeers is not null || _joinEndpoints is not null
+                ? new ClusterConfig([new ClusterMember(_id, "", ClusterMemberRole.Witness)])
+                : ValidateWitnessConfig(_config);
+            TierRaftNode.EnableHighResolutionTimer(_options.HighResolutionTimer, _logger);
+            var store = new WitnessHighWaterStore();
+            await store.InitializeAsync(cancellationToken).ConfigureAwait(false);
+            var apply = new WitnessApplySink();   // witness 无状态机——commit 恒不推进，sink 永不触发
+            var raft = new RaftStateMachine(_id, store, transport, apply, _options.Raft, logger: _logger);
+            await raft.StartAsync(config).ConfigureAwait(false);
+            var node = new TierRaftWitnessNode(_id, raft, store, owned, _logger);
+            owned = null;   // 所有权移交节点
+            if (_joinPeers is not null)
+                await raft.JoinAsync(_joinPeers, cancellationToken: cancellationToken, autoPromote: false, asWitness: true,
+                    listenEndPoint: ResolveAnnounceEndPoint(transport)).ConfigureAwait(false);
+            else if (_joinEndpoints is not null)
+                await raft.JoinAsync(_joinEndpoints, cancellationToken: cancellationToken, autoPromote: false, asWitness: true,
+                    listenEndPoint: ResolveAnnounceEndPoint(transport)).ConfigureAwait(false);
+            return node;
+        }
+        finally
+        {
+            if (owned is not null) await owned.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>静态配置形态校验——本端须以 witness 角色在配置中（防误装配：非 witness 角色
+    /// 会走全量日志体路径，与高水位存储矛盾）。</summary>
+    private ClusterConfig ValidateWitnessConfig(ClusterConfig config)
+        => config.IsWitness(_id)
+            ? config
+            : throw new InvalidOperationException(
+                "静态配置形态本端须为 witness 角色（ClusterMemberRole.Witness）——全量节点走 StartAsync。");
+
+    /// <summary>本端通告地址（TCP 形态从传输监听配置解析——随 JoinReq 通告 leader 回连复制；
+    /// 进程内/已互联形态解析不出 = null 不通告）。</summary>
+    private static string? ResolveAnnounceEndPoint(IProtocolTransport transport)
+        => transport switch
+        {
+            NodeEndpoint ep => ep.Options.ListenEndPoint?.ToString(),
+            Core.Net.Transport.Tcp.ClusterTransport tcp => tcp.Options.ListenEndPoint?.ToString(),
+            _ => null,
+        };
+
+    /// <summary>witness 空应用槽（<see cref="IApplySink"/> no-op）：witness 分支不推进 commit
+    /// （无状态机——高水位即其持久化语义），Submit/AppliedTo 永不触发。</summary>
+    private sealed class WitnessApplySink : IApplySink
+    {
+        public void Submit(long commitIndex) { }
+#pragma warning disable CS0067 // 契约事件——witness 永不触发（无状态机）
+        public event Action<long>? AppliedTo;
+#pragma warning restore CS0067
     }
 }

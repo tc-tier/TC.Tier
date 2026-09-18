@@ -986,55 +986,119 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
         }
     }
 
-    // ═══ Standby 引导（加入既有集群——learner 入组 + 追平晋级）═══
+    // ═══ Standby 引导（加入既有集群——learner 入组 + 追平晋级 ∥ witness 入组）═══
 
     /// <summary>加入既有集群（Standby 引导编排，进程内/已互联传输形态）：向 bootstrap 同伴
     /// 轮转递 <see cref="JoinReq"/>——缺席即以 learner 入组 + 登记追平晋级；已入组未晋级期间
     /// 周期性重递（换届/新 leader 场景自愈），<see cref="IsVoter"/> 翻真返回。
     /// 前置：本节点已以 [self learner] 配置 <see cref="StartAsync"/>（本地配置仅引导用——
     /// 真实配置随复制收敛；重启节点 WAL 已载真实配置，宣告幂等）。</summary>
-    /// <param name="bootstrapPeers">引导同伴节点 ID（至少一个当前集群成员；本端自身忽略）。</param>
+    /// <param name="bootstrapPeers">引导同伴节点 ID（至少一个当前集群成员；本端自身忽略）。
+    /// 传输须可路由至这些成员（进程内 hub 注册 / TCP 形态拨号表含其地址）。</param>
     /// <param name="timeout">总时限（缺省 30s——大基线追平的集群放宽）。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <param name="autoPromote">true = 追平后自动晋级 voter（缺省，Standby 形态）；false = 保持
     /// learner 永久只读（DP 永久只读节点引导——完成条件 = 已入组且配置收敛含自身，永不晋级）。</param>
+    /// <param name="asWitness">witness 档（三期-F2 装配面）：受理即以 witness 入组——投票计多数派、
+    /// 不存日志体、永不晋级；完成条件 = leader 受理（受理即配置已提交——witness 无日志体，
+    /// 配置收敛不可本地观测）。与 <paramref name="autoPromote"/>=true 组合非法（fail-fast）。
+    /// 前置：本地配置须含本端 witness 角色（<see cref="ClusterConfig.IsWitness"/>——引擎据此走断言流）。</param>
+    /// <param name="listenEndPoint">本端监听地址（host:port——随 JoinReq 通告，leader 注册拨号表
+    /// 回连复制；进程内/已互联形态缺省 null 不通告）。TCP 形态成员表拨号加入必填——否则 leader
+    /// 无法回连本端，复制不通、配置不收敛。</param>
     /// <returns>完成时本节点已入组（autoPromote 形态另需已晋级 voter；总时限到抛 <see cref="TimeoutException"/>）。</returns>
-    public Task JoinAsync(IEnumerable<NodeId> bootstrapPeers, TimeSpan? timeout = null, CancellationToken cancellationToken = default, bool autoPromote = true)
+    public Task JoinAsync(IEnumerable<NodeId> bootstrapPeers, TimeSpan? timeout = null, CancellationToken cancellationToken = default, bool autoPromote = true, bool asWitness = false, string? listenEndPoint = null)
     {
         ArgumentNullException.ThrowIfNull(bootstrapPeers);
+        ValidateJoinRoles(autoPromote, asWitness);
         var peers = bootstrapPeers.Distinct().Where(p => p != _self).ToArray();
         ArgumentOutOfRangeException.ThrowIfZero(peers.Length);
-        return JoinLoopAsync(peers.Length, (i, token) => new ValueTask<NodeId>(peers[i % peers.Length]), timeout, cancellationToken, autoPromote);
+
+        // TCP 形态：NodeId 档 bootstrap 靠地址制拨号建立链路（§4.3——有地址者拨号，地址制
+        // 不受「较小方才拨号」归属约束；joiner 未入对端表时较大方自起拨号循环被抑制且
+        // SendRequestAsync 不自动拨——不主动建链则较大方 joiner 永远发不出首帧）。
+        // 已连目标跳过拨号（重复 ConnectAsync 替换既有链路——纯开销且撞对播防御窗口）。
+        var tcp = AsClusterTransport();
+        var addressBook = tcp?.Options.Peers;
+        ValueTask<NodeId> resolve(int i, CancellationToken token)
+        {
+            var id = peers[i % peers.Length];
+            if (tcp is null) return new ValueTask<NodeId>(id);
+            if (addressBook is not null && addressBook.TryGetValue(id, out var ep) && !tcp.IsConnected(id))
+                return DialAsync(tcp, ep, id, token);   // 未连——地址制建链（幂等：已连跳过）
+            return new ValueTask<NodeId>(id);
+        }
+        return JoinLoopAsync(peers.Length, resolve, timeout, cancellationToken, autoPromote, asWitness, listenEndPoint);
+    }
+
+    /// <summary>地址制拨号建链（NodeId 档 bootstrap——地址表供端点；链路就绪即返回目标身份）。</summary>
+    private static async ValueTask<NodeId> DialAsync(Transport.Tcp.ClusterTransport tcp, IPEndPoint ep, NodeId expected, CancellationToken token)
+    {
+        await tcp.ConnectAsync(ep, token).ConfigureAwait(false);
+        return expected;
     }
 
     /// <summary>加入既有集群（TCP 形态）：向 bootstrap 端点拨号（身份握手得知）后同
-    /// <see cref="JoinAsync(IEnumerable{NodeId}, TimeSpan?, CancellationToken, bool)"/>。
-    /// bootstrap 端点非 leader = 应答提示 + 轮转下一端点——建议覆盖全部成员。</summary>
+    /// <see cref="JoinAsync(IEnumerable{NodeId}, TimeSpan?, CancellationToken, bool, bool, string?)"/>。
+    /// bootstrap 端点非 leader = 应答提示 + 轮转下一端点——建议覆盖全部成员。
+    /// 介质 = 内建 TCP 组装（NodeEndpoint）或注入 ClusterTransport；进程内传输不支持端点拨号。</summary>
     /// <param name="bootstrapEndpoints">引导端点（至少一个当前集群成员的监听地址）。</param>
     /// <param name="timeout">总时限（缺省 30s）。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <param name="autoPromote">true = 追平后自动晋级 voter（缺省）；false = 保持 learner 永久只读。</param>
-    /// <returns>完成时本节点已入组且已晋级 voter（总时限到抛 <see cref="TimeoutException"/>）。</returns>
-    /// <exception cref="NotSupportedException">传输非 TCP 介质（端点拨号加入不可用）。</exception>
-    public Task JoinAsync(IEnumerable<IPEndPoint> bootstrapEndpoints, TimeSpan? timeout = null, CancellationToken cancellationToken = default, bool autoPromote = true)
+    /// <param name="asWitness">witness 档——语义同 NodeId 重载。</param>
+    /// <param name="listenEndPoint">本端监听地址（缺省 null = 从传输监听配置自解析——
+    /// 解析不出须显式传入；随 JoinReq 通告 leader 回连复制）。</param>
+    /// <returns>完成时本节点已入组（autoPromote 形态另需已晋级 voter；总时限到抛 <see cref="TimeoutException"/>）。</returns>
+    /// <exception cref="NotSupportedException">传输无地址制拨号介质（进程内形态——端点拨号加入不可用）。</exception>
+    public Task JoinAsync(IEnumerable<IPEndPoint> bootstrapEndpoints, TimeSpan? timeout = null, CancellationToken cancellationToken = default, bool autoPromote = true, bool asWitness = false, string? listenEndPoint = null)
     {
         ArgumentNullException.ThrowIfNull(bootstrapEndpoints);
-        if (_transport is not Transport.Tcp.ClusterTransport dialer)
-            throw new NotSupportedException(
-                $"端点拨号加入需 ClusterTransport 介质（当前 {_transport.GetType().Name}）——进程内/已互联形态用 JoinAsync(bootstrapPeers)。");
+        ValidateJoinRoles(autoPromote, asWitness);
+        var dialer = AsClusterTransport()
+            ?? throw new NotSupportedException(
+                $"端点拨号加入需 TCP 介质（当前 {_transport.GetType().Name}）——进程内/已互联形态用 JoinAsync(bootstrapPeers)。");
         var endpoints = bootstrapEndpoints.Distinct().ToArray();
         ArgumentOutOfRangeException.ThrowIfZero(endpoints.Length);
+        // 通告地址自解析：实际绑定端点优先（port 0 已解析），退配置端点；都缺 = 不可通告
+        // （调用方显式传 listenEndPoint 或接受 leader 无法回连——成员表拨号形态的显式职责）
+        var announced = listenEndPoint
+            ?? (dialer.LocalEndPoint ?? dialer.Options.ListenEndPoint)?.ToString();
         return JoinLoopAsync(endpoints.Length,
-            (i, token) => dialer.ConnectAsync(endpoints[i % endpoints.Length], token), timeout, cancellationToken, autoPromote);
+            (i, token) => dialer.ConnectAsync(endpoints[i % endpoints.Length], token), timeout, cancellationToken, autoPromote, asWitness, announced);
     }
 
-    /// <summary>加入循环：轮转递 JoinReq（单端点 2s 探测超时）→ 受理后轮询 IsVoter；
-    /// 周期 250ms；总时限到 = TimeoutException。</summary>
+    /// <summary>角色组合校验（witness 与自动晋级互斥——witness 永不晋级）。</summary>
+    private void ValidateJoinRoles(bool autoPromote, bool asWitness)
+    {
+        if (asWitness && autoPromote)
+            throw new ArgumentException("witness 档不自动晋级（asWitness=true 须 autoPromote=false）——witness 投票不存数据、永不转 voter。");
+    }
+
+    /// <summary>本端传输的 TCP 集群面（null = 非 TCP 介质——进程内 hub / 其他介质）。
+    /// NodeEndpoint（内建 TCP 组装产物）解包内层——端点拨号/拨号表注册与直连传输同路径。</summary>
+    private Transport.Tcp.ClusterTransport? AsClusterTransport()
+        => _transport as Transport.Tcp.ClusterTransport
+           ?? (_transport as Hosting.NodeEndpoint)?.TryGetClusterTransport();
+
+    /// <summary>加入循环：轮转递 JoinReq（单端点 2s 探测超时）→ 受理后按档轮询完成；
+    /// 周期 250ms；总时限到 = TimeoutException。
+    /// <para>★ 端点拨号档链路复用：ConnectAsync 握手得知远端身份后缓存——后续轮次直投该
+    /// 远端（重复地址制重拨会撞「较大方拨号归属」防御——leader 受理后已将本端 AddPeer 登记，
+    /// 见 <see cref="HandleJoinReqAsync"/>；且每轮重握手纯开销）。非 leader 应答携带
+    /// LeaderId 提示 = 直投切换；发送失败（链路断）保留缓存下轮重试——leader 侧（较小方）
+    /// 拨号循环自愈重建链路。</para>
+    /// <para>完成条件三态：autoPromote = 晋级 voter 翻真；learner 档 = 复制收敛配置含自身；
+    /// witness 档 = 受理即完成（leader 侧受理以配置提交为先——Accepted 即已入组；无日志体，
+    /// 复制收敛不可本地观测）。</para></summary>
     private async Task JoinLoopAsync(int peerCount, Func<int, CancellationToken, ValueTask<NodeId>> resolvePeerAsync,
-        TimeSpan? timeout, CancellationToken cancellationToken=default, bool autoPromote = true)
+        TimeSpan? timeout, CancellationToken cancellationToken=default, bool autoPromote = true, bool asWitness = false, string? listenEndPoint = null)
     {
         var deadline = _clock.GetMsTimestamp() + (long)(timeout ?? TimeSpan.FromSeconds(30)).TotalMilliseconds;
         var round = 0;
+        var failures = 0;
+        NodeId? cachedRemote = null;   // 已握手远端（端点拨号档——链路复用，见方法注）
+        var dialedEndpoints = new HashSet<int>();   // 已成功握手的 bootstrap 位（端点档补链跳过——重拨=替换在用链）
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -1043,21 +1107,67 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
             var index = round % peerCount;
             try
             {
-                var remote = await resolvePeerAsync(index, cancellationToken).ConfigureAwait(false);
-                var len = RaftRpcCodec.EncodePooled(new JoinReq { Term = _store.Term, CandidateId = _self, AutoPromote = autoPromote }, out var buffer);
+                if (cachedRemote is not { } remote)
+                {
+                    remote = await resolvePeerAsync(index, cancellationToken).ConfigureAwait(false);
+                    dialedEndpoints.Add(index);
+                    cachedRemote = remote;
+                }
+                var len = RaftRpcCodec.EncodePooled(new JoinReq
+                {
+                    Term = _store.Term,
+                    CandidateId = _self,
+                    AutoPromote = autoPromote,
+                    AsWitness = asWitness,
+                    EndPointBytes = System.Text.Encoding.UTF8.GetBytes(listenEndPoint ?? ""),
+                }, out var buffer);
                 try
                 {
                     var respBytes = await _transport.SendRequestAsync(remote, ProtocolIds.Raft,
                         buffer.AsMemory(0, len),
                         new RequestOptions(TimeSpan.FromSeconds(2)), cancellationToken).ConfigureAwait(false);
-                    if (RaftRpcCodec.TryDecode(respBytes, out var rpc) && rpc is JoinResp { Accepted: true })
+                    if (RaftRpcCodec.TryDecode(respBytes, out var rpc) && rpc is JoinResp resp && resp.Accepted)
                     {
-                        // 完成条件分流（#441）：autoPromote = 晋级 voter 翻真；learner 永久只读形态 =
-                        // 复制收敛配置含自身——本地引导配置 [self learner] 恒含自身，不足以证收敛；
+                        // 完成条件分流（#441 / witness 档）：autoPromote = 晋级 voter 翻真；learner 永久只读
+                        // 形态 = 复制收敛配置含自身——本地引导配置 [self learner] 恒含自身，不足以证收敛；
                         // 真实配置（集群成员 + 本端 learner）随复制到达时成员数必然 >1，
-                        // 以此证引导配置已被复制产物替换（Accepted 只代表 leader 已受理，配置提交另序）
-                        if (autoPromote ? IsVoter : Config.Contains(_self) && Config.Count > 1)
+                        // 以此证引导配置已被复制产物替换（Accepted 只代表 leader 已受理，配置提交另序）。
+                        // witness 档：受理即完成——leader 侧受理以配置提交为先（Accepted = 已入组），
+                        // 断言流随后由 leader 供给；本地引导配置 [self witness] 不等收敛（无日志体可载配置）。
+                        if (asWitness
+                            || (autoPromote ? IsVoter : Config.Contains(_self) && Config.Count > 1))
+                        {
+                            // ★ 完成前补全成员链路（换届免疫）：join 链路是懒建立的——只与「实际递达
+                            //   JoinReq 的节点」有链；若 bootstrap 只触达部分成员，换届后新 leader 与
+                            //   本端互无链路且拨号归属规则（较小方才拨）可能双方都不触发——选举/复制
+                            //   请求永不到达 = 集群卡死。逐 bootstrap 对端补链（幂等：NodeId 档已连跳过；
+                            //   端点档重拨替换既有链或撞归属拒绝被吞——旧链不受影响）。单个失败不阻断
+                            //   join 完成（换届后的 JoinAsync 重递路径可再补）。
+                            for (var k = 0; k < peerCount; k++)
+                            {
+                                if (dialedEndpoints.Contains(k)) continue;   // 已握手端点——链路已在
+                                cancellationToken.ThrowIfCancellationRequested();
+                                try
+                                {
+                                    cachedRemote = null;   // 补链不沿缓存——逐对端建链
+                                    _ = await resolvePeerAsync(k, cancellationToken).ConfigureAwait(false);
+                                    dialedEndpoints.Add(k);
+                                }
+                                catch (Exception ex)
+                                {
+                                    if (ex is OperationCanceledException) throw;
+                                    _logger?.LogDebug("Join 补链失败：bootstrap#{Index} 原因={Reason}", k, ex.Message);
+                                }
+                            }
                             return;
+                        }
+                    }
+                    else if (rpc is JoinResp { LeaderId: { } hint } && hint != NodeId.Empty && hint != _self
+                             && hint != remote)
+                    {
+                        // 非 leader 应答的 leader 提示——弃缓存走端点轮转重拨（拨到 leader 为止；
+                        // 缓存仅对"已握手且应答自此远端"的链路有效——未连接的提示方直投必失败）
+                        cachedRemote = null;
                     }
                 }
                 finally
@@ -1069,6 +1179,9 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
             {
                 if (ex is OperationCanceledException && cancellationToken.IsCancellationRequested) throw;
                 _logger?.LogDebug("Join 重试：bootstrap#{Index} 原因={Reason}", index, ex.Message);
+                // 连续失败（≈1s）弃缓存走端点轮转重拨——远端换届/链路永久断的自愈口；
+                // 单次抖动不弃（重复地址制重拨会撞较大方归属防御 + 重握手开销）
+                if (++failures >= 4) cachedRemote = null;
             }
             round++;
             await _clock.Delay(250, cancellationToken).ConfigureAwait(false);

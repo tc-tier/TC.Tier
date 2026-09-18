@@ -225,7 +225,7 @@ public sealed class TierRaftNode : IAsyncDisposable
     //   Linux 原生高精度，no-op。
     private static int _highResolutionTimerEnabled;
 
-    private static void EnableHighResolutionTimer(bool enabled, ILogger? logger)
+    internal static void EnableHighResolutionTimer(bool enabled, ILogger? logger)
     {
         if (!enabled || !OperatingSystem.IsWindows()) return;
         if (Interlocked.Exchange(ref _highResolutionTimerEnabled, 1) == 1) return;

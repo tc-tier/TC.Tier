@@ -37,9 +37,9 @@ TierKv / TierQueue 的快速上手见各自使用文档（下方链接）。
 
 ## 文档
 
-- 使用指南：[tierkv.md](docs/tierkv.md) · [tierqueue.md](docs/tierqueue.md) · [tierseries.md](docs/tierseries.md) · [tierblob.md](docs/tierblob.md) · [tierwal.md](docs/tierwal.md)（在线：[docs.mytzz.top](https://docs.mytzz.top/)）
-- 性能基线：[perf/tierkv.md](docs/perf/tierkv.md) · [perf/tierwal.md](docs/perf/tierwal.md)
-- 组合纪律与红线：[COORDINATION.md](COORDINATION.md)
+- 使用指南：[tierkv.md](https://docs.mytzz.top/docs/products/tierkv.html) · [tierqueue.md](https://docs.mytzz.top/docs/products/tierqueue.html) · [tierseries.md](https://docs.mytzz.top/docs/products/tierseries.html) · [tierblob.md](https://docs.mytzz.top/docs/products/tierblob.html) · [tierwal.md](https://docs.mytzz.top/docs/products/tierwal.html)（在线：[docs.mytzz.top](https://docs.mytzz.top/)）
+- 性能基线：[perf/tierkv.md](https://docs.mytzz.top/docs/products/perf/tierkv.html) · [perf/tierwal.md](https://docs.mytzz.top/docs/products/perf/tierwal.html)
+- 组合纪律与红线：[COORDINATION.md](https://docs.mytzz.top/docs/coordination/src/TC.Tier.Products/COORDINATION.html)
 
 ## 状态
 

@@ -3,7 +3,7 @@
 配置驱动的分层治理与代码纪律分析器包。规则、作用域、豁免全部经 `.editorconfig` 声明——
 **零默认诊断**：装包未配置 = 零报告，对消费方零打扰。
 
-> 使用指南（快速上手/规则清单/豁免纪律/反模式）：[docs/tier-analyzers.md](docs/tier-analyzers.md)
+> 使用指南（快速上手/规则清单/豁免纪律/反模式）：[docs/tier-analyzers.md](https://docs.mytzz.top/docs/codegen/tier-analyzers.html)
 
 ## 安装
 

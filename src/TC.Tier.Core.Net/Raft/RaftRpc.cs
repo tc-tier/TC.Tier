@@ -185,8 +185,9 @@ public sealed record InstallSnapshotResp : RaftRpc
     public required long SnapshotIndex { get; init; }
 }
 
-/// <summary>加入集群请求（Standby 引导——新节点向 leader 递；leader 以 learner 入组并按
-/// <see cref="AutoPromote"/> 追平后晋级）。bootstrap 端点非 leader = 应答携带其已知 leader
+/// <summary>加入集群请求（Standby 引导——新节点向 leader 递；leader 按申请档入组：
+/// 缺省 learner（<see cref="AutoPromote"/> 追平后晋级）∥ <see cref="AsWitness"/> witness 档
+/// （投票不存数据，永不晋级））。bootstrap 端点非 leader = 应答携带其已知 leader
 /// 提示（Accepted=false——调用方轮转重试）。</summary>
 [WireMessageTag(0x09)]
 public sealed record JoinReq : RaftRpc
@@ -194,8 +195,18 @@ public sealed record JoinReq : RaftRpc
     /// <summary>申请加入的节点 ID。</summary>
     public required NodeId CandidateId { get; init; }
 
-    /// <summary>追平后自动晋级 voter（false = 保持 learner——观察副本形态）。</summary>
+    /// <summary>追平后自动晋级 voter（false = 保持 learner——观察副本形态；
+    /// <see cref="AsWitness"/> = true 时忽略——witness 永不晋级）。</summary>
     public required bool AutoPromote { get; init; }
+
+    /// <summary>加入方监听地址（host:port 的 UTF-8——leader 据此注册拨号表回连复制；
+    /// 进程内/已互联传输形态 = 空）。</summary>
+    [WireMember(MaxCount = 64)]
+    public ReadOnlyMemory<byte> EndPointBytes { get; init; }
+
+    /// <summary>witness 档（三期-F2 装配面）：受理即以 witness 入组——投票计多数派、
+    /// 不存日志体（断言流推进）、永不晋级。</summary>
+    public bool AsWitness { get; init; }
 }
 
 /// <summary>加入集群应答。</summary>

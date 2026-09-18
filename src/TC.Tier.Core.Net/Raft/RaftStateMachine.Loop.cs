@@ -28,13 +28,16 @@ public sealed partial class RaftStateMachine
         cancellationToken = linked.Token;
         _loopStarted.TrySetResult();
         Volatile.Write(ref _lastLoopProgressTicks, _clock.GetMsTimestamp());
-        if (_config.Count == 1 && _config.Contains(_self) && _config.IsVoter(_self))
+        if (_config.Count == 1 && _config.Contains(_self) && _config.IsVoter(_self) && !_config.IsWitness(_self))
         {
             // ★ Standalone 快捷路径（spec-01 §5.5 定案）：N=1 多数派 = 1——启动即 Leader（跳过
             //   PreVote/Candidate 全流程、零网络开销）；心跳循环照常（无 peer 空转）。
             //   ★ voter 门（二期-B 锚点暴露的既有潜伏缺陷）：单 learner 配置（Count==1 非 voter）
             //     不得走捷径——learner 无多数派可 lead，Commit 推进面（MajorityThreshold 对零
             //     voter 配置）也无定义；单 learner 节点 = 待加入的 follower（JoinAsync 形态）。
+            //   ★ witness 门（三期-F2 装配面暴露）：witness 计多数派（IsVoter=true）但永不自荐
+            //     （高水位无日志体——选举超时门已拦，捷径路径同规）；单 witness 节点 =
+            //     待加入的断言流 follower（JoinAsync asWitness 形态）。
             await BecomeLeaderAsync(cancellationToken);
         }
         else

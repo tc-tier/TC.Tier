@@ -9,7 +9,7 @@ TC.Tier 的 **raft × TierWAL 官方产品节点**——Core.Net 共识引擎与
 - **多源与反熵**：快照块化发布、多源并行拉取、leader 发起的对端轮转对账（Swarm 装配时启用）
 - **宿主调度**：日志增长阈值触发一体快照压缩 + 发布 + 反熵的公共循环；换届自动接线
 - **稳定身份**：`TierFsIdentityStore` 身份文件（原子保存 + CRC 校验，损坏 fail-fast）
-- **复制档组路由**：`GroupReplicaRouter` 通用面——传输绑定 + 组分发 + 提案转发 + 状态封套四件事单点承载，副本类实现 `IGroupProposalHandler` 即挂载（域号分配表见 [COORDINATION.md](COORDINATION.md) §6）
+- **复制档组路由**：`GroupReplicaRouter` 通用面——传输绑定 + 组分发 + 提案转发 + 状态封套四件事单点承载，副本类实现 `IGroupProposalHandler` 即挂载（域号分配表见 [COORDINATION.md](https://docs.mytzz.top/docs/coordination/src/TC.Tier.Products.Net/COORDINATION.html) §6）
 
 ## 快速开始
 
@@ -36,9 +36,9 @@ await node.Raft.ReplicateAsync(command);         // 复制完成档见 Core.Net 
 
 ## 文档
 
-- 使用指南：[docs/raft-node.md](docs/raft-node.md)（在线：[docs.mytzz.top](https://docs.mytzz.top/)）
-- 共识引擎语义：Core.Net 使用指南 [net.md](../TC.Tier.Core.Net/docs/net.md)
-- 组装层红线：[COORDINATION.md](COORDINATION.md)
+- 使用指南：[docs/raft-node.md](https://docs.mytzz.top/docs/products/raft-node.html)（在线：[docs.mytzz.top](https://docs.mytzz.top/)）
+- 共识引擎语义：Core.Net 使用指南 [net.md](https://docs.mytzz.top/docs/core/net.html)
+- 组装层红线：[COORDINATION.md](https://docs.mytzz.top/docs/coordination/src/TC.Tier.Products.Net/COORDINATION.html)
 
 ## 状态
 
