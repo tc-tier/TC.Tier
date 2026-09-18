@@ -25,7 +25,7 @@
 | `TierRaftNodeBuilder` | 三段式装配收口（Create → 链式 → StartAsync 一次成型）；传输**二选一**：`WithTransport`（注入现成——嵌入式同进程/调用方自组装）∥ `WithClusterTransport`（内建经 ClusterBuilder 组装 TCP）——双供给/零供给 fail-fast | `WithJoin`（learner 引导：本地配置强制 `[self learner]`，追平自动晋级 voter——`Raft.IsVoter` 翻真即就绪）；装配失败不残留半启动传输 |
 | `TierRaftNodeOptions` | 产品装配选项（全部缺省即产品形态：TierWal 生产默认/raft 默认策略；多源/反熵/宿主压缩缺省**关**） | `HighResolutionTimer` 缺省 true（Windows timeBeginPeriod(1)——时序敏感路径不被 15.6ms 量子钉住） |
 | `TierWalRaftStore` | `IRaftStore` 的 TierWAL 适配器——**帧格式知识唯一宿主**：载荷帧 `[Term 8B LE][Kind 1B][Content]`、opaque meta `[ver][term][votedFor][applied][snapshotIndex]`（均 `[BinaryLayout]` 声明式单点） | 语义映射：prevIndex 断言冲突 = `TruncateSuffixAsync`+`AppendBatchAsync` 一体；fsync 点 = `CommitAsync`+`WaitForPersistedAsync`；`TruncatePrefixTo` = 仅推快照水位（物理截头延迟至 TierWal 压缩调度）；append/truncate/import 经 `_gate` 串行 |
-| `TierFsIdentityStore` | `IIdentitySource` 的 TierFs 身份文件适配器（25B 定长：`[Magic "TCID"][Ver][NodeId 16B][CRC32]`） | 首次生成原子保存（temp+rename，半写不可见）；损坏/截断 **fail-fast 抛**——禁静默重生成（重生成=静默换身份）；一个路径 = 一个节点进程 |
+| `TierFsIdentityStore` | `IIdentitySource` 的 TierFs 身份文件适配器（新写一律 v2：`[Magic "TCID"][Ver][NodeId 16B][KeyLen 4B][材料][CRC32]` ≥29B；v1 25B `[Magic][Ver][NodeId][CRC]` 仅读兼容） | 首次生成原子保存（temp+rename，半写不可见）；损坏/截断 **fail-fast 抛**——禁静默重生成（重生成=静默换身份）；一个路径 = 一个节点进程 |
 
 兼容壳：`TierRaftNode.StartAsync`（静态）签名不变——内部走 `TierRaftNodeBuilder`；
 新代码一律走装配器（传输形态显式二选一）。
@@ -52,7 +52,8 @@ Products（TierWAL 存储）       ─┘
 ```
 
 本层是**唯一的引擎 × 存储汇合点**：Core.Net 零产品知识、Products 零协议知识（各自编译期
-锁死）——布局翻译只许发生在这里。`InternalsVisibleTo` 仅 `TC.Tier.Net.AdversarialTests`。
+锁死）——布局翻译只许发生在这里。`InternalsVisibleTo` = `TC.Tier.Net.AdversarialTests` +
+`DynamicProxyGenAssembly2`（Moq 代理）。
 
 ## 4. 反模式（禁止重蹈）
 

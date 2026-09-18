@@ -8,8 +8,9 @@
 > `ObjectStoreCapabilities` / 条件结构体等）在 Core/IO 定义，本层只做实现。
 >
 > 配合阅读：
-> - [`docs/network-file-system-s3.md`](docs/network-file-system-s3.md) —— 消费者使用指南（两部分自包含：对象层 §1-6 快速开始/全参数/凭证源/厂商矩阵/错误重试；**统一远程 IO 协议 §7-9**——RemoteFileSystem 构造/调参/核心语义/增量 Flush/恢复）
-> - [`../TC.Tier.Core/docs/io.md`](../TC.Tier.Core/docs/io.md) —— `RemoteFileSystem` 桥（把本层升格为 `IFileSystem` 第三介质；差异表/池化 Flush 置顶警告）
+> - [`docs/s3-protocol.md`](docs/s3-protocol.md) —— S3 协议特有部分（对象层 §1-6 快速开始/全参数/凭证源/厂商矩阵/错误重试）
+> - [`../TC.Tier.Core/docs/network-file-system.md`](../TC.Tier.Core/docs/network-file-system.md) —— 网络文件系统桥层语义（RemoteFileSystem 构造/调参/核心语义/增量 Flush/恢复——属 Core 层，四类文件系统之一）
+> - [`../TC.Tier.Core/docs/io.md`](../TC.Tier.Core/docs/io.md) —— Core/IO 总入口（四类文件系统选型/spec/能力协商/陷阱清单）
 > - [`docs/sync-async-bridge.md`](../TC.Tier.Core/docs/sync-async-bridge.md) —— 同步包装的桥接底座（`ObjectStoreExtensions` 内部使用）
 
 ---
@@ -31,7 +32,7 @@
 | `S3Xml` | `S3Xml.cs` | XML 解析/构造（ListObjectsV2 / multipart / 错误体）——**命名空间免疫**（LocalName 匹配） | 🔒 internal；畸形响应容错（分页继续、条目跳过） |
 | `ICredentialProvider` / `S3Credentials` / `StaticCredentials` / `EnvironmentCredentials` | 同名文件（一类型一文件） | 凭证三源：静态 / 环境变量（每次重读——外部 STS 刷新生效）/ 自定义 | 每次签名前取当前凭证；STS 会话 token 自动入签 |
 
-**目录形态**：全部平铺本目录（9 文件）——层小不值得子目录；契约类型（`IObjectStore` 族，已按一类型族一文件拆分）在 `../TC.Tier.Core/IO/`（入口文档见 [`../TC.Tier.Core/docs/io.md`](../TC.Tier.Core/docs/io.md)）。
+**目录形态**：全部平铺本目录（10 文件）——层小不值得子目录；契约类型（`IObjectStore` 族，已按一类型族一文件拆分）在 `../TC.Tier.Core/IO/`（入口文档见 [`../TC.Tier.Core/docs/io.md`](../TC.Tier.Core/docs/io.md)）。
 
 ## 2. 正确用法要点
 

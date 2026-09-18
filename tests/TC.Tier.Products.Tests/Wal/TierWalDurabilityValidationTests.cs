@@ -23,7 +23,7 @@ public class TierWalDurabilityValidationTests : IDisposable
 
     private IFileSystem NewVirtual(bool carrierWriteThrough)
     {
-        var vol = Path.Combine(_dir, $"vol-{Guid.NewGuid():N}.raw");
+        var vol = Path.Combine(_dir, $"vol-{Guid.NewGuid():N}.tier");
         var fs = TierFs.New($"virtual:///{vol.Replace('\\', '/')}",
             new TierVolumeFormatOptions { CarrierWriteThrough = carrierWriteThrough });
         _fss.Add(fs);

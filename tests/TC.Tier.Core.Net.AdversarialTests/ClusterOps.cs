@@ -8,6 +8,43 @@ internal static class ClusterOps
     /// <summary>命令载荷（确定性内容）。</summary>
     internal static byte[] Cmd(int i) => System.Text.Encoding.UTF8.GetBytes($"cmd-{i:D4}");
 
+    /// <summary>业务域恰好一次断言：applied 按键升序恰为 cmd-0001..cmd-{count:D4}，无重复无空洞。
+    /// ★ 日志 index ≠ 业务序列——leader 任期锚点条目不达状态机（二期-B，Noop apply 跳过），
+    /// 业务条目自锚点起右移；断言只认业务载荷序列，不认日志 index 连续性。</summary>
+    internal static void AssertAppliedExactlyOnce(AdversarialNode node, int count)
+    {
+        var pairs = node.Machine.Applied.OrderBy(kv => kv.Key).ToArray();
+        pairs.Select(p => p.Key).Should().BeInAscendingOrder("apply 按日志序——键必升序");
+        pairs.Should().HaveCount(count);
+        for (var i = 0; i < count; i++)
+            pairs[i].Value.Should().Equal(Cmd(i + 1));
+    }
+
+    /// <summary>业务域严格递增断言（soak 形态——命令号跨重启段有洞、锚点在键序列留洞）：
+    /// applied 键升序 + 载荷 cmd 号严格递增无重复——命令域的"无洞无重复"真语义。</summary>
+    internal static void AssertAppliedStrictlyAscending(AdversarialNode node)
+    {
+        var pairs = node.Machine.Applied.OrderBy(kv => kv.Key).ToArray();
+        pairs.Should().NotBeEmpty("节点应至少应用一段");
+        pairs.Select(p => p.Key).Should().BeInAscendingOrder("apply 按日志序——键必升序");
+        var last = 0;
+        foreach (var pair in pairs)
+        {
+            var n = CmdNumber(pair.Value);
+            n.Should().BeGreaterThan(last, "业务命令号严格递增（重启续传段/锚点洞两侧均不许重复与回退）");
+            last = n;
+        }
+    }
+
+    /// <summary>解析命令载荷 cmd-N 的业务命令号（非命令形态 = 格式损坏抛）。</summary>
+    internal static int CmdNumber(byte[] payload)
+    {
+        var text = System.Text.Encoding.UTF8.GetString(payload);
+        return text.StartsWith("cmd-", System.StringComparison.Ordinal) && int.TryParse(text[4..], out var n)
+            ? n
+            : throw new FormatException($"载荷非 cmd-N 形态：'{text}'。");
+    }
+
     /// <summary>条件等待（超时抛——取证信息由调用方补充）。</summary>
     internal static async Task WaitForAsync(Func<bool> condition, TimeSpan? timeout = null)
     {

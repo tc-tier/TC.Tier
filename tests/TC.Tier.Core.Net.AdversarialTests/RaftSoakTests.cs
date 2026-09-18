@@ -96,11 +96,11 @@ public abstract class RaftSoakScenarios
         {
             foreach (var n in fx.Nodes)
                 await ClusterOps.WaitForAsync(() => n.Raft.CommitIndex >= committed, TimeSpan.FromSeconds(30));
-            // applied 收敛口径：应用到本节点提交尾（★重启节点 Machine.Applied 只含恢复起点之后的新应用段
-            // ——pipeline 从 store.AppliedIndex 续传不重放，Applied.Count ≠ committed 是正常形态）
+            // applied 收敛口径 = 管道水位追平提交尾（Pipeline.AppliedIndex 跨锚点推进——★二期-B 任期
+            // 锚点不达状态机，Machine.Applied.Keys.Max() 停在最后一条命令，== CommitIndex 在锚点尾
+            // 上恒假；重启节点 Machine.Applied 只含恢复起点之后的新应用段，Count ≠ committed 正常形态）
             await ClusterOps.WaitForAsync(
-                () => fx.Nodes.All(n => !n.Machine.Applied.IsEmpty
-                    && n.Machine.Applied.Keys.Max() == n.Raft.CommitIndex),
+                () => fx.Nodes.All(n => n.Pipeline.AppliedIndex >= n.Raft.CommitIndex),
                 TimeSpan.FromSeconds(30));
         }
         catch (TimeoutException)
@@ -109,19 +109,22 @@ public abstract class RaftSoakScenarios
             {
                 var keys = n.Machine.Applied.Keys.OrderBy(k => k).ToArray();
                 return $"min={(keys.Length > 0 ? keys[0] : -1)} max={(keys.Length > 0 ? keys[^1] : -1)} " +
-                    $"count={keys.Length} commit={n.Raft.CommitIndex} storeApplied={n.Store.AppliedIndex}";
+                    $"count={keys.Length} commit={n.Raft.CommitIndex} pipelineApplied={n.Pipeline.AppliedIndex} " +
+                    $"storeApplied={n.Store.AppliedIndex}";
             }));
             throw new TimeoutException($"[{WireLabel}] soak 收敛失败：committed={committed} applied[{appliedDetail}] "
                 + ClusterOps.Dump(fx.Nodes) + "\n" + ClusterOps.Traces(fx.Nodes));
         }
 
-        // 恰好一次（相对恢复起点）：各节点 applied 键连续无洞无重复 + 尾达 committed
+        // 恰好一次（相对恢复起点）：applied 键升序（★不保证连续——段内任期锚点留 1 洞）+
+        // 业务载荷严格递增无重复（cmd-N 序——命令域的"无洞无重复"真语义）
+        foreach (var n in fx.Nodes)
+            ClusterOps.AssertAppliedStrictlyAscending(n);
+
+        // 应用尾达提交尾（收尾探针 = 命令条目，锚点在其前——末条 applied 键即 committed）
         foreach (var n in fx.Nodes)
         {
             var keys = n.Machine.Applied.Keys.OrderBy(k => k).ToArray();
-            keys.Should().NotBeEmpty($"[{WireLabel}] 节点应至少应用一段");
-            keys.Should().BeEquivalentTo(Enumerable.Range((int)keys[0], keys.Length),
-                $"[{WireLabel}] applied 键连续无洞（重启续传段）");
             keys[^1].Should().Be((int)committed, $"[{WireLabel}] 应用尾达提交尾");
         }
 

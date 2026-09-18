@@ -212,14 +212,21 @@ public sealed partial class CommandGenerator
                 sb.AppendLine($"{indent}if (!{BoundFlag(parameter)}) return __tcsg_results.WriteError(400, \"缺少 query 选项 {parameter.LongName}\");");
         }
 
-        // body：JSON 反序列化（GetTypeInfo 查表非反射——AOT 契约）
+        // body：JSON 反序列化（GetTypeInfo 查表非反射——AOT 契约）。
+        // 查表未命中 / JSON null 绑非可空声明 → 400 回执——消费方 context 注册面跨程序集不可编译期校验，
+        // 裸抛 ArgumentNullException / NRE 会逃出错误映射面成 500
         if (bodyParam is not null)
         {
+            var bodyType = bodyParam.TypeDisplay.Replace("global::", string.Empty);
             sb.AppendLine($"{indent}if (__tcsg_json is null) return __tcsg_results.WriteError(400, \"命令含 body 参数——需 JsonSerializerContext\");");
+            sb.AppendLine($"{indent}var __tcsg_ti = __tcsg_json.GetTypeInfo(typeof({bodyParam.TypeOfDisplay}));");
+            sb.AppendLine($"{indent}if (__tcsg_ti is null) return __tcsg_results.WriteError(400, \"body 类型 {bodyType} 未注册于 JsonSerializerContext（需 [JsonSerializable(typeof({bodyType}))]）\");");
             sb.AppendLine($"{indent}try");
             sb.AppendLine($"{indent}{{");
-            sb.AppendLine($"{indent}    var __tcsg_ti = __tcsg_json.GetTypeInfo(typeof({bodyParam.TypeDisplay}));");
-            sb.AppendLine($"{indent}    {bodyParam.Name} = ({bodyParam.TypeDisplay})global::System.Text.Json.JsonSerializer.Deserialize(__tcsg_request.Body, __tcsg_ti)!;");
+            sb.AppendLine($"{indent}    var __tcsg_deserialized = global::System.Text.Json.JsonSerializer.Deserialize(__tcsg_request.Body, __tcsg_ti);");
+            if (!bodyParam.AllowsNull)
+                sb.AppendLine($"{indent}    if (__tcsg_deserialized is null) return __tcsg_results.WriteError(400, \"body 不能为 null\");");
+            sb.AppendLine($"{indent}    {bodyParam.Name} = ({bodyParam.TypeDisplay})__tcsg_deserialized!;");
             sb.AppendLine($"{indent}}}");
             sb.AppendLine($"{indent}catch (global::System.Text.Json.JsonException __tcsg_ex) {{ return __tcsg_results.WriteError(400, \"body JSON 解析失败: \" + __tcsg_ex.Message); }}");
         }

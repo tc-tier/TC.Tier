@@ -184,9 +184,10 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
             if (argAttr is null && optAttr is null && bodyAttr is null
                 && CommandModel.IsCancellationToken(parameter.Type))
             {
+                var ctDisplay = parameter.Type.ToDisplayString();
                 parameters.Add(new CommandModel.ParamModel(parameter.Name, CommandModel.ParamRole.Arg,
                     CommandModel.BindKind.CancellationToken, CommandModel.BindKind.CancellationToken,
-                    parameter.Type.ToDisplayString(), string.Empty, -1, string.Empty, default,
+                    ctDisplay, ctDisplay, string.Empty, -1, string.Empty, default,
                     false, string.Empty, true, string.Empty, parameter.Locations[0]));
                 continue;
             }
@@ -206,9 +207,10 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
             if (role is null)
             {
                 // 未标注——TCSG056 在 Emit 期报（这里用未标注占位保序）
+                var unannotatedDisplay = type.ToDisplayString();
                 parameters.Add(new CommandModel.ParamModel(parameter.Name, CommandModel.ParamRole.Arg,
                     CommandModel.BindKind.String, CommandModel.BindKind.String,
-                    type.ToDisplayString(), string.Empty, -1, CommandModel.Kebab(parameter.Name),
+                    unannotatedDisplay, unannotatedDisplay, string.Empty, -1, CommandModel.Kebab(parameter.Name),
                     default, parameter.HasExplicitDefaultValue, CommandModel.DefaultExpr(parameter),
                     false, unbindable, parameter.Locations[0]));
                 continue;
@@ -234,8 +236,19 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
                 ? (CommandModel.BindKind.Body, CommandModel.BindKind.Body, string.Empty)
                 : CommandModel.ClassifyParam(type);
 
+            // typeof 查表用显示名——可空引用类型剥尾缀 '?'（typeof(T?) 非法 CS8639），
+            // Nullable<T> 值类型包裹保留（typeof(T?) 合法且查表类型不同）
+            var display = type.ToDisplayString();
+            var typeOfDisplay = display;
+            if (type is INamedTypeSymbol namedType
+                && namedType.OriginalDefinition.SpecialType != SpecialType.System_Nullable_T
+                && display.EndsWith("?", StringComparison.Ordinal))
+            {
+                typeOfDisplay = display.Substring(0, display.Length - 1);
+            }
+
             parameters.Add(new CommandModel.ParamModel(parameter.Name, role.Value, kind, inner,
-                type.ToDisplayString(), enumFqn, position, longName, shortName,
+                display, typeOfDisplay, enumFqn, position, longName, shortName,
                 parameter.HasExplicitDefaultValue, CommandModel.DefaultExpr(parameter),
                 true, unbindable, parameter.Locations[0]));
         }

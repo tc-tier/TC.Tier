@@ -20,13 +20,14 @@
 |--------|-----------|------|
 | `Lifecycle/` | `.Lifecycle` | `ILifecycle<>`, `IRecovery<>`, `RecoveryPhase`, `RecoveryState`, `RecoveryProgress`, `EmptyHints` |
 | `Common/` | `.Common` | `IAsyncOperation`, `IAsyncOperation{TResult}`, `AsyncOperationStatus` |
-| `Storage/` | `.Storage` | `IStorageEngine`, `IStorageInfo`, `ISequentialReader`, `LogicalAddress`, `EngineRecoveryHints`, `IOMode`, `PersistenceMode`, `SnapshotMode`, `ReadDirection`, `CompactStatus`, `CompactResult`, `MagicLocation` |
+| `Storage/` | `.Storage` | `IStorageEngine`, `IStorageInfo`, `ISequentialReader`, `LogicalAddress`, `EngineRecoveryHints`, `SnapshotMode`, `ReadDirection`, `CompactStatus`, `CompactResult`, `MagicLocation` |
 | `Structures/` | `.Structures` | `IRecordStore<>`, `IRecordScanCursor`, `IStructureScanCursor` |
-| `Meta/` | `.Meta` | `IMetaPolicy<,>`, `IMetaLayout<,>`, `IMetaHost`, `IMetaSink`, `MetaPolicyFactory`, `MetaPolicyKind` |
+| `Meta/` | `.Meta` | `IMetaPolicy<,>`, `IMetaLayout<,>`, `IMetaTransport`, `MetaPolicyFactory`, `MetaPolicyKind` |
 | `Transactions/` | `.Transactions` | `ITransactionLog`, `ITransactionParticipant` |
 | `Layout/` | `.Layout` | `RecordFlags`, `RecordMagic`, `Crc32Footer`, `Crc64Footer`（均标 `[BinaryLayout]`，由源生成器产出 `*Codec`） |
+| `Serialization/` | `.Serialization` | `ISpanSerializer`（Span 序列化契约） |
 
-namespace 一律 `TC.Tier.Contracts.{子目录}`。消费方在自己 `GlobalUsings.cs` 一次加全 6 个子命名空间即可。
+namespace 一律 `TC.Tier.Contracts.{子目录}`。消费方在自己 `GlobalUsings.cs` 一次加全 8 个子命名空间即可。
 
 ---
 
@@ -103,8 +104,8 @@ Contracts 的 `Layout/` 与 `Storage/LogicalAddress` 标了 `[BinaryLayout]`，�
 - `RecordMagic`：统一 magic 登记表（`uint32`，落盘 LE，hex dump 读 ASCII 可辨识类型）；新增不能撞值。
 - `Crc32Footer`/`Crc64Footer`：CRC 覆盖范围 = **Header + Payload + padding**（padding 由 `Header.PaddingLength` 定）。
 
-### 5.8 Meta 契约（`Meta/`，演进中）
-- `IMetaHost`（Embedded，只搬字节不算 CRC）/ `IMetaSink`（External，⚠️ 同步方法**禁 sync-over-async**，同步用 Span / 异步用 Memory）。
+### 5.8 Meta 契约（`Meta/`）
+- `IMetaTransport`：策略与存储介质之间的**唯一通道**——写一个完整 meta block / 读回最后一条；传输只搬字节（块格式与 CRC 完全由策略负责），实现决定介质与放置（单槽覆盖/追加倒扫/远程服务……）。
 - `IMetaLayout`/`IMetaPolicy` 统一布局（Header 纯规范，水位归 Payload）。4 个 `IMetaPolicy` 实现在 Runtime（`TC.Tier.Runtime.Meta`）。
 
 ---

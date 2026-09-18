@@ -1053,8 +1053,10 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
                     if (RaftRpcCodec.TryDecode(respBytes, out var rpc) && rpc is JoinResp { Accepted: true })
                     {
                         // 完成条件分流（#441）：autoPromote = 晋级 voter 翻真；learner 永久只读形态 =
-                        // 已入组且配置收敛含自身（活动配置含 learner 角色——永不触发晋级登记）
-                        if (autoPromote ? IsVoter : Config.Contains(_self))
+                        // 复制收敛配置含自身——本地引导配置 [self learner] 恒含自身，不足以证收敛；
+                        // 真实配置（集群成员 + 本端 learner）随复制到达时成员数必然 >1，
+                        // 以此证引导配置已被复制产物替换（Accepted 只代表 leader 已受理，配置提交另序）
+                        if (autoPromote ? IsVoter : Config.Contains(_self) && Config.Count > 1)
                             return;
                     }
                 }

@@ -210,7 +210,7 @@ public class MirrorBaseRecoveryTests
             using var mirror = new WholeMirror(vol.Fs, settings, recovery: scripted);
             mirror.Initialize();
 
-            SpinWait.SpinUntil(() => mirror.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
+            TestWait.Until(() => mirror.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
                 .Should().BeTrue("恢复算法抛出后状态机应进入 Failed");
             mirror.IsReady.Should().BeFalse();
             mirror.RecoveryState.Error.Should().BeOfType<InvalidOperationException>()
@@ -238,13 +238,13 @@ public class MirrorBaseRecoveryTests
             mirror.Initialize();
             mirror.CancelRecovery();
 
-            SpinWait.SpinUntil(() => mirror.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
+            TestWait.Until(() => mirror.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
                 .Should().BeTrue("取消并入 Failed");
             mirror.IsReady.Should().BeFalse();
 
             var retry = () => mirror.Initialize();
             retry.Should().NotThrow();
-            SpinWait.SpinUntil(() => mirror.IsReady, 30000).Should().BeTrue("重试后恢复完成");
+            TestWait.Until(() => mirror.IsReady, 30000).Should().BeTrue("重试后恢复完成");
             scripted.Runs.Should().Be(2, "同一恢复实例被重跑（Reset 语义）");
         }
         finally { vol.Dispose(); }

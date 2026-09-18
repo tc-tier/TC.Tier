@@ -91,7 +91,8 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         ICheckpoint? checkpoint = null,
         ILogger? logger = null,
         ObservabilityHub? hub = null,
-        LightEpoch? epoch = null)
+        LightEpoch? epoch = null,
+        Func<ISegmentHandler, ISegmentHandler>? segmentHandlerDecorator = null)
         : base(logger: logger)
     {
         _options = options ??= StorageEngineOptions.Default;
@@ -142,7 +143,9 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         _epoch = epoch ?? new LightEpoch();
         //   Epoch 用所有权二态：自建 Owned（组释放）/ 注入 Referenced（调用方自管，仅跟踪诊断）。
         Resources.Add(_epoch, ownership: epoch == null ? ResourceOwnership.Owned : ResourceOwnership.Referenced);
-        var segmentHandler = new DefaultSegmentHandler(this);
+        ISegmentHandler segmentHandler = new DefaultSegmentHandler(this);
+        // ★ #420 取证/测试面：handler 装饰器包在默认委托外层（合成建段时序——慢失败等）
+        if (segmentHandlerDecorator is { } decorate) segmentHandler = decorate(segmentHandler);
         _segmentTable = new SegmentTable(_options.ToSegmentTableSettings(), segmentHandler, Logger);
         // ★ DefaultSegmentHandler 无状态（纯委托转发到引擎）——无需释放，不进 Resources
         //   （ResourceGroup 要求 IDisposable，注册即拒——ResourceGroup.Add:72 契约）。

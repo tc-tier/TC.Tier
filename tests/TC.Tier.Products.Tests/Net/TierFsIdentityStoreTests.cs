@@ -64,9 +64,15 @@ public class TierFsIdentityStoreTests
         using (var store = new TierFsIdentityStore(fs, IdPath))
             original = (await store.LoadOrCreateAsync()).Id;
 
-        // 破坏 NodeId 首字节——CRC 随之失配
+        // 破坏 NodeId 首字节——CRC 随之失配（★ 翻转而非写死 0xAB：原值恰为 0xAB 时写死 = 无操作，
+        // 1/256 概率 flake——#464 实证）
         using (var handle = fs.Open(IdPath, new FileOpenOptions { Access = AccessMode.ReadWrite }))
-            handle.Write(5, new byte[] { 0xAB });
+        {
+            var b = new byte[1];
+            _ = handle.Read(5, b);
+            b[0] ^= 0xFF;
+            handle.Write(5, b);
+        }
 
         using var reloaded = new TierFsIdentityStore(fs, IdPath);
         var act = () => reloaded.LoadOrCreateAsync().AsTask();

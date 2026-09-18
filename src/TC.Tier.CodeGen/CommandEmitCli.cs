@@ -359,7 +359,10 @@ public sealed partial class CommandGenerator
                          && parameter.InnerKind == CommandModel.BindKind.String)) init = " = default!";
             else init = " = default";   // 值类型/枚举/可空值类型——零值初始化消 CS0165
             sb.AppendLine($"{indent}{parameter.TypeDisplay} {parameter.Name}{init};");
-            if (NeedsBoundFlag(parameter))
+            // ★ 旗标声明面 = 全部位置参数 ∪ NeedsBoundFlag（#454 残项：带缺省值的位置参数也是槽位
+            //   跟踪单位——槽消费循环按旗标判"已填/未填"，不声明即 CS0103；必选校验面仍只认
+            //   NeedsBoundFlag——带缺省值参数缺席走默认值，不算缺参）
+            if (parameter.Role == CommandModel.ParamRole.Arg || NeedsBoundFlag(parameter))
                 sb.AppendLine($"{indent}bool {BoundFlag(parameter)} = false;");
         }
 
@@ -428,7 +431,9 @@ public sealed partial class CommandGenerator
             EmitParse(sb, indent + "            ", parameter.Kind, parameter.InnerKind, parameter.EnumFqn,
                 parameter.TypeDisplay, "__tcsg_args[__tcsg_pos]", parameter.Name,
                 CliErrBlock($"位置参数 {parameter.Name} 值非法: ", "__tcsg_args[__tcsg_pos]", helpConst));
-            sb.AppendLine($"{indent}            {(NeedsBoundFlag(parameter) ? $"{BoundFlag(parameter)} = true;" : string.Empty)}");
+            // ★ 槽已消耗——旗标无条件置位（全部位置参数都有旗标声明，#454 残项）：可选槽置位后
+            //   后续多余令牌正确落"多余的参数"，不再被未置位的可选槽重复吸收
+            sb.AppendLine($"{indent}            {BoundFlag(parameter)} = true;");
             sb.AppendLine($"{indent}            __tcsg_pos++;");
             sb.AppendLine($"{indent}            continue;");
             sb.AppendLine($"{indent}        }}");
@@ -448,10 +453,15 @@ public sealed partial class CommandGenerator
             sb.AppendLine($"{indent}if (!{BoundFlag(parameter)}) {{ __tcsg_stderr.WriteLine(\"缺少{label}\"); __tcsg_stderr.Write({helpConst}); return 2; }}");
         }
 
-        // body 读取（stdin 全量字节——Unix 惯例，零新选项）
+        // body 读取（stdin 全量字节——Unix 惯例，零新选项）。
+        // 查表未命中在 stdin 读取前拦截（fail-fast 不吞输入流）；JSON null 绑非可空声明 → 语法错误退出——
+        // 消费方 context 注册面跨程序集不可编译期校验，裸抛 ArgumentNullException 会逃出错误回执面
         if (bodyParam is not null)
         {
+            var bodyType = bodyParam.TypeDisplay.Replace("global::", string.Empty);
             sb.AppendLine($"{indent}if (__tcsg_json is null) {{ __tcsg_stderr.WriteLine(\"命令含 body 参数——需经 json 参数传入 JsonSerializerContext\"); return 2; }}");
+            sb.AppendLine($"{indent}var __tcsg_ti = __tcsg_json.GetTypeInfo(typeof({bodyParam.TypeOfDisplay}));");
+            sb.AppendLine($"{indent}if (__tcsg_ti is null) {{ __tcsg_stderr.WriteLine(\"body 类型 {bodyType} 未注册于 JsonSerializerContext（需 [JsonSerializable(typeof({bodyType}))]）\"); return 2; }}");
             sb.AppendLine($"{indent}byte[] __tcsg_bodyBytes;");
             sb.AppendLine($"{indent}using (var __tcsg_stdin = global::System.Console.OpenStandardInput())");
             sb.AppendLine($"{indent}using (var __tcsg_ms = new global::System.IO.MemoryStream())");
@@ -461,8 +471,12 @@ public sealed partial class CommandGenerator
             sb.AppendLine($"{indent}}}");
             sb.AppendLine($"{indent}try");
             sb.AppendLine($"{indent}{{");
-            sb.AppendLine($"{indent}    var __tcsg_ti = __tcsg_json.GetTypeInfo(typeof({bodyParam.TypeDisplay}));");
-            sb.AppendLine($"{indent}    {bodyParam.Name} = ({bodyParam.TypeDisplay})global::System.Text.Json.JsonSerializer.Deserialize(__tcsg_bodyBytes, __tcsg_ti)!;");
+            sb.AppendLine($"{indent}    var __tcsg_deserialized = global::System.Text.Json.JsonSerializer.Deserialize(__tcsg_bodyBytes, __tcsg_ti);");
+            if (!bodyParam.AllowsNull)
+            {
+                sb.AppendLine($"{indent}    if (__tcsg_deserialized is null) {{ __tcsg_stderr.WriteLine(\"body 不能为 null\"); return 2; }}");
+            }
+            sb.AppendLine($"{indent}    {bodyParam.Name} = ({bodyParam.TypeDisplay})__tcsg_deserialized!;");
             sb.AppendLine($"{indent}}}");
             sb.AppendLine($"{indent}catch (global::System.Text.Json.JsonException __tcsg_ex) {{ __tcsg_stderr.WriteLine($\"body JSON 解析失败: {{__tcsg_ex.Message}}\"); return 2; }}");
         }

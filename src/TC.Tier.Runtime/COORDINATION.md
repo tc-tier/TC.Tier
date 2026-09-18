@@ -49,21 +49,21 @@ using var fs = TierFs.New("local:///data/myapp");
 // ② 程序集声明一次封闭形态（[RingKey] 源生成器 → RingOfLong / HashOfLong 等；long 已内置）
 [assembly: RingKey(typeof(long))]
 
-// ③ Create = 构造 + Initialize + WaitForReady 一步到位
-using var ring = RingOfLong.Create(
+// ③ CreateAsync = 构造 + Initialize + WaitForReadyAsync 一步到位
+await using var ring = await RingOfLong.CreateAsync(
     new BlittableRingSettings(new StorageEngineOptions("my-ring")), fs);
 
 // ④ 写读：追加写返回逻辑地址（多线程并发安全）；地址直达取值
 var addr = ring.Write(42L, "hello"u8);
 ring.GetValue(addr, buf);
 
-// ⑤ 崩溃后重开同一卷：Create 内 Initialize 自动恢复（§4.2 三级回退）——零恢复代码
+// ⑤ 崩溃后重开同一卷：CreateAsync 内 Initialize 自动恢复（§4.2 三级回退）——零恢复代码
 ```
 
 **组合 KV**（Ring=真相源，索引=派生——写先真相后派生，读两段合口径）：
 
 ```csharp
-using var index = HashOfLong.Create(fs,
+await using var index = await HashOfLong.CreateAsync(fs,
     new HashIndexSettings(new StorageEngineOptions("my-hash")), keyResolver: ring);
 
 var addr = ring.Write(key, value);                    // 写：① Ring.Write 得地址

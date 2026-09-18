@@ -109,7 +109,7 @@ public class SortedIndexBaseRecoveryTests : IDisposable
             index.Initialize(new SortedIndexRecoveryHints(LogicalAddress.Empty, MakeAddr(100)));
 
             // 消除时序：等恢复失败终态登记后，WaitForReady 的守卫路径才确定性重抛
-            SpinWait.SpinUntil(() => index.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
+            TestWait.Until(() => index.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
                 .Should().BeTrue("fail-fast 应使恢复进入 Failed 终态");
             var act = () => index.WaitForReady();
             act.Should().Throw<InvalidOperationException>()

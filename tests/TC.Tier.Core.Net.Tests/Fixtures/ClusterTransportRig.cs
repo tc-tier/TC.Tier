@@ -37,8 +37,17 @@ public static class ClusterTransportRig
         var highUp = new TaskCompletionSource();
         low.PeerConnected += _ => lowUp.TrySetResult();
         high.PeerConnected += _ => highUp.TrySetResult();
-        await lowUp.Task.WaitAsync(limit);
-        await highUp.Task.WaitAsync(limit);
+        try
+        {
+            await lowUp.Task.WaitAsync(limit);
+            await highUp.Task.WaitAsync(limit);
+        }
+        catch
+        {
+            // setup 失败即收尾（握手等待超时形态）——半建链不外漏（#470：循环线程随套件累积）
+            await DisposeBothAsync(low, high);
+            throw;
+        }
 
         return (low, high, lowId, highId);
     }

@@ -24,7 +24,7 @@ public class TierWalSnapshotStoreTests : IDisposable
 
     private IFileSystem NewVolume()
     {
-        var vol = Path.Combine(_dir, $"vol-{Guid.NewGuid():N}.raw");
+        var vol = Path.Combine(_dir, $"vol-{Guid.NewGuid():N}.tier");
         var fs = TierFs.New($"virtual:///{vol.Replace('\\', '/')}",
             new TierVolumeFormatOptions { CarrierWriteThrough = true });   // ★ 契约① 地板验证：virtual 须载体写穿挂载
         _fss.Add(fs);

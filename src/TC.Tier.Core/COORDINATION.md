@@ -16,9 +16,9 @@
 > - [`docs/priority-queues.md`](docs/priority-queues.md) —— 优先队列族（`BucketPriorityQueue`/`SkipListPriorityQueue`/`AsyncPriorityQueue`，Linux 完整验证；实测见 [docs/perf/priority-queues-performance.md](docs/perf/priority-queues-performance.md)）
 > - [`docs/cache-and-compute.md`](docs/cache-and-compute.md) —— 缓存/弱引用字典/CRC/计时/位运算/异常（`ClockCache`/`ShardLockWeakReference`/`UnifiedCrc`/`MicroTimer`/`Utility`/`ThrowHelper`）
 > - [`docs/native-interop.md`](docs/native-interop.md) —— 原生 syscall facade（`DiskNative`/`FileNative`/`MemoryNative`，IO/预分配/打洞/刷盘/内存锁；★ Core.IO 的内部实现底座，**不对外**——能力已由 Core.IO 全部封口）
-> - [`docs/io.md`](docs/io.md) —— 文件 IO 原语层（`IFileSystem`/`IFileHandle`/`FileHandlePool`/`MemoryFileSystem`/`FaultInjectingFileSystem`，两平面×四介质×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）
-> - [`docs/virtual-file-system.md`](docs/virtual-file-system.md) —— **第四介质 TierVolume**（`TierVolumeFs`：`.tier` 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 [docs/perf/io-performance.md](docs/perf/io-performance.md) §8）
-> - [`../TC.Tier.Core.IO.S3/COORDINATION.md`](../TC.Tier.Core.IO.S3/COORDINATION.md) —— S3 兼容对象存储客户端层（`S3ObjectStore`：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；使用指南 [`../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md`](../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md)）
+> - [`docs/io.md`](docs/io.md) —— 文件 IO 原语层（`IFileSystem`/`IFileHandle`/`FileHandlePool`/`MemoryFileSystem`/`FaultInjectingFileSystem`，两平面×四类文件系统×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）
+> - [`docs/virtual-file-system.md`](docs/virtual-file-system.md) —— **虚拟文件系统 TierVolume**（`TierVolumeFs`：`.tier` 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 [docs/perf/io-performance.md](docs/perf/io-performance.md) §8）
+> - [`../TC.Tier.Core.IO.S3/COORDINATION.md`](../TC.Tier.Core.IO.S3/COORDINATION.md) —— S3 兼容对象存储客户端层（`S3ObjectStore`：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；S3 协议使用指南 [`../TC.Tier.Core.IO.S3/docs/s3-protocol.md`](../TC.Tier.Core.IO.S3/docs/s3-protocol.md)；网络文件系统桥层语义见 [`docs/network-file-system.md`](docs/network-file-system.md)）
 > - [`../TC.Tier.Core.Net/COORDINATION.md`](../TC.Tier.Core.Net/COORDINATION.md) —— 网络与共识层（`IProtocolTransport` 三形态 × 三介质、`RaftStateMachine` 共识引擎、HyParView/Swarm、ClusterBuilder 装配；使用指南 [`../TC.Tier.Core.Net/docs/net.md`](../TC.Tier.Core.Net/docs/net.md)——Net 层的执行/日志/可观测全部消费本层积木）
 > - [`docs/observability.md`](docs/observability.md) —— 可观测（`ObservabilityHub`/`IMetricsSink`/`ITracer`：视图全景/采样/零开销契约/测试场景）
 > - [`docs/logging.md`](docs/logging.md) —— 日志（`ILogger`/`LoggerExtensions`：重载矩阵/热路径规则/与 Hub 的边界）
@@ -59,7 +59,7 @@
 | `ILogger` / `ILoggerFactory` | `Logging/` | 极简日志（去掉 M.E.Logging 的 `TState`/`formatter`）；全 36 重载 null 安全 + `IsEnabled` 短路；`NullLogger` 零开销默认 | 上层注入 factory；用法见 [`docs/logging.md`](docs/logging.md) |
 | `IMetricsSink` | `Metrics/` | 指标三原语 Counter/Histogram/Gauge（`ReadOnlySpan<KeyValuePair>` tags 零分配热路径） | 经 `ObservabilityHub` 视图走，**不直接调** |
 | `ITracer` / `ISpan` | `Tracing/` | 分布式追踪（`AsyncLocal` 父子 span）；`NullTracer` 默认；AOT 友好（无反射/Emit） | `if (TracingEnabled) BeginSpan`；`using` 自动收尾 |
-| `ObservabilityHub` | `Observability/` | **唯一可观测接入点**：聚合 Metrics + Tracing（⚠️ **不含 Logging**），两级短路 + 采样 + 5 维度视图（Metrics/Storage/Log/Index/**SegmentAllocator**） | `ObservabilityHub.Create(sink, tracer, opts)` 或 `Disabled`；完整指南 [`docs/observability.md`](docs/observability.md) |
+| `ObservabilityHub` | `Observability/` | **唯一可观测接入点**：聚合 Metrics + Tracing（⚠️ **不含 Logging**），两级短路 + 采样 + 7 维度视图（Metrics/Storage/Log/Index/**SegmentAllocator**/Net/Raft） | `ObservabilityHub.Create(sink, tracer, opts)` 或 `Disabled`；完整指南 [`docs/observability.md`](docs/observability.md) |
 | **— 高性能工具集（见 §4，全部性能验证过）—** | | | | |
 | `Primitives/` 叶子工具 + `Collections/` 容器 | `Primitives/` · `Collections/` | 异步同步原语 / 原生内存 / 优先队列 / 内存池 / 缓存 / 计时 / CRC——零分配、无锁、池化、硬件加速 | **先查 §4.1 选型表，禁止自己造**。叶子（原生内存/异步同步/计算计时）在 `Primitives/`，容器（队列/缓存/池）在 `Collections/` |
 | **— 核心契约与原语（见 §6）—** | | | |
@@ -211,7 +211,7 @@ var hub0 = ObservabilityHub.Disabled;                               // 零开销
 if (hub.Storage.IsEnabled) {
     using var t = hub.Storage.BeginReadSample();   // MicroTimer，命中采样才计
     /* do read */
-    hub.Storage.OnRead(bytes, t.Microseconds, errorCode);
+    hub.Storage.OnRead(bytes, t.ElapsedMicros(), errorCode);
 }
 using var span = hub.BeginSpan("wal.append", SpanKind.Producer);  // TracingEnabled=false → null
 ```
@@ -245,7 +245,7 @@ using var span = hub.BeginSpan("wal.append", SpanKind.Producer);  // TracingEnab
 | 异步等事件（多 waiter 广播） | `AsyncManualResetEvent` | `ManualResetEventSlim` / `SemaphoreSlim(1,1)` / 手写 TCS 广播 |
 | 等 N 个并行子任务全完成 | `AsyncCountDown` | `CountdownEvent` + `Task.WhenAll`（每次堆分配） |
 | 异步生产-消费队列 | `AsyncQueue` | `Channel` / `BlockingCollection` / `ConcurrentQueue+SemaphoreSlim` |
-| **离散枚举**优先级队列（最快） | `BucketPriorityQueue<TItem,TEnum>` | `PriorityQueue<T,Enum>` + 锁 |
+| **离散枚举**优先级队列（最快） | `BucketPriorityQueue<TPriority,T>` | `PriorityQueue<T,Enum>` + 锁 |
 | **任意 long** 优先级队列 | `SkipListPriorityQueue` | `PriorityQueue<T,long>` + 全局锁 |
 | 极高并发 **lock-free** 优先队列 | `AsyncPriorityQueue` | 手写 lock-free PQ（极易写错） |
 | pinned / 对齐内存池 | `PinnedBufferPool` | `ArrayPool<byte>.Shared`（无 pinned/对齐） |
@@ -285,7 +285,7 @@ using var span = hub.BeginSpan("wal.append", SpanKind.Producer);  // TracingEnab
 - **`UnifiedCrc`**：CRC32C（x86 走 `Sse42.X64.Crc32` 硬件加速 ~1GB/s，ARM 走 `Crc32`，否则软件表）+ CRC64（软件）。支持增量、零拷贝。⚠️ 硬件加速依赖平台；CRC64 实例非线程安全。
 
 ### 4.6 杂项
-- **`ThrowHelper`**：`[DoesNotReturn]` + `NoInlining`，把 throw 隔离出热路径，让调用方法可被 JIT 内联（放在 `namespace System` 便于无 using 使用）。
+- **`ThrowHelper`**：`[DoesNotReturn]` + `NoInlining`，把 throw 隔离出热路径，让调用方法可被 JIT 内联（在 `TC.Tier.Core.Primitives`——经 `GlobalUsings` 全局引入，免 using）。
 - **`ShardLockWeakReference<TKey,TValue>`**：16 分片独立锁（位运算定位），Value 弱引用不阻止 GC。⚠️ shardCount 须 2 的幂；需定期 `CleanupDeadReferences()`。
 - **`Utility`**：位运算/哈希通用工具（`PreviousPowerOf2`、`GetLogBase2` De Bruijn、`XorBytes` 8 字块、Knuth 哈希）、`ParseSize`/`PrettySize`、`MonotonicUpdate`（CAS 单调推进水位，拒回退）。
 

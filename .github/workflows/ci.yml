@@ -11,9 +11,11 @@ jobs:
   build-test-pack:
     strategy:
       fail-fast: false
-      max-parallel: 1   # ★ 双腿串行错峰（2026-09-16 裁定）：win-ci VM 与 pve-ci LXC 同宿 PVE 主机
-                        #   （8 物理核——dev VM 另占 12 vCPU 配额），并行=三方分蛋糕，墙钟阈值
-                        #   测试轮转红（实锤多轮）；串行后任意时刻宿主上只有一条腿在烧。
+      max-parallel: 2   # ★ 双腿并行（2026-09-17 裁定）：两 runner 同宿 PVE（pve-ci LXC +
+                        #   pve-win-ci VM），旧串行口径的实质约束是 #470 泄漏——挂死态单腿
+                        #   968 线程 × 双腿并发 = 线程风暴 + 墙钟阈值轮转红（实锤多轮）；
+                        #   泄漏根修后单腿峰值 ~250 有界，同宿并行裕度已足。判据：本裁定后
+                        #   墙钟阈值红再现 = 回退 max-parallel: 1 的信号，不做白名单隔离。
       matrix:
         # ubuntu 腿走 PVE 自建 runner（pve-ci——6C VM，本地化裕度治理：#424/#426 flaky 族）
         # ★ macOS 腿已移除（2026-09-14 成本裁定：macOS 托管分钟 10× 计价，额度烧穿 #427）——
@@ -22,8 +24,7 @@ jobs:
         # ★ ARM 腿同步移除（2026-09-14 同日裁定）——CI 常设面 = windows/pve-ci 双腿（均 x64）；
         #   ARM（linux-arm64）验证降级为 **main 发布时手动**：按量起 SR1.LARGE8（¥0.51/时，
         #   广州 Ampere Altra 2.8GHz——鲲鹏 MA 官方界面不可购）跑全套测试后销毁（几小时 ≈¥2）
-        # windows 腿走阿里云杭州自建 runner（win-ci——阿里云 ECS e 4C8G Windows Server 2022，
-        #   云助手 + COS 中转装机：#427 托管腿额度烧穿后退役，成本归零）
+        # windows 腿 = PVE 宿上的 Windows VM（runner 名 pve-win-ci，标签 win-ci）
         os: [win-ci, pve-ci]
     runs-on: ${{ matrix.os }}
     steps:
@@ -115,16 +116,13 @@ jobs:
       #   的执行面，§4.1 拆分 + 本裁定；在全部功能套件之后单独执行，不与任何套件并行争抢）。
       #   仅 Linux 腿：Windows 侧 raft/net 对抗家族存量场景环境性失败（本地实锤 dev 干净树
       #   同挂——修复后纳 win 腿）。Core.AdversarialTests（OverflowPool 压测）为本轮新立项目。
-      #   !~FaultMatrix!~RaftSoak 过滤 = #446（复制故障注入收敛族五场景双平台确定性失败——
-      #   dev 既有缺陷非回归，e7669749 干净树复现；修复后移除过滤）。
       - name: Test Adversarial (serial tail)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           for attempt in 1 2; do
             if dotnet test tests/TC.Tier.Core.AdversarialTests/TC.Tier.Core.AdversarialTests.csproj -c Release --no-build --nologo \
-               && dotnet test tests/TC.Tier.Core.Net.AdversarialTests/TC.Tier.Core.Net.AdversarialTests.csproj -c Release --no-build --nologo \
-                  --filter "FullyQualifiedName!~FaultMatrix&FullyQualifiedName!~RaftSoak"; then
+               && dotnet test tests/TC.Tier.Core.Net.AdversarialTests/TC.Tier.Core.Net.AdversarialTests.csproj -c Release --no-build --nologo; then
               exit 0
             fi
             echo "== Test Adversarial 第 $attempt 次失败（对抗时序常态——重试）=="

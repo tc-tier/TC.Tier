@@ -484,10 +484,13 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
                 established = true;
                 await link.RunReceiveAsync(ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
+            catch (Exception ex)
             {
-                Logger?.LogDebug("拨号循环（{Peer}）：{Message}", peer, ex.Message);
+                // ★ 半建链一并收尾（含 OCE 打断在建链形态——Close 幂等）：写循环线程已随
+                //   StartWriteLoop 起线，漏收尾 = 链路未闭 + 专用线程永久泄漏（#470）
                 if (link is not null) await link.DisposeAsync();
+                if (ex is not OperationCanceledException)
+                    Logger?.LogDebug("拨号循环（{Peer}）：{Message}", peer, ex.Message);
             }
 
             delay = established ? _tunables.ReconnectInitialDelay : // 建立过即复位——退避只惩罚连续失败

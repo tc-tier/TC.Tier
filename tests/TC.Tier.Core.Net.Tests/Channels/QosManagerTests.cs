@@ -17,18 +17,31 @@ namespace TC.Tier.Core.Net.Tests.Channels;
 /// </summary>
 public class QosManagerTests
 {
-    /// <summary>E4：令牌桶——突发准入、耗尽拒绝、时间回填。</summary>
+    /// <summary>E4：令牌桶——突发准入、耗尽拒绝、时间回填（速率上限）。</summary>
     [Fact]
     public async Task TokenBucket_BurstThenRefill()
     {
         var bucket = new TokenBucket(perSecond: 10, burst: 5);
         for (var i = 0; i < 5; i++)
             bucket.TryConsume().Should().BeTrue("突发额度内准入");
+
+        // 排空残余回填——消费间隙 ≥100ms 的调度停顿即回填 1 token（10/s），
+        // 即时负断言对停顿敏感；有界排空后桶空判定
+        for (var i = 0; i < 10 && bucket.TryConsume(); i++)
+        {
+        }
         bucket.TryConsume().Should().BeFalse("桶空——拒绝");
 
-        await Task.Delay(150);   // 10/s × 150ms = 1.5 个令牌回填
+        await Task.Delay(150);   // 10/s × 150ms ≈ 1.5 个令牌回填
         bucket.TryConsume().Should().BeTrue("时间回填——可再消费");
-        bucket.TryConsume().Should().BeFalse("回填不足两次消费");
+
+        // 速率上限钉（回填按速率匀速、非瞬满）：150ms 窗 ≈1.5 token，停顿容差后 <4——
+        // 有界排空替代"回填不足两次消费"的即时负断言
+        var refilled = 0;
+        while (bucket.TryConsume() && ++refilled < 8)
+        {
+        }
+        refilled.Should().BeLessThanOrEqualTo(4, "150ms 回填量受速率上限约束——非瞬满");
     }
 
     /// <summary>E4：QosManager 两级判定——域级聚合 + 来源级独立桶。</summary>

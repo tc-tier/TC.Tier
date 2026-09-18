@@ -163,7 +163,9 @@ public sealed class NodeKeyPair : IDisposable
         return compressed;
     }
 
-    private static ECParameters ImportCompressed(ReadOnlySpan<byte> compressed)
+    /// <summary>compressed → ECParameters（解压：X 上曲线求 Y，P-256）。
+    /// 内部可见——测试以独立曲线数学构造角点逐字节对拍（#470 高位零 y 回归缝）。</summary>
+    internal static ECParameters ImportCompressed(ReadOnlySpan<byte> compressed)
     {
         // compressed → 点解压：X 上曲线求 Y（P-256: y² = x³ - 3x + b (mod p)，平方剩余二选一按奇偶位）
         Span<byte> xBytes = stackalloc byte[32];

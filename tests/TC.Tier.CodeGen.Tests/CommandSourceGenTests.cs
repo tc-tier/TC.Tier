@@ -16,6 +16,12 @@ public sealed class RouteSpec
     public string Name { get; set; } = string.Empty;
 }
 
+/// <summary>测试用未注册类型（不进 TestJsonContext——GetTypeInfo 查表未命中面）。</summary>
+public sealed class UnregisteredBody
+{
+    public string Name { get; set; } = string.Empty;
+}
+
 /// <summary>测试用 STJ source-gen 上下文（消费方 [JsonSerializable] 一次收口形态——AOT 契约）。</summary>
 [JsonSerializable(typeof(RouteSpec))]
 internal sealed partial class TestJsonContext : JsonSerializerContext
@@ -65,6 +71,12 @@ public class CommandSourceGenTests
                     return $"spec {level} {spec.Name}";
                 }
 
+                [Command("raw", Description = "未注册 body 类型")]
+                public string Raw([CommandBody] UnregisteredBody raw) => raw.Name;
+
+                [Command("maybe", Description = "可空 body")]
+                public string Maybe([CommandBody] RouteSpec? maybe) => maybe?.Name ?? "none";
+
                 [Command("stat", Description = "统计")]
                 public static long Stat([CommandOption(LongName = "limit")] long limit = 10) => limit;
 
@@ -74,6 +86,13 @@ public class CommandSourceGenTests
                     [CommandArg(1)] string pos,
                     [CommandOption(LongName = "ttl")] int? ttl = null)
                     => $"{key}/{pos}/{ttl?.ToString() ?? "none"}";
+
+                [Command("put", Description = "可选位置参数（#454 残项——带缺省值位置参数的旗标声明）")]
+                public string Put(
+                    [CommandArg(0)] string ns,
+                    [CommandArg(1)] string jobId = "",
+                    [CommandOption(LongName = "ttl")] int? ttl = null)
+                    => $"{ns}/{jobId}/{ttl?.ToString() ?? "none"}";
 
                 public static class Probe
                 {
@@ -144,7 +163,9 @@ public class CommandSourceGenTests
                 MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Console.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Linq.dll")),
             ],
-            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+            // 对齐真实消费面（NRT 启用）——可空 body 声明的注解依赖编译期 Nullable 上下文
+            options: new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary,
+                nullableContextOptions: NullableContextOptions.Enable));
         var driver = CSharpGeneratorDriver.Create(new CommandGenerator());
         driver.RunGeneratorsAndUpdateCompilation(comp, out var output, out var diagnostics);
         return (diagnostics, output);
@@ -172,7 +193,7 @@ public class CommandSourceGenTests
         return (System.Reflection.Assembly.Load(pe.ToArray()), Tcsg(diags));
     }
 
-    private static object InvokeRun(System.Reflection.Assembly asm, params string[] args)
+    private static object InvokeRun(System.Reflection.Assembly asm, System.Text.Json.Serialization.JsonSerializerContext? json, params string[] args)
     {
         var cliType = asm.GetType("Sample.TrafficCommandsCli")!;
         var service = System.Activator.CreateInstance(asm.GetType("Sample.TrafficCommands")!)!;
@@ -182,7 +203,7 @@ public class CommandSourceGenTests
         var parameters = run.GetParameters();
         var inputs = new object?[]
         {
-            args, service, stdout, stderr, TestJsonContext.Default, default(System.Threading.CancellationToken), null,
+            args, service, stdout, stderr, json, default(System.Threading.CancellationToken), null,
         };
         var actual = new object?[parameters.Length];
         for (int i = 0; i < parameters.Length; i++) actual[i] = inputs[i];
@@ -192,7 +213,13 @@ public class CommandSourceGenTests
 
     private static (int Rc, string Out, string Err) RunCli(System.Reflection.Assembly asm, params string[] args)
     {
-        dynamic boxed = InvokeRun(asm, args);
+        dynamic boxed = InvokeRun(asm, TestJsonContext.Default, args);
+        return ((int)boxed.Item1, (string)boxed.Item2, (string)boxed.Item3);
+    }
+
+    private static (int Rc, string Out, string Err) RunCliNoJson(System.Reflection.Assembly asm, params string[] args)
+    {
+        dynamic boxed = InvokeRun(asm, null, args);
         return ((int)boxed.Item1, (string)boxed.Item2, (string)boxed.Item3);
     }
 
@@ -257,6 +284,32 @@ public class CommandSourceGenTests
     }
 
     [Fact]
+    public void Cli_OptionalPositional_DefaultsAndExtraTokens()
+    {
+        var (asm, _) = EmitAssembly(FamilySample);
+
+        // 缺必选位置参数 → 语法错误（缺省值只豁免可选槽）
+        RunCli(asm, "put").Rc.Should().Be(2);
+        // 可选位置参数缺席 → 默认值；在场 → 绑定
+        var a = RunCli(asm, "put", "n");
+        a.Rc.Should().Be(0, a.Err);
+        a.Out.Trim().Should().Be("n//none");
+        var b = RunCli(asm, "put", "n", "j1");
+        b.Rc.Should().Be(0, b.Err);
+        b.Out.Trim().Should().Be("n/j1/none");
+        var c = RunCli(asm, "put", "n", "j1", "--ttl", "5");
+        c.Out.Trim().Should().Be("n/j1/5");
+        // 多余令牌：可选槽消耗后旗标已置位——落"多余的参数"而非重复吸收
+        RunCli(asm, "put", "n", "j1", "extra").Rc.Should().Be(2);
+
+        // HTTP 面：可选位置参数 query 回落
+        var (rcH, stH, bodyH) = InvokeHttp(asm, "POST", "/traffic/put", "ns=n&jobId=j1", Array.Empty<byte>());
+        rcH.Should().Be(0);
+        stH.Should().Be(200);
+        bodyH.Should().Contain("n/j1/none");
+    }
+
+    [Fact]
     public void Cli_ExitCodes_HelpAndSyntaxAndRuntime()
     {
         var (asm, _) = EmitAssembly(FamilySample);
@@ -295,9 +348,29 @@ public class CommandSourceGenTests
     public void Cli_BodyWithoutJson_Exit2()
     {
         var (asm, _) = EmitAssembly(FamilySample);
-        var (rc, _, stderr) = RunCli(asm, "spec", "High");
+        var (rc, _, stderr) = RunCliNoJson(asm, "spec", "High");
         rc.Should().Be(2);
         stderr.ToString().Should().Contain("body");
+    }
+
+    [Fact]
+    public void Cli_BodyEmptyStdin_JsonException_Exit2()
+    {
+        var (asm, _) = EmitAssembly(FamilySample);
+        // json 注入但 stdin 空（测试宿主 EOF）——空输入走 JsonException 语法错误路径
+        var (rc, _, stderr) = RunCli(asm, "spec", "High");
+        rc.Should().Be(2);
+        stderr.ToString().Should().Contain("解析失败");
+    }
+
+    [Fact]
+    public void Cli_BodyTypeNotRegisteredInContext_Exit2()
+    {
+        var (asm, _) = EmitAssembly(FamilySample);
+        // 查表未命中在 stdin 读取前拦截——不经输入流即可观测
+        var (rc, _, stderr) = RunCli(asm, "raw");
+        rc.Should().Be(2);
+        stderr.ToString().Should().Contain("未注册");
     }
 
     [Fact]
@@ -406,6 +479,44 @@ public class CommandSourceGenTests
         // body 解析失败 → 400
         InvokeHttp(asm, "POST", "/traffic/spec", "level=Low",
             System.Text.Encoding.UTF8.GetBytes("{not-json")).Status.Should().Be(400);
+    }
+
+    [Fact]
+    public void Http_BodyTypeNotRegisteredInContext_BadRequest()
+    {
+        var (asm, _) = EmitAssembly(FamilySample);
+        var (rc, status, body) = InvokeHttp(asm, "POST", "/traffic/raw", null,
+            System.Text.Encoding.UTF8.GetBytes("""{"Name":"n1"}"""));
+        rc.Should().Be(0);
+        status.Should().Be(400);
+        body.Should().Contain("未注册");
+    }
+
+    [Fact]
+    public void Http_JsonNullBody_NonNullableBadRequest_NullableBindsNull()
+    {
+        var (asm, _) = EmitAssembly(FamilySample);
+
+        // 非可空声明 body：JSON null → 400 回执（不裸 null 绑定进命令面）
+        var (rc, status, body) = InvokeHttp(asm, "POST", "/traffic/spec", "level=Low",
+            System.Text.Encoding.UTF8.GetBytes("null"));
+        rc.Should().Be(0);
+        status.Should().Be(400);
+        body.Should().Contain("body 不能为 null");
+
+        // 可空声明 body（RouteSpec?）：JSON null 放行 → 命令收到 null
+        var (rc2, status2, body2) = InvokeHttp(asm, "POST", "/traffic/maybe", null,
+            System.Text.Encoding.UTF8.GetBytes("null"));
+        rc2.Should().Be(0);
+        status2.Should().Be(200);
+        body2.Should().Contain("none");
+
+        // 可空声明 + 正常载荷照常绑定
+        var (rc3, status3, body3) = InvokeHttp(asm, "POST", "/traffic/maybe", null,
+            System.Text.Encoding.UTF8.GetBytes("""{"Name":"m1"}"""));
+        rc3.Should().Be(0);
+        status3.Should().Be(200);
+        body3.Should().Contain("m1");
     }
 
     [Fact]

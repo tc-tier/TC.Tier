@@ -162,6 +162,17 @@ public abstract partial class RingBase<TKey>
                 int aligned = (filled + Owner.RingCodec.Alignment - 1) & ~(Owner.RingCodec.Alignment - 1);
                 if (aligned <= 0) aligned = Owner.RingCodec.Alignment;
 
+                // ★ #413：CRC 验收（口径与恢复扫描 ScanPageForRecords 一致）——header 可解析而
+                //   CRC 失配的陈旧帧（池化残留/预分配窗口恢复形态）不得计入；越页垃圾长度同口径重同步。
+                int crcCoverEnd = headerSize + (int)fields.PayloadLength;
+                if (offsetInPage + crcCoverEnd > _pageSize
+                    || !Owner.RingCodec.VerifyCrc(new ReadOnlySpan<byte>((void*)phys, crcCoverEnd),
+                        headerSize, (int)fields.PayloadLength))
+                {
+                    _nextAddress = Owner._engine.CalculationAddress(_nextAddress, Owner.RingCodec.Alignment);
+                    continue;
+                }
+
                 if ((fields.Flags & RecordFlags.FLAG_ENTRY_IS_META) != 0)
                 {
                     _nextAddress = Owner._engine.CalculationAddress(_nextAddress, aligned);

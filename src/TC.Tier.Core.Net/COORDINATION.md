@@ -33,7 +33,7 @@
 |------|------|------|--------|
 | `IProtocolTransport` | `Channels/` | **节点端点完整面**（连接面 `ITransport` × 协议域面 `IProtocol` 合一）——介质无关消费面 | 机制/装配/使用方实际持有的类型；换介质零改代码 |
 | `InProcessTransportHub` / `InProcessNode` | `Transport/InProcess/` | 进程内介质（同构基准/语义参考实现——发送方上下文直排派发；内建注入矩阵） | 单元/契约测试主场、同进程多节点夹具 |
-| TCP 介质（`ClusterTransport`/`PeerLink`） | `Transport/Tcp/` | 🔒 internal——TCP 长连接（三步握手/双优先写队列/读缓冲批拉/保活）。**外部经 `ClusterBuilder` 装配** | 生产跨进程；测试用 `TransportIsomorphismTests` 形态对齐 |
+| TCP 介质（`ClusterTransport`/`PeerLink`） | `Transport/Tcp/` | TCP 长连接（三步握手/双优先写队列/读缓冲批拉/保活）；`ClusterTransport` public（直构可达——探测/benchmark 直连形态），`PeerLink` 🔒 internal——**装配一律走 `ClusterBuilder`** | 生产跨进程；测试用 `TransportIsomorphismTests` 形态对齐 |
 | 数据报（`SendDatagramAsync`） | `Channels/` | 尽力送达：对端未连/未注册/注入丢弃 = 静默；handler 快进快出 | 心跳/探测/可容忍丢失的广播 |
 | 请求回调（`SendRequestAsync`） | `Channels/` | 单请求 → 关联应答 → 超时（CorrId 传输生成）；目标未连抛 `NetIOException`；缺省 at-most-once，`RetryPolicy` 显式升级 at-least-once（重发 + 应答端去重窗口重放） | RPC 形态（raft AppendEntries、块请求） |
 | 流式（`OpenStreamAsync`/`IWireStream`） | `Channels/` | 可靠有序会话 + 背压（写 await 传导）；GB 级 O(单帧) 不驻留；会话不跨重连 | 大块传输（快照安装/备份导出） |
@@ -101,7 +101,7 @@ var resp = await transport.SendRequestAsync(target, MyProtocolId, payload,
 
 ```csharp
 // 发起端
-await using var stream = await transport.OpenStreamAsync(target, MyProtocolId, ct);
+await using var stream = await transport.OpenStreamAsync(target, MyProtocolId, ct: ct);
 await stream.WriteAsync(chunk, ct);        // 每帧可靠有序；await = 背压传导（对端慢则本端等待）
 await stream.CompleteAsync(ct);            // 正常收尾（End 帧）
 
@@ -192,8 +192,9 @@ await using var client = await NetClientBuilder.Create(nodeId)
 var remote = client.RemoteId;                // 握手学得的对端身份
 ```
 
-- **安全档（客户端预设）**：无参 `WithKeyPair()`/`WithMutualTls()` 抛 `NotSupportedException`
-  （fail-closed——不静默降级明文）；带配置的服务端安全档装配见 `net.md` 安全档节。
+- **安全档（客户端预设）**：`WithKeyPair(SecurityOptions)`/`WithMutualTls(...)` 强制档位校验——
+  null/错档配置抛 `ArgumentNullException`/`ArgumentException`（fail-closed——不静默降级明文）；
+  带配置的服务端安全档装配见 `net.md` 安全档节。
 - 拨号归属：成员制 = NodeId 较小方拨号（双向对拨防御）；地址制 = 有地址者拨号。
 
 ---
@@ -223,7 +224,7 @@ var remote = client.RemoteId;                // 握手学得的对端身份
 - **正解**：写 = `ReplicateAsync`/`ReplicateCommittedAsync`；读业务效果走 apply 管道产物。
 
 ### ❌ 反模式 3：机制零件手工构造传输
-- **症状**：`new ClusterTransport(...)`（internal——本就不可达）；或手工拼握手参数。
+- **症状**：`new ClusterTransport(...)` 手工直构（public 可达但绕过装配——选项校验/机制挂载全自担）；或手工拼握手参数。
 - **正解**：`ClusterBuilder`/`NetClientBuilder` 三段式——选项校验 fail-fast、机制按序挂载、
   中途失败自动清理。
 

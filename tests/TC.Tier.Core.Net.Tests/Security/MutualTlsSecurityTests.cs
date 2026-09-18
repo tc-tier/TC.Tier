@@ -15,9 +15,13 @@ namespace TC.Tier.Core.Net.Tests.Security;
 /// 自签 CA + 节点证书（SAN nid 条目）：正确互通（TLS 通道上业务往返）、
 /// 错 SAN 拒（证书身份 ≠ 实际节点）、无客户端证书拒、防降级（mTLS 遇明文）。
 /// </summary>
-public class MutualTlsSecurityTests
+/// <remarks>★ 传输体所有权：Setup 内登记 <see cref="_owned"/>，DisposeAsync 统一收尾——
+/// setup 中途握手等待超时抛出不漏释放（#470：未释放传输体的专用循环线程随套件累积）。</remarks>
+public class MutualTlsSecurityTests : IAsyncDisposable
 {
     private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(5);
+
+    private readonly List<ClusterTransport> _owned = [];
 
     // ══ 测试 PKI（★进程级一次性生成——RSA 2048 证书生成+PFX 是 CPU 密集段，每测生成在
     //   xunit 并行下挤占线程池，把其他测试的超时窗击穿（flaky 判例：混跑随机失败/隔离全绿/
@@ -57,7 +61,7 @@ public class MutualTlsSecurityTests
             return (ca, Issue(PkiLowId, "node-low"), Issue(PkiHighId, "node-high"), Issue(PkiWrongId, "node-high-wrong-san"));
         });
 
-    private static async Task<(ClusterTransport Low, ClusterTransport High, NodeId LowId, NodeId HighId)>
+    private async Task<(ClusterTransport Low, ClusterTransport High, NodeId LowId, NodeId HighId)>
         SetupTlsPairAsync(bool wrongSanHigh = false)
     {
         var (ca, lowCert, highCert, highWrongSan) = CachedPki.Value;
@@ -71,12 +75,14 @@ public class MutualTlsSecurityTests
             TransportOptions.Default(new IPEndPoint(IPAddress.Loopback, 0), knownOfHigh),
             SecurityOptions.MutualTls(actualHighCert, cas));
         high.Start();
+        _owned.Add(high);
         var listenEndPoint = high.LocalEndPoint!;
 
         var low = new ClusterTransport(lowId,
             TransportOptions.Default(null, new Dictionary<NodeId, IPEndPoint> { [highId] = listenEndPoint }),
             SecurityOptions.MutualTls(lowCert, cas));
         low.Start();
+        _owned.Add(low);
 
         if (wrongSanHigh) return (low, high, lowId, highId);   // 错 SAN = 连接永不建立（被测行为）——Setup 不等
         var lowUp = new TaskCompletionSource();
@@ -227,5 +233,17 @@ public class MutualTlsSecurityTests
     {
         public void OnRequest(NodeId from, ReadOnlyMemory<byte> payload, IReplyContext reply)
             => _ = reply.ReplyAsync(payload).AsTask();
+    }
+
+    /// <summary>本测试方法登记传输体的统一收尾（xUnit 每测试方法一个类实例）。</summary>
+    public async ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        foreach (var transport in _owned)
+        {
+            try { await transport.DisposeAsync(); }
+            catch { /* 尽力收尾——单侧失败不阻断余量 */ }
+        }
+        _owned.Clear();
     }
 }

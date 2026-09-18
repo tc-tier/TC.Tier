@@ -64,9 +64,17 @@ internal static class TestRingSettingsFactory
     public static BlittableRing<TKey> NewRing<TKey>(TestVolume vol, BlittableRingSettings settings,
         LightEpoch? epoch = null)
         where TKey : unmanaged, IEquatable<TKey>
+        => NewRing<TKey>(vol, settings, hints: null, epoch);
+
+    /// <summary>带恢复提示的构造形态——hints 随首次 Initialize 生效（★不可先无参初始化再补 hints：
+    /// 生命周期门下二次 Initialize 静默无效，恢复实际走引擎尾回退——#413 flake 根因之一）。</summary>
+    public static BlittableRing<TKey> NewRing<TKey>(TestVolume vol, BlittableRingSettings settings,
+        RingRecoveryHints? hints, LightEpoch? epoch = null)
+        where TKey : unmanaged, IEquatable<TKey>
     {
         var ring = new BlittableRing<TKey>(settings, vol.Fs, epoch: epoch);
-        ring.Initialize();
+        if (hints is { } h) ring.Initialize(h);
+        else ring.Initialize();
         ring.WaitForReady();
         return ring;
     }
