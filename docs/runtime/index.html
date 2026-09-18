@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Index 使用指南——点查 Hash / 有序 BTree / SkipList | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Index 使用指南——点查 Hash / 有序 BTree / SkipList | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/index.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="index-使用指南点查-hash--有序-btree--skiplist">Index 使用指南——点查 Hash / 有序 BTree / SkipList</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要索引（点查/范围/前缀批量删）的 KV 组合开发者
+<strong>回答什么</strong>：HashIndex vs BTreeIndex vs SkipListIndex 怎么选 / Settings 全参数 / KeyResolver 闭环 / 持久化两形态 / 恢复
+<strong>本篇只讲机制</strong>——帧字节布局见源码；性能数字见 <a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a>
+<strong>定位</strong>：Structures/ 6 子族之一，<strong>派生数据</strong>（与 Ring=真相源 组合为 KV）</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>索引 = 派生数据 + KeyResolver 闭环判等 + 自建主存储（PersistenceKind 可关）。</strong></p>
+<ul>
+<li><strong>写编排正序</strong>：先 <code>ring.Write</code> 得地址 → <code>index.Insert</code> 指向；反序 = 索引指向不存在数据。</li>
+<li><strong>两族持久化均为自建主存储</strong>（内置后台 dump + 帧恢复），区别在帧策略——
+Hash 走链 + N 版轮替，Sorted 固定锚点覆写。不配也安全，走全量重放 fail-safe。</li>
+<li><strong>两族不设公共基类</strong>——选族即选消费形态：有序遍历/range scan 选比较族，极省内存点查选探测族。</li>
+</ul>
+<hr>
+<h2 id="1-定位">1. 定位</h2>
+<h3 id="11-派生数据">1.1 派生数据</h3>
+<p>索引是<strong>派生数据</strong>（可重建，存在性 = 优化非正确性）——索引丢失不损数据，只损恢复速度。
+Ring 是数据真相源（record 流），索引是派生数据（可重建）。写编排<strong>正序</strong>：先真相源写、再索引插；
+反向 = 索引指向不存在的数据。读两段合口径：先经索引发现地址，之后永久直达取值（跳过 hash）。</p>
+<h3 id="12-地址一等公民">1.2 地址一等公民</h3>
+<p>16B <code>LogicalAddress</code> 是唯一的取值句柄——先经索引发现地址，之后永久直达取值（跳过 hash）；
+判等/哈希只比较地址本身。地址即句柄：<code>ring.GetValue(addr)</code> 永久零税，无需会话/索引保护。</p>
+<h3 id="13-三选一决策树">1.3 三选一决策树</h3>
+<pre><code>需要有序遍历 / range scan / 前缀批量删？
+├─ 否 → HashIndex（点查为主，内存最省，tag-only 桶不物化 key）
+└─ 是 → 写并发模式与记录尺寸？
+    ├─ 高写并发 + 小记录 → SkipListIndex（无分裂重排，CAS 塔链）
+    └─ 读重 / 大记录 / 紧凑内存 → BTreeIndex（B+树扁平节点缓存全 L3 常驻）
+        └─ 需字节字典序（RocksDB/LMDB 同款范围通用序）→ ByteOrderBTreeIndex
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>选项</th>
+<th>优势</th>
+<th>注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>HashIndex</strong></td>
+<td>tag-only 桶不物化 key，内存最省</td>
+<td>构造必注入 KeyResolver（判等闭环）；无有序遍历</td>
+</tr>
+<tr>
+<td><strong>BTreeIndex</strong></td>
+<td>B+树扁平节点缓存全 L3 常驻（100k 条 ≈ 2.2MB）</td>
+<td>内部操作闸读写全互斥；游标仅 Forward</td>
+</tr>
+<tr>
+<td><strong>SkipListIndex</strong></td>
+<td>无分裂重排（高写并发小记录最优）</td>
+<td>arena 驻留节点（100k 条 ≈ 6.5MB）；游标仅 Forward</td>
+</tr>
+<tr>
+<td><strong>ByteOrderBTreeIndex</strong></td>
+<td>字节字典序范围通用序</td>
+<td>sealed 子类，比较器固定非可注入</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-settings-全参数">2. Settings 全参数</h2>
+<h3 id="21-三-settings-对比">2.1 三 Settings 对比</h3>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>所属</th>
+<th>Hash 默认</th>
+<th>BTree 默认</th>
+<th>SkipList 默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PersistenceKind</code></td>
+<td>基类</td>
+<td><code>Builtin</code></td>
+<td><code>Builtin</code></td>
+<td><code>Builtin</code></td>
+<td><code>None</code>=纯内存+重放；<code>Builtin</code>=自建主存储</td>
+</tr>
+<tr>
+<td><code>PersistencePolicy.Interval</code></td>
+<td>基类</td>
+<td>30s</td>
+<td>30s</td>
+<td>30s</td>
+<td>后台 dump 时间间隔（自上次 dump 起）</td>
+</tr>
+<tr>
+<td><code>PersistencePolicy.EntryDeltaThreshold</code></td>
+<td>基类</td>
+<td>10_000</td>
+<td>10_000</td>
+<td>10_000</td>
+<td>条目增量水位阈值（任一命中触发 dump）</td>
+</tr>
+<tr>
+<td><code>PersistenceKeepVersions</code></td>
+<td>基类</td>
+<td>2</td>
+<td>2</td>
+<td>2</td>
+<td>版本保留数（N 版轮替，对齐 Mirror/Metadata 家族）</td>
+</tr>
+<tr>
+<td><code>HashTableCapacity</code></td>
+<td>Hash 专属</td>
+<td><code>1&lt;&lt;14</code></td>
+<td>—</td>
+<td>—</td>
+<td>哈希表<strong>初始</strong>桶数（2 的幂，超 0.7 自动翻倍增长）</td>
+</tr>
+<tr>
+<td><code>OverflowPoolCapacity</code></td>
+<td>Hash 专属</td>
+<td><code>1&lt;&lt;12</code></td>
+<td>—</td>
+<td>—</td>
+<td>初始溢出池桶数（增长换代新池=新表/2，下限 1024）</td>
+</tr>
+<tr>
+<td><code>NodeSize</code></td>
+<td>BTree 专属</td>
+<td>—</td>
+<td>256</td>
+<td>—</td>
+<td>节点大小（实际取 max(结构体大小, 256, 本值)）</td>
+</tr>
+<tr>
+<td><code>MinFillPercent</code></td>
+<td>BTree 专属</td>
+<td>—</td>
+<td>50</td>
+<td>—</td>
+<td>最小填充率（节点合并触发阈值——百分比）</td>
+</tr>
+<tr>
+<td><code>MaxLevel</code></td>
+<td>SkipList 专属</td>
+<td>—</td>
+<td>—</td>
+<td>16</td>
+<td>塔最大层数（head 哨兵按满层建；几何层分配 p=1/2 封顶）</td>
+</tr>
+<tr>
+<td><code>HighLevelCacheThreshold</code></td>
+<td>SkipList 专属</td>
+<td>—</td>
+<td>—</td>
+<td>8</td>
+<td>高层缓存阈值（≥此值全量内存缓存——塔高层稀疏，代价低）</td>
+</tr>
+<tr>
+<td><code>MaxRetryCount</code></td>
+<td>SkipList 专属</td>
+<td>—</td>
+<td>—</td>
+<td>3</td>
+<td>CAS 插入最大重试次数（塔链竞争失败重试上限）</td>
+</tr>
+<tr>
+<td><code>SafeReclaimDelayMs</code></td>
+<td>SkipList 专属</td>
+<td>—</td>
+<td>—</td>
+<td>1000</td>
+<td>物理回收延迟（ms——等 epoch 退出后回收被删节点）</td>
+</tr>
+<tr>
+<td><code>NodeCacheInitialCapacity</code></td>
+<td>Sorted 基类</td>
+<td>—</td>
+<td>1024</td>
+<td>1024</td>
+<td>节点缓存初始槽位（非上限，按数据量增长至索引量级）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-构造形态">2.2 构造形态</h3>
+<p>三 Settings 均接受 <code>StorageEngineOptions</code> 直构（对齐 <code>BlittableRingSettings</code>/<code>EntryLogSettings</code> 双 ctor 形态）：</p>
+<pre><code class="lang-csharp">var ringSettings    = new BlittableRingSettings(new StorageEngineOptions(&quot;kv-ring&quot;, 64L &lt;&lt; 20));
+var hashSettings    = new HashIndexSettings(new StorageEngineOptions(&quot;kv-hash&quot;, 64L &lt;&lt; 20));
+var btreeSettings   = new BTreeIndexSettings(new StorageEngineOptions(&quot;kv-btree&quot;, 64L &lt;&lt; 20));
+var skipListSettings = new SkipListIndexSettings(new StorageEngineOptions(&quot;kv-skiplist&quot;, 64L &lt;&lt; 20));
+</code></pre>
+<blockquote>
+<p>基类（<code>ProbingIndexSettings</code>/<code>SortedIndexSettings</code>）收持久化机制配置（Kind/Policy/KeepVersions），
+子类只填格式布局参数（对齐 <code>LogBase</code>/<code>RingBase</code>/<code>MirrorBase</code>：机制容器在基类，子类只实现 codec）。
+segment 增长上限固定 1G（<code>AlignmentConst.Alignment1G</code>）。</p>
+</blockquote>
+<hr>
+<h2 id="3-构造与生命周期">3. 构造与生命周期</h2>
+<h3 id="31-ringkey-源生成器">3.1 <code>[RingKey]</code> 源生成器</h3>
+<p>开放泛型（<code>HashIndex&lt;TKey&gt;</code>/<code>BTreeIndex&lt;TKey&gt;</code>/<code>SkipListIndex&lt;TKey&gt;</code>）的构造是 <code>protected internal</code>——
+消费面只经 <code>[RingKey]</code> 生成的<strong>封闭薄类</strong>（编译期封闭 + <code>CreateAsync</code> 工厂）。内置 <code>long</code> 已声明（<code>TC.Tier.Runtime</code>
+程序集），<code>HashOfLong</code>/<code>BTreeOfLong</code>/<code>SkipListOfLong</code> 开箱即用；自定义 Key 在消费程序集加一行：</p>
+<pre><code class="lang-csharp">[assembly: RingKey(typeof(OrderId))]   // 产出 RingOfOrderId / HashOfOrderId / BTreeOfOrderId / SkipListOfOrderId
+</code></pre>
+<h3 id="32-createasync-工厂三索引">3.2 CreateAsync 工厂（三索引）</h3>
+<pre><code class="lang-csharp">using var fs    = TierFs.New(&quot;memory:&quot;);
+await using var ring  = await RingOfLong.CreateAsync(ringSettings, fs);
+await using var hash  = await HashOfLong.CreateAsync(fs, hashSettings, ring);         // KeyResolver=ring（判等闭环必注入）
+await using var btree = await BTreeOfLong.CreateAsync(fs, btreeSettings, ring);       // KeyResolver=ring（恢复重放需要）
+await using var skipl = await SkipListOfLong.CreateAsync(fs, skipListSettings, ring); // KeyResolver=ring（恢复重放需要）
+</code></pre>
+<ul>
+<li><strong>CreateAsync = 构造 + Initialize + WaitForReadyAsync</strong>（一步就绪——<code>LifecycleBase</code> 编排）。</li>
+<li><strong>HashIndex</strong>：<code>KeyResolver</code> <strong>构造期必注入</strong>（tag 命中后回读真 key 校验——判等闭环硬依赖，
+null 抛 <code>ArgumentNullException</code>：&quot;探测族判等闭环强依赖 IKeyResolver&quot;）。</li>
+<li><strong>SortedIndex</strong>：<code>KeyResolver</code> 可选注入——判等不需要（key 物化条目内），恢复重放需要；
+有重放窗口而无 resolver 者，恢复核心 fail-fast：&quot;比较族重放窗口需要 IKeyResolver&quot;。</li>
+<li><code>ByteOrderBTreeIndex&lt;TKey&gt;</code> 是 <code>BTreeIndex&lt;TKey&gt;</code> 的 sealed 子类，内置 <code>KeyByteOrderComparer&lt;TKey&gt;</code>
+（字节字典序——RocksDB/LMDB 同款范围扫描通用序，非可注入，类型语义即排序语义）。</li>
+</ul>
+<h3 id="33-keyresolver-闭环">3.3 KeyResolver 闭环</h3>
+<table>
+<thead>
+<tr>
+<th>族</th>
+<th>判等机制</th>
+<th>KeyResolver 角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HashIndex</td>
+<td>tag 命中后回读真 key 比对（FASTER 判等闭环）</td>
+<td><strong>构造期必注入</strong>——tag 只是加速器，冲突会假阳性</td>
+</tr>
+<tr>
+<td>BTreeIndex</td>
+<td>key 物化条目内，比较即路由</td>
+<td>可选——恢复重放需要（拉流自建节点）</td>
+</tr>
+<tr>
+<td>SkipListIndex</td>
+<td>key 物化条目内，比较即路由</td>
+<td>可选——恢复重放需要（拉流自建节点）</td>
+</tr>
+</tbody>
+</table>
+<p><code>IKeyResolver&lt;TKey&gt;</code> 三方法：</p>
+<ul>
+<li><code>TryGetKey(addr, out key)</code>——按地址读单条 key（false = 读不到/无效地址/record 无效）。</li>
+<li><code>GetFlushedWatermark()</code>——真相源已落盘水位 W（主存储 dump 的 footer 锚点）。</li>
+<li><code>ScanAsync(begin, end, ct)</code>——范围扫描吐 <code>(Key, Address, IsTombstone)</code> 三元组（墓碑感知重放）。</li>
+</ul>
+<h3 id="34-写读-kv-编排">3.4 写读 KV 编排</h3>
+<pre><code class="lang-csharp">// 写编排（正序两步写——先真相源得地址，再索引插指向）
+static LogicalAddress KvPut(RingOfLong ring, IIndex&lt;long&gt; index, long key, ReadOnlySpan&lt;byte&gt; value)
+{
+    var addr = ring.Write(key, value);               // ① 真相源先写，得地址
+    index.Insert(key, addr, LogicalAddress.Empty);   // ② 索引后插（指向该地址）
+    return addr;
+}
+
+// 读编排（两段合口径——索引命中得地址，真相源按址取值）
+static bool KvTryGet(RingOfLong ring, IIndex&lt;long&gt; index, long key, Span&lt;byte&gt; buf, out int len)
+{
+    len = 0;
+    var addr = index.Find(key);               // ① 索引命中得地址
+    if (addr == LogicalAddress.Empty) return false;
+    len = ring.GetValue(addr, buf);           // ② 真相源按址取值
+    return true;
+}
+
+// 批量读（EnterScope——一批一进出，零逐查 epoch 进出开销 ~10ns/op）
+using var scope = index.EnterScope();
+Span&lt;long&gt; addrs = stackalloc long[64];
+index.FindBatch(keys, addrs);                // 批量点查（同一轮 epoch 内完成）
+for (int i = 0; i &lt; keys.Length; i++)
+    if (addrs[i] != LogicalAddress.Empty)
+        ring.GetValue(addrs[i], buf);
+</code></pre>
+<blockquote>
+<p>终态读形态（批量最快）：<code>index.EnterScope()</code> 一批一进出 + <code>IndexScope.Find</code> + <code>Ring.GetValueSpan</code>
+（零拷贝切片——仅同步栈内合法；跨 await 必须走拷贝 API）。</p>
+</blockquote>
+<hr>
+<h2 id="4-api-详表">4. API 详表</h2>
+<h3 id="41-iindextkey-五成员最小协议">4.1 IIndex&lt;TKey&gt; 五成员最小协议</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>签名</th>
+<th>返回 / 语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Find</code></td>
+<td><code>LogicalAddress Find(TKey key)</code></td>
+<td>命中 = value 逻辑地址；<code>Empty</code> = 不存在</td>
+</tr>
+<tr>
+<td><code>Insert</code></td>
+<td><code>LogicalAddress Insert(TKey key, LogicalAddress valueAddress, LogicalAddress beginAddress)</code></td>
+<td>同 key 覆写 value 不增计数；返回插入后地址</td>
+</tr>
+<tr>
+<td><code>Delete</code></td>
+<td><code>bool Delete(TKey key)</code></td>
+<td>true = 真删到；false = 不存在</td>
+</tr>
+<tr>
+<td><code>EntryCount</code></td>
+<td><code>long EntryCount { get; }</code></td>
+<td>条目数（写者维护——O(1)）</td>
+</tr>
+<tr>
+<td><code>IndexSize</code></td>
+<td><code>long IndexSize { get; }</code></td>
+<td>索引内存占用估算（字节）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>beginAddress</code> 参数：探测下限地址（重放路径约定）——槽内旧条目地址小于它视为陈旧，可覆写落位。
+Sorted 族插入不消费此参数（保留接口对称）。</p>
+</blockquote>
+<h3 id="42-两族共有扩展-api">4.2 两族共有扩展 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BeginAddress</code></td>
+<td><code>LogicalAddress BeginAddress { get; }</code></td>
+<td>探测/结构起始地址（引擎 MinAddress）</td>
+</tr>
+<tr>
+<td><code>EnterScope</code></td>
+<td><code>IndexScope EnterScope()</code></td>
+<td>读保护 scope（ref struct——创建即 Resume epoch，Dispose 即 Suspend）</td>
+</tr>
+<tr>
+<td><code>IndexScope.Find</code></td>
+<td><code>LogicalAddress Find(TKey key)</code></td>
+<td>scope 内单查（走 <code>FindNoEpoch</code>——省逐次 epoch 进出 ~10ns/op）</td>
+</tr>
+<tr>
+<td><code>FindBatch</code></td>
+<td><code>void FindBatch(ReadOnlySpan&lt;TKey&gt; keys, Span&lt;LogicalAddress&gt; results)</code></td>
+<td>批量点查（同一轮 epoch 内完成——零逐查 Resume/Suspend 开销）</td>
+</tr>
+<tr>
+<td><code>EnterEpoch</code> / <code>ExitEpoch</code></td>
+<td><code>void EnterEpoch()</code> / <code>void ExitEpoch()</code></td>
+<td>epoch 读保护协议（<code>IEpochProtected</code>——Session 读 scope 聚合入口转发）</td>
+</tr>
+<tr>
+<td><code>CheckpointFrame</code></td>
+<td><code>bool CheckpointFrame()</code></td>
+<td>显式帧落盘（公开检查点触发口——语义同内部 <code>TryDump</code>）</td>
+</tr>
+<tr>
+<td><code>MainStorageAppliedLastRecovery</code></td>
+<td><code>bool { get; }</code></td>
+<td>诊断位：上次恢复是否走了主存储载入路径（false = 全量重放 fail-safe）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-hashindex-专属-api">4.3 HashIndex 专属 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GrowIndex</code></td>
+<td><code>void GrowIndex()</code></td>
+<td>扩容（装载超 0.7 由 Insert 自动触发——函数式换代表，均摊 O(1)/插）</td>
+</tr>
+<tr>
+<td><code>DiagDumpBucketRaw</code></td>
+<td><code>internal string DiagDumpBucketRaw(TKey key)</code></td>
+<td>诊断：dump 某 key 所在桶全部原始槽位（排障用）</td>
+</tr>
+<tr>
+<td><code>DiagScanKeyAllSlots</code></td>
+<td><code>internal string[] DiagScanKeyAllSlots(TKey key)</code></td>
+<td>诊断：全表扫描收集某 key 的全部实体（幽灵实体定位——O(全表)）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>HashIndex 内核：128B <code>HashBucket</code>（8 槽 × 16B <code>LogicalAddress</code>）、表+溢出池同代原子对 <code>InternalHashTable</code>、
+条带写锁（64 条——Insert/Delete 按 hash 低位分条带）+ 溢出链条带锁（16 条）。
+槽稳定读协议：16B <code>LogicalAddress</code> 普通读可能撕裂——双读比对一致才接受，不一致走 CAS 环读兜底。</p>
+</blockquote>
+<h3 id="44-sortedindex-专属-api">4.4 SortedIndex 专属 API</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CreateScanCursor</code></td>
+<td><code>IIndexScanCursor&lt;TKey&gt; CreateScanCursor(ReadDirection direction)</code></td>
+<td>有序遍历游标（<strong>仅 Forward</strong>——叶链/层 0 链单向，Backward 显式抛 <code>NotSupportedException</code>）</td>
+</tr>
+<tr>
+<td><code>TryGetMax</code></td>
+<td><code>bool TryGetMax(out TKey key, out LogicalAddress value)</code></td>
+<td>键序最大条目（Latest 语义——时序/版本链&quot;最新点查&quot;），O(log n)</td>
+</tr>
+<tr>
+<td><code>TryGetFloor</code></td>
+<td><code>bool TryGetFloor(TKey key, out TKey floorKey, out LogicalAddress value)</code></td>
+<td>键序 ≤ key 的最大条目（floor/前驱语义——Prometheus @ 采样/前驱点查），O(log n)</td>
+</tr>
+<tr>
+<td><code>TruncatePrefix</code></td>
+<td><code>long TruncatePrefix(TKey boundExclusive)</code></td>
+<td>键序前缀批量删（删除全部 key &lt; bound 的条目——retention trim 专用，批量 O(覆盖区)）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>BTreeIndex 内核：160B <code>BTreeNode</code>（9 槽定长 <code>(TKey, LogicalAddress)</code> + <code>Next</code> 叶链指针 + 叶/根标志位）。
+SkipListIndex 内核：arena 驻留变长节点（32B 头 + 16B×实际层高），addr→指针缓存（零结构拷贝下降）。
+操作闸（<code>MonitorScope</code>）：全部公开操作（读/写/游标单步/后台 dump）经内部<strong>操作闸</strong>互斥——
+单操作粒度全互斥，结构自保证任意并发组合安全。粒度 = 单操作（游标 = 单步推进），长扫描经逐步持闸与写者交错。</p>
+</blockquote>
+<h3 id="45-iindexscancursortkey-游标">4.5 IIndexScanCursor&lt;TKey&gt; 游标</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CurrentKey</code></td>
+<td><code>TKey CurrentKey { get; }</code></td>
+<td>当前条目的 key（从 RecordStore 读回真 key，非占位符）</td>
+</tr>
+<tr>
+<td><code>CurrentValue</code></td>
+<td><code>LogicalAddress CurrentValue { get; }</code></td>
+<td>当前条目的 value 逻辑地址（指向 record）</td>
+</tr>
+<tr>
+<td><code>SeekLowerBound</code></td>
+<td><code>bool SeekLowerBound(TKey key)</code></td>
+<td>定位到首个 key ≥ key 的条目（lower_bound；可在迭代前或迭代中调用）</td>
+</tr>
+<tr>
+<td><code>MoveNext</code></td>
+<td><code>bool MoveNext()</code></td>
+<td>推进到下一条目（操作闸单步粒度——与写者交错；首次调用定位起点）</td>
+</tr>
+<tr>
+<td><code>MoveNextAsync</code></td>
+<td><code>ValueTask&lt;bool&gt; MoveNextAsync(CancellationToken ct)</code></td>
+<td>异步推进（同步委托 MoveNext——无真异步 IO）</td>
+</tr>
+<tr>
+<td><code>Dispose</code> / <code>DisposeAsync</code></td>
+<td><code>void Dispose()</code> / <code>ValueTask DisposeAsync()</code></td>
+<td>释放游标（幂等——游标不持有页资源，仅置标记）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>范围查询 [from, to) = <code>SeekLowerBound(from)</code> + 逐条 <code>MoveNext</code> 推进至 key ≥ to 停（无需从头跳过被略键）。
+BTree 游标：最左叶定位 + 叶链 <code>Next</code> 前向推进 + 跨空叶（删除不重平衡可留 Count=0 的叶）。
+SkipList 游标：层 0 链前向推进 + lower_bound 塔链定位。</p>
+</blockquote>
+<hr>
+<h2 id="5-自定义注入工厂">5. 自定义注入工厂</h2>
+<table>
+<thead>
+<tr>
+<th>注入点</th>
+<th>接口</th>
+<th>必填</th>
+<th>用途</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>KeyResolver</td>
+<td><code>IKeyResolver&lt;TKey&gt;</code></td>
+<td>Hash 必填 / Sorted 可选</td>
+<td><strong>判等闭环核心</strong>——Hash tag 命中后回读 Ring 拿 key 比对；两族恢复拉流重放</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>KeyComparer</td>
+<td><code>IKeyComparer&lt;TKey&gt;</code></td>
+<td>可选（默认 <code>KeyComparer&lt;TKey&gt;</code> 全字段判等）</td>
+<td>哈希/比较路由；Hash 点查 latest 版本语义可注入版本无关比较器</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Codec</td>
+<td><code>IProbingIndexCodec</code> / <code>ISortedIndexCodec</code></td>
+<td>族私有（子类内置单例）</td>
+<td>主存储帧格式（magic/version/kind/字段布局/CRC 偏移）——<strong>禁跨族共用</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>PersistenceKind</td>
+<td><code>ProbingIndexPersistenceKind</code> / <code>SortedIndexPersistenceKind</code></td>
+<td>默认 <code>Builtin</code></td>
+<td><code>None</code>=纯内存+重放；<code>Builtin</code>=自建主存储</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>PersistencePolicy</td>
+<td><code>ProbingIndexPersistencePolicy</code> / <code>SortedIndexPersistencePolicy</code></td>
+<td>默认 30s / 10k 条目</td>
+<td>后台 dump 触发策略（时间间隔 / 条目增量水位阈值，任一命中）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>RecoveryHints</td>
+<td><code>ProbingIndexRecoveryHints</code> / <code>SortedIndexRecoveryHints</code></td>
+<td>经 <code>Initialize(hints)</code> 注入</td>
+<td>重放窗口 [Begin, End)——组合层锚点 W</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>Epoch</td>
+<td><code>LightEpoch</code></td>
+<td>可选（null=索引自建并持有）</td>
+<td>读保护（<code>IEpochProtected</code>——Session 读 scope 聚合入口）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td>ITransactionParticipant</td>
+<td>显式实现（六件套）</td>
+<td>内置</td>
+<td>2PC：Prepare / ConfirmCommitted / OnCommitted / Abort</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>IKeyResolver 闭环</strong>：<code>TryGetKey(addr, out key)</code> 按 address 回读真 key（Hash 判等）；<code>GetFlushedWatermark()</code>
+返回已落盘水位 W（主存储 dump footer 锚点——组合层契约：Insert 先于落盘、失败回滚，已落盘必已入索引）；
+<code>ScanAsync(begin, end, ct)</code> 异步迭代器流式回源（冷区真异步 IO 不阻塞，墓碑感知）。</p>
+<p><strong>ISortedIndexCodec / IProbingIndexCodec 契约律</strong>（对齐 <code>ILogCodec</code>）：基类只管机制（帧走链/CRC 总验收/体长定界），
+格式知识（magic/version/kind/字段布局）全在实现侧——接口只传机制需要的原始值，不暴露任何具体格式类型。</p>
+<p><strong>ITransactionParticipant 六件套</strong>（显式实现）：<code>Prepare(seq)</code> / <code>PrepareAsync(seq, ct)</code> /
+<code>ConfirmCommitted(seq)</code> / <code>OnCommitted(seq, callback)</code> / <code>Abort(seq)</code> / <code>AbortAsync(seq, ct)</code>。
+协调器 = <code>Transactions/TransactionLog</code>（写独立 commit record 文件驱动）；上层编排归 Session（<a href="session.html"><code>session.md</code></a>）。</p>
+</blockquote>
+<h3 id="51-recoveryhints-注入">5.1 RecoveryHints 注入</h3>
+<pre><code class="lang-csharp">// 组合层职责：恢复 Ring 后从 opaque 取锚点 W，连同 Ring 尾注入 index 恢复窗口
+var opaque = ring.ReadOpaqueMeta();                              // opaque 容器（ReadOnlySpan——同步栈内消费）
+//   W 由组合层自行编解码（如 8B LogicalAddress 编码在容器内）；IsEmpty = 无锚点/损坏
+var begin  = DecodeW(opaque, ring.BeginAddress);                 // 无锚点 → W = BeginAddress（宁可旧多重放）
+var end    = ring.TailAddress;                                   // Ring 尾（半开区间不含）
+var hints  = new ProbingIndexRecoveryHints(begin, end);          // [Begin, End) 重放窗口
+hash.Initialize(hints);                                         // 注入恢复窗口
+await hash.WaitForReadyAsync(ct);                                // 等恢复完成（载帧物化或重放）
+
+// 每次 dump/重放后更新锚点：CheckpointFrame 落帧 → W 编码进 opaque（随 meta 写原子落盘）
+hash.CheckpointFrame();                                          // 显式帧落盘（W = ring 已落盘水位）
+ring.SetOpaqueMeta(EncodeW(watermark));                          // 更新 opaque 锚点 W（ReadOnlySpan&lt;byte&gt;）
+</code></pre>
+<blockquote>
+<p><code>HasReplayWindow</code> = <code>End &gt; Begin</code> 才重放（默认 default hints = Empty/Empty = 不重放，空结构首开）。
+W = Begin 走同一条 <code>ScanAsync</code> 路径——降级全量重建不是第二条路。</p>
+</blockquote>
+<hr>
+<h2 id="6-持久化机制两族对比">6. 持久化机制（两族对比）</h2>
+<p>两族均<strong>自建主存储</strong>（内置后台 dump worker + 帧恢复载入），区别在帧策略：</p>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>HashIndex</th>
+<th>SortedIndex（BTree/SkipList）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>帧定位</td>
+<td><strong>帧走链</strong>——从 MinAddress 前向逐帧扫描选最新完整帧</td>
+<td><strong>固定锚点</strong>——首开预留 84B 锚点槽（MinAddress），dump 覆写</td>
+</tr>
+<tr>
+<td>版本管理</td>
+<td>N 版轮替（<code>PersistenceKeepVersions</code>，<code>ReclaimHead</code> 回收最老帧）</td>
+<td>单帧覆写（帧长固定，无版本链需求）</td>
+</tr>
+<tr>
+<td>帧体内容</td>
+<td>几何 32B + 桶区 size×128B + 溢出池 ofbCap×128B（fuzzy 逐槽原子读拷贝）</td>
+<td>几何 32B（root/head 指针 + 计数 + structSize）——节点本就写时持久化在引擎内</td>
+</tr>
+<tr>
+<td>物化</td>
+<td>整读体重建表+溢出池 → 重数实收（fuzzy 帧内混入条目以实收为准）</td>
+<td>设根 + 引擎读回根节点 → 计数（recountNeeded 时全树/全链实收）</td>
+</tr>
+<tr>
+<td>dump 与写并发</td>
+<td>fuzzy 一致性（128bit 原子读拷贝，跳 Tentative 只收 Occupied；换代 stale-but-valid）</td>
+<td>操作闸全互斥（脏节点延迟写回——插入/分裂路径零引擎写，dump 时批量写回）</td>
+</tr>
+<tr>
+<td>后台触发</td>
+<td><code>BackgroundWorkerLoop</code>（1s 轮询粒度，到点按策略判定）</td>
+<td>同左</td>
+</tr>
+<tr>
+<td>帧格式</td>
+<td>三段式 <code>[头][体][尾]</code>——头先行校验、体自定界、尾总验收</td>
+<td>同左（codec 族私有）</td>
+</tr>
+<tr>
+<td>关闭</td>
+<td><code>PersistenceKind=None</code> = 纯内存 + Ring 全量重放</td>
+<td>同左</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>不配也安全</strong>——<code>PersistenceKind=None</code> 走全量重放 fail-safe（恢复核心三级回退兜底）。
+<strong>帧格式</strong>（自校验三段式，对齐段表同款理由——写入的是外部存储就不完全相信）：</p>
+<ul>
+<li>头（先行校验，快速失败）：magic/version/flags/kind + 体长——不符立即判无效，不读体。</li>
+<li>体（自定界）：结构内容由族自己的几何块推出边界。</li>
+<li>尾（总验收）：footerMagic + 水位 W + CRC64（覆盖头+体+尾前缀）——有效性最终裁决。</li>
+</ul>
+<p><strong>W = <code>IKeyResolver.GetFlushedWatermark()</code></strong>（已落盘水位——组合层契约：Insert 先于落盘、失败回滚，
+已落盘必已入索引；在途 = 未落盘 = 崩溃即失）。调用 <code>CheckpointFrame</code> 前须先落盘真相源（如 Ring FlushUntil(Tail)）。</p>
+<p><strong>HashIndex fuzzy 一致性</strong>（FASTERKV 同构）：逐槽 128bit 原子读拷贝（槽 = <code>LogicalAddress</code> 16B 原子单元，零撕裂）</p>
+<ul>
+<li>跳 Tentative 只收 Occupied + 换代 stale-but-valid（dump 期间 GrowIndex 照常）。正确性靠组合一致性底座：
+dump 表覆盖 [?, W] 完整折叠；&gt; W 混入条目靠重放 (W, End] 幂等收敛或恢复后 ring 裁决惰性失效。</li>
+</ul>
+<p>SortedIndex 节点即数据教义**：节点写时持久化在自持引擎（节点变更即 <code>WriteNodeContent</code> 记脏标记，
+dump 时批量写回引擎——插入/分裂路径零引擎写）。物化只需设根 + 引擎读回根节点，零逐节点流。</p>
+<p><strong>BTreeIndex 脏节点延迟写回</strong>：<code>_dirtyNodes</code> 地址集（只存地址 16B/项——值快照版 240B×n 超 L3 污染点查，已销案）；
+写回从缓存取值——不变式：每次 <code>WriteNodeContent</code> 前节点必已入缓存（<code>RefreshCache</code>/根特例 <code>_cachedRoot</code>），
+读路径 miss = 从未变更 = 引擎内容最新，无需脏兜底。崩溃窗口（dump 前）由恢复重放 (W, End] 修复——
+W = 上次 dump 水位，重放补齐全部变更，引擎旧链无害。</p>
+<p><strong>SkipListIndex arena 驻留</strong>：变长非托管块（32B 头 + 16B×实际层高）——工作集从 288B/节点 压到均值 ~64B/节点
+（100k 条 28.8MB→~6.5MB，L3 常驻）；块只增不搬移 = 指针恒稳。addr→指针缓存（<code>LogicalAddressMap&lt;nint&gt;</code>，
+8B 值）——跳一跳 = 探测+指针直访，零结构拷贝。几何层分配 p=1/2 封顶 <code>MaxLevel</code>，与插入时间/条目数解耦。</p>
+</blockquote>
+<hr>
+<h2 id="7-恢复协议">7. 恢复协议</h2>
+<h3 id="71-三级回退统一生命周期">7.1 三级回退（统一生命周期）</h3>
+<pre><code>① hints（组合层最强知识）——重放窗口 [Begin, End)
+② 主存储最新完整帧（载入物化 + 重放 (W, End]）——Hash 帧走链 / Sorted 固定锚点
+③ 建空结构 + Ring 全量重放兜底（W=Begin 走同一条 ScanAsync 路径）
+</code></pre>
+<p>每级失败自动降级到下一级——恢复不变量不变（索引 = 派生数据，重建数据面 = 真相源 record 流）。</p>
+<h3 id="72-锚点-w-协议">7.2 锚点 W 协议</h3>
+<pre><code>① Ring.Create → 恢复水位；锚点 W = ring.ReadOpaqueMeta()
+   （无锚点 / 损坏 / W 越过当前尾 → 回退 BeginAddress——宁可旧多重放）
+② index.Initialize(hints) → hints.Begin = W, hints.End = ring.TailAddress
+③ 主存储帧有效且 W∈[Begin,End] → 载帧物化 + 只重放 (W, End)
+   无帧 / 损坏 / W 越界 → 建空结构 + 全量重放 [Begin, End)
+④ 每次 dump/重放后 ring.SetOpaqueMeta(W) 即可
+</code></pre>
+<h3 id="73-重放核心">7.3 重放核心</h3>
+<p>恢复核心拉 <code>KeyResolver.ScanAsync(W, End)</code> 流逐条处理：</p>
+<ul>
+<li>普通记录 → <code>Insert(key, addr, LogicalAddress.Empty)</code>（同 key 覆写——流序折叠 = 最新写胜出）。</li>
+<li>墓碑记录 → <code>Delete(key)</code>（已删 key 不复活；窗口内旧 put 先插后删收敛）。</li>
+</ul>
+<blockquote>
+<p>Sorted 族锚点槽预留（<code>EnsureAnchorReserved</code>）：首开空引擎 = 第一个分配（MinAddress，节点分配自然在其后）；
+重开 = 旧锚点原位（MinAddress 恒为锚点——节点 <code>ReclaimTail</code> 不动 MinAddress）。</p>
+<p>Hash 族帧走链（<code>ScanFrames</code>）：从引擎 MinAddress 起，头（magic/version/kind）+ 帧长推导 + 尾 magic + CRC 总验收；
+写中断的尾帧 CRC 不过即停——最新完整帧 = 最后一个通过验收的帧。账本同时重建（轮替用）。</p>
+<p>恢复全程经 <code>LifecycleBase</code> 模板编排（<code>RecoveryBase</code> 派生——只填恢复算法钩子，
+底层生命周期骨架是压测背书的信任边界，结构层只填钩子）。详见 <a href="meta.html"><code>meta.md</code></a>（opaque 搭车）与
+<a href="storage-engine.html"><code>storage-engine.md</code></a>（引擎恢复）。</p>
+</blockquote>
+<hr>
+<h2 id="8-反模式">8. 反模式</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果 / 正解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>写编排反序</strong>：先 <code>index.Insert</code> 再 <code>ring.Write</code></td>
+<td>索引指向不存在的数据——必须先真相源写再索引插</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>增长后检查索引阈值</strong></td>
+<td>增长必须在<strong>插入之前</strong>检查（增长时刻表内条目必可经 KeyResolver 解析）</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>跨实例组合 <code>DeleteOnClose=true</code></strong></td>
+<td>跨重启组合必须 <code>DeleteOnClose=false</code>（否则索引重建时真相源被清）</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>绕过 KeyResolver 判等</strong></td>
+<td>Hash tag 冲突静默错误——tag 只是加速器，命中后必读回真 key 校验</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>为 Sorted 手搭 checkpoint 引擎/存储</strong></td>
+<td>内置自建主存储（<code>CheckpointFrame</code>）——无需自搭</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>BTree/SkipList 游标传 Backward</strong></td>
+<td>叶链/层 0 链单向——<code>NotSupportedException</code>；倒序经 <code>TryGetMax</code>/<code>TryGetFloor</code> 组合</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>SortedIndex 重放窗口不注入 KeyResolver</strong></td>
+<td>恢复核心 fail-fast——构造期须注入（判等不需要，重放需要）</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>给地址直达读加会话/索引</strong></td>
+<td>地址即句柄——<code>ring.GetValue(addr)</code> 永久零税（<a href="ring.html"><code>ring.md</code></a>）</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>零拷贝 span 跨 await</strong></td>
+<td><code>GetValueSpan</code> 返回值仅同步栈内合法——跨 await 走拷贝 API（<code>TryGetValue</code>/<code>GetValue</code>）</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>绕过 <code>[RingKey]</code> 直接继承开放泛型</strong></td>
+<td>封闭薄类是唯一消费面（外部直接 new = CS0122）</td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>dump 前未落盘真相源</strong></td>
+<td>W = 已落盘水位——调用 <code>CheckpointFrame</code> 前须先 <code>ring.FlushUntil(Tail)</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-想深入指路">9. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>总览（七种结构速查 + KV 组合三步上手）</td>
+<td><a href="structures.html"><code>structures.md</code></a></td>
+</tr>
+<tr>
+<td>Ring 真相源（写读/水位/截断/快照/内容自愈读）</td>
+<td><a href="ring.html"><code>ring.md</code></a></td>
+</tr>
+<tr>
+<td>Log WAL（组提交与回放/单写者）</td>
+<td><a href="log.html"><code>log.md</code></a></td>
+</tr>
+<tr>
+<td>meta 统一协议（opaque 搭车/块格式/锚点 W）</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+</tr>
+<tr>
+<td>Session 协调协议（写/读/检查点三 op、悬挂裁决）</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+</tr>
+<tr>
+<td>引擎使用（读写/水位/恢复/Compact）</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a></td>
+</tr>
+<tr>
+<td>镜像/快照（WholeMirror/StreamSnapshot 基线形态）</td>
+<td><a href="mirror.html"><code>mirror.md</code></a> / <a href="snapshot.html"><code>snapshot.md</code></a></td>
+</tr>
+<tr>
+<td>版本链元数据（跨重启单值状态）</td>
+<td><a href="versioned-metadata.html"><code>versioned-metadata.md</code></a></td>
+</tr>
+<tr>
+<td>性能基线（点查/写/恢复/并发扩展）</td>
+<td><a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a></td>
+</tr>
+<tr>
+<td>帧格式/主存储机制/恢复细节</td>
+<td>源码注释（<code>Structures/ProbingIndex/</code> + <code>Structures/SortedIndex/</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>机制级细节（帧字节布局、dump 协议内部状态机、环防御阈值 <code>MaxDescentPath</code>、
+槽稳定读双读比对协议、arena 驻留节点偏移契约）按需从源码与设计稿查阅——
+使用面不需要这些细节；能力全集以类型 XML 注释为准。</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/index.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

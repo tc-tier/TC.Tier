@@ -95,8 +95,8 @@
 复现：</p>
 <pre><code class="lang-bash">dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*FileIoBenchmarks*&quot; --job short   # 本地文件系统/抽象税
 dotnet run --project benchmarks/TC.Tier.Core.Benchmarks -c Release -- --filter &quot;*TierVolumeIo*&quot;                            # Virtual 六维（16 项）
-dotnet run --project prototypes/IoMediumMatrixProbe -c Release                                                      # 四类文件系统矩阵（含 MinIO）
-dotnet run --project prototypes/IoConcurrencyProbe -c Release                                                       # 并发扩展性（5 形态 × 梯度）
+dotnet run --project probes/IoMediumMatrixProbe -c Release                                                      # 四类文件系统矩阵（含 MinIO）
+dotnet run --project probes/IoConcurrencyProbe -c Release                                                       # 并发扩展性（5 形态 × 梯度）
 </code></pre>
 <p><strong>配套</strong>：API 语义见 <a href="../io.html">io.md</a>；虚拟文件系统深指南 <a href="../virtual-file-system.html">virtual-file-system.md</a>。</p>
 </blockquote>
@@ -361,7 +361,7 @@ dotnet run --project prototypes/IoConcurrencyProbe -c Release                   
 <h2 id="7-网络文件系统remotefilesystem--minio-本机实测2026-08-19">7. 网络文件系统（RemoteFileSystem × MinIO 本机实测——2026-08-19）</h2>
 <blockquote>
 <p>环境：本机 docker <code>minio/minio</code>（loopback 网络，RTT &lt; 1ms）——量化<strong>桥层成本结构</strong>（staging/Flush 编排/读缓存）；
-真云 WAN 数字见 §7.3 COS 对照。探针 <code>prototypes/IoMediumMatrixProbe</code>（与 §9 矩阵同源）。</p>
+真云 WAN 数字见 §7.3 COS 对照。探针 <code>probes/IoMediumMatrixProbe</code>（与 §9 矩阵同源）。</p>
 </blockquote>
 <h3 id="71-元数据面与数据面minio-loopback">7.1 元数据面与数据面（MinIO loopback）</h3>
 <table>
@@ -606,7 +606,7 @@ Open/Stat/枚举是纯内存操作零 syscall；Disk 每次 Open = open(2) + fst
 </tbody>
 </table>
 <hr>
-<h2 id="9-四类文件系统横向矩阵2026-08-19-空闲机实测prototypesiomediummatrixprobe">9. 四类文件系统横向矩阵（2026-08-19 空闲机实测——<code>prototypes/IoMediumMatrixProbe</code>）</h2>
+<h2 id="9-四类文件系统横向矩阵2026-08-19-空闲机实测probesiomediummatrixprobe">9. 四类文件系统横向矩阵（2026-08-19 空闲机实测——<code>probes/IoMediumMatrixProbe</code>）</h2>
 <blockquote>
 <p>同一套形态跑遍四类文件系统（本地 ext4 / 内存 Sparse / 虚拟文件载体 / 网络 MinIO loopback）——
 本地三类文件系统<strong>数据面全带内持平</strong>（差异在元数据面与一致性语义）；网络文件系统是另一个物理世界（网络往返）。</p>
@@ -741,7 +741,7 @@ Remote 26-40ms（对象版本粒度）——持久化粒度与成本单调对应
 </tbody>
 </table>
 <hr>
-<h2 id="10-并发与扩展性四类文件系统--5-负载形态--1-16-线程梯度prototypesioconcurrencyprobe">10. 并发与扩展性（四类文件系统 × 5 负载形态 × 1-16 线程梯度——<code>prototypes/IoConcurrencyProbe</code>）</h2>
+<h2 id="10-并发与扩展性四类文件系统--5-负载形态--1-16-线程梯度probesioconcurrencyprobe">10. 并发与扩展性（四类文件系统 × 5 负载形态 × 1-16 线程梯度——<code>probes/IoConcurrencyProbe</code>）</h2>
 <blockquote>
 <p>2026-08-19 空闲窗实测（12 核，两轮复跑格局一致）。读维为<strong>每线程独立句柄</strong>（引擎读池形态——
 单句柄多线程读不在 <code>IFileHandle</code> 契约内：Remote 读句柄缓存非线程安全，Mem/Disk/Virtual 单句柄
@@ -1063,7 +1063,7 @@ Virtual 写路径锁分段 / Mem Reserved 追加快道（Grow 换租）/ Sparse 
 <li><strong>迭代间重置</strong>：追加维每 op 删建文件（<code>IterationSetup</code>）——否则预分配 × 迭代数打满卷（DiskFull 假阴性）。</li>
 <li><strong>空闲机终判 ±5%</strong>：共享机负载波动 3× 时数字失真（Disk 自身可退化 100×）；正式结论 load &lt; 1.2 实测。</li>
 <li><strong>fsync 维沉降</strong>：前序基准的内核回写积压会污染 fsync 段（单 inode fsync 付全部积压 vs 多 inode 的测量不对称）。</li>
-<li><strong>探针 vs BDN</strong>：探针（DiskVsVirtualProbe）快速肉眼对照；正式数字走 BDN（进程隔离 + 预热 + 多轮）。</li>
+<li><strong>探针 vs BDN</strong>：探针（DiskVsRawProbe）快速肉眼对照；正式数字走 BDN（进程隔离 + 预热 + 多轮）。</li>
 </ol>
 <h2 id="12-已知边界">12. 已知边界</h2>
 <ul>

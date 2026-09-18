@@ -344,7 +344,10 @@ engine.ReclaimHead(consumedUpTo);
 <pre><code class="lang-csharp">var builder = new StorageEngineOptions(&quot;eng&quot;, segmentGrowthLimit: 4096).WithFaults().Builder(fs);
 var dev = builder.Start();
 dev.WaitForReady();
-var faults = builder.Engine.Faults;      // IStorageEngineFaultInjector?（开启后非 null）
+var faults = builder.Engine.Faults;      // IStorageEngineFaultInjector?（开启后非 null；
+                                         // StorageEngine 与 Builder.Engine 均 internal——
+                                         // 经 InternalsVisibleTo 的测试项目可达；外部消费方
+                                         // 在文件系统缝用 Core 的 FaultInjectingFileSystem）
 
 faults!.FailOn(&quot;Append&quot;, IOError.DiskFull, atCallIndex: 2);   // op 级失败——语义码透传
 faults!.DelayOn(&quot;Flush&quot;, TimeSpan.FromMilliseconds(80));      // op 级慢——watchdog/有界等待触发器

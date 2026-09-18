@@ -105,7 +105,7 @@ using var h = fs.Open(&quot;docs/hello.txt&quot;, new FileOpenOptions
     Mode = FileOpenMode.OpenOrCreate,
     Sharing = FileSharing.ReadWrite,
 });
-h.Write(0, &quot;hello, raw medium&quot;u8);
+h.Write(0, &quot;hello, virtual medium&quot;u8);
 h.Flush();
 </code></pre>
 <hr>
@@ -206,11 +206,6 @@ WRITE_THROUGH 写穿档（IS-03 同机制）；扇区经 <code>GetDiskFreeSpace<
 <td>false</td>
 <td>载体句柄写穿档（IS-03）：载体以 FILE_FLAG_WRITE_THROUGH/O_SYNC 打开——每写完成即达稳定存储；journal 提交免独立 fsync（写穿完成即单屏障），Flush 对已写穿数据短路。与句柄级 <code>FileOpenHints.WriteThrough</code>（逐写 journal 提交）正交</td>
 </tr>
-<tr>
-<td><code>Label</code></td>
-<td>&quot;&quot;</td>
-<td>卷标签（≤32B UTF-8）</td>
-</tr>
 </tbody>
 </table>
 <ul>
@@ -238,9 +233,9 @@ public static TierVolumeFs Open(TierVolumeCarrier?[] carriers, TierVolumeOpenOpt
 </thead>
 <tbody>
 <tr>
-<td><code>ReadOnly</code></td>
-<td>false</td>
-<td>只读打开；写意图操作抛 <code>IOError.ReadOnlyVolume</code></td>
+<td><code>Access</code>（基类三态）</td>
+<td>ReadWrite</td>
+<td><code>Read</code> = 只读打开（写意图抛 <code>IOError.ReadOnlyVolume</code>）；<code>ReadWrite</code> = 缺省；<code>Write</code> = 纯摄入——虚拟卷无此概念，Open 即拒</td>
 </tr>
 <tr>
 <td><code>PageCacheBytes</code></td>
@@ -328,8 +323,8 @@ h.Lock(off, len, FileLockMode.Exclusive);   // 进程内逻辑范围锁（单实
 h.TryLock(off, len, mode);
 h.Unlock(off, len);
 
-using var view = h.Map(offset, length, MapAccess.ReadWrite);  // MMF 直映射（文件载体；
-                                                             // 单连续区间文件零拷贝；碎片文件自动物化）
+using var view = h.Map(offset, length, AccessMode.ReadWrite);  // MMF 直映射（文件载体；
+                                                              // 单连续区间文件零拷贝；碎片文件自动物化）
 h.Advise(FileAdvise.Sequential);            // 纯流式读档（见 §4.3）
 </code></pre>
 <h3 id="35-卷几何精确">3.5 卷几何（精确）</h3>
@@ -454,7 +449,7 @@ RootSpaceImage.Transfer(sourceFs, targetFs);
 <hr>
 <h2 id="8-能力位capabilities">8. 能力位（Capabilities）</h2>
 <p>TierVolume 置位（对照 Disk 全对齐 + 6 增强）：</p>
-<p><code>Sparse</code>（内部恒真）· <code>RandomWrite</code> · <code>EmptyDirectories</code> · <code>DurableRename</code> · <code>AtomicDirectoryMove</code>（<strong>增强</strong>：实例内元数据事务，不依赖 OS）· <code>ExclusiveLock</code>（<strong>增强</strong>：内建）· <code>RangeLock</code>（<strong>增强</strong>：进程内逻辑锁）· <code>RangeShift</code>（<strong>增强</strong>：全平台）· <code>ContiguousCapture</code> · <code>MaintenanceGate</code> · <code>CopyRange</code> · <code>VectorIO</code> · <code>DirectIO</code> · <code>Advise</code> · <code>WriteThrough</code> · <code>FlushDataOnly</code> · <code>Mmap</code>（文件载体；设备诚实不置位）· <code>Volume</code> 几何精确（<strong>增强</strong>）。</p>
+<p><code>Sparse</code>（内部恒真）· <code>RandomWrite</code> · <code>EmptyDirectories</code> · <code>DurableRename</code> · <code>AtomicDirectoryMove</code>（<strong>增强</strong>：实例内元数据事务，不依赖 OS）· <code>ExclusiveLock</code>（<strong>增强</strong>：内建）· <code>RangeLock</code>（<strong>增强</strong>：进程内逻辑锁）· <code>RangeShift</code>（<strong>增强</strong>：全平台）· <code>ContiguousCapture</code> · <code>MaintenanceGate</code> · <code>CopyRange</code> · <code>VectorIO</code> · <code>DirectIO</code> · <code>Advise</code> · <code>WriteThrough</code> · <code>FlushDataOnly</code> · <code>Mmap</code>（文件载体；设备诚实不置位）。卷几何精确（superblock+位图推导）经 <code>fs.Volume</code> 读面提供——是读面非能力位。</p>
 <p>消费方<strong>按能力位决策</strong>，不要按文件系统硬编码——这是四类文件系统平权的机械保证。</p>
 <hr>
 <h2 id="9-错误码速查">9. 错误码速查</h2>
@@ -537,8 +532,9 @@ RootSpaceImage.Transfer(sourceFs, targetFs);
 h.Advise(FileAdvise.Sequential);                 // 纯流式：无页机制、无预取交互
 </code></pre>
 <p><strong>配方 C：备份到 S3 再恢复</strong></p>
-<pre><code class="lang-csharp">var remote = new RemoteFileSystem(/* s3 options */);
-RootSpaceImage.Transfer(rawFs, remote);          // 结构化管线（TCA1 + Zstd 压缩）
+<pre><code class="lang-csharp">using var store = S3ObjectStore.Create(/* s3 options */);
+using var remote = RemoteFileSystem.OpenOrCreate(store);   // 桥构造动词见 network-file-system.md §1
+RootSpaceImage.Transfer(volumeFs, remote);       // 结构化管线（TCA1 + Zstd 压缩）
 // 灾备：Transfer(remote, TierVolumeFs.New(TierVolumeCarrier.File(&quot;/restore.tier&quot;), ...))
 </code></pre>
 <p><strong>配方 D：在线扩容不打断服务</strong></p>
@@ -549,7 +545,7 @@ RootSpaceImage.Transfer(rawFs, remote);          // 结构化管线（TCA1 + Zst
 <ul>
 <li>契约测试族 <code>tests/TC.Tier.Core.Tests/IO/TierVolume/</code>（1:1 跟源文件走）；</li>
 <li>性能基准 <code>benchmarks/TC.Tier.Core.Benchmarks/IO/TierVolumeIoBenchmarks.cs</code>（<code>dotnet run -c Release -- --filter *TierVolumeIo*</code>）；</li>
-<li>探针 <code>prototypes/DiskVsRawProbe/</code>（快速肉眼对照）；</li>
+<li>探针 <code>probes/DiskVsRawProbe/</code>（快速肉眼对照）；</li>
 <li>数字与验收线见 <a href="perf/io-performance.html">perf/io-performance.md</a>。</li>
 </ul>
 

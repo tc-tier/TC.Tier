@@ -97,41 +97,169 @@
 <li><strong>项目类型</strong>：普通 <code>net8.0</code> 类库（不是 analyzer、不是生成器）。</li>
 <li><strong>依赖</strong>：<strong>无</strong>（零 ProjectReference、零 PackageReference）——这是它在依赖链最底端的根本原因。</li>
 <li><strong>namespace</strong>：<code>TC.Tier.CodeGen</code>（⚠️ 特殊：项目名是 <code>...CodeGen.Abstractions</code>，但 namespace 用 <code>TC.Tier.CodeGen</code>——为对齐源生成器的 FQN 识别，消费方 <code>global using TC.Tier.CodeGen;</code> 即用）。</li>
-<li><strong>内容</strong>：6 个特性（<code>[BinaryLayout]</code> + <code>[Valid*]</code> 族），是源生成器 <code>TC.Tier.CodeGen</code> 识别特性的&quot;形状定义&quot;。</li>
+<li><strong>内容</strong>：21 个文件——生成器识别的全部标注/契约（<code>[BinaryLayout]</code> + <code>[Valid*]</code> 校验族 + RingKey/KvStore/WireMessage/WireArray/ConstantRegistry/协议注册桥/命令壳族），是源生成器 <code>TC.Tier.CodeGen</code> 识别标注的&quot;形状定义&quot;。</li>
 </ul>
 <hr>
-<h2 id="2-文件清单6-个特性">2. 文件清单（6 个特性）</h2>
+<h2 id="2-文件清单按生成器分组">2. 文件清单（按生成器分组）</h2>
 <table>
 <thead>
 <tr>
 <th>文件</th>
 <th>内容</th>
+<th></th>
+<th></th>
 </tr>
 </thead>
 <tbody>
 <tr>
+<td><strong>BinaryLayout 族</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
 <td><code>BinaryLayoutAttribute.cs</code></td>
 <td><code>[BinaryLayout(Features = BinaryLayoutFeatures.*)]</code>——标记 <code>[StructLayout]</code> struct 触发生成 <code>XxxCodec</code></td>
+<td></td>
+<td></td>
 </tr>
 <tr>
 <td><code>BinaryLayoutFeatures.cs</code></td>
 <td>生成开关 flags：<code>StructSize</code> / <code>FieldConstants</code> / <code>FieldReaders</code> / <code>FieldWriters</code></td>
+<td></td>
+<td></td>
 </tr>
 <tr>
 <td><code>LayoutValidationAttributes.cs</code></td>
 <td><code>[ValidEquals(const)]</code>（== 常量，Magic/Version/Flags）——字段校验族基类</td>
+<td></td>
+<td></td>
 </tr>
 <tr>
 <td><code>ValidHasFlagsAttribute.cs</code></td>
 <td><code>[ValidHasFlags(mask)]</code>——位掩码包含基线位</td>
+<td></td>
+<td></td>
 </tr>
 <tr>
 <td><code>ValidNonDefaultAttribute.cs</code></td>
 <td><code>[ValidNonDefault]</code>——字段非默认零值</td>
+<td></td>
+<td></td>
 </tr>
 <tr>
 <td><code>ValidRangeAttribute.cs</code></td>
 <td><code>[ValidRange(min,max)]</code>——字段在区间内（PayloadLength 等）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>RingKey / KvStore 族</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>RingKeyAttribute.cs</code></td>
+<td><code>[assembly: RingKey(typeof(TKey))]</code>——封闭 Ring/索引薄类源生成入口</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>KvStoreAttribute.cs</code></td>
+<td><code>[assembly: KvStore(...)]</code>——KV 组合存储源生成入口</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><strong>Wire 格式族</strong></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>WireMessageAttribute.cs</code></td>
+<td><code>[WireMessage]</code>——RPC 消息族线格式标注</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>WireArrayAttribute.cs</code></td>
+<td><code>[WireArray]</code>——变长集合字段标注（[Count][item×N]）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><strong>协议注册桥</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>ProtocolRegistrationAttributes.cs</code></td>
+<td>协议程序集（如 S3）自动注册 TierFs 介质协议的标注</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><strong>命令壳族（CommandShell）</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommandGroupAttribute.cs</code></td>
+<td><code>[CommandGroup]</code>——命令组（嵌套命名空间）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommandAttribute.cs</code></td>
+<td><code>[Command]</code>——命令方法标注</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommandArgAttribute.cs</code> / <code>CommandOptionAttribute.cs</code> / <code>CommandBodyAttribute.cs</code></td>
+<td>位置参数 / 具名选项 / 管道 body 标注</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommandErrorAttribute.cs</code></td>
+<td><code>[CommandError]</code>——异常 → 退出码/状态码映射</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommandResults.cs</code></td>
+<td><code>ICommandResults</code>——结果渲染器契约</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommandHttp.cs</code></td>
+<td><code>CommandHttpResponse</code>——HTTP 结果纯数据载体（Status/ContentType/Body）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><strong>杂项</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>ConstantRegistryAttribute.cs</code></td>
+<td><code>[ConstantRegistry]</code>——常量表注册（重复值编译期 Error）</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>IsExternalInit.cs</code></td>
+<td>record/init 支持（netstandard/net8.0 消费面）</td>
+<td></td>
 </tr>
 </tbody>
 </table>
@@ -208,7 +336,7 @@ internal struct MyHeader
 <ul>
 <li>标记点的 struct <strong>必须</strong> 同时有 <code>[StructLayout(LayoutKind.Explicit, Size = N)]</code>——<code>Size</code> 必须准确（否则 TCSG001）。</li>
 <li>嵌套 struct 字段必须也标 <code>[BinaryLayout]</code>（否则 TCSG002）。</li>
-<li><strong>谁会标记</strong>：当前标记点在 <code>TC.Tier.Contracts</code>（<code>LogicalAddress</code> / <code>Crc32Footer</code> / <code>Crc64Footer</code> / <code>RecordFlags</code>）；<code>TC.Tier.Core</code> 自身零 <code>[BinaryLayout]</code>。新增布局 struct 放 Contracts 并标记即可。</li>
+<li><strong>谁会标记</strong>：当前标记点分布在 <code>TC.Tier.Contracts</code>（<code>LogicalAddress</code> / <code>Crc32Footer</code> / <code>Crc64Footer</code> / <code>RecordFlags</code>）与 <code>TC.Tier.Core</code>（<code>TierVolumeFrameLayouts</code>——TierVolume 帧布局族）。新增布局 struct 就近放所属程序集并标记即可。</li>
 <li><strong>验证生成生效</strong>：编译后查 <code>obj/.../generated/TC.Tier.CodeGen/TC.Tier.CodeGen.BinaryLayoutGenerator/*.g.cs</code> 有产物；缺失说明消费项目的 Analyzer 引用（<code>TC.Tier.CodeGen</code> 以 <code>OutputItemType=Analyzer</code> 引用）未配置。</li>
 </ul>
 <hr>

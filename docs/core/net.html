@@ -387,7 +387,7 @@ endpoint.RegisterRequestHandler(MyProtocolId, new MyHandler());
 </code></pre>
 <h3 id="42-流式会话">4.2 流式会话</h3>
 <pre><code class="lang-csharp">// 发起端
-await using (var stream = await endpoint.OpenStreamAsync(target, MyProtocolId, ct))
+await using (var stream = await endpoint.OpenStreamAsync(target, MyProtocolId, ct: ct))
 {
     foreach (var chunk in chunks)
         await stream.WriteAsync(chunk, ct);      // await = 背压（对端慢则本端等待）
@@ -397,8 +397,8 @@ await using (var stream = await endpoint.OpenStreamAsync(target, MyProtocolId, c
 // 接受端（OnStream 回调里起消费循环——循环任务由使用方管理，如经 Core TaskSink 受控提交）
 public sealed class MyAcceptor : IStreamAcceptor
 {
-    public void OnStream(NodeId from, IWireStream stream)
-        =&gt; ConsumeAsync(stream);             // 你的消费循环入口
+    public void OnStream(NodeId from, IWireStream stream, ReadOnlyMemory&lt;byte&gt; openPayload)
+        =&gt; ConsumeAsync(stream);             // 你的消费循环入口（openPayload = 开流载荷）
     private async Task ConsumeAsync(IWireStream s)
     {
         await using (s)

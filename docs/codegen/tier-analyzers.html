@@ -88,8 +88,8 @@
 <h1 id="tier-分析器tcsg130-139声明驱动的编译期纪律封堵">Tier 分析器（TCSG130-139）——声明驱动的编译期纪律封堵</h1>
 
 <p>把仓库工程纪律写成 <code>.editorconfig</code> 声明，编译期直接报错：分层依赖方向、禁用线程原语、
-禁反射、禁同步阻塞、禁 fire-and-forget 丢弃。<strong>零默认诊断——声明即启用</strong>：不在
-<code>.editorconfig</code> 声明规则的工程，分析器完全沉默。</p>
+禁反射、禁同步阻塞、禁 fire-and-forget 丢弃。<strong>零默认诊断——声明即启用</strong>：不声明规则的
+工程，分析器完全沉默。</p>
 <h2 id="快速上手">快速上手</h2>
 <p>三行 <code>.editorconfig</code> 声明 + 严重级配置，纪律即生效：</p>
 <pre><code class="lang-ini"># 全局节：规则声明（tier_layer.* / tier_forbidden.* 键）
@@ -105,6 +105,33 @@ dotnet_diagnostic.TCSG130.severity = none
 </code></pre>
 <p>之后凡引用方向违规 / 裸 <code>new Thread</code> / 反射调用 / <code>.Result</code> 阻塞 / <code>_ = Task.Run(...)</code> 丢弃，
 编译直接红——不需要任何运行时检查或 code review 约定。</p>
+<h2 id="配置读数通道editorconfig--globalconfig-双通道">配置读数通道（.editorconfig / .globalconfig 双通道）</h2>
+<p>规则键两个通道都收，<strong>跨通道同键异值 = TCSG139 fail-fast</strong>（绝静默取一）：</p>
+<table>
+<thead>
+<tr>
+<th>通道</th>
+<th>键落点</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>.editorconfig</code>（含无节全局区/路径节）</td>
+<td>per-tree options → 分析器全树并集</td>
+<td>日常推荐——版本随仓、按目录分级</td>
+</tr>
+<tr>
+<td><code>.globalconfig</code>（<code>is_global = true</code>）</td>
+<td>GlobalOptions</td>
+<td>消费方不想要仓库 editorconfig、或 CI 需要显式单文件注入时</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>治理键声明<strong>全树一致</strong>是契约：同一键在不同源出现不同值即配置冲突报错；同值多源声明合法（单份执法）。</li>
+<li><code>dotnet_diagnostic.*</code> 严重级键走标准 Roslyn 通道，不受上述合并语义约束。</li>
+</ul>
 <h2 id="规则清单">规则清单</h2>
 <h3 id="分层依赖族tcsg130-133tier_layer-键声明">分层依赖族（TCSG130-133，<code>tier_layer.*</code> 键声明）</h3>
 <table>
@@ -134,6 +161,13 @@ dotnet_diagnostic.TCSG130.severity = none
 </tbody>
 </table>
 <p>声明语法：<code>tier_layer.forbidden_reference = &lt;源命名空间&gt; =&gt; &lt;禁止目标&gt; [| 更多目标] ; 分号分隔多条</code>。</p>
+<p>白名单扩展键：<code>tier_layer.allowed_framework_prefix = &lt;前缀1&gt; | &lt;前缀2&gt;</code>——在缺省框架豁免集
+（System / Microsoft / netstandard / mscorlib）之外追加豁免前缀。典型两例：</p>
+<pre><code class="lang-ini"># 生态包前缀（本家族程序集不构成&quot;越界依赖&quot;）
+tier_layer.allowed_framework_prefix = TC.Tier.
+# Windows SDK 侧隐式框架程序集（不在 System.*/Microsoft.* 自动豁免内）
+tier_layer.allowed_framework_prefix = TC.Tier. | WindowsBase
+</code></pre>
 <h3 id="禁用模式族tcsg134-138tier_forbiddenpack-键声明-选择启用">禁用模式族（TCSG134-138，<code>tier_forbidden.pack</code> 键声明，<code>|</code> 选择启用）</h3>
 <table>
 <thead>
@@ -171,12 +205,12 @@ dotnet_diagnostic.TCSG130.severity = none
 </tr>
 </tbody>
 </table>
-<p>声明语法：<code>tier_forbidden.pack = reflection | sync_over_async | fire_and_forget</code>（任选子集）。</p>
+<p>声明语法：<code>tier_forbidden.pack = reflection | sync_over_async | fire_and_forget | bare_threads | hotpath_discipline</code>（任选子集）。</p>
 <h2 id="豁免">豁免</h2>
 <ul>
 <li><strong>个别调用点</strong>：标准 <code>#pragma warning disable TCSG138</code> + 相邻理由注释（写明为何此处形态有
 意——治理内核的受控丢弃即此形态）；</li>
-<li><strong>实现组件本体</strong>（TCSG134）：源码 <code>exempt</code> 前缀声明豁免；</li>
+<li><strong>实现组件本体</strong>（TCSG134）：<code>.editorconfig</code> 键 <code>tier_forbidden.exempt.bare_threads = &lt;FQN 前缀列表&gt;</code> 声明豁免；</li>
 <li><strong>整类降级</strong>：<code>dotnet_diagnostic.TCSGxxx.severity = none</code>（按路径节精细控制——tests 目录
 常见放行）。</li>
 </ul>
@@ -197,8 +231,8 @@ dotnet_diagnostic.TCSG130.severity = none
 </ol>
 <h2 id="想深入">想深入</h2>
 <ul>
-<li>TierFs 协议规范分析器（TCSG120-122）：<a href="../TC.Tier.CodeGen.Analyzers/docs/tierfs-spec.md">TierFs 规范分析器</a></li>
-<li>生成器诊断（TCSG020/054-059 族）：<code>src/TC.Tier.CodeGen</code> 各生成器源码头注释</li>
+<li>TierFs 协议规范分析器（TCSG120-122）：<a href="tierfs-spec.html">TierFs 规范分析器</a></li>
+<li>生成器诊断（TCSG020/054-060 族）：<code>src/TC.Tier.CodeGen</code> 各生成器源码头注释</li>
 </ul>
 
 </article>

@@ -256,8 +256,8 @@ while (!ct.IsCancellationRequested)
 <ol>
 <li><strong>SkipList priority 是 16 位有效域</strong>（key 编码所限）——宽值域（Ticks/大权重）必须先压缩映射，
 否则不同优先级互相折叠、顺序错乱。</li>
-<li><strong>Bucket 的枚举即桶布局</strong>——枚举值 discontinuous（如 <code>A=1, B=100</code>）会建 101 个桶（中间全空扫），
-定义尽量从 0 连续。</li>
+<li><strong>Bucket 的枚举即桶布局</strong>——枚举值经字典映射到紧凑桶下标（稀疏枚举如 <code>A=1, B=100</code> 也只建 2 个桶、
+无空桶扫描）；桶数 = 枚举值个数，定义尽量精简。</li>
 <li><strong><code>Count</code> 是近似值</strong>（各实现内部 Interlocked 读，瞬时态）——不能用于&quot;等 Count==0 再做 X&quot;的同步协议，
 用 <code>TryDequeue</code> 返回值或外部信号。</li>
 <li><strong>Dispose 不清空元素</strong>——只唤醒等待者并封禁后续操作（<code>ObjectDisposedException</code>）；残余元素由 GC

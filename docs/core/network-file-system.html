@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>网络文件系统（network://）使用指南——RemoteFileSystem 桥 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="网络文件系统（network://）使用指南——RemoteFileSystem 桥 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/network-file-system.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="网络文件系统network使用指南remotefilesystem-桥">网络文件系统（network://）使用指南——RemoteFileSystem 桥</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要&quot;本地不落地 / 容量无界 / 共享&quot;文件 IO 的组件开发者（引擎、数据结构、备份归档）。
+<strong>回答什么</strong>：网络文件系统怎么构造、staging 写回层怎么编排、Flush 唯一持久化点契约、增量与恢复协议。
+<strong>本篇只讲机制</strong>——S3 协议特有部分（SigV4/厂商矩阵/COS vhost/chunked 链签等）见
+<a href="s3-protocol.html"><code>../TC.Tier.Core.IO.S3/docs/s3-protocol.md</code></a>。</p>
+<p><strong>定位</strong>：网络文件系统是 Core 层<strong>四类文件系统之一</strong>（本地/内存/虚拟/网络），
+与 <code>RemoteFileSystem</code> 桥 + <code>IObjectStore</code> 注入点共同构成——任何 <code>IObjectStore</code> 实现
+升格为统一文件 IO 协议（与本地/内存文件系统平权）。S3 是 <code>IObjectStore</code> 的协议实现之一
+（见 <a href="s3-protocol.html"><code>../TC.Tier.Core.IO.S3/docs/s3-protocol.md</code></a>）；
+其他协议实现按相同契约接入即可。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong><code>RemoteFileSystem</code> 把任意 <code>IObjectStore</code> 升格为 <code>IFileSystem</code> 统一协议下的网络文件系统（四类之一）——
+消费者只认 <code>IFileSystem</code>/<code>IFileHandle</code>，从不问&quot;数据在哪&quot;。</strong></p>
+<p><code>network:///s3/...</code> 中的 <code>s3</code> 是协议头（与 IO.S3 程序集自动注册绑定）；换协议头即换对象层实现，
+桥层零修改。</p>
+<hr>
+<h2 id="1-构造与打开">1. 构造与打开</h2>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Core.IO.Remote;
+
+// 1. 选 IObjectStore 实现（S3 / 其他协议适配）
+using var store = S3ObjectStore.Create(cosOptions);   // S3 协议见 s3-protocol.md §1
+
+// 2. 桥升格为 IFileSystem（与本地/内存文件系统同构）
+using var fs = RemoteFileSystem.OpenOrCreate(store, new RemoteFileSystemOptions
+{
+    KeyPrefix = &quot;engine-a/&quot;,          // 多引擎共桶隔离（对象键 = KeyPrefix + path）
+    Spill = RemoteSpill.ToDisk(&quot;/var/tmp&quot;),  // staging 超内存预算的落盘根（null=纯内存超限 DiskFull；无盘形态用 RemoteSpill.ToMemory()）
+});
+
+// 3. 打开语义与本地/内存文件系统完全同构（IFileSystem 契约）
+using var w = fs.Open(&quot;seg-001&quot;, new FileOpenOptions
+{
+    Access = AccessMode.ReadWrite,
+    Mode = FileOpenMode.OpenOrCreate,   // ★ 显式给——裸默认是 OpenExisting（与其他文件系统同规则）
+});
+</code></pre>
+<p><strong>spec 形态</strong>（<code>TierFs.Open(&quot;network:///s3/...&quot;)</code> 工厂自动构造桥——见 <a href="io.html"><code>io.md</code></a> §2.1）：</p>
+<pre><code>network:///s3/host[:port]/bucket/prefix    ← 协议首段必填（s3 随 IO.S3 程序集自动注册）
+?label=..&amp;quota=100G&amp;access=ro|wo|rw&amp;exclusive=1&amp;cred=env:NAME&amp;spill=local:///var/tmp
+</code></pre>
+<hr>
+<h2 id="2-remotefilesystemoptions-调参表">2. RemoteFileSystemOptions 调参表</h2>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>KeyPrefix</code></td>
+<td><code>&quot;&quot;</code></td>
+<td>命名空间隔离；path 经共享校验规则（分隔符/越根/非法字符全拒）——不可能访问同桶其他前缀</td>
+</tr>
+<tr>
+<td><code>StagingMemoryLimit</code> / <code>StagingPageSize</code></td>
+<td>64MB / 64KiB</td>
+<td>写句柄 staging 预算与页粒度（延迟加载/回填的最小单位）</td>
+</tr>
+<tr>
+<td><code>Spill</code></td>
+<td>null</td>
+<td>超预算落点（<code>RemoteSpill.ToDisk(dir)</code> 磁盘目录 / <code>RemoteSpill.ToMemory()</code> 内存私有卷——互斥二态；null = 超限 DiskFull）</td>
+</tr>
+<tr>
+<td><code>MultipartThreshold</code> / <code>PartSize</code> / <code>MaxParts</code> / <code>MaxConcurrency</code></td>
+<td>8MB / 8MB / 10000 / 4</td>
+<td>Flush 的 multipart 编排</td>
+</tr>
+<tr>
+<td><code>ReadCacheBytes</code> / <code>PrefetchPages</code></td>
+<td>4MB / 4</td>
+<td>读句柄页缓存与预取窗口（<code>Advise(Sequential)</code> 放大 4×）</td>
+</tr>
+<tr>
+<td><code>LeaseTimeout</code></td>
+<td>60s</td>
+<td>fencing 卷锁租约（心跳超时接管窗口）</td>
+</tr>
+<tr>
+<td><code>OrphanUploadCleanup</code></td>
+<td>null</td>
+<td>非空 = 构造时扫描清理早于阈值的残留 multipart 会话（崩溃碎片回收）</td>
+</tr>
+<tr>
+<td><code>Preallocation</code></td>
+<td><code>Metadata</code></td>
+<td>预分配方式轴（IS-04 统一词汇）：network 无预分配概念（对象存储无块布局——厂商配额）；显式请求 <code>Full</code> 在挂载入口抛 <code>IOError.Unsupported</code>（能力位诚实不置 + 不静默）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="3-核心语义与本地内存文件系统的差异必须知道的三条">3. 核心语义（与本地/内存文件系统的差异——必须知道的三条）</h2>
+<h3 id="31--flush-是唯一持久化点">3.1 ★ Flush 是唯一持久化点</h3>
+<p><code>Write</code>/<code>Append</code> 只进 staging（页缓存的远端同构物）即返回；
+<strong>任何 Dispose 都不触发上传</strong>——池内句柄 Dispose = 归还（staging 留池续用）、池外 Dispose = 关闭
+（未 Flush 的数据丢弃 = &quot;未 fsync 即丢&quot;）。需要&quot;用完即持久&quot;必须显式：</p>
+<pre><code class="lang-csharp">using var h = pool.Acquire(&quot;seg-001&quot;, opts);   // 或 fs.Open
+h.Append(payload);
+h.Flush();                                     // ← 唯一持久化点（multipart complete——此前崩溃旧对象完好）
+</code></pre>
+<p>Dispose 方向同本地文件系统（&quot;离开目录&quot;——仅释放桥自持资源，已开句柄继续有效）；与
+内存/虚拟文件系统的&quot;拔盘/关卷&quot;语义不同（见 <a href="io.html"><code>io.md</code></a> §置顶二）。</p>
+<h3 id="32-读句柄不追新">3.2 读句柄不追新</h3>
+<p>读句柄的 Length 和数据是 <strong>Open 时刻的快照</strong>——其他句柄 Flush 的追加对它不可见，
+需要追新 = 重新 Open。写句柄自身的 read-your-writes 天然成立（读走 staging）。</p>
+<h3 id="33-随机覆写已有大文件--逐区间按需拉取延迟加载">3.3 随机覆写已有大文件 = 逐区间按需拉取（延迟加载）</h3>
+<p>纯追加句柄永不拉历史（追加路径零网络）；
+随机覆写会按页粒度 Range GET 拉满所触区间——GB 级文件秒级 + 全额带宽。
+<strong>追加式访问模式是网络文件系统的正确姿势</strong>（<code>RandomWrite</code> 能力位不置位即为此）。</p>
+<p><strong>常用操作速查</strong>：<code>Append</code> 原子预留（同 fs 跨句柄落点不交）/ <code>PunchHole</code> 读零语义（无对齐约束——
+<code>AllocationUnit=1</code>）/ <code>SetLength</code> 截断后扩展读零（不复活旧数据）/ <code>CollapseRange</code>·<code>InsertRange</code> 抛
+Unsupported（能力位表达；<code>Lock</code> = 进程内 advisory、<code>Map</code> = 物化映射，均可用）/ <code>Move</code> = 服务端 Copy+Delete /
+<code>EnumerateEntries</code> = 前缀枚举（恢复扫描零额外 Head）/ xattr = PUT 原子快照（Flush 随对象提交）。</p>
+<hr>
+<h2 id="4-增量-flush-与恢复">4. 增量 Flush 与恢复</h2>
+<ul>
+<li><strong>增量 Flush</strong>：二次 Flush 只上传<strong>脏 part</strong>，未改 part 走服务端自拷贝（零出口流量）——追加负载的
+出口流量 O(增量) 而非 O(总长)。</li>
+<li><strong>洞元数据读加速</strong>：<code>PunchHole</code> 后 Flush 会把洞区间编码进对象元数据——后续读句柄命中洞区间本地
+返零、不发 GET。</li>
+<li><strong>恢复</strong>：<code>fs.EnumerateEntries()</code> 返回融合列表（<code>FsEntry</code>：<code>Name</code>/<code>Length</code>）——引擎扫段重建段表与本地文件系统路径同构；
+崩溃未 Flush 的 staging 丢 = 未 fsync 丢，<strong>恢复协议零修改</strong>。</li>
+<li><strong>fencing 卷锁</strong>：<code>fs.AcquireExclusive(timeout)</code> = lock 对象 + 条件 PUT 抢建 + 心跳超时接管 +
+token 防误删——<strong>尽力型</strong>（仅防意外双开；引擎正确性由段表 lease 单写者协议承担）。</li>
+</ul>
+<hr>
+<h2 id="5-能力位矩阵与本地内存虚拟文件系统的差异">5. 能力位矩阵（与本地/内存/虚拟文件系统的差异）</h2>
+<table>
+<thead>
+<tr>
+<th>能力</th>
+<th>本地</th>
+<th>内存</th>
+<th>虚拟</th>
+<th><strong>网络</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>DIO（无缓冲）</td>
+<td>✓（探测扇区）</td>
+<td>✗（不置位）</td>
+<td>✓（按载体）</td>
+<td>✗（不置位）</td>
+</tr>
+<tr>
+<td>稀疏 / PunchHole</td>
+<td>✓（按对齐）</td>
+<td>✓（字节粒度）</td>
+<td>✓（块粒度）</td>
+<td>✓（<strong>字节粒度——AllocationUnit=1</strong>）</td>
+</tr>
+<tr>
+<td>随机覆写</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td><strong>延迟加载</strong>（按页 Range GET）</td>
+</tr>
+<tr>
+<td>内存映射</td>
+<td>✓</td>
+<td>✓（视图写回）</td>
+<td>✓</td>
+<td>✓（<strong>物化映射</strong>——Read=Range GET 快照/写回 staging）</td>
+</tr>
+<tr>
+<td>范围锁</td>
+<td>✓（advisory）</td>
+<td>✓（进程内真锁）</td>
+<td>✓（advisory）</td>
+<td>✓（进程内 advisory）</td>
+</tr>
+<tr>
+<td>Append 原子预留</td>
+<td>✓（fs 级）</td>
+<td>✓</td>
+<td>✓</td>
+<td>✓（<strong>staging 内即返回</strong>）</td>
+</tr>
+<tr>
+<td>持久化点</td>
+<td><code>h.Flush()</code>（fsync）</td>
+<td>导出镜像（§5.2）</td>
+<td><code>h.Flush()</code>（superblock 轮写）</td>
+<td><strong><code>h.Flush()</code>（PUT/multipart complete）</strong></td>
+</tr>
+</tbody>
+</table>
+<p>完整四类文件系统平权矩阵见 <a href="medium-parity-matrix.html"><code>medium-parity-matrix.md</code></a>。</p>
+<hr>
+<h2 id="6-想深入指路">6. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>S3 协议特有部分（SigV4 签名/厂商矩阵/凭证源/重试/chunked 直传/COS vhost 适配）</td>
+<td><a href="s3-protocol.html"><code>../TC.Tier.Core.IO.S3/docs/s3-protocol.md</code></a></td>
+</tr>
+<tr>
+<td>Core/IO 总入口（四类文件系统选型/spec/能力协商/陷阱清单）</td>
+<td><a href="io.html"><code>io.md</code></a></td>
+</tr>
+<tr>
+<td>虚拟文件系统（TierVolume 深指南）</td>
+<td><a href="virtual-file-system.html"><code>virtual-file-system.md</code></a></td>
+</tr>
+<tr>
+<td>采集/还原/迁移管线（TCA1/快道/启动四形态）</td>
+<td><code>IO/Image/RootSpaceImage.cs</code> 注释与 <a href="io.html"><code>io.md</code></a> §5.2</td>
+</tr>
+<tr>
+<td>桥级契约测试（staging 语义/池协议/增量断言/洞读零 GET/孤儿清理）</td>
+<td><code>tests/TC.Tier.Core.Tests/IO/Remote/</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="7-常见陷阱网络文件系统专属通用陷阱见-iomd-7">7. 常见陷阱（网络文件系统专属——通用陷阱见 <a href="io.html"><code>io.md</code></a> §7）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>陷阱</th>
+<th>要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>N1</td>
+<td>池归还 ≠ 上传</td>
+<td>池内 Dispose = 归还（staging 留池续用）；池外未 Flush Dispose = 丢弃</td>
+</tr>
+<tr>
+<td>N2</td>
+<td><code>RemoveAll</code> 不得 flush</td>
+<td>删段后 flush 会复活已删对象——三出口（<code>Release(close:true)</code>/<code>RemoveAll</code>/<code>pool.Dispose</code>）全部不 flush</td>
+</tr>
+<tr>
+<td>N3</td>
+<td>读句柄是快照</td>
+<td>他人 Flush 的追加对读句柄不可见；追新必须重新 Open</td>
+</tr>
+<tr>
+<td>N4</td>
+<td>随机覆写代价</td>
+<td>GB 级文件秒级 + 全额带宽——追加式访问是正确姿势</td>
+</tr>
+<tr>
+<td>N5</td>
+<td>fencing 是尽力型</td>
+<td>仅防意外双开；强一致由段表 lease 协议承担</td>
+</tr>
+<tr>
+<td>N6</td>
+<td>vhost × COS</td>
+<td>COS 必须 <code>UseVirtualHostAddressing=true</code>；path-style 下整段路径被当 key</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/docs/network-file-system.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

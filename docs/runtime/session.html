@@ -102,11 +102,11 @@ using TC.Tier.Runtime.Structures.Ring;
 using TC.Tier.Runtime.Structures.ProbingIndex;
 using TC.Tier.Contracts.Structures;
 
-// ① 建结构（照常——结构对会话零感知；装配见 structures.md §0.2）
+// ① 建结构（照常——结构对会话零感知；装配见 structures.md §1.2）
 using var fs = TierFs.New(&quot;memory:&quot;);
-using var ring = RingOfLong.Create(new BlittableRingSettings(new StorageEngineOptions(&quot;kv-ring&quot;, 64L &lt;&lt; 20))
+await using var ring = await RingOfLong.CreateAsync(new BlittableRingSettings(new StorageEngineOptions(&quot;kv-ring&quot;, 64L &lt;&lt; 20))
     { PageSize = 4096, MemorySize = 64 * 1024, MutableFraction = 0.5 }, fs);
-using var index = HashOfLong.Create(fs, new HashIndexSettings(new StorageEngineOptions(&quot;kv-hash&quot;, 64L &lt;&lt; 20)), ring);
+await using var index = await HashOfLong.CreateAsync(fs, new HashIndexSettings(new StorageEngineOptions(&quot;kv-hash&quot;, 64L &lt;&lt; 20)), ring);
 
 // ② 建域：fs + 名字 + 参与者全集（同结构写必经同一域）
 var mgr = SessionManager.Create(fs, &quot;kv&quot;,
@@ -129,7 +129,7 @@ var direct = ring.GetValueSpan(addr);          // 地址直达：无会话零税
 <p>检查点（管线串行——时机归协议，内容归组合层）：</p>
 <pre><code class="lang-csharp">long watermark = await mgr.EnqueueCheckpoint(seq =&gt;
 {
-    index.TryDump();           // 内容组合层自定（Hash/SortedIndex 主存储 dump）
+    index.CheckpointFrame();   // 内容组合层自定（Hash/SortedIndex 主存储 dump）
     meta.WriteAnchor(seq);     // seq = 当前已提交水位（管线传入）
 });
 </code></pre>
@@ -272,7 +272,7 @@ plan 抛 = 回执原异常，<strong>管线续跑</strong>（检查点无结构�
 <tbody>
 <tr>
 <td>2PC 六件套与 Abort 窗口契约</td>
-<td><a href="structures.html"><code>structures.md</code></a> §3.5</td>
+<td>各子族 API 详表 §4（<a href="ring.html"><code>ring.md</code></a> §4.8 / <a href="log.html"><code>log.md</code></a> §4.5 / <a href="index.html"><code>index.md</code></a> §5）</td>
 </tr>
 <tr>
 <td>恢复协议（悬挂裁决/注入档/Confirm 不落盘语义）</td>

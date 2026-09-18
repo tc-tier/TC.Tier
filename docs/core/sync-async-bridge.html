@@ -117,7 +117,7 @@
 <tbody>
 <tr>
 <td><strong>① IO 同步 API 桥</strong></td>
-<td><code>IO/IObjectStore.cs:214-251</code>（9 个同步便捷包装）、<code>IO/Remote/RemoteFileHandle.cs:113,135,360,401,500,524</code>（同步 IFileHandle over 异步 staging）、<code>RemoteFileHandle.cs:574-605</code>（multipart：<code>throttle.Wait()</code> + <code>Task.WhenAll(...).GetAwaiter().GetResult()</code>）、<code>IO/Remote/RemoteFileSystem.cs:121-211</code> + <code>:298-373</code>（fencing 锁同步 Head/Get/Put + <code>Thread.Sleep(15)</code> 轮询）</td>
+<td><code>IO/Remote/ObjectStoreExtensions.cs</code>（9 个同步便捷包装）、<code>IO/Remote/RemoteFileHandle.cs:113,135,360,401,500,524</code>（同步 IFileHandle over 异步 staging）、<code>RemoteFileHandle.cs:574-605</code>（multipart：<code>throttle.Wait()</code> + <code>Task.WhenAll(...).GetAwaiter().GetResult()</code>）、<code>IO/Remote/RemoteFileSystem.cs:121-211</code> + <code>:298-373</code>（fencing 锁同步 Head/Get/Put + <code>Thread.Sleep(15)</code> 轮询）</td>
 <td>调用线程（可能是公共池线程）原地阻塞等异步对象存储操作</td>
 </tr>
 <tr>
@@ -189,7 +189,7 @@ IAsyncOperation{TResult}</strong>（依赖方向：Contracts 定义接口、Core
 无需查类 API。完成侧（Report*）不进接口（实现类成员）。</p>
 </blockquote>
 <h3 id="41-api">4.1 API</h3>
-<pre><code class="lang-csharp">namespace TC.Tier.Core.Primitives;   // ★ 枚举 AsyncOperationStatus 在 TC.Tier.Contracts.Storage（迁入）
+<pre><code class="lang-csharp">namespace TC.Tier.Core.Primitives;   // ★ 枚举 AsyncOperationStatus 在 TC.Tier.Contracts.Common
 
 public enum AsyncOperationStatus
 {
@@ -369,7 +369,7 @@ public sealed class SyncBridgeOptions
 {
     public string Name { get; init; } = &quot;sync-bridge&quot;;  // 诊断名（对齐调度器命名规范）
     public TaskScheduler? Scheduler { get; init; }      // null = 默认桥池；可注入 own 实例
-    public int DefaultTimeoutMs { get; init; } = 15_000; // 同步 Wait 默认上限（★ 强制有界）
+    public int TimeoutMs { get; init; } = SyncAsyncBridge.DefaultTimeoutMs; // 同步 Wait 默认上限（15s——强制有界）
 }
 </code></pre>
 <p>执行模型（时序）：</p>
@@ -553,7 +553,7 @@ watchdog 慢任务告警（TaskTimeout=5s）已随默认池生效。</li>
 </tr>
 </tbody>
 </table>
-<p><strong><code>tests/TC.Tier.Core.Tests/Shared/SyncAsyncBridgeTests.cs</code></strong></p>
+<p><strong><code>tests/TC.Tier.Core.Tests/Execution/SyncAsyncBridgeTests.cs</code></strong></p>
 <table>
 <thead>
 <tr>

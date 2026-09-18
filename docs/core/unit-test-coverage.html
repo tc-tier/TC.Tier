@@ -135,6 +135,11 @@ collection 打满池后 Task.Run <b>起跑</b>延迟秒级的注入节流（固�
 <td>🔬（实验线——原生 32B 槽位版，测试默认 Skip；见 <a href="priority-queues.html">priority-queues.md</a>）</td>
 </tr>
 <tr>
+<td>AsyncPriorityQueueV4.cs</td>
+<td>Collections/AsyncPriorityQueueV4Tests.cs</td>
+<td>🔬（实验线——<code>[Experimental(&quot;TCTier001&quot;)]</code> internal，验证后默认 Skip；见 <a href="priority-queues.html">priority-queues.md</a>）</td>
+</tr>
+<tr>
 <td>AsyncQueue.cs</td>
 <td>Collections/AsyncQueueTests.cs</td>
 <td>✅</td>
@@ -262,6 +267,21 @@ collection 打满池后 Task.Run <b>起跑</b>延迟秒级的注入节流（固�
 <td>✅</td>
 </tr>
 <tr>
+<td>PooledValueTaskSourceOfT.cs</td>
+<td>Primitives/PooledValueTaskSourceOfTTests.cs</td>
+<td>✅（泛型形态——池化 <code>IValueTaskSource&lt;T&gt;</code>）</td>
+</tr>
+<tr>
+<td>PooledBufferWriter.cs</td>
+<td>Primitives/PooledBufferWriterTests.cs</td>
+<td>✅</td>
+</tr>
+<tr>
+<td>MonitorScope.cs</td>
+<td>—（无 1:1 测试）</td>
+<td>🔴（缺口——Monitor 语义薄封装，现经 SpinRWLock/FairGate 测试间接覆盖；按 1:1 铁律补契约测试）</td>
+</tr>
+<tr>
 <td>NativeArena.cs</td>
 <td>Primitives/NativeArenaTests.cs</td>
 <td>✅</td>
@@ -302,6 +322,16 @@ collection 打满池后 Task.Run <b>起跑</b>延迟秒级的注入节流（固�
 <td><strong>AsyncPump.cs</strong></td>
 <td><strong>Execution/AsyncPumpTests.cs</strong></td>
 <td>✅（新增：单线程异步泵——续体回流同线程/多续体顺序/返回值/异常重抛/发起段抛+上下文还原/嵌套自锁快速失败/上下文还原/ConfigureAwait(false) 段安全完成/空转等待唤醒/取消打断/并发实例独立/千续体全排空/Send 就地执行 13 例）</td>
+</tr>
+<tr>
+<td><strong>TaskSink.cs</strong></td>
+<td><strong>Execution/TaskSinkTests.cs</strong></td>
+<td>✅（fire-and-forget 治理——<code>Submit</code>/<code>SubmitFast</code>：生命周期/取消/异常隔离一体；丢弃任意 Task 即泄漏的分析器配套原语）</td>
+</tr>
+<tr>
+<td>DeadlineRegistry.cs</td>
+<td>Execution/DeadlineRegistryTests.cs</td>
+<td>✅</td>
 </tr>
 <tr>
 <td>SyncBridgeOptions.cs</td>
@@ -353,6 +383,8 @@ collection 打满池后 Task.Run <b>起跑</b>延迟秒级的注入节流（固�
 <h3 id="epochs-补lightepoch-协议绊线-8-测试--常设-debug-示波器">Epochs/ ✅（补：LightEpoch 协议绊线 8 测试 + 常设 Debug 示波器）</h3>
 <p>LightEpoch/FastThreadLocal/EpochProtectedVersionScheme/VersionSchemeStateMachine/VersionSchemeState 均有对应测试。
 <code>LightEpochTests</code> 补齐<strong>协议违反绊线测试</strong>（未 Resume 就 Bump/Suspend、跨线程 Suspend、保护区重入、嵌套 bump、Dispose 持保护、drain action 异常）——Debug 构建断言立即抛异常（消息含协议操作历史），Release 构建断言零开销不抛。</p>
+<h3 id="hazards-">Hazards/ ✅</h3>
+<p>HazardPointers.cs ↔ Hazards/HazardPointersTests.cs（无锁回收安全协议——pointer 发布/reclaim 栅栏契约）。</p>
 <h3 id="logging--metrics--observability--tracing-">Logging / Metrics / Observability / Tracing ✅/🟡</h3>
 <p>LoggerExtensions、NullLogger、Metrics、ObservabilityHub、Tracing 有测试；各 ObservabilityHub.*.cs 分视图由 ObservabilityHubTests 覆盖（🟡 维度视图逐个加强属后续）。</p>
 <h3 id="nativeinterop-pinvoke-声明层">NativeInterop/ ⚪（P/Invoke 声明层）</h3>

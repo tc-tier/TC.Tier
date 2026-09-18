@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Snapshot 使用指南——流式快照 / 增量快照 / 段表恢复 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Snapshot 使用指南——流式快照 / 增量快照 / 段表恢复 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/snapshot.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="snapshot-使用指南流式快照--增量快照--段表恢复">Snapshot 使用指南——流式快照 / 增量快照 / 段表恢复</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要流式帧文件快照 / raft 日志压缩的组件开发者
+<strong>回答什么</strong>：StreamSnapshot vs IncrementalSnapshot 怎么选 / 按字节截断 vs 版本号截断 / 段表 O(1) 恢复 / 阈值合并
+<strong>本篇只讲机制</strong>——帧字节布局见源码（<code>Structures/Snapshot/</code> 各 partial）
+<strong>定位</strong>：Structures/ 6 子族之一，<strong>搭配件</strong>；与 Mirror 同族异坐标系（字节截断 vs 版本号截断）</p>
+</blockquote>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>Snapshot = 完整状态基线纯流式形态 + 按字节截断 + 增量形态（新段 append 不重写旧段）</strong></p>
+<ul>
+<li><code>StreamSnapshot</code> = 流式帧文件（<code>[Header 14B][Data][Footer 28B]</code> 多帧）</li>
+<li><code>IncrementalSnapshot</code> = 段=帧的增量快照：新段 append 不重写旧段 + 段表 O(1) 恢复 + 阈值合并</li>
+</ul>
+<p>两者<strong>共用同一帧格式</strong>（<code>StreamFrameCodec</code>，Magic=<code>SNHD</code>/<code>SNFT</code>）与 <code>SnapshotBase</code> 三水位/2PC 能力；区别在语义层——StreamSnapshot 的帧 = 数据帧，IncrementalSnapshot 的帧 = 段（带 N₀ 8B 前缀）。</p>
+<h2 id="1-定位">1. 定位</h2>
+<ul>
+<li><strong>搭配件</strong>：与 Ring/Log 主结构搭配，承载&quot;完整状态基线&quot;。Ring 是数据真相源（record 流），Snapshot 是基线导出/恢复加速件——<strong>存在性=优化非正确性</strong>，无快照也能走全量重放。</li>
+<li><strong>形态差异</strong>（StreamSnapshot vs IncrementalSnapshot）：
+<ul>
+<li><strong>StreamSnapshot</strong>：流式帧文件——单条快照 = N 帧（每帧 <code>[Header][Data][Footer]</code>，CRC64 流式增量）；适合一次性整体导出。</li>
+<li><strong>IncrementalSnapshot</strong>：段=帧的增量——每段 = 一帧（<code>[Header][N₀ 8B][条目流][Footer]</code>）；新段 append 不重写旧段，<strong>快照越频繁写省越多</strong>（基准 8 次快照 4.5× 字节差）；段累积达阈值自动合并。</li>
+</ul>
+</li>
+<li><strong>与 Mirror 同族异坐标系</strong>：Mirror 按版本号截断（版本链 N=2 轮转回收），Snapshot 按字节截断（纯流式无版本链）。两者都承载&quot;完整状态基线&quot;，但 Mirror 是版本链形态（覆写历史可读），Snapshot 是追加流形态（append 可回滚、Overwrite 不可回滚）。</li>
+<li>⚠️ <strong>与 Ring 自带区间快照（<code>OpenSnapshotReader/Writer</code>）无引用关系</strong>——Ring 那是导出能力（区间字节流），本子族是独立文件形态（<code>SnapshotBase</code> 持有独立 <code>StorageEngine</code>）。同名为&quot;快照&quot;是历史巧合，<strong>不要混用</strong>。</li>
+<li><strong>raft 日志压缩场景</strong>：<code>IncrementalSnapshot</code> = 镜像快照设计稿第三部件（TierWAL 内部快照）——段 = raft apply 序号快照点，新段不重写旧段契合&quot;快照越频繁写省越多&quot;的 raft 日志压缩特征。</li>
+</ul>
+<h3 id="11-选型决策">1.1 选型决策</h3>
+<table>
+<thead>
+<tr>
+<th>场景特征</th>
+<th>选型</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>一次性整体导出（备份/迁移/冷存档）</td>
+<td><strong>StreamSnapshot</strong></td>
+<td>单条快照 = N 帧流式追加，CRC 增量累积零内存压力；不需要段表/合并</td>
+</tr>
+<tr>
+<td>raft 日志压缩（周期性快照点）</td>
+<td><strong>IncrementalSnapshot</strong></td>
+<td>新段 append 不重写旧段契合 raft 周期快照；段表 O(1) 恢复定位；阈值合并控制段数</td>
+</tr>
+<tr>
+<td>raft 快照安装（外部镜像注入）</td>
+<td><strong>IncrementalSnapshot</strong> + <code>ImportSegmentAsync</code></td>
+<td>替换语义——段表替换为单段，旧段物理回收</td>
+</tr>
+<tr>
+<td>整体快照外存 + 版本化历史可读</td>
+<td><strong>Mirror</strong>（<a href="mirror.html"><code>mirror.md</code></a>）</td>
+<td>版本链 N=2 轮转——覆写历史可读；与 Snapshot 同族异坐标系</td>
+</tr>
+<tr>
+<td>区间字节流导出（依附 Ring 生命周期）</td>
+<td>Ring 的 <code>OpenSnapshotReader/Writer</code></td>
+<td>不是本子族——Ring 导出能力，无独立 <code>StorageEngine</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键判断点</strong>：要&quot;周期性快照 + 越频繁越省写&quot;→ IncrementalSnapshot；要&quot;一次性整体流&quot;→ StreamSnapshot；要&quot;版本化历史&quot;→ Mirror。</p>
+<h2 id="2-settings-全参数">2. Settings 全参数</h2>
+<p><code>SnapshotSettings</code> 继承 <code>Settings</code>（<code>MainEngine</code> / <code>MetaPolicyKind</code> / <code>MetaOpaqueBytes</code> 公共面），<code>StreamSnapshotSettings</code> / <code>IncrementalSnapshotSettings</code> 各自派生。两子类公共字段相同，差异在专属配置。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>来源</th>
+<th>StreamSnapshot 默认</th>
+<th>IncrementalSnapshot 默认</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MainEngine</code></td>
+<td><code>Settings</code> 基</td>
+<td><code>(&quot;tc.snapshot&quot;, 256MB, enableSegmentation=true, preallocateFile=false)</code></td>
+<td><code>(&quot;tc.snapshot.inc&quot;, 256MB, enableSegmentation=true, preallocateFile=false)</code></td>
+</tr>
+<tr>
+<td><code>Name</code></td>
+<td><code>Settings</code> 基</td>
+<td><code>&quot;tc.snapshot&quot;</code></td>
+<td><code>&quot;tc.snapshot.inc&quot;</code></td>
+</tr>
+<tr>
+<td><code>PreallocateFile</code></td>
+<td><code>Settings</code> 基</td>
+<td><code>false</code>（按需增长，GB/TB 流式不预分配）</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>DeleteOnClose</code></td>
+<td><code>Settings</code> 基</td>
+<td><code>false</code>（跨重启必须保留）</td>
+<td><code>false</code></td>
+</tr>
+<tr>
+<td><code>MetaPolicyKind</code></td>
+<td><code>Settings</code> 基</td>
+<td><code>Disabled</code>（默认不装 meta——纯流式可走 Backward 扫描兜底）</td>
+<td><code>Disabled</code>（增量快照<strong>强烈建议</strong>设 <code>Managed</code>——段表靠 opaque meta 落盘）</td>
+</tr>
+<tr>
+<td><code>MetaOpaqueBytes</code></td>
+<td><code>Settings</code> 基</td>
+<td><code>0</code></td>
+<td><strong>须 ≥ 段表容量</strong> = <code>8 + 段数上限 × 40</code>（如 64 段 → ≥2576B）</td>
+</tr>
+<tr>
+<td><code>SessionBufferSize</code></td>
+<td><code>SnapshotSettings</code></td>
+<td><code>128KB</code>（双 buffer 写会话/读会话单 buffer 大小）</td>
+<td><code>128KB</code></td>
+</tr>
+<tr>
+<td><code>CompactSegmentThreshold</code></td>
+<td><code>IncrementalSnapshotSettings</code> 专属</td>
+<td>—</td>
+<td><code>8</code>（段数达此值自触发 <code>CompactSegments</code>——低频全量重写）</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>便捷构造（无参 <code>new StreamSnapshotSettings()</code> / <code>new IncrementalSnapshotSettings()</code>）即用默认值；要自定义注入 <code>StorageEngineOptions</code>。<strong>meta 装配</strong>：<code>IncrementalSnapshot</code> 段表 = opaque meta 载体，禁用 meta = 段表丢失 → 恢复只能 Backward 扫描兜底（O(N) 全盘），生产场景请开 <code>Managed</code>。</p>
+</blockquote>
+<h2 id="3-构造与生命周期">3. 构造与生命周期</h2>
+<p><code>SnapshotBase</code> 继承 <code>LifecycleBase&lt;SnapshotRecoveryHints&gt;</code>——三段式生命周期：<code>new</code> → <code>Initialize()</code>（同步 void，启动后台恢复）→ <code>WaitForReady()</code>（等恢复就绪）；异步调用方用 <code>WaitForReadyAsync</code>。无便捷工厂（与 Log 族同形态——封闭结构才有 <code>CreateAsync</code>）。</p>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Runtime.Storage;
+using TC.Tier.Runtime.Structures.Snapshot;
+
+// ① 文件系统（组合根；示例用 mem，真磁盘改 &quot;local:///path&quot;）
+using var fs = TierFs.New(&quot;memory:&quot;);
+
+// ② StreamSnapshot：流式帧文件（meta 关闭，走 Backward 扫描兜底）
+var streamSettings = new StreamSnapshotSettings();
+using var stream = new StreamSnapshot(fs, streamSettings);
+stream.Initialize();
+stream.WaitForReady();
+
+// ③ IncrementalSnapshot：增量快照（meta 开启——段表靠 opaque 落盘）
+var incSettings = new IncrementalSnapshotSettings
+{
+    MetaPolicyKind = MetaPolicyKind.Managed,
+    MetaOpaqueBytes = 4096,   // 容纳 ≥100 段表条目（8 + 100×40 = 4008B）
+    CompactSegmentThreshold = 16,
+};
+using var inc = new IncrementalSnapshot(fs, incSettings);
+inc.Initialize();
+inc.WaitForReady();
+
+// Dispose 幂等——Resources 链统一释放（主引擎/meta 引擎/MetaPolicy 全 owned）
+</code></pre>
+<p><code>Dispose</code> 幂等：<code>SnapshotBase</code> 把主引擎、Managed 模式下的 meta 引擎、<code>MetaPolicy</code> 全部登记进 <code>Resources</code>（owned），统一释放顺序。<code>Initialize</code> 后台启动恢复（<code>OnInitializeBegin</code> 同步 init 主引擎 + meta 引擎，<code>WaitForReadyAsync</code> 等 join 完成），恢复算法经 <code>CreateRecovery</code> 工厂单点创建（注入实例则直接用）。</p>
+<h3 id="31-分步构造--hints-注入观察恢复注入水位">3.1 分步构造 + hints 注入（观察恢复/注入水位）</h3>
+<p>raft 节点重启已知 apply 序号时，可注入 <code>SnapshotRecoveryHints</code> 优先于扫盘：</p>
+<pre><code class="lang-csharp">// 已知写尾（如 raft 节点重启前持久化的 apply 水位）
+var hints = new SnapshotRecoveryHints
+{
+    WriteAddress = knownWriteTail,
+    PhysicalWriteAddress = knownPhysTail,   // 可选；缺省走 AlignUpToSector
+};
+using var inc = new IncrementalSnapshot(fs, incSettings);
+inc.Initialize(hints);   // 透传给 IncrementalRecovery.OnRecoveryCoreAsync
+inc.WaitForReady();
+// 恢复后段表已加载、_nextSeq 已续接，可直接 ReadAllChunksAsync 或 AppendSegmentAsync
+</code></pre>
+<p>注入恢复算法实例（替换默认 <code>IncrementalRecovery</code>）：</p>
+<pre><code class="lang-csharp">IRecovery&lt;SnapshotRecoveryHints&gt; customRecovery = new MySnapshotRecovery(...);
+using var inc = new IncrementalSnapshot(fs, incSettings, recovery: customRecovery);
+// 基类构造透传——CreateRecovery() 工厂被跳过（注入实例优先）
+</code></pre>
+<h2 id="4-api-详表">4. API 详表</h2>
+<h3 id="41-streamsnapshot">4.1 StreamSnapshot</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OpenWrite</code></td>
+<td><code>StreamFrameWriter OpenWrite()</code></td>
+<td>物理起点续接开新帧写入器；flush 回调推进双水位（逻辑按 data.Length 非对齐、物理按对齐长度）</td>
+</tr>
+<tr>
+<td><code>OpenWriteRange</code></td>
+<td><code>StreamFrameWriter OpenWriteRange(LogicalAddress start, LogicalAddress end)</code></td>
+<td>指定逻辑区间开帧（物理续接、逻辑不推进——逻辑↔物理由 checkpoint 二分换算）</td>
+</tr>
+<tr>
+<td><code>OpenRead</code></td>
+<td><code>StreamFrameReader OpenRead()</code></td>
+<td>从 <code>_truncatedAddress</code> 读到 <code>_writeAddress</code>（剩余可读 = 区间长度）</td>
+</tr>
+<tr>
+<td><code>OpenReadRange</code></td>
+<td><code>StreamFrameReader OpenReadRange(LogicalAddress start, LogicalAddress end)</code></td>
+<td>指定逻辑区间读</td>
+</tr>
+<tr>
+<td><strong>StreamFrameWriter</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>WriteAsync</code></td>
+<td><code>ValueTask WriteAsync(ReadOnlyMemory&lt;byte&gt; data, ct)</code></td>
+<td>写一个 entry（首次自动加帧头；CRC64 增量累积；<code>EntryCount+1</code>）。快速路径同步完成</td>
+</tr>
+<tr>
+<td><code>Write</code></td>
+<td><code>void Write(ReadOnlySpan&lt;byte&gt; data)</code></td>
+<td>同步轨</td>
+</tr>
+<tr>
+<td><code>CompleteAsync</code></td>
+<td><code>ValueTask CompleteAsync(ct)</code></td>
+<td>写帧尾（FooterMagic + TotalLength + EntryCount + Crc64）+ flush + 重置（可开新帧）</td>
+</tr>
+<tr>
+<td><code>Complete</code></td>
+<td><code>void Complete()</code></td>
+<td>同步轨</td>
+</tr>
+<tr>
+<td><code>DisposeAsync</code></td>
+<td><code>ValueTask DisposeAsync()</code></td>
+<td>未 <code>Complete</code> 的帧自动闭环（仅 using 也安全）</td>
+</tr>
+<tr>
+<td><code>TotalDataLength</code></td>
+<td><code>long</code></td>
+<td>当前帧已写 data 字节数</td>
+</tr>
+<tr>
+<td><code>EntryCount</code></td>
+<td><code>long</code></td>
+<td>当前帧 entry 条数</td>
+</tr>
+<tr>
+<td><strong>StreamFrameReader</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ReadDataAsync</code></td>
+<td><code>ValueTask&lt;int&gt; ReadDataAsync(Memory&lt;byte&gt; dest, ct)</code></td>
+<td>读 data（EOF 返回 0，自动解析校验 footer CRC64）。帧头 magic 非法抛 IOException</td>
+</tr>
+<tr>
+<td><code>ReadAllChunksAsync</code></td>
+<td><code>IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadAllChunksAsync(ct)</code></td>
+<td>64KB chunk 流式枚举</td>
+</tr>
+<tr>
+<td><code>IsFooterValid</code></td>
+<td><code>bool</code></td>
+<td>footer 是否已解析且 CRC 通过（读至 data 末尾自动解析）</td>
+</tr>
+<tr>
+<td><code>EntryCount</code> / <code>TotalLength</code> / <code>StoredChecksum</code></td>
+<td><code>long</code>/<code>long</code>/<code>ulong</code></td>
+<td>footer 字段（解析前为 0）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>写流程</strong>：<code>OpenWrite</code> → <code>WriteAsync</code> × N → <code>CompleteAsync</code> → <code>using</code> 自动 Dispose。多帧：<code>CompleteAsync</code> 后 <code>ResetFrame</code> 内部复位，可直接继续 <code>WriteAsync</code> 开新帧。</p>
+<pre><code class="lang-csharp">// StreamFrameWriter 写 + Complete（多帧）
+await using var writer = stream.OpenWrite();
+
+// 帧一：写 N 个 entry
+foreach (var entry in entriesChunk1)
+    await writer.WriteAsync(entry, ct);
+await writer.CompleteAsync(ct);   // 帧尾落盘 + flush + ResetFrame（EntryCount 清零）
+
+// 帧二：紧接再写（首 WriteAsync 自动加新帧头）
+await writer.WriteAsync(someEntry, ct);
+await writer.CompleteAsync(ct);
+// DisposeAsync 等价 CompleteAsync（若忘记 Complete 也安全闭环）
+
+// 读回：校验 footer CRC64
+await using var reader = stream.OpenRead();
+var buf = new byte[64 * 1024];
+int n;
+while ((n = await reader.ReadDataAsync(buf, ct)) &gt; 0)
+    Consume(buf.AsSpan(0, n));
+if (!reader.IsFooterValid) throw new InvalidDataException(&quot;帧 CRC 校验失败&quot;);
+</code></pre>
+<h3 id="42-incrementalsnapshot">4.2 IncrementalSnapshot</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AppendSegmentAsync</code></td>
+<td><code>ValueTask&lt;long&gt; AppendSegmentAsync(long n0, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; chunks, ct)</code></td>
+<td><strong>追加段</strong>：<code>[Header 14B][N₀ 8B][chunks][Footer 28B]</code> 一帧 → 2PC 提交 → 段表注册（追加）+ meta 原子落盘。返回 n0。段数达阈值自触发合并。<strong>单写者</strong>——并发/重入抛 InvalidOperationException</td>
+</tr>
+<tr>
+<td><code>ImportSegmentAsync</code></td>
+<td><code>ValueTask&lt;long&gt; ImportSegmentAsync(long n0, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; chunks, ct)</code></td>
+<td><strong>替换段</strong>（raft 快照安装语义）：写完整镜像段 → 段表替换为单段（旧段物理回收）。chunk 流异常 = Abort 回滚——新段清除、旧快照完好</td>
+</tr>
+<tr>
+<td><code>ReadAllChunksAsync</code></td>
+<td><code>IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadAllChunksAsync(ct)</code></td>
+<td>顺序流式读全部段（跳过每段 N₀ 前缀）= 最新快照条目流。段级 CRC64 校验失败抛 InvalidDataException</td>
+</tr>
+<tr>
+<td><code>ReadSegmentDataAsync</code></td>
+<td><code>IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadSegmentDataAsync(int index, ct)</code></td>
+<td>段 i 的数据流（测试/诊断用；越界抛）</td>
+</tr>
+<tr>
+<td><code>CompactSegmentsAsync</code></td>
+<td><code>ValueTask CompactSegmentsAsync(ct)</code></td>
+<td>合并全部段为新基线段（读全段拼接 → 写新帧 → 截旧段 → 段表=单段 + meta 落盘）。低频——成本 = 一次全量写</td>
+</tr>
+<tr>
+<td><code>ClearAsync</code></td>
+<td><code>ValueTask ClearAsync(ct)</code></td>
+<td>清空全部段（截断全量 + 段表空 + meta 落盘）</td>
+</tr>
+<tr>
+<td><code>SegmentCount</code></td>
+<td><code>int</code></td>
+<td>段数（内存段表，含最新段）</td>
+</tr>
+<tr>
+<td><code>LatestN0</code></td>
+<td><code>long</code></td>
+<td>最新段覆盖点 N₀（无段=0）</td>
+</tr>
+<tr>
+<td><code>GetSegmentN0</code></td>
+<td><code>long GetSegmentN0(int index)</code></td>
+<td>段 i 的 N₀（单调递增；越界抛）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>段格式</strong>：<code>[Header 14B][N₀ 8B][chunks...][Footer 28B]</code>。N₀ = 段自描述覆盖点（raft apply 序号），独立读一段可知其覆盖点。段表（opaque meta 载体）= <code>[count 4B][pad 4B][条目 40B × N]</code>，每条目 = <code>LogicalStart 16B + PhysStart 16B + N₀ 8B</code>。</p>
+<p><strong>段表恢复 + 阈值合并</strong>示例：</p>
+<pre><code class="lang-csharp">// 追加段（raft 快照：n0 = apply 序号）
+await inc.AppendSegmentAsync(applyIndex, ProduceChunksAsync(ct), ct);
+// 段数 ≥ CompactSegmentThreshold(默认8) → 自触发 CompactSegmentsCoreAsync
+//   合并 = 一次全量重写为新基线段（覆盖点 N₀ 不变）+ 旧段物理回收 + 段表=单段 + meta 落盘
+
+// raft 快照安装（替换语义）：导入完整镜像段，段表替换为单段
+await inc.ImportSegmentAsync(applyIndex, ProduceFullImageAsync(ct), ct);
+
+// 恢复后读最新快照（段表驱动逐段顺序拼接）
+await foreach (var chunk in inc.ReadAllChunksAsync(ct))
+    Consume(chunk);
+// 段级帧 CRC64 失败抛 InvalidDataException
+
+// 显式合并（不依赖阈值）
+await inc.CompactSegmentsAsync(ct);
+</code></pre>
+<p><strong>单写者契约</strong>：<code>AppendSegmentAsync</code> / <code>ImportSegmentAsync</code> / <code>CompactSegmentsAsync</code> / <code>ClearAsync</code> 互斥（<code>_writing</code> 0/1 闸门）；并发/重入抛 InvalidOperationException。raft 快照低频串行天然契合。多生产者场景须外部队列汇聚。</p>
+<h3 id="43-共有snapshotbase">4.3 共有（SnapshotBase）</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>三水位</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>WriteAddress</code></td>
+<td><code>ref LogicalAddress</code></td>
+<td>逻辑写尾（非对齐）</td>
+</tr>
+<tr>
+<td><code>PhysicalWriteAddress</code></td>
+<td><code>ref LogicalAddress</code></td>
+<td>物理写尾（扇区对齐，DIO 写基准）</td>
+</tr>
+<tr>
+<td><code>TruncatedAddress</code></td>
+<td><code>ref LogicalAddress</code></td>
+<td>逻辑截断点（头截断推进）</td>
+</tr>
+<tr>
+<td><code>Size</code></td>
+<td><code>long</code></td>
+<td>流大小 = <code>WriteAddress - TruncatedAddress</code></td>
+</tr>
+<tr>
+<td><strong>写</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Append</code> / <code>AppendAsync</code></td>
+<td><code>void Append(ReadOnlySpan&lt;byte&gt;)</code> / <code>ValueTask AppendAsync(ReadOnlyMemory&lt;byte&gt;, ct)</code></td>
+<td>append（<strong>可回滚</strong>——双水位推进；空数据 no-op）</td>
+</tr>
+<tr>
+<td><code>Overwrite</code> / <code>OverwriteAsync</code></td>
+<td><code>void Overwrite(LogicalAddress, ReadOnlySpan&lt;byte&gt;)</code> / ...</td>
+<td><strong>不可回滚</strong>——原位覆写破坏旧数据，2PC 不覆盖</td>
+</tr>
+<tr>
+<td><strong>截断</strong>（按字节）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>TruncatePrefix</code></td>
+<td><code>void TruncatePrefix(LogicalAddress address)</code></td>
+<td>头截断（业务调，回收已读头部）+ 推进 <code>TruncatedAddress</code></td>
+</tr>
+<tr>
+<td><code>TruncateSuffix</code></td>
+<td><code>void TruncateSuffix(LogicalAddress address)</code></td>
+<td>尾截断（2PC Abort 内部）+ 写窗口作废</td>
+</tr>
+<tr>
+<td><code>ReclaimRange</code></td>
+<td><code>void ReclaimRange(LogicalAddress? from, LogicalAddress? to)</code></td>
+<td>区间 PunchHole</td>
+</tr>
+<tr>
+<td><strong>2PC</strong>（<code>ITransactionParticipant</code>）</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>Prepare</code> / <code>PrepareAsync</code></td>
+<td><code>void Prepare(long seq)</code></td>
+<td>flush + meta.Commit（记 <code>LastPreparedSeq</code> + 水位）</td>
+</tr>
+<tr>
+<td><code>ConfirmCommitted</code></td>
+<td><code>void ConfirmCommitted(long seq)</code></td>
+<td>CAS 推进 <code>LastCommittedSeq</code> + 推进 <code>CommittedWriteAddress</code>（Abort 回退点）</td>
+</tr>
+<tr>
+<td><code>Abort</code> / <code>AbortAsync</code></td>
+<td><code>void Abort(long seq)</code></td>
+<td><code>TruncateSuffix(CommittedWriteAddress)</code> 回滚 append 部分（Overwrite 不可回滚）</td>
+</tr>
+<tr>
+<td><code>OnCommitted</code></td>
+<td><code>void OnCommitted(long seq, Action callback)</code></td>
+<td>注册提交回调（已提交到更高 seq 立即同步触发）</td>
+</tr>
+<tr>
+<td><strong>meta opaque</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>SetOpaqueMeta</code></td>
+<td><code>void SetOpaqueMeta(ReadOnlySpan&lt;byte&gt; data)</code></td>
+<td>登记外部 opaque（随下次水位提交原子落盘）。<code>Disabled</code> 抛 InvalidOperationException；超 <code>MetaOpaqueBytes</code> 抛 ArgumentException</td>
+</tr>
+<tr>
+<td><code>ReadOpaqueMeta</code></td>
+<td><code>ReadOnlySpan&lt;byte&gt; ReadOpaqueMeta()</code></td>
+<td>读最近已提交 opaque（无/禁用 = 空）</td>
+</tr>
+<tr>
+<td><strong>地址算术</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>AdvanceAddress</code></td>
+<td><code>LogicalAddress AdvanceAddress(LogicalAddress addr, long delta)</code></td>
+<td>段感知地址推进/回退</td>
+</tr>
+<tr>
+<td><code>Distance</code></td>
+<td><code>long Distance(LogicalAddress from, LogicalAddress to)</code></td>
+<td>段感知两地址间字节距离</td>
+</tr>
+<tr>
+<td><code>SectorSize</code></td>
+<td><code>int</code></td>
+<td>设备扇区大小</td>
+</tr>
+<tr>
+<td><code>DioAlignment</code></td>
+<td><code>int</code>（protected）</td>
+<td><code>max(SectorSize, 4096)</code>——保证 DIO 兼容</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-2pc-编排跨结构原子性">4.4 2PC 编排（跨结构原子性）</h3>
+<p>SnapshotBase 实现 <code>ITransactionParticipant</code>——可参与 <code>Transactions/TransactionLog</code> 协调器驱动的跨结构原子性（详见 <a href="session.html"><code>session.md</code></a>）。Snapshot 侧的 2PC 语义：</p>
+<ul>
+<li><strong><code>Prepare(seq)</code></strong>：<code>_engine.Flush()</code> + 记 <code>LastPreparedSeq</code> + <code>WriteMeta()</code>（meta 落盘 prepared 水位——悬干状态）</li>
+<li><strong><code>ConfirmCommitted(seq)</code></strong>：CAS 推进 <code>LastCommittedSeq</code> + 推进 <code>CommittedWriteAddress</code>（Abort 回退基准）+ <code>WriteMeta()</code> + <code>FireTransactionCallbacks</code></li>
+<li><strong><code>Abort(seq)</code></strong>：<code>TruncateSuffix(CommittedWriteAddress)</code> 回滚 append 部分（<strong>Overwrite 不可回滚</strong>）+ <code>WriteMeta()</code></li>
+<li><strong><code>OnCommitted(seq, callback)</code></strong>：注册回调（已提交到更高 seq 立即同步触发——链式触发）</li>
+</ul>
+<pre><code class="lang-csharp">// Snapshot 单独走 2PC（IncrementalSnapshot 内部即用——段写事务）
+long seq = 1;
+stream.Prepare(seq);              // flush + meta 记 prepared
+stream.ConfirmCommitted(seq);     // CAS 推进 committed + CommittedWriteAddress 推进
+// 后续 Abort(seq-1) 不影响；CommittedWriteAddress 是新的回退基准
+
+// 异常路径
+stream.Abort(seq);   // TruncateSuffix(CommittedWriteAddress)——append 部分回滚，Overwrite 不回滚
+</code></pre>
+<p><strong><code>IncrementalSnapshot.AppendSegmentAsync</code> 内部即走 2PC</strong>：<code>Prepare(seq)</code> → <code>ConfirmCommitted(seq)</code> → 段表注册 + meta 落盘；chunk 流异常 = <code>Abort(seq)</code>——尾截断回滚（新段物理清除，旧段完好）。<strong>这是会话模式一致性核心</strong>（详见 <a href="session.html"><code>session.md</code></a>）。</p>
+<h2 id="5-自定义注入工厂">5. 自定义注入工厂</h2>
+<p><code>SnapshotBase</code> 构造接受三个可选注入参数；子类（StreamSnapshot/IncrementalSnapshot）转发到基类构造。</p>
+<table>
+<thead>
+<tr>
+<th>注入点</th>
+<th>类型</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>recovery</code></td>
+<td><code>IRecovery&lt;SnapshotRecoveryHints&gt;?</code></td>
+<td>恢复算法实例（默认走 <code>CreateRecovery()</code> 工厂——StreamSnapshot=<code>DefaultSnapshotRecovery</code>、IncrementalSnapshot=<code>IncrementalRecovery</code>）。注入实例则跳过工厂</td>
+</tr>
+<tr>
+<td><code>metaPolicyFactory</code></td>
+<td><code>MetaPolicyFactory&lt;SnapshotMetaHeader, SnapshotMetaPayload&gt;?</code></td>
+<td>meta 策略工厂委托（<code>MetaPolicyKind → IMetaPolicy</code>）；默认走 <code>CreateMetaPolicyDefault</code>——<code>Managed</code>/<code>Transport</code>/<code>Disabled</code> 三选一。自定义注入可替换 Managed 实现</td>
+</tr>
+<tr>
+<td><code>metaTransport</code></td>
+<td><code>IMetaTransport?</code></td>
+<td>Transport 模式的传输实例（默认回落到内嵌 <code>MetaHost</code>——meta 块作为 <code>IS_META</code> 帧追加进快照流）</td>
+</tr>
+<tr>
+<td><strong>Contracts</strong></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ISnapshotCodec</code></td>
+<td><code>internal sealed StreamFrameCodec</code></td>
+<td>流式帧 codec——Header/Footer 读写、magic 校验。两子类共用同一实例（构造期 <code>new StreamFrameCodec()</code> 注入基类）</td>
+</tr>
+<tr>
+<td><code>ISnapshotWriteSession</code></td>
+<td><code>IDisposable, IAsyncDisposable</code></td>
+<td>双 buffer flush 流水线写会话——<code>WriteAsync</code>/<code>Write</code>/<code>WriteSmall</code>/<code>FlushIfFullAsync</code>/<code>FlushAsync</code>/<code>OnFlushed</code> 事件</td>
+</tr>
+<tr>
+<td><code>ISnapshotReadSession</code></td>
+<td><code>IAsyncDisposable</code></td>
+<td>双 buffer 异步预读读会话——<code>ReadAsync</code>/<code>LogicalStart</code>/<code>LogicalEnd</code>/<code>PhysicalEnd</code>（物理/逻辑偏移分离）</td>
+</tr>
+<tr>
+<td><code>SnapshotMetaHeader</code></td>
+<td>12B struct</td>
+<td>meta 三段式 header（<code>MagicValue</code>/<code>Version</code>/<code>Flags</code>/<code>PayloadLength</code>/<code>PaddingLength</code>）</td>
+</tr>
+<tr>
+<td><code>SnapshotMetaPayload</code></td>
+<td>80B struct</td>
+<td>meta payload（三水位 + <code>CommittedWriteAddress</code> + <code>LastCommittedSeq</code>/<code>LastPreparedSeq</code>）</td>
+</tr>
+<tr>
+<td><code>SnapshotRecoveryHints</code></td>
+<td>readonly struct</td>
+<td>恢复提示（<code>WriteAddress?</code>/<code>PhysicalWriteAddress?</code>）——上层注入已知水位，优先于扫盘</td>
+</tr>
+<tr>
+<td><code>SnapshotRecordFields</code></td>
+<td>readonly record struct</td>
+<td>帧字段包（Header: Flags/PayloadLength/PaddingLength；Footer: TotalLength/EntryCount）</td>
+</tr>
+<tr>
+<td><code>StreamFrameCodec</code></td>
+<td><code>internal sealed</code></td>
+<td><code>ISnapshotCodec</code> 默认实现——两子类共用</td>
+</tr>
+<tr>
+<td><code>ITransactionParticipant</code></td>
+<td>接口</td>
+<td>SnapshotBase 实现——2PC 协调器（<code>Transactions/TransactionLog</code>）驱动跨结构原子性，详见 <a href="session.html"><code>session.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-持久化机制">6. 持久化机制</h2>
+<h3 id="61-流式帧格式streamframecodec">6.1 流式帧格式（<code>StreamFrameCodec</code>）</h3>
+<p>两子类<strong>共用同一帧格式</strong>：</p>
+<pre><code>[Header 14B][Data][Footer 28B][padding 对齐到扇区]
+</code></pre>
+<ul>
+<li><strong>Header 14B</strong>（<code>StreamFrameHeader</code>）：<code>MagicValue(4B,&quot;SNHD&quot;)</code> + <code>Version(2B,major=1/minor=0)</code> + <code>Flags(2B)</code> + <code>PayloadLength(4B)</code> + <code>PaddingLength(2B)</code></li>
+<li><strong>Footer 28B</strong>（<code>StreamFrameFooter</code>）：<code>Magic(4B,&quot;SNFT&quot;)</code> + <code>TotalLength(8B)</code> + <code>EntryCount(8B)</code> + <code>Crc(8B)</code></li>
+<li><strong>CRC64</strong>：覆盖 <code>Header + Data + Footer 前 20B</code>（CRC 自身 8B 不参与）。流式增量累积（<code>UnifiedCrc64</code>，边写边算，不驻内存整块）——GB/TB 级快照可零内存压力流式写</li>
+<li><strong>FooterMagic</strong>：供 Backward 扫描定位帧尾（恢复取真尾——从尾向头扫 <code>chunkSize=64KB</code> 块找 <code>FooterMagic</code> 命中）</li>
+<li><strong>对齐粒度</strong>：扇区（codec <code>Alignment=512</code>）；<code>StreamSnapshotSettings</code> 默认段几何 256MB + 分段开启 + 不预分配（GB/TB 流式跨段扩容）</li>
+</ul>
+<h3 id="62-按字节截断-vs-mirror-版本号截断">6.2 按字节截断 vs Mirror 版本号截断</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Snapshot（StreamSnapshot/IncrementalSnapshot）</th>
+<th>Mirror（WholeMirror/PagedMirror）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>截断坐标系</strong></td>
+<td><strong>字节</strong>（<code>LogicalAddress</code>——头/尾字节地址）</td>
+<td><strong>版本号</strong>（版本链 N=2 轮转）</td>
+</tr>
+<tr>
+<td><strong>append 可回滚</strong></td>
+<td>✅ <code>TruncateSuffix(CommittedWriteAddress)</code>——尾部字节回滚</td>
+<td>❌（版本链不可回滚，靠 N=2 轮转回收旧版本）</td>
+</tr>
+<tr>
+<td><strong>Overwrite 不可回滚</strong></td>
+<td>✅ 独立方法名显形（覆写破坏旧数据，2PC 不覆盖）</td>
+<td>走 <code>WritePage</code> 等覆写语义</td>
+</tr>
+<tr>
+<td><strong>版本链</strong></td>
+<td>❌ 无版本概念</td>
+<td>✅ N=2 轮转</td>
+</tr>
+<tr>
+<td><strong>epoch</strong></td>
+<td>❌ 无</td>
+<td>✅</td>
+</tr>
+<tr>
+<td><strong>同族定位</strong></td>
+<td>纯流式形态（基线导出）</td>
+<td>版本链形态（基线镜像）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>同族异坐标系</strong>：两者都承载&quot;完整状态基线&quot;，但 Snapshot 是追加流（<code>Append</code> 可回滚、<code>Overwrite</code> 不可回滚、无版本链），Mirror 是版本链（N=2 轮转、覆写历史可读）。<strong>raft 日志压缩选哪个看场景</strong>：流式整体导出 → StreamSnapshot；版本化镜像 → Mirror；段级增量（新段不重写旧段） → IncrementalSnapshot。</p>
+<h3 id="63-incrementalsnapshot-段累积机制">6.3 IncrementalSnapshot 段累积机制</h3>
+<pre><code>段1:[Header 14B][N0₁ 8B][条目流₁][Footer 28B]  ← append，不重写
+段2:[Header 14B][N0₂ 8B][条目流₂][Footer 28B]  ← append
+...
+段N:[Header 14B][N0_N 8B][条目流_N][Footer 28B] ← append
+[合并达阈值 → CompactSegments → 新基线段（N0_N 不变）+ 旧段物理回收]
+</code></pre>
+<ul>
+<li><strong>新段 append 不重写旧段</strong>：段写 = <code>OpenWriteSession(physStart)</code> 物理续接，不动旧段；段表注册在 2PC <code>ConfirmCommitted</code> 后（<code>SetOpaqueMeta(SerializeSegments())</code> + <code>WriteMeta()</code>），opaque meta 搭水位线原子落盘（同一块同一 CRC）</li>
+<li><strong>段表 = O(1) 恢复定位</strong>：恢复时 <code>DeserializeSegments(ReadOpaqueMeta())</code> 一次拿到全部段起点（<code>LogicalStart</code> + <code>PhysStart</code> + <code>N₀</code>），免全盘扫描</li>
+<li><strong>段表条目 40B</strong>：<code>LogicalStart 16B + PhysStart 16B + N₀ 8B</code>（<code>PhysStart</code> 必须持久化——逻辑↔物理有 flush padding 偏差，无法从逻辑推算）</li>
+<li><strong>段级 CRC64</strong>：每段独立帧 CRC——崩溃 = 旧段完好、半写段恢复期被悬干裁决截掉</li>
+<li><strong>阈值合并</strong>：段数 ≥ <code>CompactSegmentThreshold</code>（默认 8）自触发 <code>CompactSegmentsCoreAsync</code>——读全段拼接 → 写新基线帧 → 截旧段（<code>TruncatePrefix</code> 到新基线帧起点向下 4096 对齐）→ 段表=单段 + meta 落盘。<strong>低频</strong>——成本 = 一次全量写；<strong>raft 只需最新快照</strong>，段累积不无限增长</li>
+</ul>
+<h3 id="64-streamframewriter-checkpoint-机制逻辑物理换算">6.4 StreamFrameWriter checkpoint 机制（逻辑↔物理换算）</h3>
+<p><code>StreamSnapshot</code> 内部维护帧 checkpoint 列表 <code>_frameCheckpoints</code>——每次 <code>OpenWrite</code> / <code>OpenWriteRange</code> 调用 <code>RecordCheckpoint(logical, physical)</code> 追加（按 logical 单调）。<code>LogicalToPhysical(logical)</code> 二分查找最后一个 <code>logical &lt;= 目标</code> 的 checkpoint，再叠加偏移得到物理地址。</p>
+<p><strong>为何需要</strong>：DIO 写要求扇区对齐（每次 flush 块 = <code>AlignUp(logicalBytes, SectorSize)</code>），但逻辑字节流非对齐。多次 flush 后逻辑↔物理产生 padding 偏差累积，不能简单线性换算。checkpoint = 每个 <code>OpenWrite</code> 起点的双坐标系锚点，二分 + 偏移叠加 = O(log N) 换算。</p>
+<p><code>OpenWriteRange(start, end)</code> 的 flush 回调只推进物理尾（不推进逻辑尾）——逻辑区间由调用方拥有，物理续接。读侧 <code>OpenRead</code> / <code>OpenReadRange</code> 用 <code>AlignDownAddress(LogicalToPhysical(start))</code> 定位物理预读起点。</p>
+<h2 id="7-恢复协议">7. 恢复协议</h2>
+<p><code>SnapshotBase</code> 走 <code>LifecycleBase&lt;SnapshotRecoveryHints&gt;</code> 模板——<code>Initialize</code> → <code>CreateRecovery()</code> 单点 → <code>RecoveryBase&lt;SnapshotRecoveryHints&gt;</code> 状态机驱动（状态机/闸门/进度全在模板）。</p>
+<h3 id="71-streamsnapshot-恢复defaultsnapshotrecovery">7.1 StreamSnapshot 恢复（<code>DefaultSnapshotRecovery</code>）</h3>
+<p><strong>三级回退</strong>（按优先级）：</p>
+<ol>
+<li><strong>hints</strong>（外部注入水位）：<code>SnapshotRecoveryHints.WriteAddress</code> 非 null → 直接采用；<code>PhysicalWriteAddress</code> 缺省走 <code>AlignUpToSector(hints.WriteAddress)</code></li>
+<li><strong>meta O(1) 水位</strong>：<code>MetaPolicyKind != Disabled</code> 时 <code>MetaPolicy.LoadAsync</code> + <code>ReadMetaPayload</code> → 一次拿到 <code>WriteAddress</code>/<code>PhysicalWriteAddress</code>/<code>TruncatedAddress</code>/<code>CommittedWriteAddress</code>/<code>LastCommittedSeq</code>/<code>LastPreparedSeq</code></li>
+<li><strong>Backward 扫描兜底</strong>（Disabled）：<code>LocateLastFrameEnd()</code>——从 <code>CommittedTail</code> 向头按 64KB 块扫，找 <code>FooterMagic</code> 命中 + Footer 完整可读 → 帧尾 = magic 位置 + FooterSize。<strong>前缀洞天然免疫</strong>（从尾向头扫，<code>TruncatePrefix</code> 段内打洞不影响）</li>
+</ol>
+<p><strong>悬干裁决</strong>（append 回滚）：meta <code>LastPreparedSeq &gt; LastCommittedSeq</code> = append 写崩溃（Prepare 后 Confirm 前）→ <code>TruncateSuffix(CommittedWriteAddress)</code> 回滚 append 部分（<code>Overwrite</code> 不可回滚，悬干不涉及）。</p>
+<h3 id="72-incrementalsnapshot-恢复incrementalrecovery">7.2 IncrementalSnapshot 恢复（<code>IncrementalRecovery</code>）</h3>
+<p><strong>三步核心</strong>：</p>
+<ol>
+<li><strong>三水位恢复</strong>（同 StreamSnapshot 三级回退——hints → meta → Backward 扫描）</li>
+<li><strong>悬干裁决</strong>（段写崩溃）：meta <code>LastPreparedSeq &gt; LastCommittedSeq</code> = 段写 Prepare 后 Confirm 前崩溃 → <code>TruncateSuffix(CommittedWriteAddress)</code> 尾截断回滚（未提交段物理清除——失败即清理；已提交段表/数据完好）。<strong>无&quot;自动认领未提交段&quot;语义</strong>——未提交 = 失败 = 清理</li>
+<li><strong>段表 O(1) 加载</strong>：<code>DeserializeSegments(ReadOpaqueMeta())</code> 一次拿到全部段起点（仅已提交段；恢复免全盘扫描）+ <code>_nextSeq = _lastCommittedSeq + 1</code>（2PC 事务序号续接——段写事务单调）</li>
+</ol>
+<p>恢复后 <code>SegmentCount</code> / <code>LatestN0</code> 可直接查询；调用方即可 <code>ReadAllChunksAsync</code> 拿最新快照条目流，或继续 <code>AppendSegmentAsync</code> 追加新段，或 <code>ImportSegmentAsync</code> 安装新快照。</p>
+<h3 id="73-snapshotrecoveryhints-注入">7.3 <code>SnapshotRecoveryHints</code> 注入</h3>
+<pre><code class="lang-csharp">// 上层（如 raft 节点）已知 apply 序号或外部水位时注入
+var hints = new SnapshotRecoveryHints
+{
+    WriteAddress = knownWriteTail,           // 优先采用
+    PhysicalWriteAddress = knownPhysTail,   // 可选；缺省走 AlignUpToSector
+};
+stream.Initialize(hints);   // LifecycleBase&lt;&gt;.Initialize(hints) 透传给恢复核心
+stream.WaitForReady();
+</code></pre>
+<p>hints 优先级最高——适合 raft 节点重启时已知 apply 序号场景；缺省走 meta O(1)；meta 禁用时走 Backward 扫描。</p>
+<h3 id="74-阈值合并与-raft-日志压缩">7.4 阈值合并与 raft 日志压缩</h3>
+<p>raft 日志压缩的核心需求：<strong>只需最新快照</strong>。IncrementalSnapshot 的段累积机制契合——</p>
+<ul>
+<li>每次 raft 快照 = 一段（N₀ = apply 序号）</li>
+<li>新段 append 不重写旧段（快照越频繁写省越多）</li>
+<li>段表 O(1) 恢复定位（免全盘扫描）</li>
+<li>段数达阈值自合并为新基线段（低频全量重写——成本可控）</li>
+<li><code>ImportSegmentAsync</code> 用于 raft 快照安装（替换语义——新镜像段替旧快照集）</li>
+</ul>
+<p>raft 节点重启 → <code>IncrementalRecovery</code> 段表加载 → <code>ReadAllChunksAsync</code> 拿最新快照 → 从 <code>LatestN0</code> 续接 raft log replay。</p>
+<h3 id="75-恢复全景端到端时序">7.5 恢复全景（端到端时序）</h3>
+<pre><code>┌─ SnapshotBase.Initialize(hints) ─────────────────────────────┐
+│  ① OnInitializeBegin: _engine.Initialize()（同步）          │
+│     _metaEngine?.Initialize()（Managed 模式——并行启动）    │
+│  ② CreateRecovery() → 默认/注入 IRecovery&lt;SnapshotRecoveryHints&gt;  │
+│  ③ RecoveryBase 状态机驱动:                                  │
+│     a. WaitForDependenciesAsync: join 主引擎 + meta 引擎就绪 │
+│     b. OnRecoveryCoreAsync(hints): 三水位 + 悬干 + 段表     │
+│  ④ WaitForReady 返回——水位已裁决、段表已加载、可读写        │
+└──────────────────────────────────────────────────────────────┘
+
+三水位恢复链（IncrementalSnapshot）:
+  hints.WriteAddress?  ─┬─►  采纳 + AlignUpToSector  (RaiseProgress 50)
+  缺省 → meta.LoadAsync ─┼─►  SnapshotMetaPayload 推三水位 + CommittedWriteAddress
+  缺省 → Backward 扫描 ─┴─►  LocateLastFrameEnd() 找 FooterMagic (RaiseProgress 50→90)
+
+悬干裁决: meta.LastPreparedSeq &gt; LastCommittedSeq
+  ─► TruncateSuffix(CommittedWriteAddress)  (RaiseProgress 60)
+     未提交段物理清除；已提交段表/数据完好
+
+段表加载: DeserializeSegments(ReadOpaqueMeta()) → _segments
+  _nextSeq = _lastCommittedSeq + 1  (RaiseProgress 90)
+</code></pre>
+<h2 id="8-反模式">8. 反模式</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果 / 正解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>混淆 Ring 区间快照与 StreamSnapshot/IncrementalSnapshot</strong></td>
+<td>Ring 的 <code>OpenSnapshotReader/Writer</code> 是 Ring 导出能力（区间字节流，依附 Ring 生命周期），本子族是独立文件形态（自有 <code>StorageEngine</code>）。混用 = 生命周期错绑/资源泄漏。<strong>正解</strong>：独立选型，Ring 区间导出走 Ring API，文件快照走本子族</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>IncrementalSnapshot 段累积不合并</strong></td>
+<td>段数无限增长 → 恢复期段表解析/读段拼接 O(N) 线性退化；磁盘空间累积。<strong>正解</strong>：设 <code>CompactSegmentThreshold</code>（默认 8）或定期显式 <code>CompactSegmentsAsync</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>跨实例组合 <code>DeleteOnClose=true</code></strong></td>
+<td>跨重启组合必须 <code>DeleteOnClose=false</code>——否则真相源（Ring）重建时快照被清。<code>SnapshotSettings</code> 默认 <code>false</code>，<strong>勿改 true</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>IncrementalSnapshot 关闭 meta（<code>MetaPolicyKind=Disabled</code>）</strong></td>
+<td>段表靠 opaque meta 落盘，禁用 = 段表丢失 → 恢复走 Backward 扫描 O(N) 全盘 + 段表无法续接。<strong>正解</strong>：开 <code>Managed</code> + <code>MetaOpaqueBytes ≥ 8 + 段数上限 × 40</code></td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong><code>Overwrite</code> 当 <code>Append</code> 用</strong></td>
+<td><code>Overwrite</code> 不可回滚——覆写破坏旧数据，2PC 不覆盖，Abort 不能回滚。<strong>正解</strong>：要回滚走 <code>Append</code>/<code>AppendAsync</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>多生产者并发 <code>AppendSegmentAsync</code></strong></td>
+<td>单写者硬性要求（<code>_writing</code> 0/1 闸门）——并发抛 InvalidOperationException。<strong>正解</strong>：多生产者经外部队列汇聚到单写者；raft 快照低频串行天然契合</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong><code>StreamFrameWriter</code> 不 <code>CompleteAsync</code> 也不 <code>using</code></strong></td>
+<td>未完成帧无 Footer → 读侧 magic 校验失败/CRC 无法验。<strong>正解</strong>：<code>await using</code> 自动闭环（DisposeAsync 等价 CompleteAsync）</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong><code>MetaOpaqueBytes</code> 容量不足（IncrementalSnapshot）</strong></td>
+<td>段表序列化超容量 → <code>SetOpaqueMeta</code> 抛 ArgumentException，段表无法落盘。<strong>正解</strong>：按 <code>8 + 段数上限 × 40</code> 估算，留余量（如 100 段 → ≥4008B → 设 4096B）</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>零拷贝 span 跨 await 消费 <code>StreamFrameReader.ReadDataAsync</code></strong></td>
+<td><code>ReadDataAsync</code> 已是拷贝交付（填充 caller buffer），但若用 <code>ReadAllChunksAsync</code> 返回的 <code>ReadOnlyMemory&lt;byte&gt;</code> 跨 await 持有需注意——<code>ArrayPool</code> 租用块在枚举下一次迭代后归还。<strong>正解</strong>：跨 await 持有须拷贝出去</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-想深入指路">9. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Snapshot 子族源码（帧布局/段表/恢复算法/会话双 buffer 流水线）</td>
+<td><code>src/TC.Tier.Runtime/Structures/Snapshot/</code>（各 partial）</td>
+</tr>
+<tr>
+<td>meta 统一协议（opaque 搭车水位线/块格式/Managed/Transport 三模式）</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+</tr>
+<tr>
+<td>Session 协调协议（写/读/检查点三 op、悬挂裁决、故障模型——2PC 协调层）</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+</tr>
+<tr>
+<td>StorageEngine 使用（读写/水位/恢复/Compact/Allocate 写窗口）</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a></td>
+</tr>
+<tr>
+<td>段表恢复细节（IncrementalSnapshot opaque 段表载体/序列化格式）</td>
+<td><a href="segment-table.html"><code>segment-table.md</code></a></td>
+</tr>
+<tr>
+<td>同族 Ring（数据真相源——<code>OpenSnapshotReader/Writer</code> 区间导出能力）</td>
+<td><a href="ring.html"><code>ring.md</code></a></td>
+</tr>
+<tr>
+<td>同族 Log（WAL——raft log replay 续接点）</td>
+<td><a href="log.html"><code>log.md</code></a></td>
+</tr>
+<tr>
+<td>同族索引（HashIndex/BTreeIndex/SkipListIndex——派生数据）</td>
+<td><a href="index.html"><code>index.md</code></a></td>
+</tr>
+<tr>
+<td>同族 Metadata（版本链单值元数据——跨重启单值状态）</td>
+<td><a href="versioned-metadata.html"><code>versioned-metadata.md</code></a></td>
+</tr>
+<tr>
+<td>同族 Mirror（<strong>同族异坐标系</strong>——版本号截断的镜像形态）</td>
+<td><a href="mirror.html"><code>mirror.md</code></a></td>
+</tr>
+<tr>
+<td>Lease 协议（raft 共识层 lease）</td>
+<td><a href="lease-protocol.html"><code>lease-protocol.md</code></a></td>
+</tr>
+<tr>
+<td>Structures 总览（6 子族选型/组合 KV/恢复统一模型）</td>
+<td><a href="structures.html"><code>structures.md</code></a></td>
+</tr>
+<tr>
+<td>raft 日志压缩（IncrementalSnapshot 镜像快照第三部件）</td>
+<td><code>src/TC.Tier.Products/Wal/</code>（TierWal）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="10-端到端示例raft-日志压缩场景">10. 端到端示例：raft 日志压缩场景</h2>
+<p>raft 节点周期性快照 + 重启恢复的典型编排：</p>
+<pre><code class="lang-csharp">using var fs = TierFs.New(&quot;local:///var/tier/raft-node-1&quot;);
+var settings = new IncrementalSnapshotSettings
+{
+    MetaPolicyKind = MetaPolicyKind.Managed,   // 段表靠 opaque 落盘——必开
+    MetaOpaqueBytes = 4096,                   // 容纳 ~100 段表条目
+    CompactSegmentThreshold = 8,              // 8 段自合并
+};
+using var snap = new IncrementalSnapshot(fs, settings);
+snap.Initialize();
+snap.WaitForReady();
+
+// ── 周期性快照（raft apply 回调里调） ──
+async Task OnRaftApplySnapshot(long applyIndex, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; stateStream, CancellationToken ct)
+{
+    // 段 = raft apply 序号快照点；新段 append 不重写旧段
+    await snap.AppendSegmentAsync(applyIndex, stateStream, ct);
+    // 段数 ≥ 8 时自合并为新基线段（覆盖点不变），旧段物理回收
+}
+
+// ── raft 快照安装（外部镜像注入——如 Leader 同步快照） ──
+async Task OnRaftInstallSnapshot(long applyIndex, IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; fullImage, CancellationToken ct)
+{
+    // 替换语义：段表替换为单段，旧段物理回收
+    await snap.ImportSegmentAsync(applyIndex, fullImage, ct);
+}
+
+// ── 重启恢复 ──
+// Initialize() 内部 IncrementalRecovery:
+//   1. 三水位恢复（hints → meta → Backward 扫描）
+//   2. 悬干裁决（meta prepared &gt; committed → 尾截断回滚）
+//   3. 段表 O(1) 加载 + _nextSeq 续接
+// 恢复后即可读最新快照 + raft log replay 续接
+async Task&lt;IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt;&gt; LoadLatestSnapshot(CancellationToken ct)
+{
+    Console.WriteLine($&quot;段数={snap.SegmentCount}, 最新N0={snap.LatestN0}&quot;);
+    return snap.ReadAllChunksAsync(ct);   // 逐段顺序拼接 + CRC64 校验
+}
+</code></pre>
+<p><strong>关键点</strong>：</p>
+<ul>
+<li><code>MetaPolicyKind=Managed</code> 必开——段表 opaque 落盘，恢复 O(1) 定位</li>
+<li><code>CompactSegmentThreshold</code> 调到实际段数上限内（默认 8 适合多数场景）</li>
+<li><code>ImportSegmentAsync</code> 用于 raft 快照安装（Leader → Follower 同步）</li>
+<li>段级 CRC64 + 悬干裁决 = 崩溃安全（未提交段物理清除，已提交段完好）</li>
+<li>raft log replay 从 <code>LatestN0 + 1</code> 续接（apply 序号单调递增）</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/snapshot.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

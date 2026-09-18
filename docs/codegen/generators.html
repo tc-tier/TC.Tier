@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>源生成器家族总览（TC.Tier.CodeGen） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="源生成器家族总览（TC.Tier.CodeGen） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen/docs/generators.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="源生成器家族总览tctiercodegen">源生成器家族总览（TC.Tier.CodeGen）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：要用 TC.Tier 标注驱动编译期代码生成的开发者（结构/产品/协议/线格式/命令壳作者）。
+<strong>回答什么</strong>：每个生成器吃什么标注、吐什么代码、报什么诊断、详细文档在哪。
+<strong>形态</strong>：本包是<strong>纯生成器</strong>（IIncrementalGenerator——零运行时反射，NativeAOT 安全）；标注定义在
+<code>TC.Tier.CodeGen.Abstractions</code>（零依赖，见标注面总概）。全部生成器经 <code>Directory.Build.props</code>
+以 Analyzer 引用全局注入——<strong>引用 TC.Tier 包即生效，零手工安装</strong>。</p>
+</blockquote>
+<hr>
+<h2 id="0-生成器一览按你想生成什么找">0. 生成器一览（按&quot;你想生成什么&quot;找）</h2>
+<table>
+<thead>
+<tr>
+<th>你想要</th>
+<th>标注</th>
+<th>生成器</th>
+<th>产出</th>
+<th>详细文档</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>结构布局 codec（零手写字节序）</td>
+<td><code>[BinaryLayout]</code> + <code>[Valid*]</code> 族</td>
+<td><code>BinaryLayoutGenerator</code></td>
+<td><code>XxxCodec</code>：<code>StructSize</code>/<code>Offset_*</code>/<code>Read_*</code>/<code>Write_*</code>/<code>Validate</code>/<code>Create()</code></td>
+<td><a href="COORDINATION.html">标注面总概</a> §3</td>
+</tr>
+<tr>
+<td>Ring/索引封闭类型</td>
+<td><code>[assembly: RingKey(typeof(TKey))]</code></td>
+<td><code>RingKeyGenerator</code></td>
+<td><code>RingOfXxx</code>/<code>HashOfXxx</code>/<code>BTreeOfXxx</code>/<code>SkipListOfXxx</code> 封闭薄类 + <code>CreateAsync</code></td>
+<td><a href="../runtime/ring.html">ring.md</a> §3.1</td>
+</tr>
+<tr>
+<td>KV 组合存储</td>
+<td><code>[assembly: KvStore(...)]</code></td>
+<td><code>KvStoreGenerator</code></td>
+<td><code>TierKvOfXxx</code> 存储族 + 会话类型</td>
+<td><a href="../products/tierkv.html">tierkv.md</a></td>
+</tr>
+<tr>
+<td>RPC 线消息族</td>
+<td><code>[WireMessage]</code>+<code>[WireMessageTag(n)]</code></td>
+<td><code>WireMessageGenerator</code></td>
+<td><code>XxxCodec.Encode/TryDecode</code> + <code>Tag*</code> 常量（tag 判别/公共前缀/字段序全生成物）</td>
+<td>本文 §2</td>
+</tr>
+<tr>
+<td>变长集合线编码</td>
+<td><code>[WireArray]</code></td>
+<td><code>WireArrayGenerator</code></td>
+<td><code>[Count 4B][item×N]</code> codec（<code>Encode</code>/<code>TryDecode</code>）</td>
+<td>本文 §2</td>
+</tr>
+<tr>
+<td>常量表防冲突</td>
+<td><code>[ConstantRegistry]</code></td>
+<td><code>ConstantRegistryGenerator</code></td>
+<td>重复值编译期 Error + <code>Zones</code> 区间谓词注入</td>
+<td>本文 §3</td>
+</tr>
+<tr>
+<td>TierFs 类型化重载族</td>
+<td><code>[MediumOptions(&quot;nature&quot;)]</code></td>
+<td><code>TierFsGenerator</code></td>
+<td><code>TierFs.New/Open(spec, TOptions, logger)</code> 重载族</td>
+<td>本文 §4</td>
+</tr>
+<tr>
+<td>TierFs 协议自动注册</td>
+<td><code>[NetworkProtocol(&quot;s3&quot;)]</code> + <code>[assembly: TierProtocolExported]</code></td>
+<td><code>TierFsGenerator</code></td>
+<td>ModuleInitializer 注册代码（引用协议程序集即挂载，消费方零代码）</td>
+<td>本文 §4</td>
+</tr>
+<tr>
+<td>命令壳（CLI+HTTP 双执行面）</td>
+<td><code>[CommandGroup]</code> 族</td>
+<td><code>CommandGenerator</code></td>
+<td><code>XxxCli</code>/<code>XxxHttp</code> 静态类（参数绑定/帮助/补全/退出码）</td>
+<td><a href="command-shell.html">command-shell.md</a></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-线格式族wiremessage--wirearray">1. 线格式族（WireMessage / WireArray）</h2>
+<p><strong>消息族</strong>（tag 判别 + 公共前缀 + 变长成员）：</p>
+<pre><code class="lang-csharp">[WireMessage]                                   // 族根：声明公共前缀字段（全体子类共享）
+public abstract partial class RaftMsg
+{
+    public long Term { get; set; }              // 声明序 = 线顺序（零偏移知识）
+}
+
+[WireMessageTag(0x01)]                          // 子类 tag（族内唯一——重复值 TCSG050 Error）
+public sealed partial class RequestVote : RaftMsg
+{
+    public long LastLogIndex { get; set; }
+    [WireMember(8)]                             // 变长成员防御上限（缺此标注 TCSG052）
+    public byte[] Data { get; set; } = [];
+}
+
+byte[] wire = RaftMsgCodec.Encode(msg);                          // 生成物（挂在族根）
+bool ok = RaftMsgCodec.TryDecode(wire, out RaftMsg? decoded);    // 未知 tag/截断/超上限 = false（畸形拦截）
+</code></pre>
+<ul>
+<li>生成 <code>XxxCodec.Encode → byte[]</code> / <code>TryDecode(ReadOnlySpan&lt;byte&gt;, out msg) → bool</code> 与 <code>Tag子类名</code>
+常量；tag 判别、公共前缀、字段声明序、小端字节序全部生成物。</li>
+<li>成员支持：bool/基元整型、标注 <code>[BinaryLayout]</code> 的 struct（嵌套件）、<code>byte[]</code>/<code>ReadOnlyMemory&lt;byte&gt;</code>
+（<code>[Len 4B][bytes]</code>）、数组/列表（<code>[Count 4B][item×N]</code>）。</li>
+<li><strong>变长集合 struct</strong>（<code>[WireArray]</code>）：非数组字段构成定长前缀 + 恰一个数组字段承载变长区；
+<code>Count &gt; MaxCount = TryDecode false</code>。嵌套项的项大小经其 <code>StructSize</code> 获得（须开
+<code>BinaryLayoutFeatures.StructSize</code>）。</li>
+</ul>
+<hr>
+<h2 id="2-常量注册表constantregistry">2. 常量注册表（ConstantRegistry）</h2>
+<pre><code class="lang-csharp">[ConstantRegistry(Zones = new[] {
+    &quot;IsCore:0x00-0x4F&quot;, &quot;IsUserRegistrable:0x60-0xAF&quot;, &quot;IsForbidden:0x50-0x5F,0xB0-0xFF&quot; })]
+public static partial class ProtocolId
+{
+    public const byte Raft = 0x10;
+    public const byte Mirror = 0x20;      // 撞值 → TCSG040 Error（编译期锁死）
+}
+</code></pre>
+<ul>
+<li>类内全部整型 <code>const</code> 数值两两相异——重复即 <code>TCSG040</code>（FrameKind/ProtocolId/协议域防冲突）。</li>
+<li><code>Zones</code> 可选：生成 <code>static bool 谓词(value)</code> 注入本类（类须 <code>partial</code>）；混合整型类型报 <code>TCSG044</code>。</li>
+</ul>
+<hr>
+<h2 id="3-tierfs-生成面重载族--协议注册桥tierfsgenerator">3. TierFs 生成面（重载族 + 协议注册桥，TierFsGenerator）</h2>
+<p><strong>类型化重载族</strong>——options 子类贴 <code>[MediumOptions]</code>，消费方即得类型化工厂重载：</p>
+<pre><code class="lang-csharp">[MediumOptions(&quot;local&quot;, Verbs = &quot;New,Open,OpenOrCreate&quot;)]   // nature = 本性四类（local/memory/virtual/network）
+public sealed class DiskFileSystemOptions : FileSystemOptions { ... }
+// 生成：TierFs.New/Open/OpenOrCreate(&quot;local:///...&quot;, DiskFileSystemOptions, logger) 类型化重载族
+//（virtual 拆两簇：FormatOptions=Verbs&quot;New&quot; / OpenOptions=Verbs&quot;Open&quot;——各发各的动词）
+</code></pre>
+<p><strong>协议自动注册</strong>——实现 <code>ITierProtocolBuilder</code> + 两行标注，引用即挂载：</p>
+<pre><code class="lang-csharp">[NetworkProtocol(&quot;s3&quot;)]                            // 协议键 = spec path 首段
+public sealed class S3ProtocolBuilder : ITierProtocolBuilder { ... }
+
+[assembly: TierProtocolExported]                   // 程序集级导出声明（消费方桥精确扫描——零误扫）
+// 消费方引用本程序集 → TierFsGenerator 发射 ModuleInitializer 注册 → TierFs.Open(&quot;network:///s3/...&quot;) 即达
+</code></pre>
+<ul>
+<li>未知 nature 值编译期报错（拼错即炸，fail-fast）；注册走无参构造 + ModuleInitializer——零反射。</li>
+</ul>
+<hr>
+<h2 id="4-诊断-id-速查">4. 诊断 ID 速查</h2>
+<table>
+<thead>
+<tr>
+<th>段</th>
+<th>归属</th>
+<th>例子</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCSG001-002</td>
+<td>BinaryLayout</td>
+<td>Size 不准 / 嵌套 struct 缺标注</td>
+</tr>
+<tr>
+<td>TCSG020</td>
+<td>RingKey</td>
+<td>声明不满足 <code>unmanaged</code> 约束</td>
+</tr>
+<tr>
+<td>TCSG022-023</td>
+<td>KvStore</td>
+<td>KvStore 声明违规</td>
+</tr>
+<tr>
+<td>TCSG040/044</td>
+<td>ConstantRegistry</td>
+<td>常量重复 / Zones 混合整型类型</td>
+</tr>
+<tr>
+<td>TCSG050/052</td>
+<td>WireMessage</td>
+<td>tag 重复 / 变长成员缺上限</td>
+</tr>
+<tr>
+<td>TCSG054-060</td>
+<td>Command</td>
+<td>路径冲突/参数未标注/GET 带 body 等</td>
+</tr>
+<tr>
+<td>TCSG120-122</td>
+<td>TierFs 规范分析器（独立包）</td>
+<td>scheme 拼错/参数不适用介质——见 <a href="tierfs-spec.html">TierFs 规范分析器</a></td>
+</tr>
+<tr>
+<td>TCSG130-139</td>
+<td>通用纪律分析器（独立包）</td>
+<td>分层依赖/禁用模式——见 <a href="tier-analyzers.html">Tier 分析器</a></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-反模式">5. 反模式</h2>
+<ol>
+<li><strong>手写字节序/偏移常量</strong>——布局知识归标注声明 + 生成物；手拼即违规（漂移无编译期守卫）。</li>
+<li><strong>绕过封闭薄类直接继承开放泛型</strong>——<code>[RingKey]</code> 产出的封闭类是唯一消费面（CS0122 防误绑）。</li>
+<li><strong>在标注上写运行时逻辑</strong>——标注是纯声明；生成物之外的行为放partial 方法/扩展。</li>
+</ol>
+<hr>
+<h2 id="6-想深入指路">6. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>标注全集与 BinaryLayout 使用细节</td>
+<td><a href="COORDINATION.html">标注面总概</a></td>
+</tr>
+<tr>
+<td>命令壳全参数（CLI/HTTP/绑定规则/补全）</td>
+<td><a href="command-shell.html">command-shell.md</a></td>
+</tr>
+<tr>
+<td>生成器/分析器诊断 ID 与豁免</td>
+<td>生成器源码头注释 + <a href="tier-analyzers.html">Tier 分析器</a></td>
+</tr>
+<tr>
+<td>结构侧消费形态（RingKey/KvStore 落地示例）</td>
+<td><a href="../runtime/ring.html">ring.md</a> / <a href="../products/tierkv.html">tierkv.md</a></td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.CodeGen/docs/generators.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

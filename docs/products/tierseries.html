@@ -201,7 +201,7 @@ await series.FlushAsync(ct);
 </tr>
 <tr>
 <td><code>GetStatsAsync()</code></td>
-<td>First/Last/SampleCount/IndexEntryCount/TrimmedUntil/Head/Tail/DurableTail</td>
+<td><code>FirstTimestamp</code>/<code>LastTimestamp</code>/<code>SampleCount</code>/<code>IndexEntryCount</code>/<code>TrimmedUntilTimestamp</code>/<code>HeadAddress</code>/<code>TailAddress</code>/<code>DurableTail</code></td>
 </tr>
 </tbody>
 </table>
@@ -212,14 +212,14 @@ await series.FlushAsync(ct);
     SeriesName = &quot;app.metrics&quot;,
     DenseSeries = true,                 // 稠密多序列模式
     SeriesCapacity = 1 &lt;&lt; 20,           // 序列数护栏（缺省 2²⁰，超限 fail-fast）
-}).StartAsync(ct);
+}).StartAsync(ct: ct);
 
 // 三参 API = 命名序列（首写惰性注册，零预注册成本）
 await series.AppendAsync(routeId, timestamp, value, ct);
 await foreach (var (ts, v, addr) in series.RangeAsync(routeId, from, to, ct)) { }
 var latest = await series.LatestAsync(routeId, ct);
 var stats  = await series.GetStatsAsync(routeId, ct);
-await series.TruncateAsync(routeId, beforeExclusive: cutoff, ct);
+await series.TruncateAsync(routeId, beforeTimestampExclusive: cutoff, ct);
 
 // 两参 API = 默认序列（seriesId 0）——与命名序列同实例共存，零迁移
 await series.AppendAsync(timestamp, value, ct);
@@ -255,7 +255,7 @@ Timescale 连续聚合的&quot;只取算子面&quot;形态）。</li>
 <ul>
 <li><code>RetentionTime</code> / <code>MaxBytes</code> 后台轮（<code>RetentionScanInterval</code>，缺省 1 分钟）：
 TTL 与字节上限取更晚锚回收；水位单调不回退；空闲轮次零写入。</li>
-<li><code>TruncateAsync(beforeExclusive)</code> 显式回收，返回回收样本数。</li>
+<li><code>TruncateAsync(beforeTimestampExclusive)</code> 显式回收，返回回收样本数。</li>
 </ul>
 <h2 id="持久化与恢复">持久化与恢复</h2>
 <p>文件布局（按序列名）：<code>{SeriesName}.ts.ring</code>（数据）/ <code>.ts.index</code>（时间索引）/ <code>.ts.water</code>（水位）。</p>
@@ -367,7 +367,7 @@ fail-fast；多序列请启用 <code>DenseSeries</code>。</li>
 <h2 id="想深入">想深入</h2>
 <ul>
 <li>同族产品：<a href="tierkv.html">TierKv</a>、<a href="tierqueue.html">TierQueue</a>——组合积木语义可参照。</li>
-<li>raft 组合档：<a href="../TC.Tier.Products.Net/docs/raft-node.md">Products.Net raft-node</a>。</li>
+<li>raft 组合档：<a href="raft-node.html">Products.Net raft-node</a>。</li>
 </ul>
 
 </article>

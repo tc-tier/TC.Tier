@@ -122,7 +122,7 @@ public sealed class TrafficRoot
 <tr>
 <td><code>TrafficRootCli</code></td>
 <td>命令行</td>
-<td><code>Run(args, service, stdout, results)</code>（返回退出码）、<code>WriteHelp</code>、<code>CompleteNext</code>（补全）、<code>CommandPaths</code></td>
+<td><code>Run(args, service, stdout, stderr[, json][, ct][, results])</code>（返回退出码）、<code>WriteHelp</code>、<code>CompleteNext</code>（补全）、<code>CommandPaths</code></td>
 </tr>
 <tr>
 <td><code>TrafficRootHttp</code></td>
@@ -132,14 +132,17 @@ public sealed class TrafficRoot
 </tbody>
 </table>
 <p>CLI 接线（<code>Main</code> 里三行）：</p>
-<pre><code class="lang-csharp">int exitCode = TrafficRootCli.Run(args, new TrafficRoot(), Console.Out, results);
+<pre><code class="lang-csharp">int exitCode = TrafficRootCli.Run(args, new TrafficRoot(), Console.Out, Console.Error, results: results);
 return exitCode;
 </code></pre>
 <p>HTTP 接线（ASP.NET Core 路由兜底形态——不匹配返回 null，宿主续走自己的 404/静态面）：</p>
 <pre><code class="lang-csharp">app.Map(&quot;/traffic/{*path}&quot;, async ctx =&gt;
 {
     var result = await TrafficRootHttp.TryHandleAsync(ctx.Request, new TrafficRoot(), results);
-    if (result is not null) await result.WriteToAsync(ctx.Response);
+    if (result is not null)
+    {
+        ctx.Response.StatusCode = result.Status;   // CommandHttpResponse = 纯数据载体（Status/ContentType/Body）——写响应归宿主
+    }
 });
 </code></pre>
 <p><code>results</code> 为消费方实现的 <code>ICommandResults</code>（成功载荷渲染 + 错误写出——模式匹配自家异常提取
@@ -167,6 +170,29 @@ HTTP 缺省路由 = <code>/{各级组名}/{命令名}</code>（<code>[Command]</
 <li><strong>错误映射（<code>[CommandError(typeof(异常), 状态码)]</code>）</strong>：声明式异常→状态码/退出码映射，
 方法与组两级可标（<code>AllowMultiple</code>）；未声明的异常 → 500 兜底。</li>
 </ul>
+<h2 id="body-绑定">body 绑定</h2>
+<p><code>[CommandBody]</code> 参数类型任意复杂——POCO 强类型（record/类）、<code>JsonElement</code> 直通、可空声明 <code>T?</code>
+皆可，按参数类型自然分流，CLI/HTTP 双面同语义：</p>
+<pre><code class="lang-csharp">public sealed record OrchSaveBody(string OrchId, long IfRev);
+
+[Command(&quot;orch-save&quot;)]
+public async Task&lt;Receipt&gt; SaveAsync(
+    [CommandArg(0)] string orchId,
+    [CommandBody] OrchSaveBody body, ...)   // POCO 绑定——schema 可从类型反射派生
+</code></pre>
+<ul>
+<li><strong>JsonSerializerContext 注册（AOT 契约）</strong>：body 走 STJ source-gen 查表反序列化（零反射）——
+消费方在自家 <code>JsonSerializerContext</code> 标注 <code>[JsonSerializable(typeof(&lt;body 类型&gt;))]</code>，
+经调用点 <code>json:</code> 参数注入 <code>Run</code>/<code>RunAsync</code>/<code>TryHandleAsync</code>；含 body 的命令不注入 → 400 / exit 2。</li>
+<li><strong>错误回执语义</strong>（HTTP 400 / CLI exit 2）：
+<ul>
+<li>body 类型未注册于 context——<code>GetTypeInfo</code> 查表未命中即拦截（CLI 在读 stdin 前），
+回执指明 <code>[JsonSerializable]</code> 注册方式，不落 <code>ArgumentNullException</code>/NRE 逃出错误面；</li>
+<li>JSON 语法/形状非法——<code>JsonException</code> → <code>body JSON 解析失败: &lt;原因&gt;</code>；</li>
+<li>JSON null——非可空声明（<code>T</code>）→ <code>body 不能为 null</code>；可空声明（<code>T?</code>）→ 绑定为 null 传入命令。</li>
+</ul>
+</li>
+</ul>
 <h2 id="怎么选">怎么选</h2>
 <ul>
 <li>命令行工具/管理 CLI → 只接 <code>*Cli</code>；</li>
@@ -181,7 +207,9 @@ HTTP 缺省路由 = <code>/{各级组名}/{命令名}</code>（<code>[Command]</
 占用即 TCSG060 编译期报；此外生成器标识符已全面保留前缀化，用户参数名任意取不撞名；</li>
 <li><strong>嵌套组全链无同型成员且无可访问无参构造</strong>——获取表达式回退 <code>new</code>，生成物直接编译失败
 （CS7036 形态）——把组实例暴露为任一祖辈组的 public 属性/字段即可；</li>
-<li><strong>命令重名/空名</strong>——编译期诊断 TCSG054/TCSG055，不要指望运行期覆盖。</li>
+<li><strong>命令重名/空名</strong>——编译期诊断 TCSG054/TCSG055，不要指望运行期覆盖；</li>
+<li><strong>body 类型忘了注册进 JsonSerializerContext</strong>——运行期 400/exit 2 回执会指名（编译期无法跨程序集校验），
+接线报错先查 <code>[JsonSerializable]</code> 收口与 <code>json:</code> 参数注入。</li>
 </ul>
 <h2 id="想深入">想深入</h2>
 <ul>

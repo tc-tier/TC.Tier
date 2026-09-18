@@ -199,10 +199,9 @@ byte[] got = mirror.ReadOpaqueMeta().ToArray();    // 读最近已提交块的 o
 // 恢复核心（= join）：WaitForDependenciesAsync 双 await → MetaPolicy.LoadAsync
 </code></pre>
 <h3 id="24-引擎直连消费方事务日志测试自管引擎全生命周期">2.4 引擎直连消费方（事务日志/测试——自管引擎全生命周期）</h3>
-<pre><code class="lang-csharp">// 自管引擎全生命周期：结构层 internal 构造 + 类面 Initialize（外部经 options.Builder(fs).StartAsync()）
-using var metaEngine = new StorageEngine(fs, metaOptions);
-metaEngine.Initialize();
-metaEngine.WaitForReady();
+<pre><code class="lang-csharp">// 自管引擎全生命周期：外部经 options.Builder(fs).Start()（构造+Initialize+WaitForReady 一步；
+// Runtime 内部组件如 TransactionLog 才走 internal 构造 + 类面 Initialize/WaitForReady）
+using var metaEngine = new StorageEngineOptions(&quot;meta-engine&quot;).Builder(fs).Start();
 using var policy = new ManagedMetaPolicy&lt;MyHeader, MyPayload&gt;(layout, metaEngine);
 if (!policy.Load())   // false = 空/无/损坏 三态（全新初始化本就从 false 开始）
 {

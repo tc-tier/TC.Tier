@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Mirror 使用指南——字节镜像 / 版本链 / 整体 vs 分页 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Mirror 使用指南——字节镜像 / 版本链 / 整体 vs 分页 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/mirror.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="mirror-使用指南字节镜像--版本链--整体-vs-分页">Mirror 使用指南——字节镜像 / 版本链 / 整体 vs 分页</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要整体状态基线外存的组件开发者（镜像备份 / SortedIndex 桥接主存储 / 跨重启恢复）。
+<strong>回答什么</strong>：WholeMirror vs PagedMirror 怎么选 / 三拍会话 / 版本链 / 2PC Abort 语义 / 恢复。
+<strong>本篇只讲机制</strong>——帧字节布局见源码注释（<code>Structures/Mirror/Contracts/MirrorFrame.cs</code>）。
+<strong>定位</strong>：Structures/ 6 子族之一，<strong>搭配件</strong>；与 Snapshot 同族异坐标系（版本号截断 vs 字节截断）。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>Mirror = 字节镜像 + 版本链 + 2PC 六件套（Abort = 丢弃未确认会话）。</strong>
+WholeMirror 整体流式（三拍会话：<code>BeginSession → AppendChunk × N → EndSession</code>，不知尺寸、零缓冲、CRC64 边写边累积）；PagedMirror 逐页增量（<code>WritePage</code> 一页一帧，可乱序，CRC32C）；<code>EndSession</code> flush 才落盘；版本链 N=2 轮替（当前 + 上一 checkpoint，更老即收）。</p>
+<p><strong>最小可用代码（WholeMirror，单 checkpoint + 2PC 提交）</strong>：</p>
+<pre><code class="lang-csharp">using var mirror = new WholeMirror(fs, new WholeMirrorSettings { MetaPolicyKind = MetaPolicyKind.Managed });
+mirror.Initialize();                                              // 后台恢复
+mirror.WaitForReady();                                            // 等就绪
+
+var head = mirror.BeginSession();                                 // 帧三拍①：圈头 + 写瘦头
+mirror.AppendChunk(stateBytes);                                   // 帧三拍②：追加 payload
+mirror.EndSession();                                              // 帧三拍③：CRC 收官 + flush
+mirror.Prepare(seq: 1);                                           // 2PC①：数据 fsync + meta 落 LastPreparedSeq
+mirror.ConfirmCommitted(seq: 1);                                  // 2PC②：CAS 推进 + 链头推进 + N=2 回收
+
+int n = mirror.ReadChunk(mirror.HighestVersionAddress, 0, dst);   // 读已提交链头
+</code></pre>
+<p>最小模型四步即覆盖 Mirror 全部核心机制（帧三拍 + flush + 2PC + 链头推进 + N=2 回收）；恢复时构造 + Initialize + WaitForReady 三步自动重建链头。</p>
+<hr>
+<h2 id="1-定位">1. 定位</h2>
+<ul>
+<li><strong>角色</strong>：整体状态基线外存。与 Ring/Log 主结构搭配——主结构是数据真相源，Mirror 是基线镜像（恢复时按基线截断 + 增量重放）。</li>
+<li><strong>形态差异</strong>：
+<ul>
+<li><strong>WholeMirror</strong>：整体单链 checkpoint。每 checkpoint 一个完整新版本，整帧流式写入（不知总长也能写），适合&quot;整体快照外存 / SortedIndex 桥接主存储&quot;。</li>
+<li><strong>PagedMirror</strong>：per-page 多链。每 checkpoint 内每页一个帧（按 <code>PageId</code> 寻址独立链），可乱序写入，适合&quot;按页增量镜像&quot;。</li>
+</ul>
+</li>
+<li><strong>与 Snapshot 同族异坐标系</strong>：
+<ul>
+<li>Mirror 按版本号截断——保留 N=2 个 checkpoint 版本，更老物理回收；恢复按版本号识别&quot;最后一批未裁决 record&quot;。</li>
+<li>Snapshot 按字节截断——纯流式形态，无版本概念（详见 <code>snapshot.md</code>）。</li>
+</ul>
+</li>
+<li><strong>桥接器 <code>WholeMirrorPersistence</code></strong>（位于 <code>Runtime/DataMirror/</code>）：<code>ITransferPersistence</code> 的内置桥接器，自持一个 <code>WholeMirror</code>（三段式相位 ↔ 三拍会话；Confirm 挂 WriteFooter，Abort 挂尾截断）。<strong>注</strong>：索引族（HashIndex/SortedIndex）现已改用自建主存储（<code>PersistenceKind.Builtin</code>），镜像通道注入面已退役——见 <code>index.md</code> §6；此桥接器仍保留给其他需&quot;借镜像存储能力&quot;的组件（按 <code>Runtime/COORDINATION.md</code> §6 铁律 8 桥接模式）。</li>
+</ul>
+<h3 id="11-选型速查">1.1 选型速查</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>WholeMirror</th>
+<th>PagedMirror</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>链拓扑</td>
+<td>全局单链（<code>MirrorChainKind.Single</code>）</td>
+<td>per-page 多链（<code>MirrorChainKind.PerKey</code>，按 <code>PageId</code>）</td>
+</tr>
+<tr>
+<td>写门面</td>
+<td>三拍会话：<code>BeginSession → AppendChunk × N → EndSession</code>（流式，不知尺寸）</td>
+<td>逐页 <code>WritePage</code>（每页一帧，可乱序）</td>
+</tr>
+<tr>
+<td>CRC 算法</td>
+<td>CRC64（<code>FLAG_CRC64</code>，magic WMHD/WMFT）</td>
+<td>CRC32C（<code>FLAG_CRC32C</code>，magic PMVH/PMFT）</td>
+</tr>
+<tr>
+<td>恢复快路径</td>
+<td>尾锚直达（<code>Locate(尾 magic, Last)</code> + <code>PreviousVersion</code> 回跳 N=2）</td>
+<td>全走链按 <code>PageId</code> 重建（每页独立链头）</td>
+</tr>
+<tr>
+<td>适用形态</td>
+<td>整体快照外存 / 桥接 SortedIndex 主存储</td>
+<td>按页增量镜像（页粒度更新）</td>
+</tr>
+<tr>
+<td>N=2 保留窗口</td>
+<td>全局第二新地址</td>
+<td>所有页 keepAddr 最小值（误删某页在用版本由全局水位兜底）</td>
+</tr>
+<tr>
+<td>flush 时机</td>
+<td><code>EndSession</code> 内部 flush</td>
+<td>逐页不 flush，<code>Prepare</code> 统一 flush</td>
+</tr>
+<tr>
+<td>写并发模型</td>
+<td>单线程会话（多生产者经队列汇聚）</td>
+<td>单线程会话，多链在会话内可乱序</td>
+</tr>
+</tbody>
+</table>
+<p><strong>选型口诀</strong>：整体镜像（一整段状态序列化）→ WholeMirror；按页镜像（页粒度独立更新，部分页不变即跳过）→ PagedMirror。两者均与 SortedIndex 同协议（2PC 六件套 + meta 三模式），可在不同 checkpoint 域并存。</p>
+<hr>
+<h2 id="2-settings-全参数">2. Settings 全参数</h2>
+<p>读 <code>MirrorSettings.cs</code> + <code>Settings.cs</code> 基类。两子类配置项差异：<code>PagedMirrorSettings</code> 增 <code>LogPageSizeBits</code>，<code>WholeMirrorSettings</code> 无专属字段。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>类型</th>
+<th>WholeMirror 默认</th>
+<th>PagedMirror 默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MainEngine</code></td>
+<td><code>StorageEngineOptions</code></td>
+<td>单段稀疏（<code>enableSegmentation=false, preallocateFile=false, segmentGrowthLimit=64MB</code>）</td>
+<td>同左</td>
+<td>Mirror 版本链是单段追加流——分段默认关，稀疏按需增长</td>
+</tr>
+<tr>
+<td><code>Name</code></td>
+<td><code>string</code></td>
+<td><code>&quot;tc.mirror&quot;</code></td>
+<td><code>&quot;tc.mirror&quot;</code></td>
+<td>引擎名（便捷构造默认值）</td>
+</tr>
+<tr>
+<td><code>PreallocateFile</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td><code>false</code></td>
+<td>创建时不预分配文件</td>
+</tr>
+<tr>
+<td><code>DeleteOnClose</code></td>
+<td><code>bool</code></td>
+<td><code>false</code></td>
+<td><code>false</code></td>
+<td>跨重启组合必须 <code>false</code>（否则恢复时真相源被清）</td>
+</tr>
+<tr>
+<td><code>MetaPolicyKind</code></td>
+<td><code>MetaPolicyKind</code></td>
+<td><code>Disabled</code></td>
+<td><code>Disabled</code></td>
+<td>meta 持久化策略；<code>Managed</code> 起独立 meta 引擎，<code>Transport</code> 嵌入主流，<code>Disabled</code> 不持久化水位</td>
+</tr>
+<tr>
+<td><code>MetaOpaqueBytes</code></td>
+<td><code>int</code></td>
+<td><code>0</code></td>
+<td><code>0</code></td>
+<td>外部 opaque 容量；启动后不可改</td>
+</tr>
+<tr>
+<td><code>LogPageSizeBits</code></td>
+<td><code>int</code></td>
+<td>—</td>
+<td><code>22</code>（PageSize=4MB）</td>
+<td>仅 PagedMirror；<code>PageSize = 1 &lt;&lt; LogPageSizeBits</code>，与源结构页对齐</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>N=2 轮替是固定策略（保留当前 + 上一 checkpoint），不设配置项。段增长上限 <code>DefaultSegmentGrowthLimit = 64MB</code> 是 const 常量。</p>
+</blockquote>
+<p>便捷构造（推荐起点）：</p>
+<pre><code class="lang-csharp">var wholeSettings   = new WholeMirrorSettings();                                   // 默认单段稀疏
+var pagedSettings   = new PagedMirrorSettings { LogPageSizeBits = 12 };            // PageSize=4096（测试轻量）
+</code></pre>
+<p>完整构造（自定义段几何 / hints / 清理策略）：</p>
+<pre><code class="lang-csharp">var settings = new WholeMirrorSettings(
+    new StorageEngineOptions(&quot;kv.mirror&quot;, 64L &lt;&lt; 20, enableSegmentation: false)
+        .WithDeleteOnClose(false))
+{
+    MetaPolicyKind   = MetaPolicyKind.Managed,
+    MetaOpaqueBytes  = 256,
+};
+</code></pre>
+<hr>
+<h2 id="3-构造与生命周期">3. 构造与生命周期</h2>
+<p>Mirror 子类无 <code>Create</code> 工厂（区别于 <code>RingOfLong.Create</code> 那种封闭类型一步就绪）——直接 <code>new</code> + <code>Initialize</code> + <code>WaitForReady</code> 三步。<code>Initialize</code> 启动后台恢复（非阻塞）；<code>WaitForReady</code> 等恢复完成。Dispose 幂等。</p>
+<pre><code class="lang-csharp">using var mirror = new WholeMirror(fs, settings);
+mirror.Initialize();          // 启动后台恢复（OnInitializeBegin：主引擎 + Managed meta 引擎并行启动）
+mirror.WaitForReady();        // 等恢复核心完成（meta Load → 三级回退 → 悬干裁决 → 链头重建）
+// 此处 IsReady=true，可读写
+</code></pre>
+<p><strong>桥接形态</strong>（<code>WholeMirrorPersistence</code>）：构造零 IO，首次 <code>TryOpenWrite/TryOpenRead</code> 触发 <code>Initialize + WaitForReady</code>——checkpoint / 恢复路径天然是等待点。</p>
+<p><strong>关键状态查询</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>属性</th>
+<th>类型</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IsReady</code></td>
+<td><code>bool</code></td>
+<td>恢复完成可服务</td>
+</tr>
+<tr>
+<td><code>CurrentVersion</code></td>
+<td><code>long</code></td>
+<td>已提交 checkpoint 版本号（单调；空卷=0）</td>
+</tr>
+<tr>
+<td><code>HighestVersionAddress</code></td>
+<td><code>LogicalAddress</code></td>
+<td>已提交链头地址</td>
+</tr>
+<tr>
+<td><code>HasCommittedVersion</code></td>
+<td><code>bool</code></td>
+<td>是否已有已提交版本——Empty 是合法地址（首 record 在地址 0），<strong>不能用地址值判有无</strong></td>
+</tr>
+<tr>
+<td><code>LowestVersionAddress</code></td>
+<td><code>LogicalAddress</code></td>
+<td>回收边界（最老保留版本地址；Empty=未回收过）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>跨实例恢复示例</strong>——同一卷上第二实例构造期尾锚扫盘恢复链头：</p>
+<pre><code class="lang-csharp">// 第一实例：写两个 checkpoint 后 Dispose（卷上保留数据）
+var vol = new TestVolume();
+var settings1 = new WholeMirrorSettings(
+    new StorageEngineOptions(&quot;test.0&quot;, 1L &lt;&lt; 24, enableSegmentation: false).WithDeleteOnClose(false));
+LogicalAddress v2Addr;
+using (var mirror1 = new WholeMirror(vol.Fs, settings1))
+{
+    mirror1.Initialize();
+    mirror1.WaitForReady();
+    WriteCheckpoint(mirror1, 4096, 0x11);
+    mirror1.Prepare(1);
+    mirror1.ConfirmCommitted(1);
+    WriteCheckpoint(mirror1, 4096, 0x22);
+    mirror1.Prepare(2);
+    mirror1.ConfirmCommitted(2);
+    v2Addr = mirror1.HighestVersionAddress;
+}
+
+// 第二实例（同卷）：尾锚扫盘恢复链头
+var settings2 = new WholeMirrorSettings(
+    new StorageEngineOptions(&quot;test.0&quot;, 1L &lt;&lt; 24, enableSegmentation: false).WithDeleteOnClose(true));
+using var mirror2 = new WholeMirror(vol.Fs, settings2);
+mirror2.Initialize();              // 后台启动恢复
+mirror2.WaitForReady();            // 等恢复完成
+
+// 恢复后 mirror2.CurrentVersion == 2；HighestVersionAddress == v2Addr（尾锚直达最新数据帧）
+vol.Dispose();
+</code></pre>
+<p><strong>关键点</strong>：跨重启组合必须 <code>DeleteOnClose=false</code>（否则恢复时真相源被清）。<code>Initialize</code> 非阻塞——后台启动恢复，<code>WaitForReady</code> 才是等待点。桥接形态（<code>WholeMirrorPersistence</code>）将 <code>Initialize + WaitForReady</code> 延迟到首次 <code>TryOpenWrite/TryOpenRead</code>，因为 checkpoint / 恢复路径天然是等待点。</p>
+<h3 id="31-生命周期钩子链继承-lifecyclebasemirrorrecoveryhints">3.1 生命周期钩子链（继承 <code>LifecycleBase&lt;MirrorRecoveryHints&gt;</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>钩子</th>
+<th>MirrorBase 实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initialize 第一阶段【前】</td>
+<td><code>OnInitializeBegin</code></td>
+<td><code>_engine.Initialize()</code> + Managed meta 引擎并行启动</td>
+</tr>
+<tr>
+<td>恢复算法工厂</td>
+<td><code>CreateRecovery</code></td>
+<td>返回 <code>new DefaultMirrorRecovery(this)</code></td>
+</tr>
+<tr>
+<td>依赖 join</td>
+<td><code>WaitForDependenciesAsync</code></td>
+<td>主引擎 + meta 引擎双 await（全异步轨，零同步阻塞）</td>
+</tr>
+<tr>
+<td>恢复核心</td>
+<td><code>OnRecoveryCoreAsync</code></td>
+<td>meta Load → 三级回退 → 悬干裁决 → 链头重建</td>
+</tr>
+<tr>
+<td>Dispose</td>
+<td><code>DisposeOverride</code> / <code>DisposeOverrideAsync</code></td>
+<td>释放帧 IO 缓冲 + 基类资源（幂等）</td>
+</tr>
+</tbody>
+</table>
+<p>生命周期详细机制（CAS 闸门 / 状态机 / 进度上报 / MarkReady）见 <code>src/TC.Tier.Core/docs/lifecycle.md</code>，本篇只讲 Mirror 侧职责。</p>
+<h3 id="32-桥接形态wholemirrorpersistence">3.2 桥接形态（WholeMirrorPersistence）</h3>
+<p><code>ITransferPersistence</code> 的内置桥接器（3a 托管模式——构造零 IO，首次使用启动恢复）。<strong>注</strong>：索引族已退役此桥接（改用自建主存储 <code>PersistenceKind.Builtin</code>，见 <code>index.md</code> §6）；此桥接器仍保留给其他需&quot;借镜像存储能力&quot;的组件消费。</p>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>WholeMirrorPersistence 行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>构造</td>
+<td><code>new WholeMirror(fileSystem, settings, ...)</code> 自持；零 IO</td>
+</tr>
+<tr>
+<td><code>TryOpenWrite/TryOpenRead</code> 首次</td>
+<td><code>EnsureStarted()</code> 触发 <code>mirror.Initialize() + WaitForReady()</code>（惰性启动）</td>
+</tr>
+<tr>
+<td>写会话</td>
+<td>三段式相位 ↔ WholeMirror 三拍会话（<code>BeginSession</code> 一族——尺寸后知）</td>
+</tr>
+<tr>
+<td>Confirm</td>
+<td>挂 <code>WriteFooter</code>（checkpoint 单人写完即提交）</td>
+</tr>
+<tr>
+<td>Abort</td>
+<td>挂未写尾 Dispose（镜像会话尾截断回退，悬干弃置）</td>
+</tr>
+<tr>
+<td>读侧</td>
+<td><code>Verify = 账面机制</code>——内容有效性由消费方格式裁决</td>
+</tr>
+<tr>
+<td>传输上限</td>
+<td>会话打开声明 <code>maxTransferBytes</code>（默认 128K），单次超限直接抛</td>
+</tr>
+<tr>
+<td>并发</td>
+<td>单写者（并发双开 → <code>TryOpenWrite</code> false，非抛）</td>
+</tr>
+<tr>
+<td>Dispose</td>
+<td>转发 <code>_mirror.Dispose()</code>（幂等）</td>
+</tr>
+</tbody>
+</table>
+<p>详见 <code>src/TC.Tier.Runtime/DataMirror/WholeMirrorPersistence.cs</code>。</p>
+<hr>
+<h2 id="4-api-详表">4. API 详表</h2>
+<p>Mirror 子族 API 按形态分三组：WholeMirror 三拍会话 / PagedMirror 逐页写读 / 共有 2PC 六件套。所有 API 同步执行（引擎 IO 同步原生）；异步轨 <code>PrepareAsync / AbortAsync</code> 实质等价同步（引擎 flush/截断原生仅同步）。</p>
+<h3 id="41-wholemirror三拍会话--读门面">4.1 WholeMirror——三拍会话 + 读门面</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BeginSession</code></td>
+<td><code>LogicalAddress BeginSession()</code></td>
+<td>分配会话版本号 + 帧三拍之一（圈头区 + 写瘦头——不预留、不知尺寸）。返回帧头地址（调用方持有，用于后续读 / 定位）</td>
+</tr>
+<tr>
+<td><code>AppendChunk</code></td>
+<td><code>void AppendChunk(ReadOnlySpan&lt;byte&gt; chunk)</code></td>
+<td>帧三拍之二：顺序追加 payload chunk（圈地 + 复写 + CRC64 边写边累积——零缓冲不驻内存）。<strong>单线程契约</strong>：逐段追加</td>
+</tr>
+<tr>
+<td><code>EndSession</code></td>
+<td><code>LogicalAddress EndSession()</code></td>
+<td>帧三拍之三：CRC 收官落尾 + <code>_engine.Flush()</code>。返回帧尾末地址。帧保持 pending 直到 <code>ConfirmCommitted</code> / <code>Abort</code></td>
+</tr>
+<tr>
+<td><code>ReadChunk</code></td>
+<td><code>int ReadChunk(LogicalAddress frameHead, long offsetInPayload, Span&lt;byte&gt; dst)</code></td>
+<td>按 payload 偏移读切片（拷贝交付）。返回实际读取字节数</td>
+</tr>
+<tr>
+<td><code>GetFrameInfo</code></td>
+<td><code>MirrorFrameInfo? GetFrameInfo(LogicalAddress frameHead)</code></td>
+<td>帧几何账目（payload 长 = 尾位 − 头 − 头结构——零长度字段，长度是推导的事实）</td>
+</tr>
+<tr>
+<td><code>GetPayloadLength</code></td>
+<td><code>long GetPayloadLength(LogicalAddress frameHead)</code></td>
+<td>帧 payload 长度（推导）。无有效帧尾返回 0</td>
+</tr>
+<tr>
+<td><code>Verify</code></td>
+<td><code>bool Verify(LogicalAddress frameHead)</code></td>
+<td>流式分段重读重算 CRC（头 + 体 + 尾前缀 对 尾 Crc 字段——大帧不驻内存）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>三拍契约</strong>：<code>BeginSession</code> → <code>AppendChunk × N</code> → <code>EndSession</code> 必须同一线程顺序执行；<code>EndSession</code> 之后才能开下一个会话（否则抛&quot;上一帧未收官&quot;）。<code>EndSession</code> 只 flush 数据，<strong>不推进 LastCommittedSeq</strong>——2PC 提交点走 <code>ConfirmCommitted</code>。</p>
+<p><strong>三拍会话完整示例</strong>——大镜像零缓冲流式写：</p>
+<pre><code class="lang-csharp">using var mirror = new WholeMirror(fs, new WholeMirrorSettings());
+mirror.Initialize();
+mirror.WaitForReady();
+
+// 任意总长——边写边知，EndSession 时才完成 CRC 收官
+const long TotalSize = 10000;
+var data = new byte[TotalSize];
+Array.Fill(data, 0xAB);
+
+var frameHead = mirror.BeginSession();                    // 帧三拍之一：圈头 + 写瘦头
+mirror.AppendChunk(data.AsSpan(0, 6000));                 // 帧三拍之二：追加任意段
+mirror.AppendChunk(data.AsSpan(6000));                    // 继续追加（无需告知总长）
+var frameEnd = mirror.EndSession();                       // 帧三拍之三：CRC 落尾 + flush
+
+// 几何推导（零长度字段）+ CRC 流式验证
+mirror.GetPayloadLength(frameHead).Should().Be(TotalSize, &quot;像长 = 尾位 − 头 − 头结构（推导）&quot;);
+mirror.Verify(frameHead).Should().BeTrue(&quot;写后 CRC64 应一致&quot;);
+
+// 按 payload 偏移读切片（拷贝交付，跨 await 也安全）
+var dst = new byte[TotalSize];
+int n = mirror.ReadChunk(frameHead, 0, dst);
+// n == TotalSize；dst 与 data 逐字节相等
+</code></pre>
+<p><strong>说明</strong>：</p>
+<ul>
+<li><code>BeginSession</code> 不知镜像总尺寸即可圈头——CRC64 边写边累积，<code>EndSession</code> 收官落尾时才需要全帧一致；大镜像（GB 级）零缓冲不驻内存。</li>
+<li><code>EndSession</code> 后帧仍 pending（未裁决）；走 2PC 时由 <code>ConfirmCommitted</code> / <code>Abort</code> 决定最终可见性。不走 2PC 的单 checkpoint 用法，<code>EndSession</code> 后即可读（committed 链头仍按 <code>HighestVersionAddress</code> 取）。</li>
+<li>读侧 <code>ReadChunk</code> 拷贝交付——跨 await / 跨线程消费合法；零拷贝形态请用 Ring 的 <code>GetValueSpan</code>（同栈内合法，详见 <code>ring.md</code>）。</li>
+</ul>
+<h3 id="42-pagedmirror逐页写读">4.2 PagedMirror——逐页写读</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>WritePage</code></td>
+<td><code>LogicalAddress WritePage(long page, long startPage, ReadOnlySpan&lt;byte&gt; pageBytes, long logicalAddress = 0)</code></td>
+<td>写一页（追加该页版本链新帧）。首个写入自动开启 checkpoint 会话。<code>pageBytes &gt; PageSize</code> 截断；<code>&lt; PageSize</code> 记 <code>FLAG_LAST_PARTIAL</code>。返回帧头地址</td>
+</tr>
+<tr>
+<td><code>ReadPage</code></td>
+<td><code>(int bytesRead, bool isValid) ReadPage(long page, long startPage, Span&lt;byte&gt; dest)</code></td>
+<td>读该页 committed 链头：帧几何推导 payload 长 → 读 payload → 全帧 CRC32C 验证。无该页 / 空链 / 帧损毁返回 <code>(0, false)</code></td>
+</tr>
+<tr>
+<td><code>PageSize</code></td>
+<td><code>int PageSize</code>（只读）</td>
+<td><code>1 &lt;&lt; LogPageSizeBits</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>多链语义</strong>：<code>page</code> 是 per-page 链键（独立链头 + 第二新）。<code>startPage</code> 是会话起始页（语义锚点，不参与寻址）。<strong>可乱序</strong>：会话内 <code>WritePage(2, ...)</code> → <code>WritePage(0, ...)</code> → <code>WritePage(1, ...)</code> 合法，多链互不影响。会话内每页首写记录 <code>previous = Invalid</code>（链尾哨兵——Empty 是合法 seg0@0，不能当哨兵）。</p>
+<p><strong>逐页写读示例</strong>——乱序写 + 多链原子提交：</p>
+<pre><code class="lang-csharp">using var mirror = new PagedMirror(fs, new PagedMirrorSettings { LogPageSizeBits = 12 });
+mirror.Initialize();
+mirror.WaitForReady();
+
+// 乱序写三页——多链互不影响；首写自动开启 checkpoint 会话
+byte[] fills = [0x00, 0x11, 0x22];
+mirror.WritePage(2, 0, MakePage(4096, fills[2]), logicalAddress: 200);
+mirror.WritePage(0, 0, MakePage(4096, fills[0]), logicalAddress: 0);
+mirror.WritePage(1, 0, MakePage(4096, fills[1]), logicalAddress: 100);
+mirror.Prepare(seq: 1);                  // 多链整体 Prepare（数据 flush + meta 落盘）
+mirror.ConfirmCommitted(seq: 1);          // 多链整体 Confirm（逐页链头推进）
+
+// 每页读自己链头——乱序写不影响读
+for (byte p = 0; p &lt; 3; p++)
+{
+    var dst = new byte[4096];
+    var (n, valid) = mirror.ReadPage(p, 0, dst);
+    // n == 4096；valid == true；dst[0] == fills[p]
+}
+</code></pre>
+<p><strong>末页短 payload</strong>：<code>pageBytes.Length &lt; PageSize</code> 时 codec 自动置 <code>FLAG_LAST_PARTIAL</code>，<code>ReadPage</code> 返回实际字节数（不补齐），调用方按 <code>(bytesRead, isValid)</code> 处理。</p>
+<h3 id="43-共有水位--版本号--2pc-六件套">4.3 共有——水位 / 版本号 / 2PC 六件套</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Prepare</code></td>
+<td><code>void Prepare(long seq)</code></td>
+<td>2PC Prepare：<code>_engine.Flush()</code> + <code>WriteMeta()</code>（记录 LastPreparedSeq + 悬干水位）。数据 fsync 先于 meta fsync——断电时 meta 绝不标记 data 未落盘的 commit 点</td>
+</tr>
+<tr>
+<td><code>PrepareAsync</code></td>
+<td><code>ValueTask PrepareAsync(long seq, CancellationToken ct)</code></td>
+<td>Prepare 异步轨（实质同步完成）</td>
+</tr>
+<tr>
+<td><code>ConfirmCommitted</code></td>
+<td><code>void ConfirmCommitted(long seq)</code></td>
+<td>CAS 推进 LastCommittedSeq + 推进链头（子类 <code>OnConfirmSession</code>）+ N=2 立即头截断回收最老 + 刷新 meta + 触发回调。<code>seq ≤ current</code> 时 no-op</td>
+</tr>
+<tr>
+<td><code>Abort</code></td>
+<td><code>void Abort(long seq)</code></td>
+<td><strong>尾截断回退悬干新 checkpoint</strong>：物理丢弃 <code>[_committedChainEnd, AllocatedTail)</code> + 回退会话链头状态 + meta。<code>seq ≤ LastAbortedSeq</code> 时幂等 no-op</td>
+</tr>
+<tr>
+<td><code>AbortAsync</code></td>
+<td><code>ValueTask AbortAsync(long seq, CancellationToken ct)</code></td>
+<td>Abort 异步轨</td>
+</tr>
+<tr>
+<td><code>OnCommitted</code></td>
+<td><code>void OnCommitted(long seq, Action callback)</code></td>
+<td>注册提交回调（已提交到更高 seq 时立即同步触发；锁外触发避免死锁）</td>
+</tr>
+<tr>
+<td><code>ReclaimOldVersions</code></td>
+<td><code>void ReclaimOldVersions()</code></td>
+<td>N=2 头截断显式入口（ConfirmCommitted 自动调；业务也可显式调）。保留窗口由子类 <code>ComputeRetainFloor</code> 决定</td>
+</tr>
+<tr>
+<td><code>((ITransactionParticipant)mirror).LastCommittedSeq</code></td>
+<td><code>long</code></td>
+<td>已提交 seq（Volatile.Read）</td>
+</tr>
+<tr>
+<td><code>((ITransactionParticipant)mirror).LastPreparedSeq</code></td>
+<td><code>long</code></td>
+<td>已 Prepare seq（Volatile.Read）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Abort 语义 = 丢弃未确认会话</strong>：会话 active 才回退；committed 链头未被会话触碰（只清 pending，不碰 committed）；尾截断物理丢弃悬干（引擎退化 AllocatedTail）；LastPreparedSeq 回退到 LastCommittedSeq。</p>
+<hr>
+<h2 id="5-自定义注入工厂contracts">5. 自定义注入工厂（Contracts）</h2>
+<table>
+<thead>
+<tr>
+<th>契约 / 类型</th>
+<th>用途</th>
+<th>注入通道</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IMirrorCodec</code></td>
+<td>帧格式 codec（Header/Footer 读写 + magic/CRC 模式校验 + 链拓扑声明）</td>
+<td>构造期由子类自带（WholeMirror.Codec / PagedMirror.Codec），<strong>不暴露注入</strong>——格式固定</td>
+</tr>
+<tr>
+<td><code>MirrorMetaHeader</code></td>
+<td>meta 水位 Header（12B 纯规范：magic &quot;MMHD&quot; + version + flags + payload 长度段）</td>
+<td>经 <code>MetaPolicyFactory&lt;MirrorMetaHeader, MirrorMetaPayload&gt;</code> 注入策略</td>
+</tr>
+<tr>
+<td><code>MirrorMetaPayload</code></td>
+<td>meta 水位 Payload（48B：版本链两端 + LastCommittedSeq + LastPreparedSeq）</td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>MirrorFrameHeader</code></td>
+<td>帧头（32B：magic + version + flags + PageId + LogicalAddress + MirrorVersion）</td>
+<td>不注入——盘上格式</td>
+</tr>
+<tr>
+<td><code>MirrorFrameFooter</code></td>
+<td>帧尾（40B：magic + version + flags + PreviousVersion + MirrorVersion + Crc）</td>
+<td>不注入——盘上格式</td>
+</tr>
+<tr>
+<td><code>MirrorFrameInfo</code></td>
+<td>帧几何账目值类型（head→footer 对 + 头尾字段快照）</td>
+<td>读 API 返回</td>
+</tr>
+<tr>
+<td><code>MirrorRecoveryHints</code></td>
+<td>恢复提示（<code>HighestVersionAddress?</code> + <code>LastCommittedSeq?</code>）</td>
+<td><code>Initialize(hints)</code> 注入；优先级最高（高于 meta、扫盘）</td>
+</tr>
+<tr>
+<td><code>MetaPolicyFactory&lt;MirrorMetaHeader, MirrorMetaPayload&gt;</code></td>
+<td>meta 策略工厂委托</td>
+<td>构造参数 <code>metaPolicyFactory</code>——默认按 <code>MetaPolicyKind</code> 内联三模式（Managed/Transport/Disabled）</td>
+</tr>
+<tr>
+<td><code>IMetaTransport</code></td>
+<td>Transport 模式的 meta 传输</td>
+<td>构造参数 <code>metaTransport</code>——未注入回落到内部 <code>MetaHost</code>（嵌入主流的 IS_META 帧）</td>
+</tr>
+<tr>
+<td><code>IRecovery&lt;MirrorRecoveryHints&gt;</code></td>
+<td>恢复算法实例</td>
+<td>构造参数 <code>recovery</code>——默认 <code>DefaultMirrorRecovery</code>（基类内置）</td>
+</tr>
+<tr>
+<td><code>ITransactionParticipant</code></td>
+<td>2PC 六件套（<code>Prepare/ConfirmCommitted/OnCommitted/Abort/LastCommittedSeq/LastPreparedSeq</code>）</td>
+<td>MirrorBase 实现此接口，经 <code>TransactionLog</code> 协调器编排</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-持久化机制">6. 持久化机制</h2>
+<h3 id="61-版本链追加">6.1 版本链追加</h3>
+<p>每次 checkpoint 写一个完整新版本追加到流尾，<strong>不重写旧帧</strong>。链经 <code>PreviousVersion</code>（帧尾字段）回跳：</p>
+<ul>
+<li>WholeMirror：全局单链，<code>PreviousVersion = 上一 checkpoint 链头</code>（首版本 = <code>Invalid</code>——<code>Empty</code> 是合法 seg0@0，不能当哨兵）。</li>
+<li>PagedMirror：per-page 多链，<code>PreviousVersion = 该页上一帧头</code>（页首版本 = <code>Invalid</code>）。</li>
+</ul>
+<p>帧长任意字节边界——v2 流式帧教义：格式零长度字段，帧长 = 尾位 − 头（推导的事实）。下一帧起点 = 本帧尾末（<code>AllocatedTail</code> 恒贴已写尾，帧间零间隙）。</p>
+<h3 id="62-endsession-flush">6.2 EndSession flush</h3>
+<p><code>WholeMirror.EndSession</code> 内部调 <code>_engine.Flush()</code>——数据落盘到设备（fsync）。非 2PC 用法在此即持久（单 checkpoint 自包含）；2PC 用法下 <code>Prepare</code> 再 flush 是幂等加固。</p>
+<p>PagedMirror 逐页不 flush（性能优先）——<code>WritePage</code> 只 <code>EndFrame</code>，落盘由 <code>Prepare</code> 统一 flush。</p>
+<p><strong>为何 Prepare 是 2PC 持久化点</strong>：数据 fsync 先于 meta fsync——断电时 meta 绝不标记 data 未落盘的 commit 点（设计决策：data fsync → meta fsync 严格偏序，崩溃一致性核心保证）。崩溃在 Prepare 后 Commit 前：seq 未推进 → 恢复按 meta 裁决尾截断悬干（一致）。</p>
+<h3 id="63-n2-轮替回收">6.3 N=2 轮替回收</h3>
+<p><code>ConfirmCommitted</code> 自动调 <code>ReclaimOldVersions</code>：保留窗口 = 当前 + 上一 checkpoint，更老物理回收（<code>_engine.ReclaimHead</code> 头截断——punch hole 清零旧帧 magic，链头重建后失效帧不可再定位）。</p>
+<ul>
+<li>WholeMirror：<code>ComputeRetainFloor</code> 返回全局第二新地址（无第二新回退链头自身 = 不回收）。</li>
+<li>PagedMirror：返回所有页 keepAddr 的最小值（引擎 MinAddress 是全局水位，只能推进到所有页都同意回收的地址——否则误删某页在用版本）。</li>
+<li><code>keepAddr == Empty</code> 时基类守卫保守跳过本轮（Empty 是合法地址，下轮补收——正确性优先）。</li>
+</ul>
+<h3 id="64-transport-嵌入-meta-帧">6.4 Transport 嵌入 meta 帧</h3>
+<p><code>MetaPolicyKind.Transport</code> 模式下，meta block 作为 <code>IS_META</code> 帧追加进镜像流（统一帧机制——meta 帧是宿主流的一等公民）：</p>
+<ul>
+<li>写：基类 <code>WriteEmbeddedMetaBlockCore</code> 走帧三拍 + <code>FLAG_ENTRY_IS_META</code>（不参与数据版本链——<code>PreviousVersion=Invalid</code>、版本号用当前值不推进、<code>EndFrame</code> 对 IS_META 跳过 <code>OnRecordAppended</code>），只追加在流尾供找回。</li>
+<li>读：<code>ScanLastEmbeddedMetaBlockCore</code> 前向帧走链单步原语扫描收集 IS_META 帧（结构完好即收——payload 交 meta policy 自校验）。</li>
+<li>默认回落：未注入 <code>IMetaTransport</code> 时基类自装配 <code>MetaHost</code> 嵌套类（实现 <code>IMetaTransport</code>）——无需独立 meta 引擎 / 独立文件。</li>
+</ul>
+<h3 id="65-2pc-协议">6.5 2PC 协议</h3>
+<p><strong>Prepare</strong>：<code>_engine.Flush()</code> + <code>WriteMeta()</code>（LastPreparedSeq + 悬干水位落 meta）。
+<strong>ConfirmCommitted</strong>：CAS 推进 LastCommittedSeq + 子类 <code>OnConfirmSession</code>（链头推进）+ N=2 头截断 + 刷新 meta + 触发回调。
+<strong>OnCommitted</strong>：注册链式回调（已提交到更高 seq 时立即同步触发）。
+<strong>Abort</strong>：见下。</p>
+<h3 id="66-abort-语义--丢弃未确认会话">6.6 Abort 语义 = 丢弃未确认会话</h3>
+<pre><code class="lang-text">if (seq &lt;= LastAbortedSeq) return;           // 幂等
+if (_sessionActive) {
+    OnAbortSession();                         // 子类清 pending（WholeMirror=ClearPendingFrame；PagedMirror=_sessionWrites.Clear()）
+    if (_lastRecordEnd &gt; _committedChainEnd) {
+        _engine.ReclaimTail(_committedChainEnd);  // 物理丢弃悬干（引擎退化 AllocatedTail）
+        _lastRecordEnd = _committedChainEnd;
+    }
+    _sessionActive = false;
+}
+LastPreparedSeq = LastCommittedSeq;          // 回退 Prepare 点
+LastAbortedSeq = seq;
+WriteMeta();
+</code></pre>
+<p><strong>关键不变量</strong>：committed 链头未被会话触碰（Abort 不动 committed）；尾截断只丢悬干；LastPreparedSeq 回退到 LastCommittedSeq。</p>
+<p><strong>2PC Abort 演示</strong>——v1 提交后 v2 写完 + Prepare → Abort：</p>
+<pre><code class="lang-csharp">using var mirror = new WholeMirror(fs, new WholeMirrorSettings());
+mirror.Initialize();
+mirror.WaitForReady();
+
+// v1：写完 → Prepare → Confirm（落定提交）
+WriteCheckpoint(mirror, 8192, 0x11);          // BeginSession + AppendChunk + EndSession
+mirror.Prepare(seq: 1);
+mirror.ConfirmCommitted(seq: 1);
+var v1Addr = mirror.HighestVersionAddress;    // 已提交链头
+
+// v2：写完 → Prepare → Abort（悬干整体回退）
+WriteCheckpoint(mirror, 8192, 0x22);
+mirror.Prepare(seq: 2);
+mirror.Abort(seq: 2);                          // 尾截断物理丢弃 [committedChainEnd, AllocatedTail)
+
+// 不变量 1：链头回退到 v1
+mirror.HighestVersionAddress.Should().Be(v1Addr, &quot;Abort 应回退链头到上一已提交 checkpoint&quot;);
+// 不变量 2：版本号不推进
+mirror.CurrentVersion.Should().Be(1, &quot;Abort 不推进 checkpoint 版本号&quot;);
+// 不变量 3：LastPreparedSeq 回退到 LastCommittedSeq
+((ITransactionParticipant)mirror).LastPreparedSeq.Should().Be(1);
+// 不变量 4：已提交 checkpoint 不受 Abort 影响——v1 CRC 完整可读
+var dst = new byte[8192];
+mirror.ReadChunk(v1Addr, 0, dst);
+dst[0].Should().Be(0x11, &quot;已提交 checkpoint 不受 Abort 影响&quot;);
+mirror.Verify(v1Addr).Should().BeTrue(&quot;Abort 尾截断后 v1 CRC 完整&quot;);
+</code></pre>
+<p><strong>WholeMirror vs PagedMirror Abort 差异</strong>：机制在基类统一执行；子类 <code>OnAbortSession</code> 只清各自的 pending 状态：</p>
+<ul>
+<li>WholeMirror：<code>ClearPendingFrame()</code>（清 <code>_hasPendingFrame / _pendingFrameHead / _pendingFrameFooter</code>）。</li>
+<li>PagedMirror：<code>_sessionWrites.Clear()</code>（清会话内逐页写入记录——committed 各页链头未被会话触碰）。</li>
+</ul>
+<p>PagedMirror Abort 的多链原子性：会话 2 写 page 0 + page 1 两页后 Abort，两页的 v2 写入一起回退，page 0/1 各自链头仍指向 v1——<strong>单链故障不会污染多链整体</strong>。</p>
+<hr>
+<h2 id="7-恢复协议">7. 恢复协议</h2>
+<h3 id="71-三级回退defaultmirrorrecovery">7.1 三级回退（DefaultMirrorRecovery）</h3>
+<p><code>Initialize</code> → 后台恢复核心 <code>OnRecoveryCoreAsync(hints, ct)</code>：</p>
+<ol>
+<li><strong>hints 优先</strong>：<code>MirrorRecoveryHints.HighestVersionAddress</code> / <code>LastCommittedSeq</code>——上层已知水位直接注入。</li>
+<li><strong>meta Load（O(1) 水位）</strong>：<code>MetaPolicyKind != Disabled</code> 时 <code>await MetaPolicy.LoadAsync</code> → 读 <code>MirrorMetaPayload</code>（版本链两端 + LastCommittedSeq + LastPreparedSeq）。</li>
+<li><strong>扫盘兜底</strong>：<code>ScanAndRebuild</code> 按版本号定位链头——<code>Single</code> 走尾锚快速路径（<code>Locate(尾 magic, Last)</code> 直达最新数据帧 + <code>PreviousVersion</code> 回跳 N=2 第二新），<code>PerKey</code> 全走链按 <code>PageId</code> 重建各链头。</li>
+</ol>
+<h3 id="72-悬干裁决">7.2 悬干裁决</h3>
+<p><code>meta.LastPreparedSeq &gt; LastCommittedSeq</code> → 最后一批帧（按最高会话版本号识别）视为悬干，<code>_engine.ReclaimTail</code> 物理丢弃。无 meta（Disabled / 损坏）= 无裁决依据，扫到状态视为已提交。</p>
+<h3 id="73-按版本号截断与-snapshot-恢复差异">7.3 按版本号截断（与 Snapshot 恢复差异）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>Mirror</th>
+<th>Snapshot</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>截断坐标系</td>
+<td><strong>版本号</strong>（会话版本号识别&quot;最后一批未裁决 record&quot;）</td>
+<td><strong>字节</strong>（按 CommittedTail 截断）</td>
+</tr>
+<tr>
+<td>保留版本数</td>
+<td>N=2（当前 + 上一 checkpoint）</td>
+<td>1（最新基线）</td>
+</tr>
+<tr>
+<td>悬干回退</td>
+<td>meta prepared &gt; committed 时尾截断物理丢弃</td>
+<td>无版本概念——纯流式</td>
+</tr>
+<tr>
+<td>多链</td>
+<td>PagedMirror per-page 独立链头（按 <code>PageId</code> 重建）</td>
+<td>不适用</td>
+</tr>
+</tbody>
+</table>
+<h3 id="74-帧判定链零长度依赖">7.4 帧判定链零长度依赖</h3>
+<p>恢复扫盘的&quot;什么是有效帧&quot;裁决链——格式本身不含长度字段，靠三件套判定：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>判据</th>
+<th>假命中的兜底</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>候选提名</td>
+<td>双 magic 值匹配（头 magic + 尾 magic）</td>
+<td>假 magic 必经 CRC 裁决淘汰</td>
+</tr>
+<tr>
+<td>结构校验</td>
+<td><code>Version == CurrentVersion</code> + flags 的 CRC 算法位（CRC64/CRC32C）</td>
+<td>版本/flags 不符直接否</td>
+</tr>
+<tr>
+<td>头尾版本一致</td>
+<td><code>footer.MirrorVersion == header.MirrorVersion</code></td>
+<td>假尾缩窗继续倒扫</td>
+</tr>
+<tr>
+<td>权威帧</td>
+<td>最新帧（WholeMirror 尾锚路径）走 CRC 全验</td>
+<td>旧代只验结构不读体——旧代损坏不遮新代</td>
+</tr>
+</tbody>
+</table>
+<p><strong>关键性质</strong>：帧长任意字节边界（v2 alignment=1）；payload 埋诱饵（payload 内塞双 magic）不影响本帧 CRC（覆盖域原样入算）；旧代损坏不遮新代（尾锚只看最新方向 + <code>PreviousVersion</code> 链对旧代只验结构不读体）。</p>
+<h3 id="75-恢复-hints-注入">7.5 恢复 hints 注入</h3>
+<pre><code class="lang-csharp">var hints = new MirrorRecoveryHints
+{
+    HighestVersionAddress = knownHeadAddr,    // 已知链头（上层注入，优先于扫盘）
+    LastCommittedSeq      = 100,             // 已知提交点
+};
+mirror.Initialize(hints);                    // 注入恢复提示
+mirror.WaitForReady();
+</code></pre>
+<h3 id="76-整体流程一览">7.6 整体流程一览</h3>
+<pre><code>  ┌─────────────────────────────────────────────────────────────┐
+  │ Initialize() ──&gt; OnInitializeBegin (主引擎 + meta 引擎并行启动) │
+  ├─────────────────────────────────────────────────────────────┤
+  │          WaitForDependenciesAsync (双引擎 join)              │
+  ├─────────────────────────────────────────────────────────────┤
+  │           OnRecoveryCoreAsync(hints, ct) 恢复核心           │
+  │  1. MetaPolicy.LoadAsync → 读 MirrorMetaPayload (O(1) 水位) │
+  │  2. 三级回退：hints → meta → 扫盘定位链头                    │
+  │  3. 悬干裁决：meta.LastPreparedSeq &gt; LastCommittedSeq →     │
+  │     尾截断物理丢弃（按最高会话版本号识别）                    │
+  │  4. ScanAndRebuild：Single 走尾锚快速路径；PerKey 全走链    │
+  │     按 PageId 重建各链头                                     │
+  ├─────────────────────────────────────────────────────────────┤
+  │             MarkReady → IsReady=true 可读写                 │
+  └─────────────────────────────────────────────────────────────┘
+</code></pre>
+<p><strong>性能特性</strong>：Managed meta 模式下恢复 O(1)（读水位块即得链头）；Disabled / meta 损坏走扫盘——WholeMirror 尾锚路径直达最新帧（一次 <code>Locate(尾 magic, Last)</code> + 倒扫本帧头 + <code>PreviousVersion</code> 回跳 N=2 第二新），PagedMirror 全走链按 <code>PageId</code> 重建（每页独立链头，扫盘代价与页数线性）。</p>
+<hr>
+<h2 id="8-反模式">8. 反模式</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果</th>
+<th>正确</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>会话未 EndSession 跨 await</strong></td>
+<td>帧三拍单线程契约破坏；下个 <code>BeginSession</code> 抛&quot;上一帧未收官&quot;</td>
+<td>三拍同线程顺序完成；跨 await 前 <code>EndSession</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>跨实例组合 <code>DeleteOnClose=true</code></strong></td>
+<td>跨重启恢复时引擎被清，真相源丢失</td>
+<td>跨重启组合 <code>DeleteOnClose=false</code>；测试一次性卷才用 <code>true</code></td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>绕过 2PC 直接靠 EndSession 当提交</strong></td>
+<td>LastCommittedSeq 不推进，恢复时该 checkpoint 视为悬干被截断</td>
+<td>提交点走 <code>Prepare</code> + <code>ConfirmCommitted</code></td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Abort 后读会话内地址</strong></td>
+<td>悬干已物理丢弃，帧头 magic 被 punch hole 清零</td>
+<td>Abort 后只读 <code>HighestVersionAddress</code>（已提交链头）</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>用 <code>HighestVersionAddress == Empty</code> 判&quot;无版本&quot;</strong></td>
+<td>首 record 就在 Empty（合法地址空间起点），误判为无版本</td>
+<td>用 <code>HasCommittedVersion</code> 标志判存在性</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>WholeMirror 多线程并发 AppendChunk</strong></td>
+<td>帧三拍单线程契约破坏，CRC 累积错乱</td>
+<td>单线程顺序追加；多生产者经队列汇聚到单写者</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>PagedMirror 跨会话不 Confirm 就写下页</strong></td>
+<td>上次会话 pending 帧未裁决，链头推进错乱</td>
+<td>每 checkpoint 会话写完走 <code>Prepare</code> + <code>ConfirmCommitted</code>/<code>Abort</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>给 Disabled meta 调 <code>SetOpaqueMeta</code></strong></td>
+<td>抛 <code>InvalidOperationException</code>（禁用即报错）</td>
+<td>配置 <code>MetaPolicyKind=Managed/Transport</code> 再写 opaque</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>跨 checkpoint 会话复用同 seq</strong></td>
+<td><code>Prepare/Confirm</code> CAS 推进错乱（seq ≤ current no-op）</td>
+<td>每 checkpoint 单调推进 seq；悬挂用独立 seq</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>未调 <code>ReclaimOldVersions</code> 期望自动回收</strong></td>
+<td>旧 checkpoint 累积，版本链变长（<code>ConfirmCommitted</code> 已自动调，但显式调合法）</td>
+<td><code>ConfirmCommitted</code> 内置自动回收；如有自定义触发点，调 <code>ReclaimOldVersions</code> 即可</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-想深入指路">9. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>源码</td>
+<td><code>src/TC.Tier.Runtime/Structures/Mirror/</code>（<code>MirrorBase.*</code> partials + <code>WholeMirror*</code> / <code>PagedMirror*</code> + <code>Contracts/</code>）</td>
+</tr>
+<tr>
+<td>帧字节布局 / Codec 内部</td>
+<td><code>Structures/Mirror/Contracts/MirrorFrame.cs</code> + <code>IMirrorCodec.cs</code> 源码注释</td>
+</tr>
+<tr>
+<td>横切：meta 协议（opaque 搭车 / Managed/Transport/Disabled 三模式）</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+</tr>
+<tr>
+<td>横切：Session 协调协议（写 / 检查点 / 悬挂裁决）</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+</tr>
+<tr>
+<td>横切：StorageEngine 使用（读写 / 水位 / Compact）</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a></td>
+</tr>
+<tr>
+<td>横切：段表机制</td>
+<td><a href="segment-table.html"><code>segment-table.md</code></a></td>
+</tr>
+<tr>
+<td>横切：lease 协议</td>
+<td><a href="lease-protocol.html"><code>lease-protocol.md</code></a></td>
+</tr>
+<tr>
+<td>同族：Ring 主结构</td>
+<td><a href="ring.html"><code>ring.md</code></a></td>
+</tr>
+<tr>
+<td>同族：Log 主结构</td>
+<td><a href="log.html"><code>log.md</code></a></td>
+</tr>
+<tr>
+<td>同族：Index 索引族</td>
+<td><a href="index.html"><code>index.md</code></a></td>
+</tr>
+<tr>
+<td>同族：VersionedMetadata</td>
+<td><a href="versioned-metadata.html"><code>versioned-metadata.md</code></a></td>
+</tr>
+<tr>
+<td>同族：Snapshot（字节截断形态）</td>
+<td><a href="snapshot.html"><code>snapshot.md</code></a></td>
+</tr>
+<tr>
+<td><code>WholeMirrorPersistence</code> 桥接器源码（索引族已退役，仍保留给其他借镜像能力的组件）</td>
+<td><code>src/TC.Tier.Runtime/DataMirror/WholeMirrorPersistence.cs</code> 源码注释</td>
+</tr>
+<tr>
+<td>总览（6 子族速查 + KV 组合）</td>
+<td><a href="structures.html"><code>structures.md</code></a></td>
+</tr>
+</tbody>
+</table>
+<p>机制级细节（8 水位全表、帧字节布局、CRC 增量算法、2PC 内部状态机、扫盘重同步策略）按需从源码与设计稿查阅——使用面不需要这些细节；能力全集以类型 XML 注释为准。</p>
+<h3 id="91-配套阅读顺序建议">9.1 配套阅读顺序建议</h3>
+<table>
+<thead>
+<tr>
+<th>顺序</th>
+<th>文档</th>
+<th>目的</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><a href="structures.html"><code>structures.md</code></a></td>
+<td>6 子族全貌 + 选型坐标</td>
+</tr>
+<tr>
+<td>2</td>
+<td>本篇（<code>mirror.md</code>）</td>
+<td>Mirror 子族机制 + 两种形态</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a></td>
+<td>引擎读写 / 水位 / Compact 基础</td>
+</tr>
+<tr>
+<td>4</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+<td>opaque 搭车 / 三模式</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+<td>跨结构 2PC 协调协议</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="snapshot.html"><code>snapshot.md</code></a></td>
+<td>同族异坐标系对比</td>
+</tr>
+</tbody>
+</table>
+<p><strong>核心要点回顾</strong>：Mirror 是字节镜像 + 版本链 + 2PC 六件套；选型看颗粒度（整体流式 → WholeMirror，按页增量 → PagedMirror）；提交点必走 <code>Prepare + ConfirmCommitted</code>（EndSession 只 flush 数据不推进 seq）；Abort = 丢弃未确认会话（committed 链头不被触碰）；恢复按版本号截断（与 Snapshot 字节截断异坐标系）。</p>
+<h3 id="92-faq">9.2 FAQ</h3>
+<ul>
+<li><strong>Q：为什么没有 <code>Create</code> 工厂？</strong> A：Mirror 子类构造 + <code>Initialize</code> + <code>WaitForReady</code> 三步即就绪（区别于 Ring 封闭类型的 <code>Create</code> 一步就绪）。桥接形态 <code>WholeMirrorPersistence</code> 将此三步推迟到首次使用。</li>
+<li><strong>Q：非 2PC 用法（单 checkpoint）如何提交？</strong> A：<code>EndSession</code> 已 flush；不走 <code>Prepare/Confirm</code> 时数据已持久，但 <code>LastCommittedSeq</code> 不推进——恢复时该 checkpoint 视为悬干可能被截断。<strong>生产用法必走 2PC</strong>。</li>
+<li><strong>Q：WholeMirror 与 Snapshot 怎么选？</strong> A：需要 N=2 版本链 / 多链 / 2PC → Mirror；纯流式字节截断 / 无版本概念 → Snapshot（同族异坐标系，详见 <code>snapshot.md</code>）。</li>
+<li><strong>Q：跨实例恢复需要配 meta 吗？</strong> A：不需要。<code>MetaPolicyKind=Disabled</code> 时走扫盘兜底（WholeMirror 尾锚 O(最新帧)，PagedMirror 全走链按 PageId 重建）；Managed 模式下 meta O(1) 加速。</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/mirror.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

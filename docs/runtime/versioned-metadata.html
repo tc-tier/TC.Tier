@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>VersionedMetadata 使用指南——版本链 N=2 轮转回收 / 单值元数据 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="VersionedMetadata 使用指南——版本链 N=2 轮转回收 / 单值元数据 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/versioned-metadata.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="versionedmetadata-使用指南版本链-n2-轮转回收--单值元数据">VersionedMetadata 使用指南——版本链 N=2 轮转回收 / 单值元数据</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要跨重启单值状态（水位/配置/锚点）的组件开发者
+<strong>回答什么</strong>：VersionedMetadata 是什么 / Settings / 版本链 N=2 / 同步 vs 异步持久化 / 外部隔离传输
+<strong>本篇只讲结构本身</strong>——Meta 横切协议（Disabled/Managed/Transport + IMetaTransport）见 <a href="meta.html">meta.md</a>
+<strong>定位</strong>：Structures/ 6 子族之一，<strong>搭配件</strong>（与 Ring/Log 主结构搭配，跨重启单值状态）</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>VersionedMetadata = 版本链追加式单值 + N=2 轮转回收 + 崩溃安全（写一半 = 旧版本完好）</strong>。</p>
+<ul>
+<li>单值：每次 <code>Write</code> 把整条 payload 当一个版本追加到磁盘版本链，链头即当前值；</li>
+<li>内存工作副本（N≥2 对齐槽）让 <code>Read</code> 零 IO、<code>Abort</code> 零 IO（回退到上一版本）；</li>
+<li>落盘 = 引擎 <code>Allocate + Write + Flush</code>，崩溃写到一半 = 链头 magic/CRC 不匹配 = 旧版本完好（断链天然容错）；</li>
+<li><code>PayloadSize</code> 须 ≥ 托管块上界（3a 外部隔离传输场景，见 §2、§8 反模式 1）。</li>
+</ul>
+<hr>
+<h2 id="1-定位">1. 定位</h2>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>与主结构的关系</td>
+<td>与 Ring/Log 主结构搭配——承载跨重启的单值状态（如 Ring 的 <code>CommittedTailAddress</code> 锚点、Session 的检查点水位、TimeSeries 的 dense 块水位）</td>
+</tr>
+<tr>
+<td>与 Meta 横切件的关系</td>
+<td>VersionedMetadata 是 Meta 横切件在结构层的<strong>具体实现</strong>——结构自身的水位（HighestVersionAddress 等）经 Meta 横切件持久化；横切协议（三模式 + IMetaTransport）见 <a href="meta.html">meta.md</a></td>
+</tr>
+<tr>
+<td>与 Index 的差异</td>
+<td>Index 派生数据（可重建、判等闭环、依赖真相源）；VersionedMetadata 是单值状态本体（追加流版本链，N=2 轮转回收）</td>
+</tr>
+<tr>
+<td>与 Mirror 的差异</td>
+<td>Mirror 是字节镜像（不知尺寸的整流式 <code>AppendChunk</code>）；VersionedMetadata 是定长/变长单值（每次 Write 一条 record）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>两种消费形态</strong>：</p>
+<ol>
+<li><strong>直接用</strong>——跨重启单值状态：构造 + Initialize + WaitForReady，按 <code>Write/Read/Persist</code> 用。</li>
+<li><strong>3a 外部隔离传输</strong>——把别的结构的 meta 块托管到 VersionedMetadata：用内置适配器 <code>MetadataMetaTransport</code>（源码 <code>Meta/MetadataMetaTransport.cs</code>），<strong>勿自写单槽文件</strong>（见 §8 反模式 2）。</li>
+</ol>
+<p><strong>为什么单值用版本链而不是单槽覆盖写</strong>：</p>
+<ul>
+<li><strong>崩溃安全免费</strong>——单槽覆盖写要自理 torn write（写一半崩 = 数据撕裂），版本链追加 + 链头 magic/CRC 校验天然容错；</li>
+<li><strong>Abort 零 IO</strong>——回退上一版本只切内存镜像，不触盘；</li>
+<li><strong>空间有界</strong>——N=2 轮转回收（<code>ReclaimOldVersions</code>），不会无界增长；</li>
+<li><strong>跨结构复用</strong>——VersionedMetadata 自身实现 <code>ITransactionParticipant</code>，可注册进 <code>TransactionLog</code> 跨结构原子提交（3a 场景直接用 <code>ext.Storage</code>）。</li>
+</ul>
+<hr>
+<h2 id="2-settings-全参数">2. Settings 全参数</h2>
+<p><code>VersionedMetadataSettings</code>（继承 <code>MetadataSettings</code> ← <code>Settings</code> 基类公共 meta 配置）：</p>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MainEngine</code></td>
+<td><code>StorageEngineOptions</code></td>
+<td>&quot;tc.metadata&quot;，单段 16MB，不分段，不预分配</td>
+<td>主引擎选项。Metadata 版本链默认<strong>单段稀疏按需增长</strong>（元数据是结构体级小数据）</td>
+</tr>
+<tr>
+<td><code>PayloadSize</code></td>
+<td><code>int</code></td>
+<td><strong>必填</strong></td>
+<td>元数据结构体字节数（写入 payload 大小，自动向上对齐到扇区）。<strong>3a 托管场景须 ≥ meta 块上界</strong>（12B 头 + 水位 struct + <code>MetaOpaqueBytes</code> + 4B 尾）</td>
+</tr>
+<tr>
+<td><code>MaxPayloadSize</code></td>
+<td><code>int?</code></td>
+<td><code>null</code></td>
+<td>变长档写入上限。<code>null</code> = 固定档（Write 截断/补零到 <code>PayloadSize</code>）；非 null 且 &gt; PayloadSize = 变长档（Write 允许 ≤ 上限任意长度，record 按实际长度落盘，超上限 fail-fast 抛）</td>
+</tr>
+<tr>
+<td><code>MaxMemoryVersions</code></td>
+<td><code>int</code></td>
+<td>2</td>
+<td>内存多版本保留窗口（N≥2 是 Abort 零 IO 底线，可配更高支持 MVCC）。构造时强制 <code>Math.Max(2, value)</code></td>
+</tr>
+<tr>
+<td><code>MetaPolicyKind</code></td>
+<td><code>MetaPolicyKind</code></td>
+<td><code>Disabled</code></td>
+<td>meta 横切件三模式：<code>Disabled</code>（扫盘恢复）/ <code>Managed</code>（独立 <code>.meta</code> 引擎）/ <code>Transport</code>（外部 <code>IMetaTransport</code>）——见 <a href="meta.html">meta.md</a> §1</td>
+</tr>
+<tr>
+<td><code>MetaOpaqueBytes</code></td>
+<td><code>int</code></td>
+<td>0</td>
+<td>外部 opaque 区容量（写侧约束，不参与盘上几何）。3a 托管场景按调用方需要配置</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>跨重启改 <code>PayloadSize</code> 合法</strong>：恢复载入的历史版本按其盘上真实 <code>PayloadLength</code> 完整交付（不补零、不截断）；本次运行的新版本按新 <code>PayloadSize</code> 几何落盘。版本链混尺寸由各 record 头部自述几何支撑。</p>
+</blockquote>
+<blockquote>
+<p><strong><code>MaxPayloadSize</code> 何时用</strong>：keyed 分区元数据（如 TimeSeries dense 水位块——n 随序列增长，每次 Write 的块长动态）。固定档消费者（Queue/Blob 等）逐字节行为不变。</p>
+</blockquote>
+<hr>
+<h2 id="3-构造与生命周期">3. 构造与生命周期</h2>
+<p>VersionedMetadata 无 <code>Create</code> 工厂——显式三步：构造（= 配置，零 IO）→ <code>Initialize</code>（同步启动后台恢复，立即返回）→ <code>WaitForReady</code>（观测等待恢复完成）。Dispose 幂等。</p>
+<h3 id="31-直接消费最常见">3.1 直接消费（最常见）</h3>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Runtime.Structures.Metadata;
+
+// ① 文件系统（介质平权——换介质 = 换一根 spec）
+using var fs = TierFs.New(&quot;memory:&quot;);   // 或 &quot;local:///path/to/dir&quot;
+
+// ② 配置（PayloadSize 必填；其余默认值即生产值）
+var settings = new VersionedMetadataSettings(
+    new StorageEngineOptions(&quot;session.ckpt&quot;, 16L * 1024 * 1024, enableSegmentation: false))
+{
+    PayloadSize = 64,                  // 单值结构体字节数
+    MetaPolicyKind = MetaPolicyKind.Managed,   // O(1) 恢复水位；Disabled 走扫盘
+};
+
+// ③ 构造 + 启动 + 等就绪
+using var md = new VersionedMetadata(fs, settings);
+md.Initialize();                       // 同步 void，启动后台恢复后立即返回
+md.WaitForReady();                    // 观测等待恢复完成（载入链头版本到内存镜像）
+</code></pre>
+<h3 id="32-write--read--abort写读编排">3.2 Write + Read + Abort（写读编排）</h3>
+<pre><code class="lang-csharp">// ① 写——返回版本号（单调递增）；本调用按落盘策略决定是否立即 flush
+long v1 = md.Write(stackalloc byte[] { /* 64B 结构体 */ });
+//   v1 == 1（首次 Write 推进到 1；恢复载入过历史版本则从载入版本号续推）
+
+// ② 读——零 IO；首次 Write 前 = 加载版本（盘上真实大小），Write 后 = 现热区
+Span&lt;byte&gt; buf = stackalloc byte[64];
+int n = md.Read(buf);                  // n = min(当前内容长度, buf.Length)
+
+// ③ 零拷贝视图——仅 epoch 存活期内有效；跨 await 必须改走 Read(dst)
+Span&lt;byte&gt; view = md.AsSpan();         // 同步栈内合法
+ref var head = ref md.GetRef&lt;long&gt;();  // 强类型首字段引用（热路径零校验）
+
+// ④ 显式持久化点——不注入 SyncPersistencePolicy 时 Write 不自动落盘，需手动触发
+md.Persist();                          // 把内存镜像追加为版本链新版本 + flush + 写 meta
+
+// ⑤ 2PC 编排（与 TransactionLog 协同——Prepare 即持久化点）
+const long seq = 100;
+md.Prepare(seq);                       // 追加新版本 + flush + 写 meta（LastPreparedSeq = seq）
+md.ConfirmCommitted(seq);              // CAS 推进 LastCommittedSeq；新版本正式成为当前
+//   失败路径：
+md.Abort(seq);                         // 内存回退到上一版本（零 IO）+ ReclaimTail 回退悬干新版本
+
+// ⑥ 头截断（后台周期调）——保留最近 N=MaxMemoryVersions 个版本，更老的从链尾方向回收
+md.ReclaimOldVersions();
+</code></pre>
+<h3 id="33-异步启动注入恢复-hints">3.3 异步启动（注入恢复 hints）</h3>
+<pre><code class="lang-csharp">using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+var hints = new MetadataRecoveryHints
+{
+    HighestVersionAddress = knownHead,  // 上层最强知识——优先级最高（&gt; meta &gt; 扫盘）
+    LastCommittedSeq = knownSeq,
+};
+md.Initialize(hints);                          // 恢复核心：启动主引擎就绪 → meta.Load → 三级回退
+await md.WaitForReadyAsync(cts.Token);
+</code></pre>
+<h3 id="34-dispose">3.4 Dispose</h3>
+<pre><code class="lang-csharp">// 显式释放（幂等）；底层引擎、meta 引擎、epoch、热区对齐内存、缓冲池一并释放
+md.Dispose();
+// 或异步释放（MetaPolicy 走异步轨）
+await md.DisposeAsync().ConfigureAwait(false);
+</code></pre>
+<p>生命周期与全部 Structures 同构（详见 <code>src/TC.Tier.Core/docs/lifecycle.md</code>）：<code>OnInitializeBegin</code> 启动主引擎 +（Managed 模式）并行启动 meta 引擎；恢复核心 <code>WaitForDependenciesAsync</code> 双 await 引擎就绪 → <code>MetaPolicy.LoadAsync</code> → 三级回退定位链头 → 加载链头版本到内存镜像。</p>
+<blockquote>
+<p><strong>变长档写读</strong>：<code>MaxPayloadSize</code> 启用后 Write 允许 ≤ 上限的任意长度，record 按实际长度落盘。<code>CurrentPayloadLength</code> 探测当前内容长度（固定档恒 PayloadSize；变长档随块增长）后分配读缓冲；<code>AsSpan()</code>/<code>GetSpan&lt;T&gt;()</code> 自动按当前实际长度切片。</p>
+</blockquote>
+<h3 id="35-文件系统与介质">3.5 文件系统与介质</h3>
+<ul>
+<li><code>IFileSystem</code> 经组合根 <code>TierFs</code> 注入——介质平权：<code>memory:</code> / <code>local:///path</code> / <code>s3://bucket</code> 等 spec 切换零代码改动；</li>
+<li>引擎名隔离同 fs 子目录——多结构同 fs 时引擎名须唯一（如 <code>&quot;my-log&quot;</code> / <code>&quot;my-log.meta&quot;</code>）；</li>
+<li><code>DeleteOnClose</code>：跨重启组合（如 3a 托管）须 <code>false</code>（默认），否则 Dispose 时清盘；测试场景可设 <code>true</code> 自动回收；</li>
+<li><code>SectorSize</code> 从 <code>_fs.Volume</code> 静态属性读取——构造期可用，padding/热区分配安全。</li>
+</ul>
+<hr>
+<h2 id="4-api-详表">4. API 详表</h2>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>签名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>写</td>
+<td><code>long Write(ReadOnlySpan&lt;byte&gt; data)</code></td>
+<td>把 <code>data</code> 写入内存镜像，推进版本号，按落盘策略触发持久化。固定档：长截短补；变长档：超 <code>MaxPayloadSize</code> 抛。返回新版本号（单调递增；恢复后从载入版本续推）</td>
+</tr>
+<tr>
+<td>持久化</td>
+<td><code>void Persist()</code></td>
+<td>强制把内存镜像作为新版本追加到磁盘版本链 + flush + 写 meta。内容未变跳过（防重复/防缩容零覆写）</td>
+</tr>
+<tr>
+<td>读（拷贝）</td>
+<td><code>int Read(Span&lt;byte&gt; dst)</code></td>
+<td>零 IO 读当前内容。加载版本优先（首次 Write 前按盘上真实大小交付）；Write 后 = 热区。返回实际读取字节数</td>
+</tr>
+<tr>
+<td>读（零拷贝）</td>
+<td><code>Span&lt;byte&gt; AsSpan()</code></td>
+<td>当前内容 0-copy Span 视图。<strong>仅 epoch 存活期内有效</strong>——并发写/Abort 可能使其失效</td>
+</tr>
+<tr>
+<td>读（强类型引用）</td>
+<td><code>ref T GetRef&lt;T&gt;() where T : unmanaged</code></td>
+<td>当前内容首字节按 T 重解释的引用（热路径 <code>GetRefUnsafe</code> 零校验）</td>
+</tr>
+<tr>
+<td>读（强类型 Span）</td>
+<td><code>Span&lt;T&gt; GetSpan&lt;T&gt;() where T : unmanaged</code></td>
+<td>按 T 重解释的 Span。要求内容大小与 sizeof(T) 对齐——历史大小 ≠ PayloadSize 时可能抛</td>
+</tr>
+<tr>
+<td>热路径读</td>
+<td><code>int ReadNoEpoch(Span&lt;byte&gt; dst)</code></td>
+<td>不含 epoch 进出的读（供已持 epoch 的 scope/batch 内调）。裸调危险</td>
+</tr>
+<tr>
+<td>当前长度</td>
+<td><code>int CurrentPayloadLength { get; }</code></td>
+<td>加载版本按盘上真实长度 / 热区按最近 Write 长度。分配读缓冲前探测用</td>
+</tr>
+<tr>
+<td>水位·链头</td>
+<td><code>LogicalAddress HighestVersionAddress { get; }</code></td>
+<td>链头/最新版本地址</td>
+</tr>
+<tr>
+<td>水位·链尾</td>
+<td><code>LogicalAddress LowestVersionAddress { get; }</code></td>
+<td>链尾/最老版本地址（头截断回收边界）</td>
+</tr>
+<tr>
+<td>水位·版本号</td>
+<td><code>long CurrentVersion { get; }</code></td>
+<td>当前版本号（单调递增，0 = 空链/无数据）</td>
+</tr>
+<tr>
+<td>扇区大小</td>
+<td><code>uint SectorSize { get; }</code></td>
+<td>引擎扇区大小（padding/对齐计算用）</td>
+</tr>
+<tr>
+<td>头截断</td>
+<td><code>void ReclaimOldVersions()</code></td>
+<td>回收旧版本磁盘空间——保留最近 N=MaxMemoryVersions 个版本，更老的从链尾方向 <code>ReclaimHead</code>（epoch 保护：等 readers 退出后回收）</td>
+</tr>
+<tr>
+<td>Opaque 写</td>
+<td><code>void SetOpaqueMeta(ReadOnlySpan&lt;byte&gt; data)</code></td>
+<td>登记外部 opaque meta 进策略缓冲，随下次水位提交原子落盘。Disabled 抛 <code>InvalidOperationException</code>；超 <code>MetaOpaqueBytes</code> 抛 <code>ArgumentException</code></td>
+</tr>
+<tr>
+<td>Opaque 读</td>
+<td><code>ReadOnlySpan&lt;byte&gt; ReadOpaqueMeta()</code></td>
+<td>读最近已提交块内的 opaque 字节视图。无数据/Disabled 时为空 Span</td>
+</tr>
+<tr>
+<td>2PC</td>
+<td>见下表</td>
+<td><code>ITransactionParticipant</code> 六件套</td>
+</tr>
+</tbody>
+</table>
+<p><strong>2PC 六件套</strong>（<code>ITransactionParticipant</code>，对齐 Log/Ring 范式，独立协议与数据写正交）：</p>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Prepare(long seq)</code> / <code>PrepareAsync(long seq, CancellationToken ct)</code></td>
+<td>记录回退快照 → 追加新版本到磁盘链头 + flush + 写 meta。内容未变跳过追加。数据 flush 原生同步，异步版仅 meta 走 <code>MetaPolicy.CommitAsync</code></td>
+</tr>
+<tr>
+<td><code>ConfirmCommitted(long seq)</code></td>
+<td>CAS 推进 <code>LastCommittedSeq</code> + 持久化 meta（刷新水位）+ 清空 Abort 回退快照 + 触发回调。<code>seq ≤ current</code> 时 no-op</td>
+</tr>
+<tr>
+<td><code>Abort(long seq)</code> / <code>AbortAsync(long seq, CancellationToken ct)</code></td>
+<td>内存窗口回退到上一版本（零 IO）+ 尾截断 <code>ReclaimTail</code> 回退悬干新版本 + flush + 写 meta。幂等——恢复时可能对同一 seq 多次调</td>
+</tr>
+<tr>
+<td><code>OnCommitted(long seq, Action callback)</code></td>
+<td>注册提交回调（链式触发）。已提交到更高 seq 时立即同步触发</td>
+</tr>
+<tr>
+<td><code>long LastCommittedSeq { get; }</code></td>
+<td>当前已提交 seq（恢复/运行时读）</td>
+</tr>
+<tr>
+<td><code>long LastPreparedSeq { get; }</code></td>
+<td>最近 Prepare 的 seq。恢复裁决悬干用（&gt; 协调者 committedSeq = 悬干，丢弃）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-自定义注入工厂">5. 自定义注入工厂</h2>
+<p>构造参数支持注入（默认实现满足绝大多数场景；替换走命名委托/接口注入，禁匿名 lambda）：</p>
+<table>
+<thead>
+<tr>
+<th>注入项</th>
+<th>接口/类型</th>
+<th>默认实现</th>
+<th>注入方式</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Codec</td>
+<td><code>IMetadataCodec</code></td>
+<td><code>VersionedMetadata.Codec</code>（私有嵌套 sealed，JIT 去虚化）</td>
+<td>经 <code>protected MetadataBase</code> 构造第一参数——子类继承传</td>
+</tr>
+<tr>
+<td>恢复算法</td>
+<td><code>IRecovery&lt;MetadataRecoveryHints&gt;</code></td>
+<td><code>DefaultMetadataRecovery</code>（三级回退：hints → meta → 扫盘）</td>
+<td>构造参数 <code>recovery</code></td>
+</tr>
+<tr>
+<td>Meta 策略工厂</td>
+<td><code>MetaPolicyFactory&lt;MetadataMetaHeader, MetadataMetaPayload&gt;</code></td>
+<td><code>CreateMetaPolicyDefault</code>（按 <code>MetaPolicyKind</code> 映射 Managed/Transport/Disabled）</td>
+<td>构造参数 <code>metaPolicyFactory</code>——命名委托，禁匿名 lambda</td>
+</tr>
+<tr>
+<td>Meta 传输</td>
+<td><code>IMetaTransport</code></td>
+<td>Transport 模式回落 <code>MetaHost</code>（meta 块作为 <code>IS_META</code> record 嵌入版本链流）</td>
+<td>构造参数 <code>metaTransport</code>——3a 外部隔离用 <code>MetadataMetaTransport</code> 或自实现</td>
+</tr>
+<tr>
+<td>Epoch</td>
+<td><code>LightEpoch</code></td>
+<td>内部 new 自管（进 <code>Resources</code> 统一释放）</td>
+<td>构造参数 <code>epoch</code>——多结构共享同一实例时注入</td>
+</tr>
+<tr>
+<td>持久化策略</td>
+<td><code>IPersistencePolicy</code></td>
+<td>不注入 = 写路径不自动落盘（仅 Prepare/Persist 强制 flush）</td>
+<td>构造参数 <code>persistencePolicy</code>——<code>SyncPersistencePolicy</code> / <code>AsyncPersistencePolicy</code></td>
+</tr>
+<tr>
+<td>Logger</td>
+<td><code>ILogger</code></td>
+<td>null</td>
+<td>构造参数 <code>logger</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Contracts 类型</strong>（<code>Structures/Metadata/Contracts/</code>）：</p>
+<table>
+<thead>
+<tr>
+<th>类型</th>
+<th>角色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>MetadataRecordFields</code></td>
+<td>版本 record 业务字段包（Flags/PayloadLength/PaddingLength/PreviousVersion/MetadataVersion），codec 读写 header 时传参</td>
+</tr>
+<tr>
+<td><code>MetadataMetaHeader</code></td>
+<td>meta 水位 Header（12B 纯规范：Magic/Version/Flags/PayloadLength/PaddingLength），走 <code>[BinaryLayout]</code> 源生成 codec</td>
+</tr>
+<tr>
+<td><code>MetadataMetaPayload</code></td>
+<td>meta 水位 Payload（48B：HighestVersionAddress/LowestVersionAddress/LastCommittedSeq/LastPreparedSeq）</td>
+</tr>
+<tr>
+<td><code>MetadataRecoveryHints</code></td>
+<td>恢复提示（<code>HighestVersionAddress?</code> / <code>LastCommittedSeq?</code>），外部主动注入——最高优先级</td>
+</tr>
+<tr>
+<td><code>IMetadataCodec</code></td>
+<td>版本 record codec 接口（HeaderSize/Magic/WriteHeader/TryReadHeader/FillCrc/VerifyCrc/ReadVersion 等）</td>
+</tr>
+<tr>
+<td><code>IPersistencePolicy</code> / <code>SyncPersistencePolicy</code> / <code>AsyncPersistencePolicy</code></td>
+<td>落盘策略——见 §6</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-持久化机制">6. 持久化机制</h2>
+<h3 id="61-版本链-n2-轮转回收">6.1 版本链 N=2 轮转回收</h3>
+<ul>
+<li><strong>磁盘</strong>：版本链追加流——每次落盘 = <code>Allocate(recordSize).Start</code> + <code>Write(addr, span)</code> + <code>Flush</code>。record 几何 = <code>[Header 42B][Payload 实际长][Padding 扇区对齐]</code>，CRC32C in Header（覆盖 Header 除 Crc 自身 + Payload + Padding）。</li>
+<li><strong>内存</strong>：N 个对齐槽（<code>AlignedMemoryManager</code>，pinned native，零 GC）。<code>Write</code> 在覆盖 [0] 前先把 [0] 滑到 [1]（保留为 Abort 零 IO 回退源）。N≥2 是底线——<code>MaxMemoryVersions</code> 强制 <code>Math.Max(2, value)</code>。</li>
+<li><strong>轮转回收</strong>：<code>ReclaimOldVersions</code> 按 <code>MaxMemoryVersions</code> 保留窗口——<code>[keepAddr, highest]</code> = 最近 N 个版本，更老的从链尾方向 <code>ReclaimHead</code>。epoch 保护（<code>BumpCurrentEpoch</code> 等 readers 退出后回收）。</li>
+<li><strong>逐 record 自身几何推进</strong>：链上 record 尺寸可能不同（PayloadSize 跨重启变更后新旧混尺寸），扫描/回收按每条 record 头部自述的 <code>PayloadLength+PaddingLength</code> 跳进——<strong>统一 record 步进会落在旧 record 中段，断链静默丢数据</strong>。</li>
+</ul>
+<p><strong>版本 record 42B Header 布局</strong>（<code>MetadataHeader</code>，源生成器 <code>[BinaryLayout]</code> 生成 codec）：</p>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>长度</th>
+<th>字段</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td><code>MagicValue</code></td>
+<td>魔数 = <code>RecordMagic.VersionedMetadata</code>，块身份校验</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2</td>
+<td><code>Version</code></td>
+<td>头版本号（major=1, minor=0），<code>ValidEquals</code> 校验</td>
+</tr>
+<tr>
+<td>6</td>
+<td>2</td>
+<td><code>Flags</code></td>
+<td><code>DefaultFlags</code> = <code>FLAG_CRC32C \| FLAG_PAYLOAD_4B</code>；meta record 叠加 <code>FLAG_ENTRY_IS_META</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>4</td>
+<td><code>PayloadLength</code></td>
+<td>元数据结构体字节数（payload 实际长度）</td>
+</tr>
+<tr>
+<td>12</td>
+<td>2</td>
+<td><code>PaddingLength</code></td>
+<td>扇区对齐填充字节数</td>
+</tr>
+<tr>
+<td>14</td>
+<td>16</td>
+<td><code>PreviousVersion</code></td>
+<td>版本链指针，指向上一版本（链尾为 <code>LogicalAddress.Empty</code>）</td>
+</tr>
+<tr>
+<td>30</td>
+<td>8</td>
+<td><code>MetadataVersion</code></td>
+<td>版本号（单调递增；调用方按版本号寻址/恢复定位）</td>
+</tr>
+<tr>
+<td>38</td>
+<td>4</td>
+<td><code>Crc</code></td>
+<td>CRC32C（覆盖 Header 除 Crc 自身 + Payload + Padding）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="62-同步-vs-异步持久化策略对比">6.2 同步 vs 异步持久化策略对比</h3>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th><code>ShouldPersist(version)</code></th>
+<th>何时落盘</th>
+<th>适用</th>
+<th>代价</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>不注入（默认）</td>
+<td>（不调）</td>
+<td>仅 <code>Prepare</code> / <code>Persist</code> 显式触发</td>
+<td>上层用 2PC 编排提交点（如 Session）</td>
+<td>Write 不自动落盘——崩在 Prepare 前 = 丢失</td>
+</tr>
+<tr>
+<td><code>SyncPersistencePolicy</code></td>
+<td>恒 true</td>
+<td>每次 <code>Write</code> 立即 <code>AppendVersionToDisk</code> + flush</td>
+<td>单值独立持久化（不参与 2PC）</td>
+<td>每次 Write 强制 IO（最高一致性，最低吞吐）</td>
+</tr>
+<tr>
+<td><code>AsyncPersistencePolicy</code></td>
+<td>恒 false</td>
+<td>后台批量 flush / <code>Prepare</code> / <code>Persist</code> 显式触发</td>
+<td>高频写、容忍批量延迟落盘</td>
+<td>后台线程批量；崩在 flush 前 = 丢失未提交版本</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong><code>Prepare</code> 无论何种策略都强制 flush</strong>——2PC 协议要求 Prepare 即持久化点（WriteAsync 不保证落盘）。</p>
+</blockquote>
+<h3 id="63-内存热窗口abort-零-io-的关键">6.3 内存热窗口（Abort 零 IO 的关键）</h3>
+<p><code>Write</code> 在覆盖热区 <code>[0]</code> 前，先把 <code>[0]</code> 滑到 <code>[1]</code>，使 <code>[1]</code> 始终持有上一版本镜像：</p>
+<pre><code>[0] = 当前版本（最近 Write 的目标）
+[1] = 上一版本（Abort 零 IO 回退源；写覆盖前的镜像）
+[2..N-1] = 更老版本（MaxMemoryVersions &gt; 2 时支持 MVCC）
+</code></pre>
+<ul>
+<li><strong>拷贝顺序从高索引往低索引</strong>（<code>[N-1] ← [N-2] ← ... ← [1] ← [0]</code>），避免 <code>[0]→[1]</code> 覆盖 <code>[1]</code> 旧值前未读到；</li>
+<li><strong>变长档槽增长</strong>：<code>EnsureHotSlotSize(needed)</code> 按需重分配整组槽（<code>max(needed, 当前×2)</code> 对数摊薄，上限 <code>_hotCapacity</code>），搬移既有镜像；固定档恒跳过（槽尺寸 = PayloadSize）；</li>
+<li><strong>冷热分离</strong>：恢复载入的历史版本按盘上真实 <code>PayloadLength</code> 从自持 <code>PinnedBufferPool</code> 租借只读缓冲，<strong>不进按当前配置分配的读写热区</strong>——历史大小 ≠ 当前 PayloadSize 时不补零、不截断；首次 Write 后当前内容切到热区，加载版本归还池（两次 Write 后不可达）；</li>
+<li><strong>Abort 回退分支</strong>：会话内有 Write（<code>_currentVersion &gt; _baseVersion</code>）时——两次以上写走热-热回退（<code>[1]→[0]</code>）；单次写且前置 = 加载版本走冷-热回退（<code>_serveLoaded = true</code>，回到恢复载入的历史版本完整大小）。</li>
+</ul>
+<h3 id="64-崩溃安全">6.4 崩溃安全</h3>
+<p>天然容错——无需 WAL：</p>
+<ul>
+<li>写到一半（torn write）：链头 record magic/CRC 不匹配 → 恢复时 <code>TryReadHeader</code> 返回 false → 链断在上一合法 record（旧版本完好）；</li>
+<li>内存镜像未落盘：恢复时从盘上链头载入（旧版本）；</li>
+<li>Prepare 后 Commit 前：磁盘链头是 Prepare 追加的新版本，但 <code>LastCommittedSeq</code> 未推进——恢复时 <code>LastPreparedSeq &gt; LastCommittedSeq</code> 即悬干，<code>Abort</code> 触发尾截断 <code>ReclaimTail</code> 回退（按 record 自身几何 + <code>_lastAppendedRecordSize</code>）。</li>
+</ul>
+<h3 id="65-外部隔离传输3a-托管">6.5 外部隔离传输（3a 托管）</h3>
+<p>把别的结构的 meta 块托管到 VersionedMetadata——用内置适配器 <code>MetadataMetaTransport</code>：</p>
+<pre><code class="lang-csharp">using TC.Tier.Core.IO;
+using TC.Tier.Runtime.Meta;
+using TC.Tier.Runtime.Structures;
+using TC.Tier.Runtime.Structures.Metadata;
+
+using var fs = TierFs.New(&quot;local:///var/lib/myapp&quot;);
+
+// ★ PayloadSize 须 ≥ meta 块上界：12B 头 + 水位 struct + MetaOpaqueBytes + 4B 尾
+//   MetadataMetaPayload = 48B；按调用方 MaxMetaOpaqueBytes 估算后留余量更稳
+var hostSettings = new VersionedMetadataSettings(
+    new StorageEngineOptions(&quot;my-log.meta&quot;, 1L &lt;&lt; 20, enableSegmentation: false))
+{
+    PayloadSize = 4096,                       // 留足余量（远大于 64 + MetaOpaqueBytes）
+    MetaPolicyKind = MetaPolicyKind.Disabled, // 托管结构自身水位走扫盘（无嵌套 meta）
+};
+
+// 构造 + 启动（适配器内部 Initialize；首次读写 WaitForReady 就绪）
+using var ext = new MetadataMetaTransport(fs, hostSettings);
+
+// 注入到 Log/Ring/Mirror 等主结构的 settings.MetaPolicyKind = Transport 时使用
+var logSettings = new EntryLogSettings(
+    new StorageEngineOptions(&quot;my-log&quot;, 64L &lt;&lt; 20)) { MetaPolicyKind = MetaPolicyKind.Transport };
+using var log = new EntryLog(fs, logSettings, metaTransport: ext);
+
+// ★ 适配器语义：WriteBlock = Write + Persist + flush + ReclaimOldVersions（N=2 轮转有界）
+//   ReadLastBlock = 内存镜像零 IO 读 + 按统一布局自述裁剪为变长精确块
+//   需要 2PC 跨结构原子提交时经 ext.Storage（VersionedMetadata 自身已实现 ITransactionParticipant）
+</code></pre>
+<p><code>WriteBlock</code> 即 meta fsync 点（data 在调用链先行落盘）；3a 语义下主结构主流水位线零影响——meta 块写入与主结构引擎完全解耦（详见 <a href="meta.html">meta.md</a> §6.3）。</p>
+<hr>
+<h2 id="7-恢复协议">7. 恢复协议</h2>
+<p><code>DefaultMetadataRecovery</code>（继承 <code>RecoveryBase&lt;MetadataRecoveryHints&gt;</code> 模板，三级回退——对齐 <a href="meta.html">meta.md</a> §6.2 全结构统一优先级）：</p>
+<pre><code>① WaitForDependenciesAsync：等主引擎 + meta 引擎（Managed 模式）双 await 全异步轨就绪
+② MetaPolicy 装配（恢复核心钩子内——依赖引擎就绪）
+③ meta.LoadAsync（水位 O(1)；Disabled no-op）
+④ 三级回退定位链头：
+   1. hints（外部注入 HighestVersionAddress——最高优先级）
+   2. meta payload（HighestVersionAddress + LastCommittedSeq + LowestVersionAddress——O(1)）
+   3. 扫盘按版本号定位 Head（无 meta / meta 损坏兜底）
+⑤ LoadVersionToMemory(head)：按 record 自身 PayloadLength 从自持 PinnedBufferPool 租借只读缓冲
+   ——历史大小 ≠ 当前 PayloadSize 时不补零不截断，完整交付
+</code></pre>
+<p><strong>扫盘</strong>：从 <code>MinAddress</code> 正向扫，按每条 record 自身 <code>PayloadLength+PaddingLength</code> 跳进，magic 不匹配 = 链结束。最后一条合法数据 record = 链头（最高地址 = 最新写入）。<strong>跳过 <code>IS_META</code> record</strong>（Transport 自流嵌入模式的 meta block 不参与数据版本号定位，几何跳进照常）。</p>
+<p><strong>链头判定细节</strong>：</p>
+<ul>
+<li><strong>不用地址值 <code>== LogicalAddress.Empty</code> 判断&quot;有没有找到&quot;</strong>——Empty 是合法地址（地址空间起点，首版本链头就是 Empty）；用 <code>headFound</code> 布尔标志；</li>
+<li><strong>链头 = 最高地址的数据 record</strong>——不用版本号比较：同一版本号可能被多次持久化（Write 落盘 + Prepare 再落盘），版本号相同但地址递增，最新地址才是当前链头；</li>
+<li><strong>扫盘 64KB 页步进</strong>（<code>ScanProbePageSize</code>）用于 magic 首扫定位起点；几何跳进后逐 record 头校验；最大扫盘 64MB 防失控。</li>
+</ul>
+<p><strong>与 Meta 横切件配合</strong>：</p>
+<ul>
+<li>结构自身水位（HighestVersionAddress 等）经 Meta 横切件持久化（MetaPolicyKind 三模式）；</li>
+<li>3a 场景下 VersionedMetadata 自身被 <code>MetadataMetaTransport</code> 包成别的结构的 meta 介质——结构自身的水位走 <code>Managed</code>（嵌套 <code>.meta.meta</code> 引擎）或 <code>Disabled</code>（扫盘）。</li>
+</ul>
+<hr>
+<h2 id="8-反模式">8. 反模式</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果 / 正确做法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>PayloadSize &lt; 托管块上界</code>（3a 场景）</td>
+<td><code>WriteBlock</code> 抛 <code>ArgumentException</code>（fail-fast 不截断）。正确：<code>PayloadSize ≥ 12B 头 + 水位 struct（48B）+ MetaOpaqueBytes + 4B 尾</code>，留余量更稳</td>
+</tr>
+<tr>
+<td>2</td>
+<td>自写单槽文件存 meta（3a 场景）</td>
+<td>独自写盘要自理 torn write 原子性、落盘顺序（data 先 meta 后）、崩溃恢复一致性、2PC 提交链路。正确：用 <code>MetadataMetaTransport</code> 托管到 VersionedMetadata（版本链天然容错 + N=2 轮转有界 + 2PC 已实现）</td>
+</tr>
+<tr>
+<td>3</td>
+<td>绕过 <code>PersistencePolicy</code> 自改落盘时机</td>
+<td>一致性失守——Async 策略下 Write 不落盘，崩在后台 flush 前 = 丢失。正确：需要每次 Write 落盘就注入 <code>SyncPersistencePolicy</code>；上层编排走 2PC（<code>Prepare</code>+<code>ConfirmCommitted</code>）</td>
+</tr>
+<tr>
+<td>4</td>
+<td>跨 await 持有 <code>AsSpan()</code> / <code>GetRef&lt;T&gt;()</code> 视图</td>
+<td>视图仅 epoch 存活期内有效——并发写/Abort 可能使其失效。正确：跨 await 走 <code>Read(dst)</code>（拷贝交付）</td>
+</tr>
+<tr>
+<td>5</td>
+<td>用地址值 <code>== LogicalAddress.Empty</code> 判断&quot;链头未找到&quot;</td>
+<td>Empty 是合法地址（地址空间起点，首版本链头就是 Empty）。正确：恢复代码用 <code>headFound</code> 布尔标志（已是这样实现的）</td>
+</tr>
+<tr>
+<td>6</td>
+<td>统一 record 步进扫描版本链</td>
+<td>PayloadSize 跨重启变更后新旧混尺寸，统一步进会落在旧 record 中段 → 静默断链丢数据。正确：按每条 record 头部自述 <code>PayloadLength+PaddingLength</code> 跳进</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Disabled 模式下 <code>SetOpaqueMeta</code> 期望被接受</td>
+<td>抛 <code>InvalidOperationException</code>（禁用即报错，不静默吞）。正确：需要 opaque 就配 <code>Managed</code>/<code>Transport</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>把 meta 块当独立提交路径（自流嵌入 3b 之外的语义）</td>
+<td>已废除——自拍水位独立成块 = 并发水位回退 + 被内部提交冲掉。正确：opaque 只登记，随水位提交原子落盘（<a href="meta.html">meta.md</a> §4）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-想深入指路">9. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>源码</td>
+<td><code>src/TC.Tier.Runtime/Structures/Metadata/</code>（VersionedMetadata / MetadataBase.* / Contracts/）</td>
+</tr>
+<tr>
+<td>Meta 横切协议（三模式 + IMetaTransport + opaque 搭车 + 块格式）</td>
+<td><a href="meta.html">meta.md</a></td>
+</tr>
+<tr>
+<td>Session 协调协议（写/读/检查点三 op、悬挂裁决）</td>
+<td><a href="session.html">session.md</a></td>
+</tr>
+<tr>
+<td>引擎使用（Allocate/Write/Flush/Reclaim/Compact）</td>
+<td><a href="storage-engine.html">storage-engine.md</a></td>
+</tr>
+<tr>
+<td>段几何 / 段表</td>
+<td><a href="segment-table.html">segment-table.md</a></td>
+</tr>
+<tr>
+<td>Lease 协议</td>
+<td><a href="lease-protocol.html">lease-protocol.md</a></td>
+</tr>
+<tr>
+<td>同族结构</td>
+<td><a href="ring.html">ring.md</a> / <a href="log.html">log.md</a> / <a href="index.html">index.md</a> / <a href="mirror.html">mirror.md</a> / <a href="snapshot.html">snapshot.md</a></td>
+</tr>
+<tr>
+<td>总览（七种结构选型 / 组合 KV / 反模式）</td>
+<td><a href="structures.html">structures.md</a></td>
+</tr>
+</tbody>
+</table>
+<p>机制级细节（record 42B header 字段全表、扫盘 64KB 页步进、<code>_hotSlotSize</code> 增长策略、Abort 回退分支条件）按需从源码 XML 注释与 <code>docs/design/</code> 设计稿查阅——使用面不需要这些细节；能力全集以类型 XML 注释为准。</p>
+<hr>
+<h2 id="10-faq">10. FAQ</h2>
+<table>
+<thead>
+<tr>
+<th>问题</th>
+<th>答案</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Write</code> 后立刻 <code>Read</code> 不到新值？</td>
+<td>不会——<code>Write</code> 同步更新内存镜像，<code>Read</code> 零 IO 读内存。但<strong>磁盘上不一定有</strong>——不注入 <code>SyncPersistencePolicy</code> 时 Write 不自动落盘，崩在 <code>Persist</code>/<code>Prepare</code> 前磁盘链头仍是旧版本（恢复后读旧值）。</td>
+</tr>
+<tr>
+<td><code>MaxMemoryVersions</code> 配 1 行不行？</td>
+<td>不行——构造强制 <code>Math.Max(2, value)</code>。N=1 时 Write 覆盖前无可保留的旧版本镜像，Abort 只能冷-热回退到加载版本（无法热-热回退到上一 Write）。N=2 是 Abort 零 IO 的几何底线。</td>
+</tr>
+<tr>
+<td>跨重启改 <code>PayloadSize</code> 安全吗？</td>
+<td>安全——历史版本按盘上真实 <code>PayloadLength</code> 从自持池租借只读缓冲，<strong>不补零不截断</strong>完整交付；本次运行的新版本按新 <code>PayloadSize</code> 几何落盘。版本链混尺寸由每条 record 头部自述几何支撑（扫描/回收按各自 PayloadLength+PaddingLength 跳进）。</td>
+</tr>
+<tr>
+<td><code>Prepare</code> 后 <code>Abort</code> 之间还能 <code>Read</code> 到新值吗？</td>
+<td>能——<code>Prepare</code> 已追加新版本到磁盘链头并 flush，但 <code>LastCommittedSeq</code> 未推进；内存镜像也是新值。<code>Abort</code> 后才回退（内存 + 磁盘链头 + 版本号一并回退到 <code>_prepareSnapshotAddress</code>）。</td>
+</tr>
+<tr>
+<td><code>Disabled</code> 模式恢复慢吗？</td>
+<td>慢——扫盘 O(链长/盘)，最大扫 64MB。GB/TB 级单值状态强烈建议开 <code>Managed</code>（O(1) 读水位）。VersionedMetadata 单值场景一般几 KB 到 MB，扫盘可接受；3a 托管场景按主流结构大小判断。</td>
+</tr>
+<tr>
+<td>变长档下 <code>AsSpan()</code> 返回的 span 长度？</td>
+<td>当前内容长度（加载版本按盘上真实 PayloadLength / 热区按最近 Write 长度）。不是 <code>PayloadSize</code>，也不是 <code>MaxPayloadSize</code>——按当前实际镜像切片。<code>CurrentPayloadLength</code> 是探测入口。</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/versioned-metadata.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -2,9 +2,9 @@
 <html>
   <head>
     <meta charset="utf-8">
-      <title>原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / PinnedBufferPool / OverflowPool） | TC.Tier — .NET 可组合存储运行时 </title>
+      <title>原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / NodeArena / PinnedBufferPool / OverflowPool） | TC.Tier — .NET 可组合存储运行时 </title>
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta name="title" content="原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / PinnedBufferPool / OverflowPool） | TC.Tier — .NET 可组合存储运行时 ">
+      <meta name="title" content="原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / NodeArena / PinnedBufferPool / OverflowPool） | TC.Tier — .NET 可组合存储运行时 ">
       
       
       <link rel="icon" href="../../favicon.ico">
@@ -85,11 +85,11 @@
         </div>
 
         <article data-uid="">
-<h1 id="原生内存与对象池使用指南alignedmemorymanager--nativearena--pinnedbufferpool--overflowpool">原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / PinnedBufferPool / OverflowPool）</h1>
+<h1 id="原生内存与对象池使用指南alignedmemorymanager--nativearena--nodearena--pinnedbufferpool--overflowpool">原生内存与对象池使用指南（AlignedMemoryManager / NativeArena / NodeArena / PinnedBufferPool / OverflowPool）</h1>
 
 <blockquote>
 <p><strong>给谁看</strong>：需要非托管内存/池化的组件开发者（引擎热路径、对齐缓冲、批量临时区）。
-<strong>回答什么</strong>：四种内存积木怎么选、怎么借怎么还、什么不要做。
+<strong>回答什么</strong>：五种内存积木怎么选、怎么借怎么还、什么不要做。
 <strong>⚠️ 铁律（先记住）</strong>：非托管内存 GC 不管——<strong>自己 new 的要 Dispose，池里借的要归还</strong>，
 两种都不做 = 真泄漏。完整积木全景见 <a href="COORDINATION.html"><code>../COORDINATION.md</code></a>。</p>
 </blockquote>
@@ -116,6 +116,12 @@
 <td><code>NativeArena</code></td>
 <td>否（单线程，建议 ThreadStatic）</td>
 <td>一次分配大块，线性 bump，<code>Reset</code> 复用</td>
+</tr>
+<tr>
+<td><strong>长命变长节点驻留</strong>（并发分配、指针恒稳）</td>
+<td><code>NodeArena</code></td>
+<td>Alloc 是（并发安全）/ Dispose 归结构层收口</td>
+<td>4MB 块 CAS-bump，只增不减，无需逐节点释放</td>
 </tr>
 <tr>
 <td><strong>pinned/对齐 buffer 池</strong>（高频 Rent/Return）</td>
@@ -188,7 +194,26 @@ arena.Reset();                                      // offset 归零复用（内
 <li>有 finalizer 兜底但不保证时效——仍应主动 Dispose。</li>
 </ul>
 <hr>
-<h2 id="4-pinnedbufferpool--pinned对齐-buffer-池旗舰池">4. <code>PinnedBufferPool</code> —— pinned/对齐 buffer 池（旗舰池）</h2>
+<h2 id="4-nodearena--并发安全的变长节点驻留竞技场">4. <code>NodeArena</code> —— 并发安全的变长节点驻留竞技场</h2>
+<pre><code class="lang-csharp">using var arena = new NodeArena();            // 4MB 块起步（ChunkSize = 1 &lt;&lt; 22）
+
+Node* node;
+unsafe { node = (Node*)arena.Alloc(sizeof(Node)); }   // 8 对齐分配，返回恒稳裸指针
+// 填充节点字段后把指针缓存进上层映射表——跨块增长长命有效
+</code></pre>
+<ul>
+<li><strong>指针恒稳</strong>：块只增不减、永不重分配搬移——缓存进上层结构的裸节点指针在 arena 持续增长时
+长命有效（SkipList 节点驻留形态的基座）。</li>
+<li><strong>并发 Alloc 安全</strong>：4MB 块内 <code>Interlocked</code> bump（无锁快路径，读者侧 admit 也安全）；
+块满建新块（lock 双检）。</li>
+<li><strong>无逐节点释放</strong>：块内存生命周期 = arena 生命周期（<code>Dispose</code> 全释放）——配合&quot;节点缓存不逐出&quot;
+的索引形态；并发竞争的重复分配 = 有界字节浪费，非泄漏。</li>
+<li><strong>单写者 + 并发读者契约</strong>：Alloc 可并发；Dispose 由结构层 Resources 收口（确定性先于读者终结）。</li>
+<li>与 <code>NativeArena</code> 分野：NativeArena = 单线程线性 bump + <code>Reset</code> 复用（批量临时缓冲）；
+NodeArena = 并发分配 + 只增不减 + 指针恒稳（长命驻留对象）。</li>
+</ul>
+<hr>
+<h2 id="5-pinnedbufferpool--pinned对齐-buffer-池旗舰池">5. <code>PinnedBufferPool</code> —— pinned/对齐 buffer 池（旗舰池）</h2>
 <pre><code class="lang-csharp">using var pool = new PinnedBufferPool(maxPerBucket: 64);
 
 // pinned byte[] 池
@@ -208,7 +233,7 @@ finally { pool.ReturnAligned(mem); }                     // 归还（池 Reset �
 <li><code>pool.Dispose()</code> 释放所有 buffer（全局栈 + 各 thread-local 栈）。</li>
 </ul>
 <hr>
-<h2 id="5-overflowpoolt--轻量固定容量对象池">5. <code>OverflowPool&lt;T&gt;</code> —— 轻量固定容量对象池</h2>
+<h2 id="6-overflowpoolt--轻量固定容量对象池">6. <code>OverflowPool&lt;T&gt;</code> —— 轻量固定容量对象池</h2>
 <pre><code class="lang-csharp">using var pool = new OverflowPool&lt;MyContext&gt;(size: 32, disposer: ctx =&gt; ctx.Cleanup());
 
 if (pool.TryGet(out MyContext? ctx))   // 借：命中 true / 池空 false（自行 new）
@@ -222,12 +247,15 @@ pool.TryAdd(ctx);                      // 还：未满入池 true / 满→dispos
 <li><strong>disposer 默认 no-op</strong>——对象若持有非托管资源必须传回收回调，否则池满丢弃即泄漏。</li>
 </ul>
 <hr>
-<h2 id="6-决策速查">6. 决策速查</h2>
+<h2 id="7-决策速查">7. 决策速查</h2>
 <pre><code>我要单块对齐内存（O_DIRECT / CAS 背板）？
   → new AlignedMemoryManager(size, alignment)。using / Resources。热路径 GetSpanUnsafe。
 
 我要批量临时缓冲（用完整体丢）？
   → new NativeArena(size)。Allocate/AllocateBytes，用完 Reset 复用或 Dispose。
+
+我要长命驻留的变长节点（并发分配、指针永不搬移）？
+  → new NodeArena()。Alloc(size) 得恒稳裸指针；不逐节点释放，Dispose 由结构层收口。
 
 我要高频 Rent/Return 复用 buffer？
   → PinnedBufferPool。Rent/Return（pinned 数组）或 RentAligned/ReturnAligned（对齐原生内存）。

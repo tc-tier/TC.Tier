@@ -453,8 +453,8 @@ TierKvBuilder 工厂注入任意 Settings/策略）；默认值只保证稳定�
 Committed 提交都把当前 32MB 页整页写回设备（mem Sparse=逐 4KB 分配 8192 次；
 磁盘=32MB 真实 IO），与页内增量大小无关（1 条 16B 与 64KB 增量同耗时，页数
 线性实验证实）</li>
-<li>修复：<code>TierKvOptions.WithRingPageSize/WithRingMemorySize</code>（默认 1MB/64MB），
-RingSettings 显式配置。<strong>修复后 Committed 覆写 p50=43.7 µs（144× 改善）</strong>；
+<li>修复：<code>TierKvOptions.WithRingPageSize/WithRingMemorySize</code>（彼时默认 1MB/64MB——现行默认
+256KB/64MB），RingSettings 显式配置。<strong>修复后 Committed 覆写 p50=43.7 µs（144× 改善）</strong>；
 原子批/RMW 同步受益</li>
 <li>教训：逐层探针定位（F&amp;F 全链 81µs / 纯引擎 Flush 0.6µs / 设备大块写 1.9µs /
 record 写 0.1µs 全部正常 → 成本专属于页写穿粒度）→ 结构默认值是日志顺序写
@@ -536,7 +536,7 @@ park 周期参数化。<strong>影响面：所有磁盘+并发+持久化写路�
 <td>P6</td>
 <td>并发扩展上限（16/32 线程）与 WiscKey 溢出分离基线</td>
 <td>多核/大 value 场景</td>
-<td><strong>溢出基线已测</strong>（2026-09-13，<a href="../../docs/benchmarks/ring-overflow-chunked-report.md">ring-overflow-chunked-report</a>：值 128KB~1GB × 并发 1/8/32 双介质对照，1GB 档整帧租赁崩溃 → 分块化后 mem 1.3GB/s / local 608MB/s）；并发扩展上限仍待测</td>
+<td><strong>溢出基线已测</strong>（2026-09-13，报告 <code>docs/benchmarks/ring-overflow-chunked-report.md</code>：值 128KB~1GB × 并发 1/8/32 双介质对照，1GB 档整帧租赁崩溃 → 分块化后 mem 1.3GB/s / local 608MB/s）；并发扩展上限仍待测</td>
 </tr>
 </tbody>
 </table>

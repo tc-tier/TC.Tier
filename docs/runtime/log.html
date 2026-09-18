@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Log 使用指南——WAL 页帧流 / 组提交 / 单写者 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Log 使用指南——WAL 页帧流 / 组提交 / 单写者 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/log.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="log-使用指南wal-页帧流--组提交--单写者">Log 使用指南——WAL 页帧流 / 组提交 / 单写者</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：用 Log 作 WAL / checkpoint delta 的组件开发者
+<strong>回答什么</strong>：EntryLog vs DeltaLog 怎么选 / Settings 全参数 / 组提交策略 / 单写者硬约束 / 恢复
+<strong>本篇只讲机制</strong>——帧字节布局见源码；性能数字见 <a href="perf/log-perf-baseline.html"><code>perf/log-perf-baseline.md</code></a>
+<strong>定位</strong>：Structures/ 6 子族之一，主结构（操作流），与 Ring 并列 2 主结构</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>Log = 单写者页帧流 + 组提交三维策略 + 恢复水位 + 不跨页 entry</strong></p>
+<ul>
+<li><code>Append</code> 返回 entry 起始 <code>LogicalAddress</code>；单条 entry 含 header+payload+padding 超 <code>PageSize</code> 抛 <code>InvalidOperationException</code>。</li>
+<li>批量 <code>BeginAppendBatch()</code> 走双页 ping-pong 让渡轨——页满不阻塞写线程，唯一等待点 = 双页都在途的背压。</li>
+<li>提交 = <code>CommitAsync</code>（推进 <code>CommittedOffset</code> + meta.Commit + fsync）；<code>Flush</code> 只落盘不推进水位。</li>
+<li>恢复三级回退：<code>LogRecoveryHints</code> → meta 持久化水位 → 扫盘验帧。</li>
+<li>多生产者必须经队列汇聚到唯一写线程——<code>_writeLock</code> 是并发安全网，<strong>不是</strong>并发许可。</li>
+</ul>
+<hr>
+<h2 id="1-定位">1. 定位</h2>
+<ul>
+<li><strong>主结构</strong>：Log 与 Ring 并列为主结构——Ring = 数据真相源（record 流），Log = 操作流（WAL/redo 流）。</li>
+<li><strong>两种形态</strong>：
+<ul>
+<li><strong>EntryLog</strong>：通用 per-entry 顺序日志，WAL 是其典型用途。CRC64 in-header，22B 头。Meta 默认 <code>Disabled</code>，组提交三维策略默认启用。</li>
+<li><strong>DeltaLog</strong>：KV 增量 checkpoint delta 流，绑定 DeltaLogCodec（不可替换）。CRC32C in-header，18B 头。Meta 默认 <code>Transport</code>（嵌入式 meta entry 写入 log 流——临时 delta 文件场景）。</li>
+</ul>
+</li>
+<li><strong>与 Metadata 关系</strong>：DeltaLog 与 <a href="versioned-metadata.html"><code>versioned-metadata.md</code></a> 配合承载 checkpoint delta + 跨重启水位。</li>
+<li><strong>与 StorageEngine 关系</strong>：Log 接入 <code>IStorageEngine</code>（逻辑地址 = 物理地址），IO 底层 = 持久化的内存——Log 不碰段/对齐/落盘细节，只在引擎地址空间上做 record 格式（codec）+ group commit 调度。引擎使用见 <a href="storage-engine.html"><code>storage-engine.md</code></a>。</li>
+</ul>
+<h3 id="11-entrylog-vs-deltalog-形态对比">1.1 EntryLog vs DeltaLog 形态对比</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>EntryLog</th>
+<th>DeltaLog</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>用途</td>
+<td>通用 per-entry 顺序日志（WAL 典型）</td>
+<td>KV 增量 checkpoint delta 流</td>
+</tr>
+<tr>
+<td>Codec</td>
+<td><code>EntryLog.Codec</code>（CRC64 in-header，22B 头，4B 对齐）</td>
+<td><code>DeltaLog.Codec</code>（CRC32C in-header，18B 头，4B 对齐）——<strong>绑定不可替换</strong></td>
+</tr>
+<tr>
+<td><code>MaxEntrySize</code></td>
+<td>4MB（<code>1 &lt;&lt; 22</code>）</td>
+<td>4MB（<code>1 &lt;&lt; 22</code>）</td>
+</tr>
+<tr>
+<td>Meta 缺省</td>
+<td><code>Disabled</code></td>
+<td><code>Transport</code>（嵌入式 meta entry 写入 log 流——临时 delta 文件场景）</td>
+</tr>
+<tr>
+<td>组提交策略</td>
+<td>默认启用（<code>GroupCommitPolicy</code> 三维度，构造 commitPolicy=null 时启用）</td>
+<td>不启用专属策略（无 <code>ICommitPolicy</code> 注入参数）</td>
+</tr>
+<tr>
+<td><code>CommittedOffset</code></td>
+<td>暴露（commit 边界水位）</td>
+<td>不暴露（基类无此字段）</td>
+</tr>
+<tr>
+<td>提前提交循环</td>
+<td>启动（<code>StartEarlyCommitLoop</code>——<code>CommitInterval ≠ -1ms</code> 时）</td>
+<td>不启动</td>
+</tr>
+<tr>
+<td>恢复钩子</td>
+<td><code>OnLogRecovered</code> override 设 <code>CommittedOffset = TailAddress</code> + 启提前提交循环</td>
+<td>默认空（无依赖恢复结果的装配）</td>
+</tr>
+<tr>
+<td>构造注入</td>
+<td><code>commitPolicy</code> / <code>cursorFactory</code> / <code>metaPolicyFactory</code> / <code>metaTransport</code> / <code>clock</code></td>
+<td><code>cursorFactory</code> / <code>metaPolicyFactory</code> / <code>metaTransport</code>（无 commitPolicy / clock）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>选型判据</strong>：需要 WAL 持久性调度（raft log / redo log）→ EntryLog；承载 checkpoint delta（与 VersionedMetadata 配合）→ DeltaLog。</p>
+<hr>
+<h2 id="2-settings-全参数">2. Settings 全参数</h2>
+<p>基类 <code>LogSettings</code>（承 <code>Settings</code>）+ 各实现类 sealed 子类。<code>Settings</code> 基类字段被所有结构共享（meta 三策略、主引擎选项）。</p>
+<h3 id="21-通用字段logsettings--settings">2.1 通用字段（<code>LogSettings</code> + <code>Settings</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LogPageSizeBits</code></td>
+<td><code>int</code></td>
+<td>22（4MB）</td>
+<td>页 = 攒批缓冲 + DIO 对齐提交单位。<code>PageSize = 1 &lt;&lt; LogPageSizeBits</code>。<strong>单 entry 不跨页</strong>——单 entry 必须 ≤ PageSize，大对象由调用方分片成多条 entry。</td>
+</tr>
+<tr>
+<td><code>MetaPolicyKind</code></td>
+<td><code>MetaPolicyKind</code></td>
+<td><code>Disabled</code></td>
+<td>meta 持久化策略：<code>Disabled</code>（无 meta）/ <code>Managed</code>（独立 meta 引擎）/ <code>Transport</code>（嵌入式 meta entry 写入 log 流，或注入 IMetaTransport 外部传输）。</td>
+</tr>
+<tr>
+<td><code>MetaOpaqueBytes</code></td>
+<td><code>int</code></td>
+<td>0</td>
+<td>外部可写入 opaque 区容量（字节）。启动后不可改。<strong>只做写侧约束</strong>——不参与盘上布局（meta 块四段自描述）。</td>
+</tr>
+<tr>
+<td><code>MainEngine</code></td>
+<td><code>StorageEngineOptions</code></td>
+<td>&quot;tc.log&quot;</td>
+<td>主引擎选项（引擎名/段几何/预分配/关闭行为）。</td>
+</tr>
+<tr>
+<td><code>Name</code></td>
+<td><code>string</code></td>
+<td>&quot;tc.log&quot;</td>
+<td>存储引擎名。</td>
+</tr>
+<tr>
+<td><code>PreallocateFile</code></td>
+<td><code>bool</code></td>
+<td>true</td>
+<td>创建时预分配文件空间。</td>
+</tr>
+<tr>
+<td><code>DeleteOnClose</code></td>
+<td><code>bool</code></td>
+<td>false</td>
+<td>关闭时删除存储引擎。<strong>跨重启组合必须 false</strong>。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-entrylog-专属字段entrylogsettings">2.2 EntryLog 专属字段（<code>EntryLogSettings</code>）</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CommitInterval</code></td>
+<td><code>TimeSpan</code></td>
+<td>10ms</td>
+<td>组提交时间阈值。<code>0</code> = 每次 Append 立即提交；<code>-1ms</code>（InfiniteTimeSpan）= 禁用时间维度（攒页/手动提交场景）。</td>
+</tr>
+<tr>
+<td><code>MaxUnflushedBytes</code></td>
+<td><code>long</code></td>
+<td>64KB</td>
+<td>组提交字节阈值。<code>0</code> = 字节维度立即满足；<code>long.MaxValue</code> = 禁用字节维度。</td>
+</tr>
+<tr>
+<td><code>MaxUnflushedCount</code></td>
+<td><code>int</code></td>
+<td>1000</td>
+<td>组提交条数阈值。<code>0</code> = 条数维度立即满足；<code>int.MaxValue</code> = 禁用条数维度。</td>
+</tr>
+</tbody>
+</table>
+<p>三维度阈值仅用于构造默认 <code>GroupCommitPolicy</code>（<code>commitPolicy</code> 参数为 null 时启用）。三场景靠阈值配置表达（无需枚举选模式）：</p>
+<table>
+<thead>
+<tr>
+<th>场景</th>
+<th>CommitInterval</th>
+<th>MaxUnflushedBytes</th>
+<th>MaxUnflushedCount</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>典型 WAL（默认）</td>
+<td>10ms</td>
+<td>64KB</td>
+<td>1000</td>
+<td>三维度兜底，崩溃窗口 ≤10ms</td>
+</tr>
+<tr>
+<td>单条强制</td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td>每次 Append 立即提交（宜配 PersistenceMode.WriteThrough）</td>
+</tr>
+<tr>
+<td>手动/2PC</td>
+<td>-1ms</td>
+<td>long.MaxValue</td>
+<td>int.MaxValue</td>
+<td>不自动提交，靠 CommitAsync / TransactionLog 驱动</td>
+</tr>
+</tbody>
+</table>
+<h3 id="23-deltalog-专属字段deltalogsettings">2.3 DeltaLog 专属字段（<code>DeltaLogSettings</code>）</h3>
+<p>无额外专属配置。构造时 <code>MetaPolicyKind</code> 缺省强制为 <code>Transport</code>（嵌入式 meta——临时 delta 文件场景语义）。两个构造重载均如此；调用方初始化器仍可覆盖。</p>
+<hr>
+<h2 id="3-构造与生命周期">3. 构造与生命周期</h2>
+<h3 id="31-生命周期全部结构统一">3.1 生命周期（全部结构统一）</h3>
+<ul>
+<li>三步装配：构造 → <code>Initialize(hints)</code> → <code>WaitForReady</code>（Log 族无工厂；封闭结构才有 <code>CreateAsync</code> 一步就绪）；异步调用方用 <code>WaitForReadyAsync</code>。</li>
+<li><code>Initialize</code> 启动双引擎并行启动（主引擎 + Managed meta 引擎，均非阻塞）。</li>
+<li><code>Dispose</code> 幂等——观察在途让渡刷盘（含补跑延迟提交链）、刷末页、释放双页缓冲与 frame 池，最后走基类编排。</li>
+</ul>
+<h3 id="32-单写者硬性约束">3.2 单写者硬性约束</h3>
+<p><code>_writeLock</code> 是<strong>并发安全网，不是并发许可</strong>——保证并发调用不损坏状态（水位/TailAddress 零改动），<strong>不改变单写者语义</strong>。多生产者必须经队列汇聚到唯一写线程。批协议背压慢路的 <code>Monitor.Exit</code> 窗口内禁止其他写者插队 <code>Begin</code>——批协议消费形态 = 单写者（raft 适配器 = wal 唯一追加方）。</p>
+<h3 id="33-代码示例">3.3 代码示例</h3>
+<h4 id="-装配三步就绪">① 装配（三步就绪）</h4>
+<pre><code class="lang-csharp">using var fs = TierFs.New(&quot;memory:&quot;);
+var settings = new EntryLogSettings(&quot;raft.wal&quot;)
+{
+    LogPageSizeBits = 20,         // 1MB 页
+    CommitInterval = TimeSpan.FromMilliseconds(10),
+    MaxUnflushedBytes = 64 * 1024,
+    MaxUnflushedCount = 1000,
+    MetaPolicyKind = MetaPolicyKind.Managed,
+    MetaOpaqueBytes = 64,
+};
+// 构造 + Initialize + WaitForReady（恢复三级回退在此完成）；异步调用方用 await log.WaitForReadyAsync(ct)
+using var log = new EntryLog(fs, settings);
+log.Initialize();
+log.WaitForReady();
+</code></pre>
+<h4 id="-append--commitasync">② Append + CommitAsync</h4>
+<pre><code class="lang-csharp">// 单写者：多生产者必须经队列汇聚到唯一写线程
+LogicalAddress addr = log.Append(stackalloc byte[128]);   // 返回 entry 起始地址
+// 默认 GroupCommitPolicy 三维度兜底；末页未 commit 数据崩溃后丢失（WAL 语义）
+// 显式提交（如 raft Apply 前需确认持久化）：
+await log.CommitAsync(ct);
+// 等待特定 entry 已 commit：
+await log.WaitForCommitAsync(addr, ct);
+// 提交错误查询（后台循环错误不冒泡到调用方）：
+Exception? lastErr = log.LastCommitError;
+</code></pre>
+<h4 id="-replay恢复--重放已-commit">③ Replay（恢复 / 重放已 commit）</h4>
+<pre><code class="lang-csharp">// 只重放 ≤ CommittedOffset 的 entry（WAL 一致性语义）
+// verifyCrc=false（默认）：仅验 Magic，约快 10-50×；true = 每条全量验 CRC（完整性审计）
+long count = log.Replay(LogicalAddress.Empty, static (payload, isMeta, addr) =&gt;
+{
+    if (isMeta) return;                 // 跳过嵌入式 meta entry
+    ApplyEntry(payload, addr);          // 零拷贝 Span——禁止跨回调持有
+}, verifyCrc: false);
+</code></pre>
+<h4 id="-批量追加高吞吐页满让渡不阻塞">④ 批量追加（高吞吐——页满让渡不阻塞）</h4>
+<pre><code class="lang-csharp">// 批（ref struct）绝不跨 await 持有（持写锁）；using 包裹保证 Dispose 释放锁
+using var batch = log.BeginAppendBatch();
+foreach (var entry in entries)
+{
+    // 页满让渡轨——当前页交异步刷盘、立即切另一页继续写
+    // 唯一等待点 = 双页都在途的背压（罕见 = 页边界 × 双页在途）
+    LogicalAddress addr = batch.Append(entry);
+}
+// Dispose 回写宿主 _pageUsed + 释放写锁——批内未 commit，靠默认 GroupCommitPolicy 或显式 CommitAsync
+</code></pre>
+<h4 id="-2pc-事务跨结构原子提交">⑤ 2PC 事务（跨结构原子提交）</h4>
+<pre><code class="lang-csharp">// 协调器 = Transactions/TransactionLog（写独立 commit record 文件驱动 Prepare/Confirm/Abort）
+// Log 是参与者之一，与 Ring / Index 等共同 Prepare → ConfirmCommitted / Abort
+log.OnCommitted(seq, () =&gt; ApplyNotify(seq));    // 注册 seq 提交回调（已提交到更高 seq → 立即同步触发）
+log.Prepare(seq);                                // FlushUntil(tail) + AppendMeta(tail)——进入悬干状态
+// ... 其他参与者 Prepare ...
+// 协调器写 commit record → 各参与者 ConfirmCommitted(seq)
+log.ConfirmCommitted(seq);                       // 推进 LastCommittedSeq + _txRollbackTail
+// 失败路径：
+log.Abort(seq);                                  // TruncateSuffix 回退到 _txRollbackTail，丢弃本轮悬干数据
+</code></pre>
+<hr>
+<h2 id="4-api-详表">4. API 详表</h2>
+<h3 id="41-写">4.1 写</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>签名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Append</code></td>
+<td><code>LogicalAddress Append(ReadOnlySpan&lt;byte&gt; payload)</code></td>
+<td>同步追加单条 entry，返回起始地址。超单页抛 <code>InvalidOperationException</code>。热路径 non-virtual。</td>
+</tr>
+<tr>
+<td><code>AppendAsync</code></td>
+<td><code>ValueTask&lt;LogicalAddress&gt; AppendAsync(ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct = default)</code></td>
+<td>异步对等版。当前实现同步完成（写路径锁内完成；页满 IO 重叠让位于锁串行）。</td>
+</tr>
+<tr>
+<td><code>BeginAppendBatch</code></td>
+<td><code>AppendBatch BeginAppendBatch()</code></td>
+<td>开启批量追加（ref struct，using 包裹）。批持写锁（批内本地游标零锁；Dispose 释放）。</td>
+</tr>
+<tr>
+<td><code>AppendBatch.Append</code></td>
+<td><code>LogicalAddress Append(ReadOnlySpan&lt;byte&gt; entry)</code></td>
+<td>批内同步追加。页满让渡轨（异步刷盘、不阻塞写线程）；双页都在途背压同步等。</td>
+</tr>
+<tr>
+<td><code>AppendBatch.AppendAsync</code></td>
+<td><code>ValueTask&lt;LogicalAddress&gt; AppendAsync(ReadOnlySpan&lt;byte&gt; entry, CancellationToken ct = default)</code></td>
+<td>批内异步追加。三档：页有空间=同步快路；页满无背压=让渡同步完成；双页在途=唯一真异步点（孤儿认领协议）。</td>
+</tr>
+<tr>
+<td><code>Flush</code></td>
+<td><code>void Flush()</code></td>
+<td>同步屏障：提交当前页（末页）+ <code>engine.Flush</code>（fsync 落盘）。<strong>不推进 CommittedOffset</strong>。</td>
+</tr>
+<tr>
+<td><code>FlushAsync</code></td>
+<td><code>ValueTask FlushAsync(CancellationToken ct = default)</code></td>
+<td>异步屏障——真异步：数据写在写锁外等待（屏障 IO 不占写锁）。</td>
+</tr>
+<tr>
+<td><code>CommitAsync</code></td>
+<td><code>ValueTask CommitAsync(CancellationToken ct = default)</code></td>
+<td>显式提交：flush 落盘 + 推进 CommittedOffset + meta.Commit。保证 §7 不变量 <code>CommittedOffset ≤ FlushedTail</code>。</td>
+</tr>
+<tr>
+<td><code>WaitForCommitAsync</code></td>
+<td><code>ValueTask WaitForCommitAsync(LogicalAddress untilAddress, CancellationToken ct = default)</code></td>
+<td>阻塞等待 CommittedOffset ≥ untilAddress。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="42-读--扫描">4.2 读 / 扫描</h3>
+<table>
+<thead>
+<tr>
+<th>方法 / 成员</th>
+<th>签名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>OpenCursor</code></td>
+<td><code>ILogCursor OpenCursor(LogicalAddress startAddress = default, LogicalAddress endAddress = default, bool verifyCrc = false, SnapshotMode snapshotMode = Consistent, bool leasePages = false)</code></td>
+<td>打开扫描游标——引擎 OpenSequentialReader + PageFrame 整页校验。默认 endAddress = <code>FlushedTail</code>（已落盘水位）。</td>
+</tr>
+<tr>
+<td><code>Replay</code></td>
+<td><code>long Replay(LogicalAddress fromAddress, EntryReplayHandler handler, bool verifyCrc = false)</code></td>
+<td>回调式重放已 commit entry（零装箱）。便捷重载 <code>Replay(handler, verifyCrc)</code>。</td>
+</tr>
+<tr>
+<td><code>ReplayAsync</code></td>
+<td><code>ValueTask&lt;long&gt; ReplayAsync(LogicalAddress fromAddress, AsyncEntryReplayHandler handler, bool verifyCrc = false, CancellationToken ct = default)</code></td>
+<td>异步对等版。</td>
+</tr>
+<tr>
+<td><code>ILogCursor.MoveNext</code></td>
+<td><code>bool MoveNext()</code></td>
+<td>同步推进到下一条 entry。</td>
+</tr>
+<tr>
+<td><code>ILogCursor.MoveNextAsync</code></td>
+<td><code>ValueTask&lt;bool&gt; MoveNextAsync(CancellationToken ct = default)</code></td>
+<td>异步推进。</td>
+</tr>
+<tr>
+<td><code>ILogCursor.CurrentAddress</code></td>
+<td><code>LogicalAddress</code></td>
+<td>当前 entry 起始地址。</td>
+</tr>
+<tr>
+<td><code>ILogCursor.CurrentPayload</code></td>
+<td><code>ReadOnlySpan&lt;byte&gt;</code></td>
+<td>当前 entry payload（零拷贝——指向读帧内）。<strong>非 lease 模式禁跨 MoveNext 持有</strong>。</td>
+</tr>
+<tr>
+<td><code>ILogCursor.CurrentPayloadMemory</code></td>
+<td><code>ReadOnlyMemory&lt;byte&gt;</code></td>
+<td>Memory 视图。lease 模式有效至 Dispose；非 lease 禁跨 MoveNext。</td>
+</tr>
+<tr>
+<td><code>ILogCursor.CurrentIsMeta</code></td>
+<td><code>bool</code></td>
+<td>当前 entry 是否为 meta。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-截断">4.3 截断</h3>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>签名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TruncatePrefix</code></td>
+<td><code>void TruncatePrefix(LogicalAddress address)</code></td>
+<td>头截断：推进 <code>BeginAddress</code> 到 address。引擎 <code>ReclaimHead</code> 回收物理段。EntryLog retention 用。</td>
+</tr>
+<tr>
+<td><code>TruncateSuffix</code></td>
+<td><code>bool TruncateSuffix(LogicalAddress address)</code></td>
+<td>尾截断：回退 <code>TailAddress</code> 到 address。引擎 <code>ReclaimTail</code> + 页缓冲复位。EntryLog raft leader 切换用。返回 false = 地址无效。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="44-水位">4.4 水位</h3>
+<table>
+<thead>
+<tr>
+<th>成员</th>
+<th>签名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BeginAddress</code></td>
+<td><code>LogicalAddress</code></td>
+<td>起始地址 = engine.MinAddress（水位读引擎，Log 不自存）。</td>
+</tr>
+<tr>
+<td><code>TailAddress</code></td>
+<td><code>LogicalAddress</code></td>
+<td>当前写游标 = 最后一个已追加 entry 尾地址（含页缓冲内未落盘 entry）。</td>
+</tr>
+<tr>
+<td><code>FlushedTail</code>（internal）</td>
+<td><code>LogicalAddress</code></td>
+<td>已落盘水位 = 最后一个已确认写完成 frame 的尾地址。游标扫描终点。</td>
+</tr>
+<tr>
+<td><code>CommittedOffset</code>（EntryLog）</td>
+<td><code>LogicalAddress</code></td>
+<td>已 commit 的最高地址（commit 边界水位）。保证 <code>≤ FlushedTail</code>。</td>
+</tr>
+<tr>
+<td><code>LastCommitError</code>（EntryLog）</td>
+<td><code>Exception?</code></td>
+<td>最近一次提交错误。上层应周期查询以发现持久化失败。</td>
+</tr>
+<tr>
+<td><code>LastCommittedSeq</code></td>
+<td><code>long</code></td>
+<td>当前已提交序号（-1 = 未参与事务）。</td>
+</tr>
+<tr>
+<td><code>LastPreparedSeq</code></td>
+<td><code>long</code></td>
+<td>最近一次 Prepare 的 seq（恢复判定悬空事务用）。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="45-2pcitransactionparticipant-六件套">4.5 2PC（<code>ITransactionParticipant</code> 六件套）</h3>
+<p>跨结构原子提交由 <code>ITransactionParticipant</code> 暴露，协调器 = <code>Transactions/TransactionLog</code>（写独立 commit record 文件驱动 Prepare/Confirm/Abort）。上层编排归 <a href="session.html"><code>session.md</code></a>。</p>
+<table>
+<thead>
+<tr>
+<th>方法</th>
+<th>签名</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Prepare</code></td>
+<td><code>void Prepare(long seq)</code></td>
+<td>事务准备：FlushUntil(tail) 数据落盘 + AppendMeta(tail) 写 meta（同一尾快照）。进入悬干状态——ConfirmCommitted 前崩溃恢复时丢弃。</td>
+</tr>
+<tr>
+<td><code>PrepareAsync</code></td>
+<td><code>ValueTask PrepareAsync(long seq, CancellationToken ct)</code></td>
+<td>异步对等版。</td>
+</tr>
+<tr>
+<td><code>ConfirmCommitted</code></td>
+<td><code>void ConfirmCommitted(long seq)</code></td>
+<td>确认提交：推进 LastCommittedSeq + 推进 <code>_txRollbackTail</code> + 触发 OnCommitted 回调。</td>
+</tr>
+<tr>
+<td><code>Abort</code></td>
+<td><code>void Abort(long seq)</code></td>
+<td>2PC 回滚：TruncateSuffix 回退到上一已确认提交边界，丢弃本轮悬干数据。守卫矩阵：seq ≤ LastCommittedSeq → no-op；陈旧 Abort → 仅复位记账；无既有提交边界 → 仅复位记账。</td>
+</tr>
+<tr>
+<td><code>AbortAsync</code></td>
+<td><code>ValueTask AbortAsync(long seq, CancellationToken ct)</code></td>
+<td>异步对等版。</td>
+</tr>
+<tr>
+<td><code>OnCommitted</code></td>
+<td><code>void OnCommitted(long seq, Action callback)</code></td>
+<td>注册 seq 的提交回调。已提交到更高 seq → 立即同步触发。</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-自定义注入工厂contracts">5. 自定义注入工厂（Contracts）</h2>
+<table>
+<thead>
+<tr>
+<th>接口 / 类型</th>
+<th>用途</th>
+<th>内置实现</th>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ILogCodec</code></td>
+<td>entry 头尾编解码——注入 LogBase 消除虚分发。<code>HeaderSize</code>（EntryLog=22B / DeltaLog=18B）/ <code>Alignment</code>（4B）/ <code>MaxEntrySize</code>（4MB）/ <code>WriteHeader</code> / <code>TryReadHeader</code>。</td>
+<td><code>EntryLog.Codec</code> / <code>DeltaLog.Codec</code>（均 internal sealed，构造期绑定）。</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ICommitPolicy</code></td>
+<td>提交策略——EntryLog group 提交引擎按策略判定&quot;何时&quot;触发提交（不决定&quot;怎么&quot;提交）。<code>bool ShouldCommit(in CommitSnapshot)</code>。</td>
+<td><code>GroupCommitPolicy</code>（internal 默认——三维度阈值兜底）；恒提交/手动提交语义经自定义实现表达。</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>LogCursorFactory&lt;out TLogCursor&gt;</code></td>
+<td>扫描游标工厂委托。参数：startAddress / endAddress / verifyCrc / snapshotMode（Consistent=快照隔离 / DirtyRead=游标锁）/ leasePages（true=换页不还池，CurrentPayloadMemory 有效至 Dispose）。</td>
+<td>默认 <code>PageFrameCursor</code>（内嵌 LogBase.Cursor.cs）。</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>EntryReplayHandler</code> / <code>AsyncEntryReplayHandler</code></td>
+<td>重放回调委托。参数：payload（零拷贝 Span）/ isMeta / entryAddress / ct。</td>
+<td>—</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>ILogCursor</code></td>
+<td>扫描游标接口（承 <code>IStructureScanCursor</code>）。<code>CurrentAddress</code> / <code>EndAddress</code> / <code>CurrentPayload</code> / <code>CurrentPayloadMemory</code> / <code>CurrentEntryLength</code> / <code>CurrentIsMeta</code> + <code>MoveNext</code> / <code>MoveNextAsync</code>。</td>
+<td><code>PageFrameCursor</code>（内嵌）。</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>LogMetaHeader</code></td>
+<td>meta 块规范头（12B，三段式 [Header 12B][Payload 80B+opaque][Crc32Footer 4B]）。</td>
+<td>—</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>LogMetaPayload</code></td>
+<td>meta payload（80B）：BeginAddress / TailAddress / CommittedOffset / LastCommittedSeq / LastPreparedSeq / PreparedTailAddress（2PC Abort 回退点）。</td>
+<td>—</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>CommitSnapshot</code></td>
+<td>提交判定快照（喂给 ICommitPolicy）：UnflushedBytes / UnflushedCount / SinceLastCommit。</td>
+<td>—</td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-持久化机制">6. 持久化机制</h2>
+<h3 id="61-页帧格式logpageframeheader">6.1 页帧格式（LogPageFrameHeader）</h3>
+<pre><code>[LogPageFrameHeader 8B][entry data 扇区对齐][Crc32Footer 4B][padding 撑到扇区对齐]
+</code></pre>
+<ul>
+<li><code>LogPageFrameHeader</code>（8B）：MagicValue（&quot;LPGF&quot;）+ DataLength（页内有效数据字节数，不含 header/footer）。源生成器自动生成 codec。</li>
+<li><code>Crc32Footer</code>（4B）：CRC32C 覆盖 [header + data]（不含 footer 自身与 padding）。</li>
+<li>entry 布局：<code>[EntryLogHeader 22B / DeltaLogHeader 18B][payload][padding 4B 对齐]</code>——单 entry 不跨页（超 PageSize 抛）。</li>
+</ul>
+<h3 id="611-地址空间窗口模型allocate--calculationaddress--write">6.1.1 地址空间窗口模型（Allocate + CalculationAddress + Write）</h3>
+<p>Log 不用 <code>engine.Append</code>（pwrite 后才知地址——无法满足&quot;entry 写入时即知地址&quot;），改用三层结构：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>操作</th>
+<th>IO</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>地址空间窗口</td>
+<td><code>engine.Allocate(SpaceAllocSize)</code> → 大区间 CAS 推水位</td>
+<td>零 IO</td>
+</tr>
+<tr>
+<td>页（PageSize 攒批单位）</td>
+<td><code>engine.CalculationAddress(_spaceStart, _spaceWriteOffset)</code> 精确推算 entry 地址</td>
+<td>纯逻辑</td>
+</tr>
+<tr>
+<td>entry 写入</td>
+<td><code>engine.Write(addr, frame)</code> 在已分配空间内覆写（lease 保护，DIO 对齐）</td>
+<td>真正 IO</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><code>SpaceAllocSize</code> = <code>PageSize × 16</code>（一个窗口放 16 页 frame，摊薄 Allocate(CAS) 开销）。</li>
+<li>窗口剩余放不下时 <code>ReclaimTail</code> 退回旧窗口未用空间 + Allocate 新窗口（窗口换代 <code>_spaceGeneration++</code>，在途写失败回滚只认同代——跨代回滚会覆写新窗口游标）。</li>
+<li>DIO 三重对齐（<code>IOMode.Enabled</code> 下硬责任）：fileOffset（Allocate 返回，段内扇区对齐）/ length（AlignUp 到扇区，padding 补零）/ buffer 地址（<code>AlignedMemoryManager</code> 扇区对齐分配）。</li>
+</ul>
+<h3 id="612-双页-ping-pong-让渡轨">6.1.2 双页 ping-pong 让渡轨</h3>
+<table>
+<thead>
+<tr>
+<th>路径</th>
+<th>调用</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>同步轨 <code>FlushPage</code></td>
+<td>Append/Flush/CommitAsync 屏障路径</td>
+<td>原地同步写——<code>_inFlightFlush</code> 等待后内联写新页</td>
+</tr>
+<tr>
+<td>让渡轨 <code>FlushPageYield</code></td>
+<td>批协议页满 / 异步 AppendAsync</td>
+<td>组帧 → 先行推进地址（frame 尺寸已知）→ 启动纯数据写任务 → 立即切另一页继续写（IO 重叠）</td>
+</tr>
+<tr>
+<td>观察点 <code>DrainInFlightSync/Async</code></td>
+<td>下次让渡 / Flush / Dispose</td>
+<td>等纯数据写完成 → 补跑延迟提交链（<code>OnPageFlushed</code>）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>让渡轨状态机</strong>：Writing → Flushing[IO 在途] → 空闲；双页 ping-pong 不变。<code>_inFlightFlush</code> 是<strong>纯数据写任务</strong>——永不触碰 <code>_writeLock</code>、永不内联跑提交链（批持锁等待在途刷盘时内嵌提交链 = 自锁死）。提交链延迟到观察点（DrainInFlightSync/Async）在锁语义内补跑。</p>
+<h3 id="62-组提交策略groupcommitpolicy-三维度">6.2 组提交策略（GroupCommitPolicy 三维度）</h3>
+<table>
+<thead>
+<tr>
+<th>维度</th>
+<th>字段</th>
+<th>0 值语义</th>
+<th>禁用值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>字节量</td>
+<td><code>MaxUnflushedBytes</code></td>
+<td>字节维度立即满足（每次 Append 触发）</td>
+<td><code>long.MaxValue</code></td>
+</tr>
+<tr>
+<td>时间</td>
+<td><code>Interval</code></td>
+<td>时间维度立即满足</td>
+<td><code>-1ms</code>（InfiniteTimeSpan）</td>
+</tr>
+<tr>
+<td>记录数</td>
+<td><code>MaxUnflushedCount</code></td>
+<td>条数维度立即满足</td>
+<td><code>int.MaxValue</code></td>
+</tr>
+</tbody>
+</table>
+<p>判定：<code>UnflushedBytes ≥ MaxUnflushedBytes || (Interval ≠ -1ms &amp;&amp; SinceLastCommit ≥ Interval) || UnflushedCount ≥ MaxUnflushedCount</code>——任一满足即触发。三个全 0 = 每次 Append 立即提前提交。</p>
+<h3 id="63-两层提交模型职责分离">6.3 两层提交模型（职责分离）</h3>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>触发</th>
+<th>语义</th>
+<th>可配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>底层页提交契约</strong>（恒成立）</td>
+<td>跨页 Append / Flush / Dispose → <code>FlushPage</code> → <code>OnPageFlushed</code></td>
+<td>前一页换出时即持久化（数据 + meta + CommittedOffset 推进）。最坏情况：写满一页才提交。</td>
+<td>否（不可关）</td>
+</tr>
+<tr>
+<td><strong>可选提前提交</strong>（注入式优化）</td>
+<td><code>ICommitPolicy</code> 在页未满时提前触发</td>
+<td>降延迟。注入 null = 仅依赖底层页契约；注入 GroupCommitPolicy = 三维度提前提交。</td>
+<td>是</td>
+</tr>
+</tbody>
+</table>
+<h3 id="64-commitasync-vs-flush">6.4 CommitAsync vs Flush</h3>
+<table>
+<thead>
+<tr>
+<th>API</th>
+<th>落盘（fsync）</th>
+<th>推进 CommittedOffset</th>
+<th>meta.Commit</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Flush</code> / <code>FlushAsync</code></td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>仅落盘，不推进水位（如读前确保可见）</td>
+</tr>
+<tr>
+<td><code>CommitAsync</code></td>
+<td>✓</td>
+<td>✓</td>
+<td>✓</td>
+<td>显式提交（raft Apply 前确认持久化）</td>
+</tr>
+<tr>
+<td><code>OnPageFlushed</code>（底层契约）</td>
+<td>✓（已落盘）</td>
+<td>✓</td>
+<td>✓</td>
+<td>页换出同步提交（恒成立）</td>
+</tr>
+<tr>
+<td>后台提前提交循环</td>
+<td>✓（仅推进到 FlushedTail）</td>
+<td>✓</td>
+<td>✓</td>
+<td>时间维度兜底（Interval 到期）</td>
+</tr>
+</tbody>
+</table>
+<p>崩溃一致性顺序：<strong>data fsync 先于 meta fsync</strong>——<code>CommitWithFlush</code> = <code>FlushUntil</code>（engine.Write + engine.Flush 落盘 data）→ <code>CommitCore</code>（AppendMeta + meta.Commit 落盘 meta）。断电时 meta 绝不会标记一个 data 尚未落盘的 commit 点。</p>
+<h3 id="641-提交执行链同步轨--异步轨">6.4.1 提交执行链（同步轨 / 异步轨）</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>同步轨 <code>CommitWithFlush</code></th>
+<th>异步轨 <code>CommitWithFlushAsync</code></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 落盘 data</td>
+<td><code>FlushUntil(commitTarget)</code> → <code>engine.Flush</code></td>
+<td><code>FlushUntilAsync</code> → <code>engine.Flush</code></td>
+</tr>
+<tr>
+<td>② 推进水位</td>
+<td><code>CommitCore(commitTarget)</code> → <code>AppendMeta</code> + <code>meta.Commit</code></td>
+<td><code>CommitCoreAsync</code> → <code>AppendMetaAsync</code> + <code>meta.CommitAsync</code></td>
+</tr>
+<tr>
+<td>③ 唤醒等待者</td>
+<td><code>Monitor.PulseAll(_commitLock)</code></td>
+<td>同</td>
+</tr>
+</tbody>
+</table>
+<h3 id="642-守卫矩阵防自递归--防-dispose-篡改">6.4.2 守卫矩阵（防自递归 / 防 Dispose 篡改）</h3>
+<table>
+<thead>
+<tr>
+<th>守卫</th>
+<th>触发条件</th>
+<th>行为</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>_inCommit</code> 重入守卫</td>
+<td><code>CommitCore</code> → <code>AppendMeta</code> 写 meta entry 触发页满 → <code>FlushWindow</code> → <code>OnPageFlushed</code> → <code>CommitCore</code></td>
+<td>重入时跳过 <code>CommitCore</code>——防无限递归栈溢出（meta entry 是提交记录本身，不需要再触发提交）。</td>
+</tr>
+<tr>
+<td><code>IsDisposed</code> 守卫</td>
+<td><code>FlushOnDispose</code> 期间的页 flush</td>
+<td>不再触发 commit——Dispose 职责是把脏页冲到盘上（避免数据丢失），但不应隐式篡改 commit 边界（未 commit 的末页重启后按未 commit 处理，符合 WAL 语义）。</td>
+</tr>
+<tr>
+<td><code>committedTail ≤ _committedOffset</code> 守卫</td>
+<td>末页重复 flush</td>
+<td>不再 commit——避免末页重复 flush 时无谓 commit。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="643-水位不变量">6.4.3 水位不变量</h3>
+<table>
+<thead>
+<tr>
+<th>不变量</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>CommittedOffset ≤ FlushedTail</code></td>
+<td>已 commit 必已落盘——<code>CommitWithFlush</code> 先 <code>FlushUntil</code> 后 <code>CommitCore</code>，保证此序。</td>
+</tr>
+<tr>
+<td><code>FlushedTail ≤ TailAddress</code></td>
+<td>已落盘水位 ≤ 当前写游标（含内存页内未 flush 的 entry）——让渡轨先行推进 <code>TailAddress</code> 后两者脱钩。</td>
+</tr>
+<tr>
+<td><code>BeginAddress ≤ CommittedOffset</code></td>
+<td>commit 边界不得越过头截断——TruncatePrefix 后不夹回（head 回收不影响 commit）。</td>
+</tr>
+<tr>
+<td>截断后 <code>CommittedOffset ≤ TailAddress</code></td>
+<td><code>TruncateSuffix</code> / <code>Abort</code> 后 EntryLog override <code>OnTailTruncated</code> / <code>OnAborted</code> 夹回——否则 Replay 越界跳段报 Segment not found。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="644-内置-icommitpolicy-对照">6.4.4 内置 ICommitPolicy 对照</h3>
+<table>
+<thead>
+<tr>
+<th>策略</th>
+<th><code>ShouldCommit</code> 返回</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GroupCommitPolicy</code>（默认——构造注入 null 即得）</td>
+<td>三维度任一满足即 true</td>
+<td>WAL 典型场景（默认 10ms/64KB/1000）</td>
+</tr>
+<tr>
+<td>自定义实现（恒 true）</td>
+<td>恒 true</td>
+<td>单条强制——每次 Append 立即提交（宜配 WriteThrough）</td>
+</tr>
+<tr>
+<td>自定义实现（恒 false）</td>
+<td>恒 false</td>
+<td>手动 / 2PC——靠 <code>CommitAsync</code> / <code>TransactionLog</code> 驱动</td>
+</tr>
+</tbody>
+</table>
+<h3 id="65-meta-持久化三策略">6.5 meta 持久化三策略</h3>
+<table>
+<thead>
+<tr>
+<th><code>MetaPolicyKind</code></th>
+<th>meta 引擎</th>
+<th>典型用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Disabled</code></td>
+<td>无</td>
+<td>不持久化水位——<code>SetOpaqueMeta</code> 抛 <code>InvalidOperationException</code>，<code>ReadOpaqueMeta</code> 恒空。</td>
+</tr>
+<tr>
+<td><code>Managed</code></td>
+<td>独立 meta 引擎（同构 Create）</td>
+<td>跨重启单值状态 + opaque 搭车水位线原子落盘。</td>
+</tr>
+<tr>
+<td><code>Transport</code></td>
+<td>嵌入式 meta entry 写入 log 流（<code>MetaHost</code>），或注入 <code>IMetaTransport</code> 外部传输</td>
+<td>DeltaLog 临时 delta 文件场景（缺省）。</td>
+</tr>
+</tbody>
+</table>
+<p>opaque 登记：<code>SetOpaqueMeta(bytes)</code> stage 进策略缓冲，<strong>随下次水位提交原子落盘</strong>（同一块、同一 CRC）。无独立 opaque 提交路径。需确定性持久化点调 <code>CommitAsync</code>（一块 = 当前水位 + opaque）。</p>
+<hr>
+<h2 id="7-恢复协议">7. 恢复协议</h2>
+<h3 id="71-三级回退与-metadatamirrorsnapshot-统一">7.1 三级回退（与 Metadata/Mirror/Snapshot 统一）</h3>
+<table>
+<thead>
+<tr>
+<th>优先级</th>
+<th>来源</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① <code>LogRecoveryHints</code></td>
+<td>外部主动注入（最高优先级）</td>
+<td>上层快照场景注入 <code>TailAddress</code>；DeltaLog 临时文件场景注入 <code>FileSize</code>（近似水位）。</td>
+</tr>
+<tr>
+<td>② meta 持久化水位</td>
+<td><code>MetaPolicy.LoadAsync</code> 读最后一块 meta</td>
+<td><code>LogMetaPayload.TailAddress &gt; Empty</code> 时启用。同时还原 <code>LastCommittedSeq</code> / <code>LastPreparedSeq</code> / <code>PreparedTailAddress</code>（2PC 悬干裁决依据）。</td>
+</tr>
+<tr>
+<td>③ 扫盘</td>
+<td>从 <code>engine.MinAddress</code> 前向走帧到最后一个有效帧尾</td>
+<td>兜底——逐帧验证 magic + dataLen + footer CRC，撕裂/坏帧止步于前一有效帧。</td>
+</tr>
+</tbody>
+</table>
+<p>恢复后 <code>ReconcileEngineTail</code>：退到 Log 真实尾 + 帧边界 padded end 对齐（meta/hints 记录的尾是末帧数据尾，padding 之后才能续写首个新 frame，否则 cursor 读完末帧 CRC 跳过 padding 后找不到新帧 header）。EntryLog 的 <code>EntryLogRecovery.OnLogRecovered</code> 在恢复后设 <code>CommittedOffset = TailAddress</code>（恢复后天然一致）+ 启动提前提交循环。</p>
+<h3 id="72-logrecoveryhints-字段">7.2 LogRecoveryHints 字段</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TailAddress</code></td>
+<td><code>LogicalAddress?</code></td>
+<td>已知写游标（上层快照场景注入；优先于扫盘）。</td>
+</tr>
+<tr>
+<td><code>BeginAddress</code></td>
+<td><code>LogicalAddress?</code></td>
+<td>已知头截断边界（retention 场景注入）。</td>
+</tr>
+<tr>
+<td><code>FlushedUntilAddress</code></td>
+<td><code>LogicalAddress?</code></td>
+<td>已知落盘边界。</td>
+</tr>
+<tr>
+<td><code>CommittedOffset</code></td>
+<td><code>LogicalAddress?</code></td>
+<td>已知 commit 边界（EntryLog 场景注入）。</td>
+</tr>
+<tr>
+<td><code>FileSize</code></td>
+<td><code>long?</code></td>
+<td>已知文件大小（非地址，DeltaLog 临时文件场景近似水位）。</td>
+</tr>
+</tbody>
+</table>
+<h3 id="73-嵌入式-meta--临时文件deltalog-形态">7.3 嵌入式 meta + 临时文件（DeltaLog 形态）</h3>
+<p>DeltaLog 默认 <code>MetaPolicyKind.Transport</code>——meta entry 作为 <code>IsMeta</code> entry 嵌入 log 流（<code>MetaHost.WriteBlock</code> 走 <code>AppendCore(isMeta: true)</code>；<code>ReadLastBlock</code> 走 cursor 找最后 <code>IsMeta</code> entry 的 payload）。无需独立 meta 引擎——临时 delta 文件场景语义（delta 用完即弃，meta 跟随 log 流一起存在/消失）。</p>
+<h3 id="74-2pc-悬干裁决">7.4 2PC 悬干裁决</h3>
+<p>恢复时还原 <code>LastPreparedSeq</code> / <code>LastCommittedSeq</code> / <code>PreparedTailAddress</code>——<code>TransactionLog.LoadAndReconcile</code> 据此判 <code>LastPreparedSeq &gt; LastCommittedSeq</code>（悬干）并驱动 <code>Abort</code> 按 <code>PreparedTailAddress</code> <code>TruncateSuffix</code> 回退（跨崩溃可用）。</p>
+<h3 id="75-扫盘算法细节">7.5 扫盘算法细节</h3>
+<table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>实现</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>起点</td>
+<td><code>engine.MinAddress</code>（已知帧边界）——<strong>非页起点</strong>（帧可跨扫描页，落在上一帧中段填充零里会断链）。</td>
+</tr>
+<tr>
+<td>帧推进</td>
+<td><code>OpenSequentialReader</code>（Consistent 快照隔离，<code>usePageCache=true</code>）逐帧读 header + data + CRC + padding。</td>
+</tr>
+<tr>
+<td>CRC 验收</td>
+<td>每帧验证 footer CRC32C（cover = header + dataLen，与 Cursor 同口径）——撕裂/坏帧止步于前一有效帧。</td>
+</tr>
+<tr>
+<td>物理截断帧容忍</td>
+<td><code>ReclaimTail</code> 打洞后 committed 边界落在帧中——读不满按实际数据解析（截断点前的 entry 完整保留）；无数据 = 真 EOF。截断帧无 CRC/padding——直接按实际解析。</td>
+</tr>
+<tr>
+<td>终止</td>
+<td>magic 不连续 / dataLen 越界 / CRC 失败 = 空洞/EOF——返回最后一个有效帧尾。</td>
+</tr>
+</tbody>
+</table>
+<p>cursor 起点 = 任意 <code>LogicalAddress</code>（不必帧边界）：探测分流——帧头 magic 验证通过 → 正常页解析（帧头对齐，零 skip）；entry 头 → 无帧头模式（cursor 内跳过 &lt; <code>startAddress</code> 的 entry，页尾靠 <code>TryDetectFrameBoundary</code> 扇区探测下一页帧头）。断点续传重放用——避免每次从 MinAddress 全量重扫。</p>
+<hr>
+<h2 id="8-反模式组合层必守">8. 反模式（组合层必守）</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果</th>
+<th>正解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>Log 并发 Append</strong></td>
+<td>单写者硬约束破坏——水位/TailAddress 错乱</td>
+<td>多生产者经队列汇聚到唯一写线程（<code>_writeLock</code> 是安全网，非并发许可）</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>批（ref struct）跨 await 持有</strong></td>
+<td>持写锁跨 await = 自锁死 / SynchronizationLockException</td>
+<td>批内 <code>AppendAsync</code> 背压慢路 await 在宿主侧（孤儿认领协议），消费方续体线程不可预期</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>单 entry 超 PageSize</strong></td>
+<td>抛 <code>InvalidOperationException</code></td>
+<td>大对象调用方拆分成多条 entry（单 entry 不跨页契约）</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>跨 MoveNext 持有 CurrentPayload Span（非 lease 模式）</strong></td>
+<td>换页即还池——span 指向已归还的池缓冲</td>
+<td>用 lease 模式（<code>leasePages=true</code>，CurrentPayloadMemory 有效至 Dispose）或拷贝交付</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>不查询 LastCommitError</strong></td>
+<td>后台循环提交错误不冒泡到调用方——持久化失败静默</td>
+<td>上层周期查询 <code>LastCommitError</code> 发现持久化失败</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>MetaPolicyKind=Disabled 时 SetOpaqueMeta</strong></td>
+<td>抛 <code>InvalidOperationException</code>（禁用即报错，不静默吞）</td>
+<td>配 <code>Managed</code> / <code>Transport</code>，或移除 opaque 写入</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>绕过组提交策略手动 CommitAsync</strong></td>
+<td>末页未 commit 数据崩溃后丢失（符合 WAL 语义，但可能误以为已持久化）</td>
+<td>显式 CommitAsync 用于 raft Apply 前确认；常规写入信任默认 GroupCommitPolicy</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>跨结构组合 DeleteOnClose=true</strong></td>
+<td>跨重启组合必须 false（否则索引重建时真相源被清）</td>
+<td>跨重启组合 <code>DeleteOnClose=false</code>（同 <a href="structures.html"><code>structures.md</code></a> §5）</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>截断后期望 CommittedOffset 自动夹回</strong></td>
+<td>EntryLog 已 override <code>OnTailTruncated</code> / <code>OnAborted</code> 夹回——子类不自管会违反 §7 不变量</td>
+<td>信任基类夹回逻辑；自定义 LogBase 子类须 override 夹自管水位</td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong>opaque 期望独立提交路径</strong></td>
+<td>旧 WriteOpaqueMeta 自拍 TailAddress 独立成块 = 并发水位回退 + 被内部提交冲掉，已废除</td>
+<td>opaque 跟随水位线提交链（<code>SetOpaqueMeta</code> stage → 下次 CommitAsync 原子落盘）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-想深入指路">9. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>总览（七种结构怎么选怎么组合）</td>
+<td><a href="structures.html"><code>structures.md</code></a></td>
+</tr>
+<tr>
+<td>引擎使用（读写/水位/恢复/Compact）</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a></td>
+</tr>
+<tr>
+<td>meta 统一协议（opaque 搭车/块格式/自定义传输）</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+</tr>
+<tr>
+<td>Session 协调协议（写/读/检查点三 op、悬挂裁决、故障模型）</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+</tr>
+<tr>
+<td>段表 / lease 协议（raft 共识层）</td>
+<td><a href="segment-table.html"><code>segment-table.md</code></a> / <a href="lease-protocol.html"><code>lease-protocol.md</code></a></td>
+</tr>
+<tr>
+<td>同族结构</td>
+<td><a href="ring.html"><code>ring.md</code></a> / <a href="index.html"><code>index.md</code></a> / <a href="versioned-metadata.html"><code>versioned-metadata.md</code></a> / <a href="mirror.html"><code>mirror.md</code></a> / <a href="snapshot.html"><code>snapshot.md</code></a></td>
+</tr>
+<tr>
+<td>性能基线（Append 吞吐 / 重放速率 / 组提交延迟）</td>
+<td><a href="perf/log-perf-baseline.html"><code>perf/log-perf-baseline.md</code></a></td>
+</tr>
+<tr>
+<td>帧字节布局 / 双页让渡轨状态机 / 2PC 内部状态机</td>
+<td>源码注释（<code>Structures/Log/</code> 各 partial）与设计稿（<code>docs/design/</code>）</td>
+</tr>
+</tbody>
+</table>
+<p>机制级细节（8 水位全表、帧字节布局、dump 协议、2PC 内部状态机）按需从源码与设计稿查阅——使用面不需要这些细节；能力全集以类型 XML 注释为准。</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/log.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

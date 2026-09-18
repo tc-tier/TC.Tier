@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Ring 使用指南——追加式 KV 环 / RCU 原地更新 / 环形驱逐 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Ring 使用指南——追加式 KV 环 / RCU 原地更新 / 环形驱逐 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/ring.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="ring-使用指南追加式-kv-环--rcu-原地更新--环形驱逐">Ring 使用指南——追加式 KV 环 / RCU 原地更新 / 环形驱逐</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：用 Ring 作 KV 真相源 / WAL 的组件开发者
+<strong>回答什么</strong>：Ring 是什么 / Settings 全参数 / 8 水位 / Codec 注入 / 写读 API / 恢复 / 反模式
+<strong>本篇只讲机制</strong>——帧字节布局见源码；性能数字见 <a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a>
+<strong>定位</strong>：Structures/ 6 子族之一，主结构（数据真相源），与 Log 并列 2 主结构</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong>Ring = 固定槽数环形页池 + 全局单调逻辑地址 + 8 水位指针 + RCU 原地更新 + 环形驱逐</strong></p>
+<ul>
+<li>追加写返回 <code>LogicalAddress</code>（16B 结构 <code>SegId+Extension+Offset</code>）= 取值句柄，地址永不重写</li>
+<li>同尺寸 value 经 <code>UpdateValue</code> 原地覆写（RCU 语义），同槽位复用</li>
+<li>环形满自动驱逐最老页（Head 推进）；地址空间永远单调向前</li>
+<li>8 水位指针经 CAS128 原子推进（cmpxchg16b 快路径 / 非对齐分片锁兜底），并发 Flush/Truncate 不会回退</li>
+<li>地址运算只用 <code>engine.GetDistance</code> / <code>engine.CalculationAddress</code>（铁律：<code>LogicalAddress.Offset</code> 跨段无意义，不参与算术）</li>
+</ul>
+<hr>
+<h2 id="1-定位">1. 定位</h2>
+<ul>
+<li><strong>与 Log 同为主结构</strong>：Ring 是数据真相源（record 流），Log 是操作流；二者均以 <code>LogicalAddress</code> 为一等公民</li>
+<li><strong>与 Index 组合</strong>：Ring=真相源 / Index=派生数据；写编排<strong>正序</strong>：先 Ring.Write → 再 Index.Insert</li>
+<li><strong>与 Mirror/Snapshot 关系</strong>：Ring 自带 <code>OpenSnapshotReader/Writer</code> 区间导出/导入能力（数据快照），与独立的 <a href="mirror.html"><code>mirror.md</code></a> / <a href="snapshot.html"><code>snapshot.md</code></a> 形态无引用关系</li>
+<li><strong>与 Meta 关系</strong>：外部 opaque 经 <code>SetOpaqueMeta</code> 随水位线原子落盘，是 Index 锚点 W 的搭车通道</li>
+<li><strong>与 StorageEngine 关系</strong>：结构层是 internal 使用者；文件系统 = 构造传哪个 <code>IFileSystem</code>（详见 <a href="storage-engine.html"><code>storage-engine.md</code></a>）。引擎自恢复 MinAddress/AllocatedTail；Ring 自管 8 水位</li>
+<li><strong>与横切协议</strong>：meta 持久化经统一 <code>IMetaPolicy</code>（见 <a href="meta.html"><code>meta.md</code></a>）；2PC 跨结构原子经 <code>ITransactionParticipant</code>（协调器见 <a href="session.html"><code>session.md</code></a>）</li>
+</ul>
+<hr>
+<h2 id="2-settings-全参数">2. Settings 全参数</h2>
+<p><code>BlittableRingSettings</code> 是 <code>RingSettings</code> 的 sealed 派生——<strong>无额外字段</strong>（key 长度由 <code>TKey</code> 类型参数提供 <code>sizeof(TKey)</code>）。所有可配置项在基类 <code>RingSettings</code>。</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>默认</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PageSize</code></td>
+<td><code>AlignmentConst.Alignment32M</code></td>
+<td>页大小（字节）。校验：2 的幂 / [4KB, 1GB]。DIO 对齐契约下限</td>
+</tr>
+<tr>
+<td><code>MemorySize</code></td>
+<td><code>AlignmentConst.Alignment16G</code></td>
+<td>总内存容量（字节）。校验：≥ PageSize 且整除为 2 的幂页数。<strong>PageCount = MemorySize/PageSize</strong> 是派生量，不在 Settings 直配</td>
+</tr>
+<tr>
+<td><code>MaxPageCount</code></td>
+<td><code>8192</code></td>
+<td>页数上界。页数过多（PageSize 太小）扫描/驱逐开销随页数线性增长，校验时拒绝</td>
+</tr>
+<tr>
+<td><code>MutableFraction</code></td>
+<td><code>0.9</code></td>
+<td>mutable 区占比 (0,1) 开区间。决定 mutable→readonly 转换点（<code>ReadOnlyLag = MutableFraction × (PageCount-1) × PageSize</code>）</td>
+</tr>
+<tr>
+<td><code>Preallocate</code></td>
+<td><code>false</code></td>
+<td>构造时是否全量预分配所有页（false = 懒分配，按需 Allocate）</td>
+</tr>
+<tr>
+<td><code>OverflowPolicy</code></td>
+<td><code>Disabled</code></td>
+<td>溢出策略（WiscKey 式 KV 分离）。<code>Disabled</code>=Value 内联主 record；<code>Enabled</code>=<code>Value &gt; MinOverflowSize</code> 时分离到溢出引擎</td>
+</tr>
+<tr>
+<td><code>MinOverflowSize</code></td>
+<td><code>0</code></td>
+<td>Value 溢出阈值（字节）。<code>Enabled</code> 时 0 = 全部溢出</td>
+</tr>
+<tr>
+<td><code>ClockCacheCapacity</code></td>
+<td><code>null</code></td>
+<td>冷页缓存槽位。<code>null</code>=按 <code>ColdReadRatio</code> 派生（默认）；显式设置覆盖 ratio，向上取整到 2 的幂</td>
+</tr>
+<tr>
+<td><code>ColdReadRatio</code></td>
+<td><code>0.25</code></td>
+<td>冷回源比例 [0.0, 1.0]。<code>0.0</code>=不缓存（每次冷读走设备）；<code>1.0</code>=缓存全部页（近乎全热）</td>
+</tr>
+<tr>
+<td><code>ColdRecordBufferLimit</code></td>
+<td><code>AlignmentConst.Alignment1M</code></td>
+<td>单条 record 部分页回源的 buffer 上限。超过此值时回退到整页路径（<code>LoadColdPage</code>）。校验：须 ≥ HeaderSize</td>
+</tr>
+<tr>
+<td><code>MainEngine</code></td>
+<td>—</td>
+<td><code>StorageEngineOptions</code>，主引擎配置（引擎名 / 段大小 / 预分配 / 删 onClose / DirectIo / Hints 等）。构造时直传</td>
+</tr>
+<tr>
+<td><code>MetaPolicyKind</code></td>
+<td>—</td>
+<td>meta 策略模式（<code>Managed</code> / <code>Transport</code> / <code>Disabled</code>）。<code>Managed</code>=独立 meta 引擎；<code>Transport</code>=外部传输（未注入回落 MetaHost 嵌入 ring 流）；<code>Disabled</code>=不持久化（opaque 拒写）</td>
+</tr>
+<tr>
+<td><code>MetaOpaqueBytes</code></td>
+<td><code>256</code></td>
+<td>opaque 槽字节数（结构级缺省；初始化器可覆盖）。上限受 <code>IMetaPolicy</code> 容量约束</td>
+</tr>
+</tbody>
+</table>
+<p>构造校验（fail-fast，<code>RingBase.Validate</code>——源码 <code>Structures/Ring/RingBase.cs</code>）：</p>
+<ol>
+<li><code>PageSize</code> 是 2 的幂 / [4KB, 1GB]</li>
+<li><code>MemorySize ≥ PageSize</code> 且整除为 2 的幂页数</li>
+<li><code>PageCount ≤ MaxPageCount</code></li>
+<li><code>SegmentGrowthLimit ≥ PageSize</code></li>
+<li><code>MutableFraction ∈ (0,1)</code> 开区间</li>
+<li><code>ColdRecordBufferLimit ≥ HeaderSize</code></li>
+</ol>
+<hr>
+<h2 id="3-构造与生命周期">3. 构造与生命周期</h2>
+<h3 id="31-ringkey-源生成器机制">3.1 <code>[RingKey]</code> 源生成器机制</h3>
+<p>开放泛型 <code>BlittableRing&lt;TKey&gt;</code> 的构造是 <code>protected internal</code>——消费面只经 <code>[RingKey]</code> 生成的<strong>封闭薄类</strong>（编译期封闭 + <code>CreateAsync</code> 工厂）。内置 <code>long</code> 已在 <code>TC.Tier.Runtime</code> 程序集声明，<code>RingOfLong</code> 开箱即用；自定义 Key 在消费程序集加一行：</p>
+<pre><code class="lang-csharp">[assembly: RingKey(typeof(OrderId))]   // 产出 RingOfOrderId / HashOfOrderId / BTreeOfOrderId ...
+</code></pre>
+<p>分析器诊断不满足 <code>unmanaged</code> 约束的声明。绕过 <code>[RingKey]</code> 直接继承开放泛型 = <code>CS0122</code> 编译错（internal 不可见时绑定器误绑 IO 扩展同名方法）。</p>
+<h3 id="32-createasync-工厂--构造--initialize--waitforreadyasync-一步就绪">3.2 <code>CreateAsync</code> 工厂 = 构造 + Initialize + WaitForReadyAsync 一步就绪</h3>
+<pre><code class="lang-csharp">using var fs = TierFs.New(&quot;memory:&quot;);
+var settings = new BlittableRingSettings(new StorageEngineOptions(&quot;kv-ring&quot;, 64L &lt;&lt; 20))
+{
+    PageSize = 4096, MemorySize = 64 * 1024, MutableFraction = 0.5,
+};
+await using var ring = await RingOfLong.CreateAsync(settings, fs);   // 就绪可读写
+</code></pre>
+<p>或分步（观察恢复进度 / 注入恢复窗口）：</p>
+<pre><code class="lang-csharp">var ring = new RingOfOrderId(settings, fs);
+ring.Initialize();                       // 触发 OnInitializeBegin → 三引擎并行启动 + 恢复
+ring.WaitForReady();                     // 等恢复完成（默认四级回退）
+</code></pre>
+<h3 id="33-写读最小用例正序两步写--两段合口径读">3.3 写读最小用例（正序两步写 / 两段合口径读）</h3>
+<pre><code class="lang-csharp">static LogicalAddress KvPut(RingOfLong ring, IIndex&lt;long&gt; index, long key, ReadOnlySpan&lt;byte&gt; value)
+{
+    var addr = ring.Write(key, value);           // ① 真相源先写，得地址
+    index.Insert(key, addr, LogicalAddress.Empty);  // ② 索引后插（指向该地址）
+    return addr;
+}
+
+static bool KvTryGet(RingOfLong ring, IIndex&lt;long&gt; index, long key, Span&lt;byte&gt; buf, out int len)
+{
+    len = 0;
+    var addr = index.Find(key);                  // ① 索引命中得地址
+    if (addr == LogicalAddress.Empty) return false;
+    len = ring.GetValue(addr, buf);              // ② 真相源按址取值
+    return true;
+}
+</code></pre>
+<h3 id="34-dispose">3.4 Dispose</h3>
+<p>幂等（CAS 排他门 <code>_disposeGate</code>）。落盘契约（存储底线）：先把 mutable 区 <code>[FlushedUntilAddress, TailAddress)</code> 落盘（<code>FlushUntilCore</code> 免门直走）→ 写 meta → 释放 meta 策略 → 释放页 native 内存。各步异常吞掉互不阻断（尽力落盘）。<code>Dispose</code> 与并发读写经 <code>EnsureReady</code>/<code>EnsureNotDisposing</code> fail-fast 隔离。</p>
+<hr>
+<h2 id="4-api-详表按功能分组">4. API 详表（按功能分组）</h2>
+<h3 id="41-写">4.1 写</h3>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LogicalAddress Write(TKey key, ReadOnlySpan&lt;byte&gt; value)</code></td>
+<td>公开写入。大 value 自动溢出（按 <code>OverflowPolicy</code>）。永不返回 <code>Empty</code></td>
+</tr>
+<tr>
+<td><code>LogicalAddress Write(TKey key, ReadOnlySpan&lt;byte&gt; prefix, ReadOnlySpan&lt;byte&gt; value)</code></td>
+<td>分段写入（免临时数组拼接）；<strong>Overflow=Enabled 时超阈值抛</strong>——用连续 value 的 Write/WriteAsync</td>
+</tr>
+<tr>
+<td><code>LogicalAddress WriteTombstone(TKey key)</code></td>
+<td>写墓碑（<code>FLAG_RINGRECORD_TOMBSTONE</code> + 空 value）；恢复时 <code>RecordKey.IsTombstone</code> 过滤</td>
+</tr>
+<tr>
+<td><code>ValueTask&lt;LogicalAddress&gt; WriteAsync(TKey key, ReadOnlyMemory&lt;byte&gt; value, CancellationToken ct = default)</code></td>
+<td>公开异步写。inline 快路径同步完成（零 async 开销）；溢出慢路径真异步</td>
+</tr>
+<tr>
+<td><code>ValueTask&lt;LogicalAddress&gt; WriteTombstoneAsync(TKey key, CancellationToken ct = default)</code></td>
+<td>异步墓碑写（同步完成）</td>
+</tr>
+<tr>
+<td><code>void UpdateValue(LogicalAddress addr, ReadOnlySpan&lt;byte&gt; newValue)</code></td>
+<td><strong>RCU 原地更新</strong>。四分支翻转：<code>overflow→overflow</code>/<code>inline→overflow</code>/<code>overflow→inline</code>（受原 inline 槽容量约束，超抛）/<code>inline→inline</code></td>
+</tr>
+<tr>
+<td><code>ValueTask UpdateValueAsync(LogicalAddress addr, ReadOnlyMemory&lt;byte&gt; newValue, CancellationToken ct = default)</code></td>
+<td>异步版。纯 inline 翻转同步完成；溢出翻转走 <code>WriteOverflowAsync</code></td>
+</tr>
+<tr>
+<td><code>WriteBatch BeginWriteBatch()</code></td>
+<td>批量写（ref struct，<code>using</code> 包裹）。多写者各持独占窗口段，批内无锁推进；详见 §4.6</td>
+</tr>
+</tbody>
+</table>
+<p><code>WriteBatch.Append</code> 签名：</p>
+<pre><code class="lang-csharp">LogicalAddress Append(TKey key, ReadOnlySpan&lt;byte&gt; value);
+LogicalAddress Append(TKey key, scoped ReadOnlySpan&lt;byte&gt; prefix, scoped ReadOnlySpan&lt;byte&gt; value);
+</code></pre>
+<p>同一 <code>WriteBatch</code> 不可并发调用；不同批各持窗口可并发。<code>Dispose</code> 释放 epoch。</p>
+<h3 id="42-读内容自愈读">4.2 读（内容自愈读）</h3>
+<p>判据 = <code>SafeSnapshotTail</code>（<code>addr &lt; 水位</code> → 页池直读；<code>≥</code> → 设备读 / 自愈回退）。热直读经 magic + CRC 校验，失败自动回退设备重读——驱逐复用/撕裂/残留不产生假数据（读到设备权威快照或空/<code>NotFound</code>，由上层定夺）。</p>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>返回 / 语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>int GetValue(LogicalAddress addr, Span&lt;byte&gt; destination)</code></td>
+<td>拷贝交付；0 = 无有效记录（未命中/墓碑/校验失败）</td>
+</tr>
+<tr>
+<td><code>bool TryGetValue(LogicalAddress addr, Span&lt;byte&gt; destination, out int written)</code></td>
+<td>拷贝交付；false = 未命中/墓碑/校验失败。<strong>跨 await 消费必须走此形态</strong></td>
+</tr>
+<tr>
+<td><code>ReadOnlySpan&lt;byte&gt; GetValueSpan(LogicalAddress addr)</code></td>
+<td><strong>零拷贝切片——仅同步栈内合法</strong>。空 span = 无有效记录。溢出 record 回退 thread-static 缓冲拷贝</td>
+</tr>
+<tr>
+<td><code>RecordKey&lt;TKey&gt; GetKey(LogicalAddress addr)</code></td>
+<td>拉到 key（+ value 长度 + flags + 地址）。无有效记录抛 <code>InvalidOperationException</code>（fail-fast）</td>
+</tr>
+<tr>
+<td><code>bool TryGetKey(LogicalAddress addr, out TKey key)</code></td>
+<td>读 key 的 NotFound 形态。false = 无有效记录</td>
+</tr>
+<tr>
+<td><code>ValueTask&lt;RecordKey&lt;TKey&gt;&gt; GetKeyAsync(LogicalAddress addr, CancellationToken ct = default)</code></td>
+<td>异步单条 key 读；热区同步快路径，冷区真异步整页回源</td>
+</tr>
+<tr>
+<td><code>ValueTask&lt;int&gt; GetValueAsync(LogicalAddress addr, Memory&lt;byte&gt; destination, CancellationToken ct = default)</code></td>
+<td>异步 value 拷贝读；溢出走 <code>ReadOverflowAsync</code></td>
+</tr>
+<tr>
+<td><code>ValueTask&lt;(TKey Key, bool Success)&gt; TryGetKeyAsync(LogicalAddress addr, CancellationToken ct = default)</code></td>
+<td>异步 key 读的 NotFound 形态</td>
+</tr>
+<tr>
+<td><code>void GetRecords&lt;THandler&gt;(ReadOnlySpan&lt;LogicalAddress&gt; addresses, THandler handler) where THandler : IReadOnlyRecordHandler&lt;TKey&gt;</code></td>
+<td>批量读（按页号聚簇，减少冷区回源次数）。无有效记录的地址跳过（不回调 <code>handler.Handle</code>）</td>
+</tr>
+<tr>
+<td><code>RingRecordFields GetFields(LogicalAddress addr)</code></td>
+<td>读 record header 字段（轻量）</td>
+</tr>
+<tr>
+<td><code>Span&lt;byte&gt; GetSpan(LogicalAddress addr, int length)</code></td>
+<td><strong>不暴露 byte*</strong>，页池 native 内存可写窗口。调用方保证页未驱逐回收</td>
+</tr>
+<tr>
+<td><code>void EnterEpoch()</code> / <code>void ExitEpoch()</code></td>
+<td>epoch 读保护协议实现（<code>IEpochProtected</code>）。<strong>读路径已退役</strong>——读安全性由内容自愈读不变式承担；写/驱逐 drain 仍使用</td>
+</tr>
+<tr>
+<td><code>long GetByteDistance(LogicalAddress from, LogicalAddress to)</code></td>
+<td>公开字节距离（队列积压/滞后 lag 度量原语）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="43-8-水位全列">4.3 8 水位（全列）</h3>
+<table>
+<thead>
+<tr>
+<th>水位</th>
+<th>含义</th>
+<th>持久化层</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>BeginAddress</code></td>
+<td>头截断边界（= engine.MinAddress，此地址前数据已回收）</td>
+<td>持久化层（meta 必存）</td>
+</tr>
+<tr>
+<td><code>FlushedUntilAddress</code></td>
+<td>落盘边界（此地址前已写引擎，恢复可信数据上限 W）</td>
+<td>持久化层（meta 必存）</td>
+</tr>
+<tr>
+<td><code>SafeReadOnlyAddress</code></td>
+<td>安全只读水位——epoch 保护下 readonly 区推进目标（读者可安全读至此处）</td>
+<td>持久化层（meta 必存）</td>
+</tr>
+<tr>
+<td><code>ReadOnlyAddress</code></td>
+<td>只读水位——此地址前页面冻结（等待 flush 后驱逐）</td>
+<td>持久化层（meta 必存）</td>
+</tr>
+<tr>
+<td><code>TailAddress</code></td>
+<td>写游标——下一条 record 的分配地址（<code>TryAllocate</code> 单调推进）</td>
+<td>持久化层（meta 必存）</td>
+</tr>
+<tr>
+<td><code>HeadAddress</code></td>
+<td>驱逐边界——此地址前的旧页已被回收（head 随 flush/驱逐推进）</td>
+<td>内存水位层（meta 可选存，恢复时从 Begin 重建）</td>
+</tr>
+<tr>
+<td><code>SafeHeadAddress</code></td>
+<td>安全驱逐边界（epoch 保护下的驱逐推进目标）</td>
+<td>内存水位层</td>
+</tr>
+<tr>
+<td><code>ClosedUntilAddress</code></td>
+<td>关页边界——此地址前的页已关闭（新写入不得落在其前）</td>
+<td>内存簿记层（永不落盘，恢复时初始化为 SafeHeadAddress）</td>
+</tr>
+</tbody>
+</table>
+<p>辅助：<code>TakeSafeSnapshotTail()</code>（lock 内采集——之前全部 header 完整可见，扫描游标构造快照 + 读路径热冷分档判据）。8B 距离水位 <code>_safeSnapshotTailDist</code>/<code>_headDist</code> 经 <code>Interlocked</code> CAS-max 发布 / Volatile 读，热路径无锁无撕裂。</p>
+<h3 id="44-截断">4.4 截断</h3>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>void TruncatePrefix(LogicalAddress address, bool truncateDevice = false)</code></td>
+<td>头截断——推进 <code>BeginAddress</code>。<strong>前置</strong>：<code>address ≤ FlushedUntilAddress</code>（否则抛——未落盘数据会丢）。<code>truncateDevice=true</code> 调 <code>engine.ReclaimHead</code>（失败不阻断逻辑截断）</td>
+</tr>
+<tr>
+<td><code>void TruncateSuffix(LogicalAddress address)</code></td>
+<td><strong>尾截断——D2 决策唯一异常路径</strong>（放松&quot;地址单调不回退&quot;铁律）。回退四件套：物理回收（<code>engine.ReclaimTail</code>）+ 内存水位条件回退（各字段独立判断）+ 页池清零 + 冷缓存失效。<strong>守卫</strong>：<code>address</code> 不得落入已驱逐区（<code>&lt; SafeHeadAddress</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="45-快照">4.5 快照</h3>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IRingSnapshotReader OpenSnapshotReader(LogicalAddress begin = default, LogicalAddress end = default)</code></td>
+<td>创建快照读取器（pull 模式）。默认区间 <code>[BeginAddress, TailAddress)</code>。冷热透明分流（<code>FlushedUntilAddress</code> 判据）</td>
+</tr>
+<tr>
+<td><code>IRingSnapshotWriter OpenSnapshotWriter(LogicalAddress begin, LogicalAddress end)</code></td>
+<td>创建快照写入器（push 模式）。<code>begin..end</code> 超出当前 AllocatedTail 时先整段预留 <code>Allocate</code>。<strong>填完所有数据须调 <code>Complete</code></strong> 推进 TailAddress 到 end</td>
+</tr>
+</tbody>
+</table>
+<p><code>IRingSnapshotReader</code>：<code>long Length</code> / <code>int Read(Span&lt;byte&gt; buf)</code> / <code>ValueTask&lt;int&gt; ReadAsync(Memory&lt;byte&gt; buf, CancellationToken ct)</code>，页级流式支持 GB/TB。
+<code>IRingSnapshotWriter</code>：<code>void Write(ReadOnlySpan&lt;byte&gt; buf)</code> / <code>ValueTask WriteAsync(ReadOnlyMemory&lt;byte&gt; buf, CancellationToken ct)</code> / <code>void Complete()</code> / <code>ValueTask CompleteAsync(CancellationToken ct)</code>。</p>
+<h3 id="46-批量写">4.6 批量写</h3>
+<p><code>BeginWriteBatch()</code> 返回 <code>ref struct WriteBatch</code>（<code>using</code> 包裹）。窗口模型：每个批 = 独占页段窗口——领取时在 <code>_tailLock</code> 内把 tail 一次性推进到窗口尾（预留段，批独占）；批内 record 分配完全无锁（页内游标推进，零锁零 EnsureSpace）。多写者各持窗口并发写——锁竞争从&quot;每 record 一次&quot;降到&quot;每窗口一次&quot;。</p>
+<h3 id="47-扫描">4.7 扫描</h3>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IRingScanCursor OpenScanCursor(LogicalAddress begin = default, LogicalAddress end = default)</code></td>
+<td>打开扫描游标（默认区间 <code>[BeginAddress, TailAddress)</code>；工厂注入或默认 <code>SequentialRingScanCursor</code>）。整段持 epoch</td>
+</tr>
+<tr>
+<td><code>IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address, bool IsTombstone)&gt; ScanAsync(LogicalAddress begin, LogicalAddress end, CancellationToken ct = default)</code></td>
+<td>范围扫描异步迭代器（包装 <code>OpenScanCursor</code>，冷区真异步 IO）。仅吐用户数据 record（过滤 <code>FLAG_ENTRY_IS_META</code>）；墓碑旗标随三元组吐出</td>
+</tr>
+<tr>
+<td><code>IAsyncEnumerable&lt;(TKey Key, LogicalAddress Address, bool IsTombstone)&gt; ScanAsync(CancellationToken ct = default)</code></td>
+<td>全量扫描（<code>BeginAddress</code> 到 <code>TailAddress</code>）</td>
+</tr>
+<tr>
+<td><code>long SpanPages(LogicalAddress from, LogicalAddress to)</code></td>
+<td>两地址间页跨度（P1 扫描模式选择器成本模型输入）</td>
+</tr>
+<tr>
+<td><code>LogicalAddress GetFlushedWatermark()</code></td>
+<td><code>IKeyResolver</code> 契约——派生结构后台持久化的 footer 锚点 W（= <code>FlushedUntilAddress</code>）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="48-2pcitransactionparticipant-六件套">4.8 2PC（<code>ITransactionParticipant</code> 六件套）</h3>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>void Prepare(long seq)</code> / <code>ValueTask PrepareAsync(long seq, CancellationToken ct)</code></td>
+<td>事务准备：落盘数据 + meta 至&quot;悬干&quot;状态。Transport 回落 MetaHost = 1 次 fsync（meta record 随数据同页 flush 原子落盘）；Managed/注入 Transport/Disabled = 2 次 fsync（FlushUntil 先 + WriteMeta 后）。经 <code>_prepareGate</code> 串行</td>
+</tr>
+<tr>
+<td><code>void ConfirmCommitted(long seq)</code></td>
+<td>推进 <code>LastCommittedSeq</code>，触发回调；推进 <code>_txRollbackTail</code>（提交边界，随 meta 持久化为 <code>CommittedTailAddress</code>）</td>
+</tr>
+<tr>
+<td><code>void OnCommitted(long seq, Action callback)</code></td>
+<td>注册 seq 回调；已提交到更高 seq 立即同步触发</td>
+</tr>
+<tr>
+<td><code>void Abort(long seq)</code> / <code>ValueTask AbortAsync(long seq, CancellationToken ct)</code></td>
+<td>2PC 回滚——<code>TruncateSuffix(_txRollbackTail)</code> 回退到上一已确认提交边界，丢弃本轮悬干数据。守卫矩阵：<code>seq ≤ LastCommittedSeq</code>=no-op；<code>seq ≠ LastPreparedSeq</code>=陈旧；无既有提交边界/无悬干数据 = 仅复位记账</td>
+</tr>
+</tbody>
+</table>
+<p><code>LastCommittedSeq</code> / <code>LastPreparedSeq</code> 公开只读（恢复 / 运行时读）。</p>
+<h3 id="49-opaque-meta-搭车">4.9 Opaque meta 搭车</h3>
+<table>
+<thead>
+<tr>
+<th>方法签名</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>void SetOpaqueMeta(ReadOnlySpan&lt;byte&gt; data)</code></td>
+<td>写外部 opaque meta（stage 进策略缓冲，随下一次水位提交原子落盘）。<strong>唯一消费者形态</strong>：TierKV 组合层登记 index 镜像锚点 W。<code>MetaPolicyKind=Disabled</code> 时拒写</td>
+</tr>
+<tr>
+<td><code>ReadOnlySpan&lt;byte&gt; ReadOpaqueMeta()</code></td>
+<td>读最近已提交块；空 = 未写入/未开启 meta 持久化——空即答案</td>
+</tr>
+<tr>
+<td><code>IMetaPolicy&lt;RingMetaHeader, RingMetaPayload&gt; MetaPolicy { get; }</code></td>
+<td>构造期装配（永非 null 纯读）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="5-自定义注入工厂">5. 自定义注入工厂</h2>
+<table>
+<thead>
+<tr>
+<th>接口 / 类型</th>
+<th>职责</th>
+<th>默认实现</th>
+<th>自定义注意</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IRingCodec</code></td>
+<td>record 三段式 codec（header/CRC/字段偏移/单字段读）</td>
+<td><code>BlittableRing.Codec</code></td>
+<td>暴露 <code>HeaderSize</code> / <code>Alignment</code> / <code>Magic</code> / <code>CrcOffset</code> / <code>PayloadLengthOffset</code>；<code>TryReadHeaderLight</code> 热路径轻量门（magic+长度上界+Flags），免全量 header 解码——本进程写入页池热读专用；设备回源/恢复走全量 <code>TryReadHeader</code></td>
+</tr>
+<tr>
+<td><code>RingRecordFields</code></td>
+<td>record 业务字段包（<code>Flags</code> / <code>PayloadLength</code> / <code>PaddingLength</code> / <code>PreviousAddress</code>）—— <code>readonly record struct</code></td>
+<td>—</td>
+<td>codec 读写 header 时传参</td>
+</tr>
+<tr>
+<td><code>RecordKey&lt;TKey&gt;</code></td>
+<td>Key + ValueLength + Flags + Address 组合返回值</td>
+<td>—</td>
+<td><code>IsOverflow</code> / <code>IsMeta</code> / <code>IsTombstone</code> 旗标属性</td>
+</tr>
+<tr>
+<td><code>IKeyResolver&lt;TKey&gt;</code></td>
+<td>Index 注入 Ring 时必需的判等闭环契约</td>
+<td><code>RingBase&lt;TKey&gt;</code> 实现</td>
+<td><code>TryGetKey</code> / <code>GetFlushedWatermark</code> / <code>ScanAsync</code> 三成员；扫描详见 §4.7</td>
+</tr>
+<tr>
+<td><code>IRingScanCursor</code></td>
+<td>扫描游标，扩 <code>IStructureScanCursor</code></td>
+<td><code>SequentialRingScanCursor</code>（嵌套 sealed）</td>
+<td><code>CurrentAddress</code> / <code>NextAddress</code> / <code>BeginAddress</code> / <code>EndAddress</code> / <code>GetFields()</code> / <code>CurrentRecordSize</code>；自定义经 <code>RingCursorFactory&lt;out TRingScanCursor&gt;</code> 委托注入</td>
+</tr>
+<tr>
+<td><code>RingCursorFactory&lt;out TRingScanCursor&gt;</code></td>
+<td>扫描游标工厂委托 <code>(begin, end) =&gt; cursor</code></td>
+<td><code>null</code> = 默认 <code>SequentialRingScanCursor</code></td>
+<td>自定义经构造参数 <code>cursorFactory</code> 注入</td>
+</tr>
+<tr>
+<td><code>IRingSnapshot</code></td>
+<td>快照统一抽象（pull/push 分离）</td>
+<td><code>RingSnapshot&lt;TRing&gt;</code>（嵌套）</td>
+<td><code>Reader(begin, end)</code> / <code>Writer(begin, end)</code>；自定义经构造参数 <code>ringSnapshot</code> 注入</td>
+</tr>
+<tr>
+<td><code>RingSnapshotReaderFactory</code> / <code>RingSnapshotWriterFactory</code></td>
+<td>快照读写器工厂委托</td>
+<td><code>null</code> = 默认 <code>RingSnapshotReader</code> / <code>RingSnapshotWriter</code></td>
+<td>自定义经构造参数 <code>snapshotReaderFactory</code> / <code>snapshotWriterFactory</code> 注入</td>
+</tr>
+<tr>
+<td><code>IRingSnapshotReader</code></td>
+<td>快照读取器——pull 模式，页级流式</td>
+<td>—</td>
+<td><code>Length</code> / <code>Read(Span)</code> / <code>ReadAsync(Memory, ct)</code>；<code>IDisposable + IAsyncDisposable</code></td>
+</tr>
+<tr>
+<td><code>IRingSnapshotWriter</code></td>
+<td>快照写入器——push 模式，<code>Complete</code> 收口</td>
+<td>—</td>
+<td><code>Write(ReadOnlySpan)</code> / <code>WriteAsync(ReadOnlyMemory, ct)</code> / <code>Complete()</code> / <code>CompleteAsync(ct)</code></td>
+</tr>
+<tr>
+<td><code>OverflowPolicy</code>（enum）</td>
+<td>溢出策略 <code>Disabled</code> / <code>Enabled</code></td>
+<td><code>Disabled</code></td>
+<td><code>Enabled</code> = WiscKey 式 value 分离，溢出引擎与主引擎同 fs</td>
+</tr>
+<tr>
+<td><code>RingMetaPayload</code>（struct）</td>
+<td>持久化层 6 指针 + <code>LastCommittedSeq</code> + <code>LastPreparedSeq</code> + <code>OverflowTailAddress</code> + <code>KeySize</code> + <code>CommittedTailAddress</code></td>
+<td>—</td>
+<td><code>[BinaryLayout]</code> 源生成器产出 codec；旧块短 payload 零扩展降级</td>
+</tr>
+<tr>
+<td><code>RingMetaHeader</code>（struct）</td>
+<td>meta header 规范字段（<code>MagicValue</code> / <code>Version</code> / <code>Flags</code> / <code>PayloadLength</code> / <code>PaddingLength</code>，12B）</td>
+<td>—</td>
+<td><code>Magic=&quot;RMHD&quot;</code>，<code>CurrentVersion=major 1/minor 0</code></td>
+</tr>
+<tr>
+<td><code>AddressInfo</code>（internal struct）</td>
+<td>溢出指针（<code>Address</code> + <code>Size</code>，24B）</td>
+<td>—</td>
+<td>旧版 8B 位压缩在 LogicalAddress(16B) 模型下不适用</td>
+</tr>
+<tr>
+<td><code>OverflowRecordHeader</code>（internal struct）</td>
+<td>溢出帧头 18B（Magic+Version+Flags+PayloadLen+PadLen+Crc32C）</td>
+<td>—</td>
+<td>Magic <code>&quot;OVRF&quot;</code>，<code>Alignment=4</code></td>
+</tr>
+<tr>
+<td><code>IReadOnlyRecordHandler&lt;in TKey&gt;</code></td>
+<td>批量读回调接口</td>
+<td>—</td>
+<td><code>Handle(LogicalAddress address, TKey key, int valueLength, ushort flags)</code>——<code>flags</code> 是 <code>RecordFlags</code> 内部位</td>
+</tr>
+<tr>
+<td><code>MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;</code></td>
+<td>meta 策略工厂委托 <code>kind =&gt; policy</code></td>
+<td><code>CreateMetaPolicyDefault</code></td>
+<td><code>Managed</code> / <code>Transport</code>（未注入 transport 回落 MetaHost）/ <code>Disabled</code> 三模式</td>
+</tr>
+<tr>
+<td><code>IMetaTransport</code></td>
+<td>Transport 模式的外部 meta 传输</td>
+<td><code>MetaHost</code>（嵌套，回落：meta record 嵌入 ring 流）</td>
+<td>自定义经构造参数 <code>metaTransport</code> 注入</td>
+</tr>
+<tr>
+<td><code>IRecovery&lt;RingRecoveryHints&gt;</code></td>
+<td>恢复策略</td>
+<td><code>DefaultRingRecovery</code>（四级回退）</td>
+<td>自定义经构造参数 <code>recovery</code> 注入；裸写 <code>IRecovery</code> 与 <code>LifecycleBase</code> 闸门不同步——继承 <code>RecoveryBase&lt;RingRecoveryHints&gt;</code></td>
+</tr>
+<tr>
+<td><code>LightEpoch</code></td>
+<td>epoch 保护</td>
+<td>自建</td>
+<td>自定义共享经构造参数 <code>epoch</code> 注入（<code>ResourceOwnership.Referenced</code>）</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="6-持久化机制">6. 持久化机制</h2>
+<h3 id="61-页池状态机4-态">6.1 页池状态机（4 态）</h3>
+<pre><code>mutable → readonly → flushed → evicted
+   ↑          │             │            │
+   │          │             │            │
+   └──────────┴─────────────┴────────────┘
+            (slot 循环复用：pageSeq &amp; PageCountMask)
+</code></pre>
+<ul>
+<li><strong>mutable</strong>：当前写者活跃区，<code>TryAllocate</code> 推进 TailAddress</li>
+<li><strong>readonly</strong>：页面冻结，等待 flush。<code>ReadOnlyAddress</code> 推进经 <code>PageAlignedShiftReadOnlyAddress</code>（页边界对齐）</li>
+<li><strong>flushed</strong>：已写引擎（<code>AsyncFlushPages</code> 把页内容 Write 回它对应的引擎地址——同地址 100% 确定）。<code>FlushedUntilAddress</code> 推进</li>
+<li><strong>evicted</strong>：旧页回收（head 推进 <code>FreePage</code>）。<code>HeadAddress</code> / <code>SafeHeadAddress</code> 推进</li>
+</ul>
+<p>页池固定 N 槽（<code>PageCount = MemorySize/PageSize</code>），<code>slot = pageSeq &amp; PageCountMask</code> 循环复用。地址单调递增永不回退，写满一圈淘汰旧页（FASTER hybrid log 模型）。<code>_emptyPageCount</code> 默认 <code>PageCount-1</code>（最大 mutable 区）；<code>_headOffsetLagBytes = (PageCount-1) × PageSize</code> 决定 mutable 区大小 + 自动驱逐触发点；<code>_readOnlyLagBytes = MutableFraction × (PageCount-1) × PageSize</code> 决定 mutable→readonly 转换点。</p>
+<h3 id="62-flusheduntiladdress-推进路径">6.2 <code>FlushedUntilAddress</code> 推进路径</h3>
+<ul>
+<li><code>FlushUntil(untilAddress)</code> / <code>FlushUntilAsync</code>：持久化契约面（写穿 + fsync）。<code>_flushGate</code> 串行门保证并发 flush 区间不重叠——「读水位快照 → 迭代刷页 → 推进水位」三步原子，避免两个并发 flush 的区间重叠触发关页链 <code>Shift→OnPagesClosed→FreePage</code> 把对方迭代中的页置 null</li>
+<li><code>FlushUntilTail()</code> / <code>FlushUntilTailAsync</code>：tail 原子快照（tail 在 <code>_tailLock</code> 内原子读取，读与用之间不被并发推进混入；快照之后的并发写入由后续 flush 覆盖，水位 CAS128 单调）</li>
+<li><code>WriteThroughUntil(untilAddress)</code>：容量写穿（驱逐链专用，<strong>零 fsync</strong>）——页复用前数据已在设备，进程崩溃安全，断电窗口归上层 checkpoint/Committed 档承担</li>
+</ul>
+<p>flush 路径必调 <code>InvalidateColdPageCache</code>（页内容随追加演进，flush 后缓存快照即陈旧——W6 缺陷根因修复：不失效则同页后续冷读永久供陈旧快照，resolver 回读 key 不匹配 → Find=Empty）。</p>
+<p>在途 flush 登记与关页 worker 互斥（<code>_ongoingCloseLock</code> 内登记区间，worker 走到与在途区间相交的页即停止本轮回收，由下一次关页触发续走）。</p>
+<h3 id="63-meta-持久化iringmetapolicy">6.3 meta 持久化（<code>IRingMetaPolicy</code>）</h3>
+<ul>
+<li><code>WriteMeta</code> / <code>WriteMetaAsync</code>：更新 meta 缓冲（水位 + payload）+ <code>Commit</code> 落盘。<code>flushedUntilOverride</code> 参数：Transport 回落 MetaHost 时的 1-fsync Prepare 优化——先记 dataTail 再随数据同页 flush，避免 Managed 那种&quot;先 flush 再记水位&quot;的 2 次 fsync</li>
+<li><code>WriteMetaRecord</code>（private protected）：把内层 meta block 作为 <code>FLAG_ENTRY_IS_META</code> record 追加到 TailAddress（纯内存写：分配 tail + 写 header + 写 payload + CRC + Seal，零 device IO；落盘靠 Prepare 末尾 FlushUntil）。flags 顺序约定：写 header 时就设全 <code>IS_META|VALID|SEALED</code>，再 FillCrc（CRC 覆盖含 flags 字段），最后 Seal 幂等</li>
+<li><code>BuildMetaPayload</code>：6 持久化指针 + <code>LastCommittedSeq</code> + <code>LastPreparedSeq</code> + <code>OverflowTailAddress</code> + <code>KeySize</code> + <code>CommittedTailAddress</code></li>
+<li><code>MetaLayout</code>（sealed 嵌套）：实现 <code>IMetaLayout&lt;RingMetaHeader, RingMetaPayload&gt;</code>——12B 规范 header + 结构化 payload + opaque 插槽；旧块短 payload 零扩展降级（新字段读默认值，优雅不抛）</li>
+<li><code>MetaHost</code>（sealed 嵌套）：Transport 未注入传输时的回落——meta record 作为 <code>FLAG_ENTRY_IS_META</code> 追加到 ring 流末尾；读回 = 倒序扫 ring 流找最后一条有效 IS_META record 的 payload</li>
+</ul>
+<p>详见 <a href="meta.html"><code>meta.md</code></a>。</p>
+<h3 id="64-与-storageengine-关系">6.4 与 StorageEngine 关系</h3>
+<ul>
+<li>主引擎构造期 <code>Create</code>（纯装配零 IO），<code>OnInitializeBegin</code> 内 <code>Initialize</code>（非阻塞）</li>
+<li>溢出引擎（<code>OverflowPolicy=Enabled</code> 时构造，引擎名 <code>.overflow</code> 后缀，与主引擎同 fs、同几何）</li>
+<li>meta 引擎（<code>MetaPolicyKind=Managed</code> 时构造，引擎名 <code>.meta</code> 后缀，段大小 ≥ 1MB，不分段）</li>
+<li>三引擎在 <code>OnInitializeBegin</code> 并行启动，<code>WaitForDependenciesAsync</code> 异步 join；引擎就绪由 <code>DefaultRingRecovery.RecoverAsync</code> 开头 <code>WaitForReadyAsync</code> 保证</li>
+<li>水位线归结构层：引擎自恢复 MinAddress/AllocatedTail，结构水位走 meta/扫盘，不下传</li>
+<li><code>_dataStart</code> 构造时由首次 <code>Allocate</code> 确定（<code>GetDistance</code> 锚点，100% 确定）；<code>pageSeq = GetDistance(_dataStart, addr) &gt;&gt; PageSizeBits</code>；<code>pageIntra = GetDistance(_dataStart, addr) &amp; PageSizeMask</code></li>
+<li>热路径快路径：同段（Ring 单段是常态）时 <code>DistanceFromDataStart</code> = 纯 long 减法，零引擎调用；跨段才 fallback 到 <code>engine.GetDistance</code></li>
+</ul>
+<hr>
+<h2 id="7-恢复协议">7. 恢复协议</h2>
+<h3 id="71-四级回退defaultringrecoveryonrecoverycoreasync">7.1 四级回退（<code>DefaultRingRecovery.OnRecoveryCoreAsync</code>）</h3>
+<pre><code>① RingRecoveryHints.RecoveredTail（外部主动注入最高优先级）
+   → hints.FlushedUntilAddress（次选）
+② meta（O(1) 正路）：MetaPolicy.LoadAsync → RingMetaPayload
+   + KeySize 锚点校验（防拿错特化开同一卷，fail-fast）
+   + 2PC 水位还原（LastCommittedSeq/LastPreparedSeq/CommittedTailAddress）
+③ 引擎 CommittedTail（已落盘区域）
+④ 扫盘找 torn write 边界：
+   MagicLocator 倒序找最后含 magic 的页（Monotone 快速档）
+   → ForwardScanRecordsAsync 前向逐页扫 record，CRC 校验求精
+   → 同页撕裂重同步（坏帧按对齐粒度步进续扫，不连带丢同页后续有效帧）
+</code></pre>
+<h3 id="72-ringrecoveryhints-注入">7.2 <code>RingRecoveryHints</code> 注入</h3>
+<pre><code class="lang-csharp">public readonly struct RingRecoveryHints
+{
+    public LogicalAddress? BeginAddress { get; init; }
+    public LogicalAddress? HeadAddress { get; init; }
+    public LogicalAddress? FlushedUntilAddress { get; init; }
+    public LogicalAddress? RecoveredTail { get; init; }            // 上层快照场景注入，优先于扫盘
+    public LogicalAddress? OverflowTailAddress { get; init; }      // 溢出引擎尾
+}
+</code></pre>
+<h3 id="73-自愈读read-protection-tiering-v2">7.3 自愈读（read-protection-tiering v2）</h3>
+<p>不变式（<strong>读安全性由不变式承担，不依赖调用方编排</strong>）：</p>
+<ul>
+<li><strong>I1 写穿先行</strong>：<code>addr &lt; FlushedUntilAddress</code> → 数据已在引擎</li>
+<li><strong>I2 水位内完整</strong>：<code>addr &lt; SafeSnapshotTail</code> → 页池必有完整 record（写者写完才推进水位）</li>
+<li><strong>I4 内容指纹</strong>：magic + CRC32C 校验</li>
+</ul>
+<p>读分档判据 = <code>IsHotRecord(dist)</code>：<code>head ≤ addr &lt; SafeSnapshotTail</code> → 页池直读；<code>addr &lt; head</code> → 页已回收（强制设备读，防同形记录复用别名假数据）；<code>addr ≥ SafeSnapshotTail</code> → 设备读。热直读经 magic+CRC 校验失败自动回退设备重读——页池与设备互为自愈。</p>
+<h3 id="74-锚点-w-与-index-协议">7.4 锚点 W 与 Index 协议</h3>
+<pre><code>① Ring.CreateAsync → 恢复水位；锚点 W = ring.ReadOpaqueMeta()
+   （无锚点 / 损坏 / W 越过当前尾 → 回退 BeginAddress——宁可旧多重放）
+② index 拉流重放：ScanAsync(W, TailAddress) 逐条 Insert 自建
+   （Hash/SortedIndex 有主存储帧时优先载帧，见 structures.md §4）
+</code></pre>
+<p>锚点 W = 索引上次主存储 dump/重放完成的水位，经 Ring 的 opaque 随水位线原子落盘；每次 dump/重放后 <code>ring.SetOpaqueMeta(W)</code> 即可。详见 <a href="meta.html"><code>meta.md</code></a>。</p>
+<h3 id="75-溢出引擎尾恢复">7.5 溢出引擎尾恢复</h3>
+<p><code>RecoverOverflowTail</code> 三级回退（同主流程）：</p>
+<ol>
+<li><code>hints.OverflowTailAddress</code> 注入</li>
+<li>meta 的 <code>OverflowTailAddress</code> 字段</li>
+<li><code>OpenSequentialReader</code> 扫描溢出帧（逐帧 magic + Skip payload，恢复容忍不验 CRC，上层读时再校验）</li>
+<li>引擎 <code>AllocatedTail</code> 近似</li>
+</ol>
+<p>恢复后引擎尾对齐：<code>_overflowTailAddress</code> 落后于引擎物理尾时（撕裂写预留/Wasted 区间），<code>ReclaimTail</code> 退齐——否则新溢出帧从撕裂区中间分配，与遗留 Wasted 区间相交被读门拦截。</p>
+<hr>
+<h2 id="8-反模式">8. 反模式</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>反模式</th>
+<th>后果 / 正解</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>写编排反序</strong>：先 <code>index.Insert</code> 再 <code>ring.Write</code></td>
+<td>索引指向不存在的数据。正序：先 <code>ring.Write</code> 得地址 → 再 <code>index.Insert</code></td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>零拷贝 span 跨 await</strong>：<code>GetValueSpan</code> 返回值跨 await 持有</td>
+<td>span 仅同步栈内合法；跨 await/跨线程消费必须走拷贝 API（<code>TryGetValue</code>/<code>GetValue</code>）——API 形态强制，不依赖约定</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>绕过 <code>[RingKey]</code> 直接继承开放泛型</strong>：<code>new BlittableRing&lt;TKey&gt;(...)</code></td>
+<td><code>CS0122</code> 编译错（protected internal 闸门）；封闭薄类是唯一消费面</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>跨实例组合 <code>DeleteOnClose=true</code></strong></td>
+<td>跨重启组合必须 <code>DeleteOnClose=false</code>（否则索引重建时真相源被清）</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>给地址直达读加会话/索引</strong>：<code>GetValue(addr)</code> 前先 <code>EnterScope</code> 等</td>
+<td>地址即句柄——<code>GetValue(addr)</code> 永久零税。读路径已退役 epoch 保护，调用方编排不必要</td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong><code>TruncatePrefix</code> 越过 <code>FlushedUntilAddress</code></strong></td>
+<td>抛 <code>InvalidOperationException</code>——未落盘数据会丢。截断点必须 ≤ FlushedUntilAddress</td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong><code>TruncateSuffix</code> 落入已驱逐区</strong>（<code>&lt; SafeHeadAddress</code>）</td>
+<td>抛——事务窗口横跨已驱逐页，无安全回退边界。Abort 前置窗口内不应发生大规模驱逐</td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong><code>WriteBatch</code> 跨 await 持有</strong>：ref struct 不跨 await，但 <code>using</code> 范围跨 await</td>
+<td>写锁语义——批窗口持 epoch，跨 await 持有 = epoch 嵌套警告。批在同步栈内开闭</td>
+</tr>
+<tr>
+<td>9</td>
+<td><strong>Overflow=Enabled 时分段写超阈值</strong></td>
+<td><code>Write(key, prefix, value)</code> 抛 <code>InvalidOperationException</code>——用连续 value 的 <code>Write/WriteAsync</code></td>
+</tr>
+<tr>
+<td>10</td>
+<td><strong><code>UpdateValue</code> overflow→inline 回退时超原 inline 槽容量</strong></td>
+<td>抛——<code>newValue.Length &gt; originalInlineCapacity</code>。原 inline 槽容量 = <code>allocated - HeaderSize - keyLen</code></td>
+</tr>
+<tr>
+<td>11</td>
+<td><strong>MetaPolicyKind=Disabled 时 SetOpaqueMeta</strong></td>
+<td>抛——未开启 meta 持久化，opaque 登记被拒。配置 Managed/Transport 或移除 opaque 写入</td>
+</tr>
+<tr>
+<td>12</td>
+<td><strong>跨特化开同一卷</strong>（<code>RingOfLong</code> 开 <code>RingOfGuid</code> 的卷）</td>
+<td><code>ValidateKeySizeAnchor</code> fail-fast——盘上 KeySize 与实例 TKey 不符，避免静默 key 损坏</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-想深入指路">9. 想深入？指路</h2>
+<table>
+<thead>
+<tr>
+<th>想懂什么</th>
+<th>去哪</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>总览（七结构选型 / 组合 KV / 恢复模型）</td>
+<td><a href="structures.html"><code>structures.md</code></a></td>
+</tr>
+<tr>
+<td>横切协议（opaque 搭车 / 块格式 / 自定义传输 / 锚点 W）</td>
+<td><a href="meta.html"><code>meta.md</code></a></td>
+</tr>
+<tr>
+<td>Session 协调协议（写/读/检查点三 op、悬挂裁决、故障模型）</td>
+<td><a href="session.html"><code>session.md</code></a></td>
+</tr>
+<tr>
+<td>引擎使用（读写/水位/恢复/Compact/段表）</td>
+<td><a href="storage-engine.html"><code>storage-engine.md</code></a> / <a href="segment-table.html"><code>segment-table.md</code></a></td>
+</tr>
+<tr>
+<td>Lease 协议（raft 共识 lease）</td>
+<td><a href="lease-protocol.html"><code>lease-protocol.md</code></a></td>
+</tr>
+<tr>
+<td>同族其他结构</td>
+<td><a href="log.html"><code>log.md</code></a> / <a href="index.html"><code>index.md</code></a> / <a href="versioned-metadata.html"><code>versioned-metadata.md</code></a> / <a href="mirror.html"><code>mirror.md</code></a> / <a href="snapshot.html"><code>snapshot.md</code></a></td>
+</tr>
+<tr>
+<td>性能基线（点查/写/恢复/并发扩展）</td>
+<td><a href="perf/structures-perf-baseline.html"><code>perf/structures-perf-baseline.md</code></a></td>
+</tr>
+<tr>
+<td>源码（base/Settings/Contracts/各 partial）</td>
+<td><code>src/TC.Tier.Runtime/Structures/Ring/</code></td>
+</tr>
+</tbody>
+</table>
+<p>机制级细节（CAS128 水位基座、帧字节布局、溢出分块骨架、2PC 内部状态机、撕裂重同步扫描器）按需从源码注释与设计稿（<code>docs/design/</code>）查阅——使用面不需要这些细节；能力全集以类型 XML 注释为准。</p>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/ring.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

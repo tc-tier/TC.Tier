@@ -103,9 +103,9 @@
 <li><a href="priority-queues.html"><code>docs/priority-queues.md</code></a> —— 优先队列族（<code>BucketPriorityQueue</code>/<code>SkipListPriorityQueue</code>/<code>AsyncPriorityQueue</code>，Linux 完整验证；实测见 <a href="perf/priority-queues-performance.html">docs/perf/priority-queues-performance.md</a>）</li>
 <li><a href="cache-and-compute.html"><code>docs/cache-and-compute.md</code></a> —— 缓存/弱引用字典/CRC/计时/位运算/异常（<code>ClockCache</code>/<code>ShardLockWeakReference</code>/<code>UnifiedCrc</code>/<code>MicroTimer</code>/<code>Utility</code>/<code>ThrowHelper</code>）</li>
 <li><a href="native-interop.html"><code>docs/native-interop.md</code></a> —— 原生 syscall facade（<code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code>，IO/预分配/打洞/刷盘/内存锁；★ Core.IO 的内部实现底座，<strong>不对外</strong>——能力已由 Core.IO 全部封口）</li>
-<li><a href="io.html"><code>docs/io.md</code></a> —— 文件 IO 原语层（<code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>MemoryFileSystem</code>/<code>FaultInjectingFileSystem</code>，两平面×四介质×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）</li>
-<li><a href="virtual-file-system.html"><code>docs/virtual-file-system.md</code></a> —— <strong>第四介质 TierVolume</strong>（<code>TierVolumeFs</code>：<code>.tier</code> 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 <a href="perf/io-performance.html">docs/perf/io-performance.md</a> §8）</li>
-<li><a href="../TC.Tier.Core.IO.S3/COORDINATION.md"><code>../TC.Tier.Core.IO.S3/COORDINATION.md</code></a> —— S3 兼容对象存储客户端层（<code>S3ObjectStore</code>：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；使用指南 <a href="network-file-system-s3.html"><code>../TC.Tier.Core.IO.S3/docs/network-file-system-s3.md</code></a>）</li>
+<li><a href="io.html"><code>docs/io.md</code></a> —— 文件 IO 原语层（<code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>MemoryFileSystem</code>/<code>FaultInjectingFileSystem</code>，两平面×四类文件系统×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）</li>
+<li><a href="virtual-file-system.html"><code>docs/virtual-file-system.md</code></a> —— <strong>虚拟文件系统 TierVolume</strong>（<code>TierVolumeFs</code>：<code>.tier</code> 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 <a href="perf/io-performance.html">docs/perf/io-performance.md</a> §8）</li>
+<li><a href="../TC.Tier.Core.IO.S3/COORDINATION.md"><code>../TC.Tier.Core.IO.S3/COORDINATION.md</code></a> —— S3 兼容对象存储客户端层（<code>S3ObjectStore</code>：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；S3 协议使用指南 <a href="s3-protocol.html"><code>../TC.Tier.Core.IO.S3/docs/s3-protocol.md</code></a>；网络文件系统桥层语义见 <a href="network-file-system.html"><code>docs/network-file-system.md</code></a>）</li>
 <li><a href="../TC.Tier.Core.Net/COORDINATION.md"><code>../TC.Tier.Core.Net/COORDINATION.md</code></a> —— 网络与共识层（<code>IProtocolTransport</code> 三形态 × 三介质、<code>RaftStateMachine</code> 共识引擎、HyParView/Swarm、ClusterBuilder 装配；使用指南 <a href="net.html"><code>../TC.Tier.Core.Net/docs/net.md</code></a>——Net 层的执行/日志/可观测全部消费本层积木）</li>
 <li><a href="observability.html"><code>docs/observability.md</code></a> —— 可观测（<code>ObservabilityHub</code>/<code>IMetricsSink</code>/<code>ITracer</code>：视图全景/采样/零开销契约/测试场景）</li>
 <li><a href="logging.html"><code>docs/logging.md</code></a> —— 日志（<code>ILogger</code>/<code>LoggerExtensions</code>：重载矩阵/热路径规则/与 Hub 的边界）</li>
@@ -280,7 +280,7 @@
 <tr>
 <td><code>ObservabilityHub</code></td>
 <td><code>Observability/</code></td>
-<td><strong>唯一可观测接入点</strong>：聚合 Metrics + Tracing（⚠️ <strong>不含 Logging</strong>），两级短路 + 采样 + 5 维度视图（Metrics/Storage/Log/Index/<strong>SegmentAllocator</strong>）</td>
+<td><strong>唯一可观测接入点</strong>：聚合 Metrics + Tracing（⚠️ <strong>不含 Logging</strong>），两级短路 + 采样 + 7 维度视图（Metrics/Storage/Log/Index/<strong>SegmentAllocator</strong>/Net/Raft）</td>
 <td><code>ObservabilityHub.Create(sink, tracer, opts)</code> 或 <code>Disabled</code>；完整指南 <a href="observability.html"><code>docs/observability.md</code></a></td>
 <td></td>
 </tr>
@@ -454,7 +454,7 @@ var hub0 = ObservabilityHub.Disabled;                               // 零开销
 if (hub.Storage.IsEnabled) {
     using var t = hub.Storage.BeginReadSample();   // MicroTimer，命中采样才计
     /* do read */
-    hub.Storage.OnRead(bytes, t.Microseconds, errorCode);
+    hub.Storage.OnRead(bytes, t.ElapsedMicros(), errorCode);
 }
 using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // TracingEnabled=false → null
 </code></pre>
@@ -530,7 +530,7 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 </tr>
 <tr>
 <td><strong>离散枚举</strong>优先级队列（最快）</td>
-<td><code>BucketPriorityQueue&lt;TItem,TEnum&gt;</code></td>
+<td><code>BucketPriorityQueue&lt;TPriority,T&gt;</code></td>
 <td><code>PriorityQueue&lt;T,Enum&gt;</code> + 锁</td>
 </tr>
 <tr>
@@ -630,7 +630,7 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 </ul>
 <h3 id="46-杂项">4.6 杂项</h3>
 <ul>
-<li><strong><code>ThrowHelper</code></strong>：<code>[DoesNotReturn]</code> + <code>NoInlining</code>，把 throw 隔离出热路径，让调用方法可被 JIT 内联（放在 <code>namespace System</code> 便于无 using 使用）。</li>
+<li><strong><code>ThrowHelper</code></strong>：<code>[DoesNotReturn]</code> + <code>NoInlining</code>，把 throw 隔离出热路径，让调用方法可被 JIT 内联（在 <code>TC.Tier.Core.Primitives</code>——经 <code>GlobalUsings</code> 全局引入，免 using）。</li>
 <li><strong><code>ShardLockWeakReference&lt;TKey,TValue&gt;</code></strong>：16 分片独立锁（位运算定位），Value 弱引用不阻止 GC。⚠️ shardCount 须 2 的幂；需定期 <code>CleanupDeadReferences()</code>。</li>
 <li><strong><code>Utility</code></strong>：位运算/哈希通用工具（<code>PreviousPowerOf2</code>、<code>GetLogBase2</code> De Bruijn、<code>XorBytes</code> 8 字块、Knuth 哈希）、<code>ParseSize</code>/<code>PrettySize</code>、<code>MonotonicUpdate</code>（CAS 单调推进水位，拒回退）。</li>
 </ul>
