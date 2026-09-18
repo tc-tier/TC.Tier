@@ -1,3 +1,4 @@
+using TC.Tier.Core.IO;
 using TC.Tier.Core.Primitives;
 using TC.Tier.Runtime.Structures.Ring;
 using FluentAssertions;
@@ -36,9 +37,8 @@ public class RingCrashDurabilityTests
             }
 
             // 实例 2：用 hints 恢复到 flushedTo，扫描应读回 2 条
-            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol));
-            ring2.Initialize(new RingRecoveryHints { FlushedUntilAddress = flushedTo });
-            ring2.WaitForReady();
+            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol),
+                new RingRecoveryHints { FlushedUntilAddress = flushedTo });
 
             using var cursor = ring2.OpenScanCursor(begin: ring2.BeginAddress, end: ring2.FlushedUntilAddress);
             int count = 0;
@@ -67,9 +67,8 @@ public class RingCrashDurabilityTests
                 ring1.FlushedUntilAddress.Should().Be(preparedTail, "Prepare 后全部落盘");
             }
 
-            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol));
-            ring2.Initialize(new RingRecoveryHints { FlushedUntilAddress = preparedTail });
-            ring2.WaitForReady();
+            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol),
+                new RingRecoveryHints { FlushedUntilAddress = preparedTail });
 
             using var cursor = ring2.OpenScanCursor(begin: ring2.BeginAddress, end: ring2.FlushedUntilAddress);
             int count = 0;
@@ -116,15 +115,55 @@ public class RingCrashDurabilityTests
                 tailBeforeDispose = ring1.TailAddress;
             }
 
-            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol));
+            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol),
+                new RingRecoveryHints { FlushedUntilAddress = tailBeforeDispose });
             // Dispose 落盘了全部（FlushUntil(TailAddress)），恢复到 tailBeforeDispose
-            ring2.Initialize(new RingRecoveryHints { FlushedUntilAddress = tailBeforeDispose });
-            ring2.WaitForReady();
 
             using var cursor = ring2.OpenScanCursor(begin: ring2.BeginAddress, end: ring2.FlushedUntilAddress);
             int count = 0;
             while (cursor.MoveNext()) count++;
             count.Should().Be(2, "Dispose 应落盘 mutable 区数据，恢复后全部读回");
+        }
+        finally { vol.Dispose(); }
+    }
+
+    /// <summary>★ #413 回归：CRC 失配帧不得被扫描游标计数。
+    /// <para>形态 = 池化残留/位腐烂：header 完好（magic/长度界全过）而载荷与存储 CRC 不再一致——
+    /// 计数路径只验 header 会把坏帧当有效 record 交给调用方。本测试原地翻转 record 2 载荷首字节
+    /// （header 不动、CRC 必失配），把偶发池化时序变成确定性断言：坏帧跳过、好帧照常读回。</para></summary>
+    [Fact]
+    public void ScanCursor_CrcMismatchedFrame_Skipped()
+    {
+        var vol = new TestVolume();
+        try
+        {
+            LogicalAddress tailBeforeDispose;
+            using (var ring1 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol)))
+            {
+                ring1.Write(1L, new byte[] { 10 });
+                ring1.Write(2L, new byte[] { 20 });
+                tailBeforeDispose = ring1.TailAddress;
+            }
+
+            // 构造坏帧：record 2 帧 [112, 168)，header 40B + payload 9B——原地翻转 payload 首字节
+            // （offset 152 ∈ CRC 覆盖域 [112, 161)），header 完好而 VerifyCrc 必失配
+            const string path = "ring.0/ring.0.0";
+            using (var h = vol.Fs.Open(path, new FileOpenOptions { Access = AccessMode.ReadWrite }))
+            {
+                var b = new byte[1];
+                _ = h.Read(152, b);
+                b[0] ^= 0xFF;
+                h.Write(152, b);
+            }
+
+            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol),
+                new RingRecoveryHints { FlushedUntilAddress = tailBeforeDispose });
+
+            using var cursor = ring2.OpenScanCursor(begin: ring2.BeginAddress, end: ring2.FlushedUntilAddress);
+            var addrs = new List<LogicalAddress>();
+            while (cursor.MoveNext()) addrs.Add(cursor.CurrentAddress);
+            addrs.Should().ContainSingle("CRC 失配的坏帧必须跳过（扫描口径与恢复扫描一致）——完好 record 1 照常读回");
+            addrs[0].Should().Be(new LogicalAddress(0, 56));
         }
         finally { vol.Dispose(); }
     }
@@ -151,9 +190,8 @@ public class RingCrashDurabilityTests
             }
 
             // 实例 2：DIO 模式恢复
-            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol, directIo: true));
-            ring2.Initialize(new RingRecoveryHints { FlushedUntilAddress = flushedTo });
-            ring2.WaitForReady();
+            using var ring2 = TestRingSettingsFactory.NewRing<long>(vol, DurabilitySettings(vol, directIo: true),
+                new RingRecoveryHints { FlushedUntilAddress = flushedTo });
 
             using var cursor = ring2.OpenScanCursor(begin: ring2.BeginAddress, end: ring2.FlushedUntilAddress);
             int count = 0;

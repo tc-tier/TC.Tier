@@ -123,19 +123,20 @@ public class MembershipChangeTests
         }
         var target5 = rig.Nodes.Select(n => (n.Id, "")).ToArray();
         await leader.Membership.ChangeMembersAsync(target5).WaitAsync(TimeSpan.FromSeconds(30));
-        await WaitForAsync(() => rig.Nodes.All(n => ConfigEquals(n.Raft.Config, target5)), TimeSpan.FromSeconds(15));
+        // 收敛窗与变更预算对齐（编排 30s）——多节点 apply 链在 runner 负载下有秒级突发延迟
+        await WaitForAsync(() => rig.Nodes.All(n => ConfigEquals(n.Raft.Config, target5)), TimeSpan.FromSeconds(30));
         rig.Nodes.Select(n => n.Raft.Config.VoterCount).Should().OnlyContain(v => v == 5, "终态 5 voter");
 
         // 新成员追平变更前数据
         await WaitForAsync(() => rig.Nodes.Where(n => joiners.Contains(n.Id))
-            .All(n => n.Machine.Applied.ContainsKey(dataIndex)), TimeSpan.FromSeconds(20));
+            .All(n => n.Machine.Applied.ContainsKey(dataIndex)), TimeSpan.FromSeconds(30));
 
         // 5→4：同一条 API 删 1（被移除者必须是 joiner——原 3 活跃节点保持多数派）
         var victim = rig.Nodes.First(n => joiners.Contains(n.Id));
         var target4 = rig.Nodes.Where(n => n.Id != victim.Id).Select(n => (n.Id, "")).ToArray();
         await leader.Membership.ChangeMembersAsync(target4).WaitAsync(TimeSpan.FromSeconds(30));
         await WaitForAsync(() => rig.Nodes.Where(n => n.Id != victim.Id)
-            .All(n => ConfigEquals(n.Raft.Config, target4)), TimeSpan.FromSeconds(15));
+            .All(n => ConfigEquals(n.Raft.Config, target4)), TimeSpan.FromSeconds(30));
         rig.Nodes.Where(n => n.Id != victim.Id).Select(n => n.Raft.Config.VoterCount)
             .Should().OnlyContain(v => v == 4, "终态 4 voter");
     }

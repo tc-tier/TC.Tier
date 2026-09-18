@@ -106,18 +106,14 @@ public abstract class FaultMatrixScenarios
             }
         }
 
-        // ★ 等待口径 = commit 且 applied（测试口径裁定：commit ≠ applied——apply 管道异步滞后，
-        //   丢包/调度时序下竞窗可见；恰好一次断言前必须等 applied 追平）
+        // ★ 等待口径 = applied 业务条数（commit ≠ applied——apply 管道异步滞后；且日志 index ≠ 业务
+        //   序列：leader 任期锚点不达状态机（二期-B），业务条目自锚点起右移——计数断言只认业务域）
         await ClusterOps.WaitForAsync(
-            () => fx.Nodes.All(n => n.Machine.Applied.Count >= lastIndex), TimeSpan.FromSeconds(60));
+            () => fx.Nodes.All(n => n.Machine.Applied.Count >= 30), TimeSpan.FromSeconds(60));
 
-        // 恰好一次：全节点 applied 序列 = 1..lastIndex 连续（无重复、无空洞）
+        // 恰好一次：全节点 applied 业务序列 = cmd-0001..cmd-0030 按序（键升序、无重复、无空洞）
         foreach (var n in fx.Nodes)
-        {
-            var keys = n.Machine.Applied.Keys.OrderBy(k => k).ToArray();
-            keys.Should().BeInAscendingOrder();
-            keys.Should().BeEquivalentTo(Enumerable.Range(1, (int)lastIndex));
-        }
+            ClusterOps.AssertAppliedExactlyOnce(n, 30);
     }
 
     /// <summary>延迟选举余量（spec-01 §8：选举超时 [150,300]ms，心跳 50ms）：
@@ -209,11 +205,12 @@ public abstract class FaultMatrixScenarios
         foreach (var f in followers)
             fx.Faults.Reorder(leader.Id, f.Id, true);
 
+        var lastWritten = 0L;
         for (var i = 1; i <= 25; i++)
         {
             try
             {
-                await ClusterOps.ReplicateAsync(leader, ClusterOps.Cmd(i), TimeSpan.FromMilliseconds(ReplicateTimeoutMs));
+                lastWritten = await ClusterOps.ReplicateAsync(leader, ClusterOps.Cmd(i), TimeSpan.FromMilliseconds(ReplicateTimeoutMs));
             }
             catch (TimeoutException)
             {
@@ -227,7 +224,7 @@ public abstract class FaultMatrixScenarios
         {
             try
             {
-                await ClusterOps.WaitForAsync(() => n.Raft.CommitIndex >= 25, TimeSpan.FromSeconds(20));
+                await ClusterOps.WaitForAsync(() => n.Raft.CommitIndex >= lastWritten, TimeSpan.FromSeconds(20));
             }
             catch (TimeoutException)
             {
@@ -236,17 +233,14 @@ public abstract class FaultMatrixScenarios
                     + "\n" + ClusterOps.Traces(fx.Nodes));
             }
         }
-        // ★ 同 Drop_HighRate：applied 滞后于 commit（commit ≠ applied）——恰好一次断言前等 applied 追平
+        // ★ 同 Drop_HighRate：applied 滞后于 commit，且日志 index ≠ 业务序列（任期锚点不达状态机）——
+        //   恰好一次断言等业务条数追平后按业务序列断言
         await ClusterOps.WaitForAsync(
             () => fx.Nodes.All(n => n.Machine.Applied.Count >= 25), TimeSpan.FromSeconds(20));
 
         // 幂等断言：恰好一次 + 按序（无重复、无空洞）
         foreach (var n in fx.Nodes)
-        {
-            var keys = n.Machine.Applied.Keys.OrderBy(k => k).ToArray();
-            keys.Should().BeInAscendingOrder();
-            keys.Should().BeEquivalentTo(Enumerable.Range(1, 25));
-        }
+            ClusterOps.AssertAppliedExactlyOnce(n, 25);
     }
 
     /// <summary>断连重加入（spec-09 矩阵"断连 | 单链路/全网"）：follower 掉线多数派继续提交 →
@@ -263,22 +257,23 @@ public abstract class FaultMatrixScenarios
         await fx.KillNodeAsync(goneIdx);
 
         // 多数派（2/3）存活——复制继续
+        var lastWritten = 0L;
         for (var i = 1; i <= 20; i++)
-            await ClusterOps.ReplicateAsync(leader, ClusterOps.Cmd(i), TimeSpan.FromMilliseconds(ReplicateTimeoutMs));
-        await ClusterOps.WaitForAsync(() => leader.Raft.CommitIndex >= 20);
+            lastWritten = await ClusterOps.ReplicateAsync(leader, ClusterOps.Cmd(i), TimeSpan.FromMilliseconds(ReplicateTimeoutMs));
+        await ClusterOps.WaitForAsync(() => leader.Raft.CommitIndex >= lastWritten);
 
         // 重加入：同介质同存储重建（快照区 + 已提交日志自动恢复）→ 追平
         var rejoined = await fx.RejoinNodeAsync(goneIdx);
         try
         {
-            await ClusterOps.WaitForAsync(() => rejoined.Raft.CommitIndex >= 20, TimeSpan.FromSeconds(20));
+            // 追平口径 = 业务条数（日志 index ≠ 业务序列——任期锚点不达状态机，二期-B）
+            await ClusterOps.WaitForAsync(() => rejoined.Machine.Applied.Count >= 20, TimeSpan.FromSeconds(20));
 
             // 追平后复制继续工作（新节点参与复制）
             await ClusterOps.ReplicateAsync(leader, ClusterOps.Cmd(21), TimeSpan.FromMilliseconds(ReplicateTimeoutMs));
-            await ClusterOps.WaitForAsync(() => rejoined.Raft.CommitIndex >= 21);
+            await ClusterOps.WaitForAsync(() => rejoined.Machine.Applied.Count >= 21);
             // 恰好一次：重加入节点无重复应用（重启重放 = at-least-once 契约——按序无重复断言）
-            rejoined.Machine.Applied.Keys.OrderBy(k => k).Should().BeInAscendingOrder();
-            rejoined.Machine.Applied.Should().HaveCount(21);
+            ClusterOps.AssertAppliedExactlyOnce(rejoined, 21);
         }
         finally
         {

@@ -17,5 +17,5 @@ TC.Tier 的**内核基础设施**——生命周期骨架、并发原语、原�
 ## 文档
 
 - 完整文档站：https://docs.mytzz.top/
-- 生命周期模型：https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html
-- 并发与锁：https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/locking-and-epoch.html
+- 生命周期模型：https://docs.mytzz.top/docs/core/lifecycle.html
+- 并发与锁：https://docs.mytzz.top/docs/core/locking-and-epoch.html

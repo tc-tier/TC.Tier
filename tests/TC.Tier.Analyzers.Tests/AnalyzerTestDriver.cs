@@ -23,6 +23,21 @@ internal static class AnalyzerTestDriver
         return await RunAsync(compilation, config, new TierGovernanceAnalyzer());
     }
 
+    /// <summary>分析多棵语法树（.editorconfig 通道的并集/冲突语义需要多树形态——#459）。</summary>
+    /// <param name="sources">逐树的源码。</param>
+    /// <param name="assemblyName">被分析程序集名。</param>
+    /// <param name="globalConfig">GlobalOptions 键值（.globalconfig 通道）。</param>
+    /// <param name="treeConfig">每树 options 键值（.editorconfig 通道）。</param>
+    /// <param name="extraReferences">附加元数据引用。</param>
+    public static async Task<ImmutableArray<Diagnostic>> AnalyzeMultiTreeAsync(
+        string[] sources, string assemblyName,
+        IReadOnlyDictionary<string, string> globalConfig, IReadOnlyDictionary<string, string> treeConfig,
+        params MetadataReference[] extraReferences)
+    {
+        var compilation = CreateCompilation(sources, assemblyName, extraReferences);
+        return await RunAsync(compilation, globalConfig, treeConfig, new TierGovernanceAnalyzer());
+    }
+
     /// <summary>分析一段源码（仅跑指定分析器——单规则族隔离验证用）。</summary>
     public static async Task<ImmutableArray<Diagnostic>> AnalyzeWithAsync(
         string source, string assemblyName, IReadOnlyDictionary<string, string> config,
@@ -41,6 +56,10 @@ internal static class AnalyzerTestDriver
 
     private static CSharpCompilation CreateCompilation(string source, string assemblyName,
         MetadataReference[] extraReferences)
+        => CreateCompilation([source], assemblyName, extraReferences);
+
+    private static CSharpCompilation CreateCompilation(string[] sources, string assemblyName,
+        MetadataReference[] extraReferences)
     {
         var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
         var references = new List<MetadataReference>
@@ -54,9 +73,12 @@ internal static class AnalyzerTestDriver
         };
         references.AddRange(extraReferences);
 
+        var trees = new List<SyntaxTree>();
+        foreach (var source in sources) trees.Add(CSharpSyntaxTree.ParseText(source));
+
         return CSharpCompilation.Create(
             assemblyName,
-            [CSharpSyntaxTree.ParseText(source)],
+            trees,
             references,
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
     }
@@ -64,10 +86,16 @@ internal static class AnalyzerTestDriver
     private static async Task<ImmutableArray<Diagnostic>> RunAsync(
         Compilation compilation, IReadOnlyDictionary<string, string> config,
         params DiagnosticAnalyzer[] analyzers)
+        => await RunAsync(compilation, config, null, analyzers);
+
+    private static async Task<ImmutableArray<Diagnostic>> RunAsync(
+        Compilation compilation, IReadOnlyDictionary<string, string> globalConfig,
+        IReadOnlyDictionary<string, string>? treeConfig,
+        params DiagnosticAnalyzer[] analyzers)
     {
         var options = new AnalyzerOptions(
             ImmutableArray<AdditionalText>.Empty,
-            new TestAnalyzerConfigOptionsProvider(config));
+            new TestAnalyzerConfigOptionsProvider(globalConfig, treeConfig));
         var withAnalyzers = compilation.WithAnalyzers(ImmutableArray.Create(analyzers), options);
         return await withAnalyzers.GetAllDiagnosticsAsync();
     }

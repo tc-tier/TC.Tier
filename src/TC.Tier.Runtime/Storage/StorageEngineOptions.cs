@@ -150,10 +150,12 @@ public sealed record StorageEngineOptions
     /// <param name="logger">可选的日志记录器。</param>
     /// <param name="hub">可选的可观察性中心。</param>
     /// <param name="epoch">可选的轻量级纪元。</param>
+    /// <param name="segmentHandlerDecorator">可选的段处理器装饰器（包在默认委托外层——合成建段时序等取证/测试面）。</param>
     /// <returns>绑定本选项的 <see cref="StorageEngineBuilder"/>（可 <c>Start/StartAsync</c> 启动）。</returns>
     public StorageEngineBuilder Builder(IFileSystem root, ICompact? compact = null, ICheckpoint? checkpoint = null,
-        ILogger? logger = null, ObservabilityHub? hub = null, LightEpoch? epoch = null)
-        => new(root, this, compact, checkpoint, logger, hub, epoch);
+        ILogger? logger = null, ObservabilityHub? hub = null, LightEpoch? epoch = null,
+        Func<AddressSpace.ISegmentHandler, AddressSpace.ISegmentHandler>? segmentHandlerDecorator = null)
+        => new(root, this, compact, checkpoint, logger, hub, epoch, segmentHandlerDecorator);
 
     /// <summary>转换为段表设置对象，用于配置段表的行为和参数。</summary>
     /// <returns>由本选项派生的 <see cref="SegmentTableSettings"/>（MinSegId/IndexCapacity/SpinMilliseconds 等逐项映射）。</returns>

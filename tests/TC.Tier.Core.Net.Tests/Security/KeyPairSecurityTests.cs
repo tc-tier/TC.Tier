@@ -15,11 +15,16 @@ namespace TC.Tier.Core.Net.Tests.Security;
 /// 钉扎互信握手 + 加密链路上三形态业务往返、错公钥拒绝（冒充）、
 /// 防降级三向（KeyPair 遇明文 / 明文遇 KeyPair）、TOFU 首连学习。
 /// </summary>
-public class KeyPairSecurityTests
+/// <remarks>★ 传输体所有权：本类传输体按测试方法登记于 <see cref="_owned"/>，
+/// DisposeAsync 统一收尾（xUnit 每测试方法一个类实例）——setup 中途抛出（如握手
+/// 等待超时）也不漏释放；#470：未释放传输体的专用循环线程随套件永久累积。</remarks>
+public class KeyPairSecurityTests : IAsyncDisposable
 {
     private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(5);
 
-    private static async Task<(ClusterTransport Low, ClusterTransport High, NodeId LowId, NodeId HighId)> SetupSecurePairAsync(
+    private readonly List<ClusterTransport> _owned = [];
+
+    private async Task<(ClusterTransport Low, ClusterTransport High, NodeId LowId, NodeId HighId)> SetupSecurePairAsync(
         NodeKeyPair? highKeyOverride = null)
     {
         var a = NodeId.NewRandom();
@@ -37,6 +42,7 @@ public class KeyPairSecurityTests
         var high = new ClusterTransport(highId,
             TransportOptions.Default(new IPEndPoint(IPAddress.Loopback, 0), knownOfHigh), highSecurity, logger: consoleLogger);
         high.Start();
+        _owned.Add(high);
         var listenEndPoint = high.LocalEndPoint!;
 
         var pinnedForLow = highKeyOverride is null ? highKey.PublicKey.ToArray() : highKey.PublicKey.ToArray();
@@ -46,6 +52,7 @@ public class KeyPairSecurityTests
             TransportOptions.Default(null, new Dictionary<NodeId, IPEndPoint> { [highId] = listenEndPoint }), lowSecurity,
             logger: consoleLogger);
         low.Start();
+        _owned.Add(low);
 
         var lowUp = new TaskCompletionSource();
         var highUp = new TaskCompletionSource();
@@ -240,12 +247,14 @@ public class KeyPairSecurityTests
             TransportOptions.Default(new IPEndPoint(IPAddress.Loopback, 0), knownOfHigh).WithUdp(new IPEndPoint(IPAddress.Loopback, 0)),
             SecurityOptions.KeyPairPinned(highKey, new PinnedTrustStore([lowId], [lowKey.PublicKey.ToArray()])));
         high.Start();
+        _owned.Add(high);
         var listenEndPoint = high.LocalEndPoint!;
 
         var low = new ClusterTransport(lowId,
             TransportOptions.Default(null, new Dictionary<NodeId, IPEndPoint> { [highId] = listenEndPoint }).WithUdp(new IPEndPoint(IPAddress.Loopback, 0)),
             SecurityOptions.KeyPairPinned(lowKey, new PinnedTrustStore([highId], [highKey.PublicKey.ToArray()])));
         low.Start();
+        _owned.Add(low);
 
         var lowUp = new TaskCompletionSource();
         var highUp = new TaskCompletionSource();
@@ -314,6 +323,18 @@ public class KeyPairSecurityTests
         public bool IsEnabled(TC.Tier.Core.Logging.LogLevel level) => true;
         public void Log(TC.Tier.Core.Logging.LogLevel level, string message, Exception? exception = null)
             => Lines.Add($"[{level}] {message} {exception?.Message ?? ""}");
+    }
+
+    /// <summary>本测试方法登记传输体的统一收尾（xUnit 每测试方法一个类实例）。</summary>
+    public async ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        foreach (var transport in _owned)
+        {
+            try { await transport.DisposeAsync(); }
+            catch { /* 尽力收尾——单侧失败不阻断余量 */ }
+        }
+        _owned.Clear();
     }
 
     private sealed class CaptureDatagramHandler(TaskCompletionSource<(NodeId, byte[])> tcs) : IDatagramHandler

@@ -16,9 +16,11 @@ using TC.Tier.Core.Net.Tests.Fixtures;
 /// <para>断连路径（连续无应答 → Close）由 <see cref="KeepaliveTrackerTests"/> 纯逻辑覆盖——
 ///   loopback 真套接字无法构造半开死链（内核感知断连），集成侧验证稳态不误断。</para>
 /// </summary>
-public class KeepaliveTests
+public class KeepaliveTests : IAsyncDisposable
 {
     private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(5);
+
+    private readonly List<ClusterTransport> _owned = [];
 
     private static (NodeId Low, NodeId High) NewOrderedIds()
     {
@@ -27,7 +29,7 @@ public class KeepaliveTests
         return a.CompareTo(b) < 0 ? (a, b) : (b, a);
     }
 
-    private static async Task<(ClusterTransport Low, ClusterTransport High, NodeId LowId, NodeId HighId)> SetupPairAsync(
+    private async Task<(ClusterTransport Low, ClusterTransport High, NodeId LowId, NodeId HighId)> SetupPairAsync(
         bool lowKeepalive, bool highKeepalive, RecordingMetricsSink? lowSink = null, RecordingMetricsSink? highSink = null)
     {
         var (lowId, highId) = NewOrderedIds();
@@ -40,6 +42,7 @@ public class KeepaliveTests
         };
         var high = new ClusterTransport(highId, highOptions, hub: highSink?.ToHub());
         high.Start();
+        _owned.Add(high);
         var listenEndPoint = high.LocalEndPoint!;
 
         var lowOptions = TransportOptions.Default(null, new Dictionary<NodeId, IPEndPoint> { [highId] = listenEndPoint }) with
@@ -49,6 +52,7 @@ public class KeepaliveTests
         };
         var low = new ClusterTransport(lowId, lowOptions, hub: lowSink?.ToHub());
         low.Start();
+        _owned.Add(low);
 
         var lowUp = new TaskCompletionSource();
         var highUp = new TaskCompletionSource();
@@ -126,5 +130,17 @@ public class KeepaliveTests
         {
             await DisposeBothAsync(low, high);
         }
+    }
+
+    /// <summary>setup 中途等待超时抛出时的传输体收尾（xUnit 每测试方法一个类实例）。</summary>
+    public async ValueTask DisposeAsync()
+    {
+        GC.SuppressFinalize(this);
+        foreach (var transport in _owned)
+        {
+            try { await transport.DisposeAsync(); }
+            catch { /* 尽力收尾——单侧失败不阻断余量 */ }
+        }
+        _owned.Clear();
     }
 }

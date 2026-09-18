@@ -25,15 +25,20 @@ internal sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
 internal sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
 {
     private readonly AnalyzerConfigOptions _global;
+    private readonly AnalyzerConfigOptions _tree;
 
-    public TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> values)
-        => _global = new TestAnalyzerConfigOptions(values);
+    /// <summary>globalConfig = GlobalOptions（.globalconfig 通道）；treeValues = 每树 options
+    /// （.editorconfig 通道——#459 读数通道回归面；null = 空树配置）。</summary>
+    public TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> values,
+        IReadOnlyDictionary<string, string>? treeValues = null)
+    {
+        _global = new TestAnalyzerConfigOptions(values);
+        _tree = treeValues is null ? TestAnalyzerConfigOptions.Empty : new TestAnalyzerConfigOptions(treeValues);
+    }
 
     public override AnalyzerConfigOptions GlobalOptions => _global;
 
-    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree)
-        => TestAnalyzerConfigOptions.Empty;
+    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => _tree;
 
-    public override AnalyzerConfigOptions GetOptions(AdditionalText text)
-        => TestAnalyzerConfigOptions.Empty;
+    public override AnalyzerConfigOptions GetOptions(AdditionalText text) => TestAnalyzerConfigOptions.Empty;
 }

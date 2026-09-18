@@ -7,7 +7,7 @@ TC.Tier 文件系统层的**根空间镜像 TCP 流式收发**——把本地 Ti
 - **TIN1 协议**：握手（magic/版本/mode）→ TCA1 载荷 → 回执帧（帧数/字节/聚合 CRC/状态）
 - **双向对称**：同一 TCP 连接，发起端既可 `Send`（采集推送）也可 `ReceiveTo`（接收落盘）——对端运行互补方法
 - **端到端确认**：TCA1 逐帧 CRC + 尾对账之上，接收端回执回传摘要——发送端确认对端落盘一致（不符抛异常）
-- **模式可选**：Structural（默认，跨介质可转、逐帧校验）∥ Raw（裸字节流，对接外部 dd/nc——中断即报废，显式选择）
+- **传送模式**：Structural（TCA1 结构化流——跨介质可转、逐帧校验，当前唯一生效形态）；`Raw` 裸字节流为 v1 预留值——握手即拒
 
 ## 快速开始
 
@@ -25,6 +25,11 @@ Console.WriteLine($"verified={result.Verified} bytes={result.RawBytes}");
 ## 依赖
 
 - TC.Tier.Core（IFileSystem/镜像采集）
+
+## 文档
+
+- 完整文档站：https://docs.mytzz.top/
+- 镜像网络传输使用指南：https://docs.mytzz.top/docs/core/network-image-transfer.html
 
 ## 状态
 

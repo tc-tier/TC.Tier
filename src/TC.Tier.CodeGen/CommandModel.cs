@@ -46,6 +46,7 @@ internal static class CommandModel
         BindKind Kind,
         BindKind InnerKind,
         string TypeDisplay,
+        string TypeOfDisplay,
         string EnumFqn,
         int Position,
         string LongName,
@@ -54,7 +55,11 @@ internal static class CommandModel
         string DefaultValueExpr,
         bool Annotated,
         string Unbindable,
-        Location Loc);
+        Location Loc)
+    {
+        /// <summary>参数声明为可空（类型显示名尾缀 '?'）——[CommandBody] 参数据此放行 JSON null 绑定。</summary>
+        internal bool AllowsNull => TypeDisplay.EndsWith("?", StringComparison.Ordinal);
+    }
 
     /// <summary>参数角色。</summary>
     internal enum ParamRole

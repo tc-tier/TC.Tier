@@ -405,4 +405,67 @@ public sealed class ChaseCompactionSimulationTests : IDisposable
 
         VerifyAll(dev, book);
     }
+
+    /// <summary>★ #420 合成复现：建段失败回调延迟超等待预算（合成 runner worker 饥饿时序）——
+    /// A7 恰好一次快失败不得退化成"逐条消耗段容量走出"（8×512B=4KB 实证形态）。</summary>
+    [Fact]
+    public async Task BrokenSegment_SlowFailureCallback_StillBoundedFastFail()
+    {
+        var vol = NewVol();
+        var seg2RelPath = $"{DeviceName}/{DeviceName}.2";   // 注入：seg2 建段必失败
+        vol.Fs.CreateDirectory(seg2RelPath);
+
+        // SpinMilliseconds=300（等待预算）< handler 失败延迟 800ms——旧形态每次 Append 消耗 512B
+        // 尾容量并超时抛（8 次走出 seg2）；分配前置门修复后等待终态、Broken 烧洞一次成型
+        using var builder = new StorageEngineOptions(DeviceName, segmentGrowthLimit: Growth)
+            .WithPreallocateFile(false)
+            .WithOptimization(new StorageEngineOptimization { SpinMilliseconds = 300 })
+            .Builder(vol.Fs, logger: TestConsoleLogger.Instance,
+                segmentHandlerDecorator: inner => new SlowCreateHandler(inner, delaySegId: 2,
+                    delay: TimeSpan.FromMilliseconds(800)));
+        using var dev = builder.Start();
+        builder.Engine.SuppressSegmentPoolForLifecycle();
+        dev.WaitForReady();
+
+        var book = new RecordBook();
+        var nextId = 0L;
+        var failures = 0;
+        for (var i = 0; i < 48; i++)
+        {
+            try
+            {
+                var addr = dev.Append(PayloadOf(nextId));
+                book.Put(nextId, addr);
+                nextId++;
+            }
+            catch (SegmentCreationException) { failures++; }
+        }
+        failures.Should().BeLessThanOrEqualTo(1, "A7：慢失败回调下跨 Broken 段仍至多一次快失败");
+        book.Snapshot().Should().OnlyContain(kv => kv.Addr.SegId != 2, "地址永不落 Broken 段");
+        VerifyAll(dev, book);
+    }
+
+    /// <summary>建段处理器装饰器——指定段号延迟后再委托（合成 runner worker 饥饿/慢失败时序）。</summary>
+    private sealed class SlowCreateHandler(
+        TC.Tier.Runtime.AddressSpace.ISegmentHandler inner, int delaySegId, TimeSpan delay) : TC.Tier.Runtime.AddressSpace.ISegmentHandler
+    {
+        public void OnSegmentCreate(int segId, long growthLimit, bool isHighPriority)
+        {
+            if (segId == delaySegId) Thread.Sleep(delay);
+            inner.OnSegmentCreate(segId, growthLimit, isHighPriority);
+        }
+
+        public void OnSegmentFull(int segId, long finalSize, long growthLimit)
+            => inner.OnSegmentFull(segId, finalSize, growthLimit);
+
+        public void OnSegmentDelete(int segId) => inner.OnSegmentDelete(segId);
+
+        public void OnSegmentReplace(int segId, long growthLimit, long maxOffset)
+            => inner.OnSegmentReplace(segId, growthLimit, maxOffset);
+
+        public void OnSegmentReclaim(int segId, long from, long to, long growthLimit)
+            => inner.OnSegmentReclaim(segId, from, to, growthLimit);
+
+        public void SubmitBackgroundWork(Action work) => inner.SubmitBackgroundWork(work);
+    }
 }

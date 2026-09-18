@@ -37,7 +37,7 @@ TierKv / TierQueue 的快速上手见各自使用文档（下方链接）。
 
 ## 文档
 
-- 使用指南：[tierkv.md](docs/tierkv.md) · [tierqueue.md](docs/tierqueue.md) · [tierwal.md](docs/tierwal.md)（在线：[docs.mytzz.top](https://docs.mytzz.top/)）
+- 使用指南：[tierkv.md](docs/tierkv.md) · [tierqueue.md](docs/tierqueue.md) · [tierseries.md](docs/tierseries.md) · [tierblob.md](docs/tierblob.md) · [tierwal.md](docs/tierwal.md)（在线：[docs.mytzz.top](https://docs.mytzz.top/)）
 - 性能基线：[perf/tierkv.md](docs/perf/tierkv.md) · [perf/tierwal.md](docs/perf/tierwal.md)
 - 组合纪律与红线：[COORDINATION.md](COORDINATION.md)
 

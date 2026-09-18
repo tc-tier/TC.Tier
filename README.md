@@ -80,7 +80,7 @@ var buf = new byte[payload.Length];
 var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // 读回
 ```
 
-组合索引 / Ring / Log 构建自定义存储模型的更多示例，见[使用文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)。
+组合索引 / Ring / Log 构建自定义存储模型的更多示例，见[使用文档](https://docs.mytzz.top/docs/runtime/storage-engine.html)。
 
 ## 安装
 
@@ -93,7 +93,7 @@ dotnet add package TC.Tier.Runtime --prerelease
 
 ## 性能
 
-以下为跨平台实测（.NET 8），**供参考**——已在 Windows（i5-12400）与 Linux（AMD 6900HX）双平台验证，实际表现请以你的硬件与负载为准。完整口径与细节见[性能文档](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html)。
+以下为跨平台实测（.NET 8），**供参考**——已在 Windows（i5-12400）与 Linux（AMD 6900HX）双平台验证，实际表现请以你的硬件与负载为准。完整口径与细节见[性能文档](https://docs.mytzz.top/docs/runtime/storage-engine-perf-baseline.html)。
 
 | 场景 | 结果 |
 |---|---|
@@ -126,10 +126,10 @@ Core.Net（分布式协议层）
 依赖单向无环：`TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products`（存储支柱）；网络支柱 `TC.Tier.Core` → `TC.Tier.Core.Net` → `TC.Tier.Products.Net`。源生成器（`TC.Tier.CodeGen`）横切——BinaryLayout / 注册桥编译期生成，零运行时反射。
 
 - 开发指南（架构与设计思想、代码组织范式）：[DEVELOPMENT.md](DEVELOPMENT.md)
-- 引擎使用指南：[storage-engine.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)
-- 网络与共识层指南：[net.md](https://docs.mytzz.top/docs/src/TC.Tier.Core.Net/docs/net.html)
-- 结构层总览：[structures.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html)
-- 生命周期模型：[lifecycle.md](https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html)
+- 引擎使用指南：[storage-engine.md](https://docs.mytzz.top/docs/runtime/storage-engine.html)
+- 网络与共识层指南：[net.md](https://docs.mytzz.top/docs/core/net.html)
+- 结构层总览：[structures.md](https://docs.mytzz.top/docs/runtime/structures.html)
+- 生命周期模型：[lifecycle.md](https://docs.mytzz.top/docs/core/lifecycle.html)
 
 ---
 

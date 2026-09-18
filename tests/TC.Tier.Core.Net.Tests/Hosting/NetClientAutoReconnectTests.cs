@@ -56,9 +56,10 @@ public class NetClientAutoReconnectTests
             var goneFired = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             client.PeerGone += _ => goneFired.TrySetResult();
 
-            // 分区断开既有链路（服务端注入——既有链路立即断开）
+            // 分区断开既有链路（服务端注入——既有链路立即断开）；
+            // 客户端侧 PeerGone 依赖读循环 EOF 唤醒——runner 负载下事件链有秒级延迟，窗给足
             server.Faults.Partition([serverId], [clientId]);
-            await goneFired.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await goneFired.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
             // 自动重拨：握手帧不注入——分区下链路即可重建
             await reconnected.Task.WaitAsync(TimeSpan.FromSeconds(5));

@@ -6,7 +6,7 @@ TC.Tier 的**存储运行时**——存储引擎 + 结构层（Ring / Log / Inde
 
 - **存储引擎**：Options/Builder 装配（构造 → 启动一步到位）、16B 逻辑地址、零写放大 Compact、全并发区间所有权
 - **结构层**：Ring（WiscKey 值分离）/ Log（WAL）/ 索引（Hash/BTree/SkipList）/ Metadata（版本链）/ Mirror（镜像）/ Snapshot（大流）
-- **TierFs 四介质**：local（Direct IO）/ memory / virtual（.tier）/ network（S3）
+- **TierFs 四类文件系统**：local（本地）/ memory（内存）/ virtual（虚拟，.tier）/ network（网络，S3）
 
 ## 快速开始
 
@@ -32,5 +32,5 @@ var addr = engine.Append("hello, tier!"u8);
 ## 文档
 
 - 完整文档站：https://docs.mytzz.top/
-- 存储引擎指南：https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html
-- 结构层总览：https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html
+- 存储引擎指南：https://docs.mytzz.top/docs/runtime/storage-engine.html
+- 结构层总览：https://docs.mytzz.top/docs/runtime/structures.html

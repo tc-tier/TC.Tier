@@ -414,15 +414,35 @@ public class TierQueueReplicaTests
         await using var cluster = await TierQueueReplicaTestHarness.ReplicaCluster.CreateAsync(3);
         await cluster.WaitReadyAsync();
 
+        // 定位当前辖权并出队——定位与出队之间辖权可再次移交（风暴残余交接）：
+        // NotGroupHomeException = 重新定位再试；有界窗内辖权不落定 = 异常上抛（调用方自决）
+        async Task<(TierQueueReplicaTestHarness.ReplicaNode Node, IReadOnlyList<QueueDelivery> Deliveries)>
+            DequeueAsHomeAsync(TimeSpan budget)
+        {
+            var deadline = DateTime.UtcNow + budget;
+            while (true)
+            {
+                var node = await cluster.WaitHomeAsync(TierQueue.DefaultGroupName);
+                try
+                {
+                    return (node, await node.Replica.DequeueAsync(8, default));
+                }
+                catch (NotGroupHomeException) when (DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(50);
+                }
+            }
+        }
+
         long lastEpoch = -1;
         var acked = new HashSet<LogicalAddress>();
         for (var round = 0; round < 4; round++)
         {
-            var home = await cluster.WaitHomeAsync(TierQueue.DefaultGroupName);
-            await home.Replica.EnqueueAsync(TierQueueTestFactory.Msg(12, round), default);
+            var entryHome = await cluster.WaitHomeAsync(TierQueue.DefaultGroupName);
+            await entryHome.Replica.EnqueueAsync(TierQueueTestFactory.Msg(12, round), default);
 
             // 当前辖权出队（token 入簿记）——同批 token 同 epoch（单辖权投递面）
-            var deliveries = await home.Replica.DequeueAsync(8, default);
+            var (home, deliveries) = await DequeueAsHomeAsync(TimeSpan.FromSeconds(10));
             if (deliveries.Count > 0)
             {
                 deliveries.Select(d => d.Token.Epoch).Distinct().Should().ContainSingle(
@@ -441,49 +461,55 @@ public class TierQueueReplicaTests
                     .Should().BeAssignableTo<InvalidOperationException>("旧辖权 Ack 必被拒");
             }
 
-            // 新辖权继续推进（未确认前缀重投 + 幂等确认集）
-            var newHome = await cluster.WaitHomeAsync(TierQueue.DefaultGroupName);
-            var redelivered = await newHome.Replica.DequeueAsync(8, default);
+            // 新辖权继续推进（未确认前缀重投 + 幂等确认集）——确认成功才入确认集（恰当前缀语义）
+            var (newHome, redelivered) = await DequeueAsHomeAsync(TimeSpan.FromSeconds(10));
             var fresh = redelivered.Where(d => !acked.Contains(d.Address)).ToList();
-            foreach (var d in fresh)
-                acked.Add(d.Address);
             if (fresh.Count > 0)
-                await newHome.Replica.AckAsync(fresh.Select(d => d.Address).ToList(), default);
+            {
+                try
+                {
+                    await newHome.Replica.AckAsync(fresh.Select(d => d.Address).ToList(), default);
+                    foreach (var d in fresh)
+                        acked.Add(d.Address);
+                }
+                catch (NotGroupHomeException)
+                {
+                    // 确认前辖权再移交——本批留待重投（零丢失由收尾排空兜底）
+                }
+            }
         }
 
         // 收尾排空：跨节点可见性滞后——终局 home 轮询出队直至残余全部确认（风暴下零丢失推进）。
-        // ★ 辖权交接竞态容忍：WaitHome 确认与 Dequeue 之间可能再次接管（风暴残余交接）——
-        //   NotGroupHomeException = 重新等 home 再试（断言面不变：残余全数确认）
-        var drainDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(20);
+        // ★ 辖权交接竞态容忍：定位/出队/确认任一点移交都重新来过，不提前弃窗——
+        //   窗内残余未收敛 = 终局断言按现有 acked 判（零丢失语义不变）
+        var drainDeadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         while (acked.Count < 4)
         {
-            TierQueueReplica home;
+            if (DateTime.UtcNow >= drainDeadline)
+                break;
             try
             {
-                home = (await cluster.WaitHomeAsync(TierQueue.DefaultGroupName)).Replica;
-            }
-            catch (TimeoutException)
-            {
-                break;   // 辖权未落定——终局断言按现有 acked 判（风暴下残余不可收敛 = 失败）
-            }
-            try
-            {
-                var rest = await home.DequeueAsync(8, default);
+                var (drainHome, rest) = await DequeueAsHomeAsync(TimeSpan.FromSeconds(5));
                 var freshRest = rest.Where(d => !acked.Contains(d.Address)).ToList();
                 if (freshRest.Count > 0)
                 {
+                    await drainHome.Replica.AckAsync(freshRest.Select(d => d.Address).ToList(), default);
                     foreach (var d in freshRest)
                         acked.Add(d.Address);
-                    await home.AckAsync(freshRest.Select(d => d.Address).ToList(), default);
                 }
+                else
+                {
+                    await Task.Delay(100);   // 暂无新确认——可见性滞后轮询
+                }
+            }
+            catch (TimeoutException)
+            {
+                // 排空出队窗内辖权未落定——轮询续试直至排空窗
             }
             catch (NotGroupHomeException)
             {
-                // 排空中辖权移交——下轮重新定位 home
+                // 排空中辖权移交——下轮重新定位
             }
-            if (DateTime.UtcNow >= drainDeadline)
-                break;
-            await Task.Delay(100);
         }
 
         acked.Count.Should().BeGreaterThanOrEqualTo(4, "每轮消息最终被恰当前缀确认（风暴下零丢失推进）");

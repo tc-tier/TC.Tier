@@ -126,9 +126,12 @@ internal static class ForbiddenPatternRules
 
     private static void OnCompilationStart(CompilationStartAnalysisContext start)
     {
-        var global = start.Options.AnalyzerConfigOptionsProvider.GlobalOptions;
-        var errors = new List<string>();
-        var config = ParseConfig(global, errors);
+        // 读数通道 = .globalconfig（GlobalOptions）∪ .editorconfig（per-tree 并集）——#459
+        var conflicts = new List<string>();
+        var merged = TierConfigChannel.Merge(start.Options.AnalyzerConfigOptionsProvider,
+            start.Compilation.SyntaxTrees, KeyNamespace, conflicts);
+        var errors = new List<string>(conflicts);
+        var config = ParseConfig(merged, errors);
 
         if (errors.Count > 0)
         {

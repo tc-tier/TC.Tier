@@ -1177,8 +1177,12 @@ public class RaftEngineTests
 
         await leader.Raft.TransferLeadershipAsync(follower.Id).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
+        // 转让编排返回 ≠ 目标已当选（TimeoutNow 选举在途——#423/#424 同族口径）：
+        // 有界收敛等待后保留断言
+        await WaitForAsync(() => follower.Raft.IsLeader, TimeSpan.FromSeconds(10));
         follower.Raft.IsLeader.Should().BeTrue("转让目标当选（TimeoutNow 立即选举）");
         follower.Raft.CurrentTerm.Should().BeGreaterThan(termBefore, "真选举抬任期");
+        await WaitForAsync(() => !leader.Raft.IsLeader, TimeSpan.FromSeconds(10));
         leader.Raft.IsLeader.Should().BeFalse("原 leader 已让位");
     }
 

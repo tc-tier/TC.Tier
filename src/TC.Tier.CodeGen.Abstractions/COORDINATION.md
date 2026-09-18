@@ -10,20 +10,39 @@
 - **项目类型**：普通 `net8.0` 类库（不是 analyzer、不是生成器）。
 - **依赖**：**无**（零 ProjectReference、零 PackageReference）——这是它在依赖链最底端的根本原因。
 - **namespace**：`TC.Tier.CodeGen`（⚠️ 特殊：项目名是 `...CodeGen.Abstractions`，但 namespace 用 `TC.Tier.CodeGen`——为对齐源生成器的 FQN 识别，消费方 `global using TC.Tier.CodeGen;` 即用）。
-- **内容**：6 个特性（`[BinaryLayout]` + `[Valid*]` 族），是源生成器 `TC.Tier.CodeGen` 识别特性的"形状定义"。
+- **内容**：21 个文件——生成器识别的全部标注/契约（`[BinaryLayout]` + `[Valid*]` 校验族 + RingKey/KvStore/WireMessage/WireArray/ConstantRegistry/协议注册桥/命令壳族），是源生成器 `TC.Tier.CodeGen` 识别标注的"形状定义"。
 
 ---
 
-## 2. 文件清单（6 个特性）
+## 2. 文件清单（按生成器分组）
 
 | 文件 | 内容 |
 |------|------|
+| **BinaryLayout 族** | |
 | `BinaryLayoutAttribute.cs` | `[BinaryLayout(Features = BinaryLayoutFeatures.*)]`——标记 `[StructLayout]` struct 触发生成 `XxxCodec` |
 | `BinaryLayoutFeatures.cs` | 生成开关 flags：`StructSize` / `FieldConstants` / `FieldReaders` / `FieldWriters` |
 | `LayoutValidationAttributes.cs` | `[ValidEquals(const)]`（== 常量，Magic/Version/Flags）——字段校验族基类 |
 | `ValidHasFlagsAttribute.cs` | `[ValidHasFlags(mask)]`——位掩码包含基线位 |
 | `ValidNonDefaultAttribute.cs` | `[ValidNonDefault]`——字段非默认零值 |
 | `ValidRangeAttribute.cs` | `[ValidRange(min,max)]`——字段在区间内（PayloadLength 等） |
+| **RingKey / KvStore 族** | |
+| `RingKeyAttribute.cs` | `[assembly: RingKey(typeof(TKey))]`——封闭 Ring/索引薄类源生成入口 |
+| `KvStoreAttribute.cs` | `[assembly: KvStore(...)]`——KV 组合存储源生成入口 |
+| **Wire 格式族** | |
+| `WireMessageAttribute.cs` | `[WireMessage]`——RPC 消息族线格式标注 |
+| `WireArrayAttribute.cs` | `[WireArray]`——变长集合字段标注（[Count][item×N]） |
+| **协议注册桥** | |
+| `ProtocolRegistrationAttributes.cs` | 协议程序集（如 S3）自动注册 TierFs 介质协议的标注 |
+| **命令壳族（CommandShell）** | |
+| `CommandGroupAttribute.cs` | `[CommandGroup]`——命令组（嵌套命名空间） |
+| `CommandAttribute.cs` | `[Command]`——命令方法标注 |
+| `CommandArgAttribute.cs` / `CommandOptionAttribute.cs` / `CommandBodyAttribute.cs` | 位置参数 / 具名选项 / 管道 body 标注 |
+| `CommandErrorAttribute.cs` | `[CommandError]`——异常 → 退出码/状态码映射 |
+| `CommandResults.cs` | `ICommandResults`——结果渲染器契约 |
+| `CommandHttp.cs` | `CommandHttpResponse`——HTTP 结果纯数据载体（Status/ContentType/Body） |
+| **杂项** | |
+| `ConstantRegistryAttribute.cs` | `[ConstantRegistry]`——常量表注册（重复值编译期 Error） |
+| `IsExternalInit.cs` | record/init 支持（netstandard/net8.0 消费面） |
 
 ---
 
@@ -81,7 +100,7 @@ internal struct MyHeader
 
 - 标记点的 struct **必须** 同时有 `[StructLayout(LayoutKind.Explicit, Size = N)]`——`Size` 必须准确（否则 TCSG001）。
 - 嵌套 struct 字段必须也标 `[BinaryLayout]`（否则 TCSG002）。
-- **谁会标记**：当前标记点在 `TC.Tier.Contracts`（`LogicalAddress` / `Crc32Footer` / `Crc64Footer` / `RecordFlags`）；`TC.Tier.Core` 自身零 `[BinaryLayout]`。新增布局 struct 放 Contracts 并标记即可。
+- **谁会标记**：当前标记点分布在 `TC.Tier.Contracts`（`LogicalAddress` / `Crc32Footer` / `Crc64Footer` / `RecordFlags`）与 `TC.Tier.Core`（`TierVolumeFrameLayouts`——TierVolume 帧布局族）。新增布局 struct 就近放所属程序集并标记即可。
 - **验证生成生效**：编译后查 `obj/.../generated/TC.Tier.CodeGen/TC.Tier.CodeGen.BinaryLayoutGenerator/*.g.cs` 有产物；缺失说明消费项目的 Analyzer 引用（`TC.Tier.CodeGen` 以 `OutputItemType=Analyzer` 引用）未配置。
 
 ---

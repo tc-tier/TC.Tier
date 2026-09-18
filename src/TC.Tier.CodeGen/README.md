@@ -13,7 +13,8 @@ TC.Tier 的**源生成器**（analyzer 包）——编译期生成，零运行�
 - **TierFs 协议注册桥**：引用协议程序集（如 S3）即自动注册 TierFs 介质协议，消费方零配置
 - **命令壳（CommandShell，#435）**：`[CommandGroup]` 命令组一份定义生成 **CLI + HTTP 双执行面**
   （参数绑定/帮助文本/补全/退出码与状态码映射——零反射）；使用文档见 `docs/command-shell.md`
-- **依赖锁分析器（E4）**：分层依赖单向铁律编译期封堵（如 Core.Net 禁引用产品层/机制面互禁）
+- **分层依赖封堵**：经 `TC.Tier.Analyzers` 的 `tier_layer.*` 配置键（TCSG130-133）编译期封堵
+  （如 Core.Net 禁引用产品层/机制面互禁）——本包自身为纯生成器（IIncrementalGenerator，无分析器）
 
 ## 安装
 
@@ -26,4 +27,5 @@ dotnet add package TC.Tier.CodeGen
 ## 文档
 
 - 完整文档站：https://docs.mytzz.top/
+- 生成器家族总览：https://docs.mytzz.top/docs/codegen/generators.html
 - API 参考：https://docs.mytzz.top/api/

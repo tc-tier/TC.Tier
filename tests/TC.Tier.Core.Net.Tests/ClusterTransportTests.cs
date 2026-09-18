@@ -415,10 +415,20 @@ public class ClusterTransportTests
 
         var serverUp = new TaskCompletionSource<NodeId>();
         server.PeerConnected += id => serverUp.TrySetResult(id);
-        var connectedId = await client.ConnectAsync(server.LocalEndPoint!);
-        connectedId.Should().Be(serverId, "地址制对端身份握手得知（§4.1——此前未知）");
-        (await serverUp.Task.WaitAsync(WaitLimit)).Should().Be(clientId);
-        return (server, client, serverId, clientId);
+        try
+        {
+            var connectedId = await client.ConnectAsync(server.LocalEndPoint!);
+            connectedId.Should().Be(serverId, "地址制对端身份握手得知（§4.1——此前未知）");
+            (await serverUp.Task.WaitAsync(WaitLimit)).Should().Be(clientId);
+            return (server, client, serverId, clientId);
+        }
+        catch
+        {
+            // setup 失败即收尾——半建链不外漏（#470：未释放传输体的循环线程随套件累积）
+            await server.DisposeAsync();
+            await client.DisposeAsync();
+            throw;
+        }
     }
 
     [Theory]

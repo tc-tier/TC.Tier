@@ -79,7 +79,7 @@ var buf = new byte[payload.Length];
 var n = await engine.ReadAsync(addr, buf, CancellationToken.None);      // read back
 ```
 
-More examples of building custom storage models with indexes / Ring / Log: [usage docs](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html).
+More examples of building custom storage models with indexes / Ring / Log: [usage docs](https://docs.mytzz.top/docs/runtime/storage-engine.html).
 
 ## Installation
 
@@ -92,7 +92,7 @@ Stable packages (v1.0.x): `TC.Tier.Contracts`, `TC.Tier.Core`, `TC.Tier.CodeGen`
 
 ## Performance
 
-Measured on .NET 8 across Windows (i5-12400) and Linux (AMD 6900HX) — **for reference only**; your actual results depend on your hardware and workload. Full methodology and details in the [performance docs](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/perf/storage-engine-perf-baseline.html).
+Measured on .NET 8 across Windows (i5-12400) and Linux (AMD 6900HX) — **for reference only**; your actual results depend on your hardware and workload. Full methodology and details in the [performance docs](https://docs.mytzz.top/docs/runtime/storage-engine-perf-baseline.html).
 
 | Scenario | Result |
 |---|---|
@@ -126,10 +126,10 @@ Official node: TierRaftNode (turnkey raft × TierWAL node, TC.Tier.Products.Net)
 Dependencies are one-way and acyclic: `TC.Tier.CodeGen.Abstractions` → `TC.Tier.Contracts` → `TC.Tier.Core` → `TC.Tier.Runtime` → `TC.Tier.Products` (storage pillar); networking pillar `TC.Tier.Core` → `TC.Tier.Core.Net` → `TC.Tier.Products.Net`. The source generator (`TC.Tier.CodeGen`) cuts across — BinaryLayout / registration bridges are generated at compile time, zero runtime reflection.
 
 - Development guide (architecture & design philosophy, code organization): [DEVELOPMENT.md](DEVELOPMENT.md) (Chinese)
-- Engine guide: [storage-engine.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/storage-engine.html)
-- Networking & consensus guide: [net.md](https://docs.mytzz.top/docs/src/TC.Tier.Core.Net/docs/net.html)
-- Structures overview: [structures.md](https://docs.mytzz.top/docs/src/TC.Tier.Runtime/docs/structures.html)
-- Lifecycle model: [lifecycle.md](https://docs.mytzz.top/docs/src/TC.Tier.Core/docs/lifecycle.html)
+- Engine guide: [storage-engine.md](https://docs.mytzz.top/docs/runtime/storage-engine.html)
+- Networking & consensus guide: [net.md](https://docs.mytzz.top/docs/core/net.html)
+- Structures overview: [structures.md](https://docs.mytzz.top/docs/runtime/structures.html)
+- Lifecycle model: [lifecycle.md](https://docs.mytzz.top/docs/core/lifecycle.html)
 
 ---
 

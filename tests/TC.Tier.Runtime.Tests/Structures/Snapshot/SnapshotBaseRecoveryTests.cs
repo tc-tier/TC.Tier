@@ -64,7 +64,7 @@ public class SnapshotBaseRecoveryTests
             using var snap = new StreamSnapshot(vol.Fs, settings, recovery: scripted);
             snap.Initialize();
 
-            SpinWait.SpinUntil(() => snap.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
+            TestWait.Until(() => snap.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
                 .Should().BeTrue();
             snap.IsReady.Should().BeFalse();
             snap.RecoveryState.Error.Should().BeOfType<InvalidOperationException>()
@@ -92,12 +92,12 @@ public class SnapshotBaseRecoveryTests
             snap.Initialize();
             snap.CancelRecovery();
 
-            SpinWait.SpinUntil(() => snap.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
+            TestWait.Until(() => snap.RecoveryState.Phase == RecoveryPhase.Failed, 5000)
                 .Should().BeTrue("取消并入 Failed");
 
             var retry = () => snap.Initialize();
             retry.Should().NotThrow();
-            SpinWait.SpinUntil(() => snap.IsReady, 30000).Should().BeTrue();
+            TestWait.Until(() => snap.IsReady, 30000).Should().BeTrue();
             scripted.Runs.Should().Be(2);
         }
         finally { vol.Dispose(); }
