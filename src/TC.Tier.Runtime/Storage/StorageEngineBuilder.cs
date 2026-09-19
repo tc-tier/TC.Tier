@@ -24,11 +24,13 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
     private readonly ILogger? _logger;
     private readonly ObservabilityHub? _hub;
     private readonly LightEpoch? _epoch;
+    private readonly IsolatedTaskScheduler? _workerScheduler;
 
     internal StorageEngineBuilder(IFileSystem root, StorageEngineOptions options, ICompact? compact = null,
         ICheckpoint? checkpoint = null, ILogger? logger = null, ObservabilityHub? hub = null,
         LightEpoch? epoch = null,
-        Func<AddressSpace.ISegmentHandler, AddressSpace.ISegmentHandler>? segmentHandlerDecorator = null)
+        Func<AddressSpace.ISegmentHandler, AddressSpace.ISegmentHandler>? segmentHandlerDecorator = null,
+        IsolatedTaskScheduler? workerScheduler = null)
     {
         _root = root;
         _options = options;
@@ -38,7 +40,8 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
         _hub = hub;
         _epoch = epoch;
         _segmentHandlerDecorator = segmentHandlerDecorator;
-        _engine = new StorageEngine(root, options, compact, checkpoint, logger, hub, epoch, segmentHandlerDecorator);
+        _workerScheduler = workerScheduler;
+        _engine = new StorageEngine(root, options, compact, checkpoint, logger, hub, epoch, segmentHandlerDecorator, workerScheduler);
     }
 
     /// <summary>
@@ -81,7 +84,7 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
             {
                 _logger?.LogWarning(disposeEx, "StorageEngineBuilder.Start: 启动失败后销毁旧引擎 Dispose 异常");
             }
-            _engine = new StorageEngine(_root, _options, _compact, _checkpoint, _logger, _hub, _epoch, _segmentHandlerDecorator);
+            _engine = new StorageEngine(_root, _options, _compact, _checkpoint, _logger, _hub, _epoch, _segmentHandlerDecorator, _workerScheduler);
             Volatile.Write(ref _started, 0);   // ★ 失败复位（重建完成后）——允许重试 Start/StartAsync
             throw;
         }
@@ -120,7 +123,7 @@ public sealed class StorageEngineBuilder : IDisposable, IAsyncDisposable
                 _logger?.LogWarning(disposeEx, "StorageEngineBuilder.StartAsync: 启动失败后销毁旧引擎 DisposeAsync 异常");
             }
 
-            _engine = new StorageEngine(_root, _options, _compact, _checkpoint, _logger, _hub, _epoch, _segmentHandlerDecorator);
+            _engine = new StorageEngine(_root, _options, _compact, _checkpoint, _logger, _hub, _epoch, _segmentHandlerDecorator, _workerScheduler);
             Volatile.Write(ref _started, 0);   // ★ 失败复位（重建完成后）——允许重试 Start/StartAsync
             throw;
         }

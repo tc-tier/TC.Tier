@@ -65,6 +65,28 @@ public sealed record StorageEngineOptions
     /// 引擎 op 入口一次空引用短路）。开启后经引擎 <c>Faults</c> 属性取得注入面。</summary>
     public bool EnableFaultInjection { get; init; }
 
+    /// <summary>
+    /// 引擎 worker 调度器选项（null = 全默认——<see cref="IsolatedTaskScheduler.RecommendedThreadCount"/>
+    /// 专用线程，诊断名 "engine-worker"）。
+    /// <para>★ 线程数与引擎实例数线性绑定是默认形态的存量成本（#486）：嵌入式/多实例（Multi-Raft 多配置组）
+    ///   场景可 <see cref="WithSchedulerThreads"/> 调小（2~4 即够）；跨实例共享一组线程 =
+    ///   经 <see cref="StorageEngineBuilder"/> 注入 <see cref="IsolatedTaskScheduler.Shared"/>（或自建实例）——
+    ///   组数↑线程数恒定。</para>
+    /// </summary>
+    public IsolatedSchedulerOptions? WorkerScheduler { get; init; }
+
+    /// <summary>设置引擎 worker 调度器专用线程数（返回新实例；其余调度器选项全默认）。</summary>
+    /// <param name="threadCount">专用线程数 M（1 ≤ M ≤ ProcessorCount——越界由 <see cref="IsolatedTaskScheduler.Create"/> 校验抛出）。</param>
+    /// <returns>替换 WorkerScheduler 后的新 <see cref="StorageEngineOptions"/> 实例。</returns>
+    public StorageEngineOptions WithSchedulerThreads(int threadCount)
+        => this with { WorkerScheduler = new IsolatedSchedulerOptions { Name = "engine-worker", ThreadCount = threadCount } };
+
+    /// <summary>设置引擎 worker 调度器选项（返回新实例——完整旋钮：队列容量/watchdog/重启策略等）。</summary>
+    /// <param name="schedulerOptions">调度器选项，非空（诊断名建议保留 "engine-worker" 前缀）。</param>
+    /// <returns>替换 WorkerScheduler 后的新 <see cref="StorageEngineOptions"/> 实例。</returns>
+    public StorageEngineOptions WithWorkerScheduler(IsolatedSchedulerOptions schedulerOptions)
+        => this with { WorkerScheduler = schedulerOptions };
+
     /// <summary>主构造（位置参数——便捷构造/结构 Settings 消费面在用；≤0 回落引擎默认）。</summary>
     public StorageEngineOptions(
         string engineName = "tier-engine",
@@ -151,11 +173,15 @@ public sealed record StorageEngineOptions
     /// <param name="hub">可选的可观察性中心。</param>
     /// <param name="epoch">可选的轻量级纪元。</param>
     /// <param name="segmentHandlerDecorator">可选的段处理器装饰器（包在默认委托外层——合成建段时序等取证/测试面）。</param>
+    /// <param name="workerScheduler">可选的外部 worker 调度器（共享形态——多引擎/多实例共用一组专用线程，
+    ///   线程数随实例数恒定，#486；所有权归调用方，引擎只引用不释放。null = 引擎按
+    ///   <see cref="WorkerScheduler"/> 配置自建并 own）。</param>
     /// <returns>绑定本选项的 <see cref="StorageEngineBuilder"/>（可 <c>Start/StartAsync</c> 启动）。</returns>
     public StorageEngineBuilder Builder(IFileSystem root, ICompact? compact = null, ICheckpoint? checkpoint = null,
         ILogger? logger = null, ObservabilityHub? hub = null, LightEpoch? epoch = null,
-        Func<AddressSpace.ISegmentHandler, AddressSpace.ISegmentHandler>? segmentHandlerDecorator = null)
-        => new(root, this, compact, checkpoint, logger, hub, epoch, segmentHandlerDecorator);
+        Func<AddressSpace.ISegmentHandler, AddressSpace.ISegmentHandler>? segmentHandlerDecorator = null,
+        IsolatedTaskScheduler? workerScheduler = null)
+        => new(root, this, compact, checkpoint, logger, hub, epoch, segmentHandlerDecorator, workerScheduler);
 
     /// <summary>转换为段表设置对象，用于配置段表的行为和参数。</summary>
     /// <returns>由本选项派生的 <see cref="SegmentTableSettings"/>（MinSegId/IndexCapacity/SpinMilliseconds 等逐项映射）。</returns>

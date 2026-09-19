@@ -126,6 +126,8 @@ public sealed partial class CommandGenerator
             ("NAMESPACE", ns),
             ("CLI_CLASS", cliClass),
             ("ROOT_CLASS", "global::" + root.Fqn),
+            ("JSON_CONTEXT", root.Fqn.Substring(root.Fqn.LastIndexOf('.') + 1) + "JsonContext"),
+            ("JSON_RESULTS", root.Fqn.Substring(root.Fqn.LastIndexOf('.') + 1) + "JsonResults"),
             ("HELP_CONSTS", helpConsts.ToString().TrimEnd()),
             ("HELP_MAP", helpMap.ToString().TrimEnd()),
             ("NODE_PATHS", nodePaths),
@@ -454,12 +456,11 @@ public sealed partial class CommandGenerator
         }
 
         // body 读取（stdin 全量字节——Unix 惯例，零新选项）。
-        // 查表未命中在 stdin 读取前拦截（fail-fast 不吞输入流）；JSON null 绑非可空声明 → 语法错误退出——
-        // 消费方 context 注册面跨程序集不可编译期校验，裸抛 ArgumentNullException 会逃出错误回执面
+        // json 缺省 = 生成 JsonContext（#484——body 类型编译期自动登记）；消费方自建 context 未登记
+        // 该类型 → 语法错误退出（stdin 读取前拦截 fail-fast 不吞输入流）；JSON null 绑非可空声明同口径
         if (bodyParam is not null)
         {
             var bodyType = bodyParam.TypeDisplay.Replace("global::", string.Empty);
-            sb.AppendLine($"{indent}if (__tcsg_json is null) {{ __tcsg_stderr.WriteLine(\"命令含 body 参数——需经 json 参数传入 JsonSerializerContext\"); return 2; }}");
             sb.AppendLine($"{indent}var __tcsg_ti = __tcsg_json.GetTypeInfo(typeof({bodyParam.TypeOfDisplay}));");
             sb.AppendLine($"{indent}if (__tcsg_ti is null) {{ __tcsg_stderr.WriteLine(\"body 类型 {bodyType} 未注册于 JsonSerializerContext（需 [JsonSerializable(typeof({bodyType}))]）\"); return 2; }}");
             sb.AppendLine($"{indent}byte[] __tcsg_bodyBytes;");
@@ -509,7 +510,6 @@ public sealed partial class CommandGenerator
                 }
                 else
                 {
-                    sb.AppendLine($"{indent}    if (__tcsg_results is null) {{ __tcsg_stderr.WriteLine(\"命令返回复杂类型——需经 results 参数注入 ICommandResults\"); return 2; }}");
                     sb.AppendLine($"{indent}    __tcsg_stdout.WriteLine(__tcsg_results.Render(__tcsg_r));");
                 }
 

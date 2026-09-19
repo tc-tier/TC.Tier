@@ -118,6 +118,8 @@ internal static class CommandModel
         bool IsRoot,
         string ParentFqn,
         string AcquireExpr,
+        bool MemberLinked,
+        bool FallbackInstantiable,
         ImmutableArray<CmdModel> Commands,
         Location Loc);
 
@@ -184,10 +186,16 @@ internal static class CommandModel
     /// <summary>组实例的服务获取表达式（生成命令函数体内的根实例引用形态）：
     /// 根自身 → service；嵌套组沿嵌套链逐级解析（父组 → 祖辈 → 根）——链上首个持有同型
     /// public 属性/字段的宿主即命中，父链递归成链式取值（service.Sys.Discovery 形态）；
-    /// 全链未命中回落可访问无参构造。服务注入与嵌套深度解耦（#454——组不必提升为根级属性）。</summary>
+    /// 全链未命中回落可访问无参构造（服务注入与嵌套深度解耦，#454——组不必提升为根级属性）。
+    /// 无可访问无参构造 → 占位表达式（TCSG061 在组声明处报——生成物不携带注定编译失败的 new）。</summary>
     internal static string AcquireExpr(INamedTypeSymbol group, INamedTypeSymbol root)
+        => Acquire(group, root).Expr;
+
+    /// <summary>组实例获取装配：表达式 + 是否经父链成员命中（TCSG061 判定面——
+    /// false = 无参构造回落或占位）。</summary>
+    internal static (string Expr, bool MemberLinked) Acquire(INamedTypeSymbol group, INamedTypeSymbol root)
     {
-        if (SymbolEqualityComparer.Default.Equals(group, root)) return ReservedServiceName;
+        if (SymbolEqualityComparer.Default.Equals(group, root)) return (ReservedServiceName, true);
         for (var owner = group.ContainingType; owner is not null; owner = owner.ContainingType)
         {
             var member = ServiceMemberName(owner, group);
@@ -196,13 +204,35 @@ internal static class CommandModel
                 var ownerExpr = SymbolEqualityComparer.Default.Equals(owner, root)
                     ? ReservedServiceName
                     : AcquireExpr(owner, root);
-                return $"{ownerExpr}.{member}";
+                return ($"{ownerExpr}.{member}", true);
             }
 
             if (SymbolEqualityComparer.Default.Equals(owner, root)) break;   // 链到根为止——根外容器不参与
         }
 
-        return $"new global::{group.ToDisplayString()}()";
+        return HasAccessibleParameterlessCtor(group)
+            ? ($"new global::{group.ToDisplayString()}()", false)
+            : ($"default(global::{group.ToDisplayString()})!", false);
+    }
+
+    /// <summary>组类型无参构造在消费程序集内可访问判定（生成物与组声明同程序集——
+    /// public/internal/protected internal 可达；private/protected 不可；抽象类不可 new）。</summary>
+    internal static bool HasAccessibleParameterlessCtor(INamedTypeSymbol type)
+    {
+        if (type.TypeKind == TypeKind.Class && type.IsAbstract) return false;
+        foreach (var ctor in type.Constructors)
+        {
+            if (ctor.IsStatic || ctor.Parameters.Length != 0) continue;
+            switch (ctor.DeclaredAccessibility)
+            {
+                case Accessibility.Public:
+                case Accessibility.Internal:
+                case Accessibility.ProtectedOrInternal:
+                    return true;
+            }
+        }
+
+        return false;
     }
 
     /// <summary>宿主上与组类型匹配的可访问 public 属性/字段名（无则 null）。</summary>

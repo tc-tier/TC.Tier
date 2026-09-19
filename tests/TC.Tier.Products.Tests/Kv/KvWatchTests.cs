@@ -26,10 +26,11 @@ public class KvWatchTests
     }
 
     /// <summary>收集恰好 count 个事件（订阅注册在启动时同步完成；超时 fail-fast）。</summary>
-    private static async Task<List<KvWatchEvent<long>>> CollectAsync(
-        IAsyncEnumerable<KvWatchEvent<long>> source, int count, int timeoutMs = 10_000)
+    private static async Task<List<KvWatchEvent<TKey>>> CollectAsync<TKey>(
+        IAsyncEnumerable<KvWatchEvent<TKey>> source, int count, int timeoutMs = 10_000)
+        where TKey : unmanaged
     {
-        var list = new List<KvWatchEvent<long>>();
+        var list = new List<KvWatchEvent<TKey>>();
         using var cts = new CancellationTokenSource(timeoutMs);
         await foreach (var ev in source.WithCancellation(cts.Token))
         {
@@ -81,6 +82,26 @@ public class KvWatchTests
 
         var events = await watch;
         events.Select(e => e.Key).Should().Equal([F1, F2], "前缀 0x10 家族按序产出，0x20 家族被过滤");
+    }
+
+    [Fact]
+    public async Task PrefixFilter_CompositeKey_EightBytePrefix()
+    {
+        using var vol = new TestVolume();
+        await using var kv = await TierKvOfTestKeyTestPayload.CreateAsync(
+            vol.Fs, TierKvOptions.Default.WithKvName("tier-kv-w9-comp"));
+        using var s = kv.CreateSession(KvSessionConditions.None);
+
+        // 8 字节前缀 = TestKey.Id 字段全宽（12 字节键，#485 同口径）——同 Id 产出、异 Id 过滤
+        var watch = CollectAsync(kv.WatchAsync(LogicalAddress.Empty, new TestKey(1, 0), prefixByteLength: 8), count: 2);
+
+        await s.PutFormattedAsync(new TestKey(1, 1), new TestPayload("a"));
+        await s.PutFormattedAsync(new TestKey(2, 1), new TestPayload("b"));
+        await s.PutFormattedAsync(new TestKey(1, 2), new TestPayload("c"));
+
+        var events = await watch;
+        events.Select(e => e.Key).Should().Equal([new TestKey(1, 1), new TestKey(1, 2)],
+            "8 字节前缀按首字段过滤：尾部字节不参与匹配");
     }
 
     [Fact]
