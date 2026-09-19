@@ -68,9 +68,9 @@ public static class {{CLI_CLASS}}
     /// <param name="service">命令服务实例。</param>
     /// <param name="stdout">标准输出。</param>
     /// <param name="stderr">错误输出。</param>
-    /// <param name="json">JSON 序列化上下文（含 body 参数的命令必传——AOT 契约）。</param>
+    /// <param name="json">JSON 序列化上下文（缺省 = {{JSON_CONTEXT}}.Default——body 类型已自动登记，#484）。</param>
     /// <param name="ct">取消令牌（框架注入）。</param>
-    /// <param name="results">结果渲染器（复杂返回类型渲染；基元返回直写 stdout 无需注入）。</param>
+    /// <param name="results">结果渲染器（缺省 = {{JSON_RESULTS}}.Default——复杂返回 JSON 渲染，#484）。</param>
     /// <returns>退出码：0 成功 / 1 执行失败 / 2 语法错误。</returns>
     public static int Run(string[] args, {{ROOT_CLASS}} service, global::System.IO.TextWriter stdout,
         global::System.IO.TextWriter stderr,
@@ -85,9 +85,9 @@ public static class {{CLI_CLASS}}
     /// <param name="service">命令服务实例。</param>
     /// <param name="stdout">标准输出。</param>
     /// <param name="stderr">错误输出。</param>
-    /// <param name="json">JSON 序列化上下文（含 body 参数的命令必传）。</param>
+    /// <param name="json">JSON 序列化上下文（缺省 = {{JSON_CONTEXT}}.Default——body 类型已自动登记）。</param>
     /// <param name="ct">取消令牌。</param>
-    /// <param name="results">结果渲染器。</param>
+    /// <param name="results">结果渲染器（缺省 = {{JSON_RESULTS}}.Default）。</param>
     /// <returns>退出码：0 成功 / 1 执行失败 / 2 语法错误。</returns>
     public static async global::System.Threading.Tasks.ValueTask<int> RunAsync(string[] args,
         {{ROOT_CLASS}} service, global::System.IO.TextWriter stdout, global::System.IO.TextWriter stderr,
@@ -95,6 +95,8 @@ public static class {{CLI_CLASS}}
         global::System.Threading.CancellationToken ct = default,
         global::TC.Tier.CodeGen.ICommandResults? results = null)
     {
+        json ??= {{JSON_CONTEXT}}.Default;
+        results ??= {{JSON_RESULTS}}.Default;
         int pos = 0;
 {{RUN_BODY}}
     }

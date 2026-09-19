@@ -44,15 +44,11 @@ public sealed class KeyByteOrderComparer<TKey> : IKeyComparer<TKey>
     /// <returns>true = <paramref name="key"/> 的前 <paramref name="prefixByteLength"/> 字节与 <paramref name="prefix"/> 逐字节一致；false = 存在任一差异字节。</returns>
     public static bool IsBytePrefix(TKey key, TKey prefix, int prefixByteLength)
     {
+        if (prefixByteLength == 0) return true;
         var kb = MemoryMarshal.AsBytes(new ReadOnlySpan<TKey>(in key));
         var pb = MemoryMarshal.AsBytes(new ReadOnlySpan<TKey>(in prefix));
-        return prefixByteLength switch
-        {
-            0 => true,
-            8 => kb.SequenceEqual(pb),
-            _ => kb.Length >= prefixByteLength && pb.Length >= prefixByteLength
-                 && kb[..prefixByteLength].SequenceEqual(pb[..prefixByteLength]),
-        };
+        return kb.Length >= prefixByteLength && pb.Length >= prefixByteLength
+               && kb[..prefixByteLength].SequenceEqual(pb[..prefixByteLength]);
     }
 
     /// <summary>XxHash64 over TKey 字节（IKeyComparer 契约面——范围索引排序不消费哈希）。</summary>

@@ -29,10 +29,12 @@ public static class TierKvAssembly
     public static StorageEngineOptions EngineOptions(IFileSystem fs, TierKvOptions options, string engineSuffix)
     {
         var preallocate = fs is not TC.Tier.Core.IO.Mem.MemoryFileSystem;
-        return new StorageEngineOptions(options.KvName + engineSuffix, options.SegmentGrowthLimit,
+        var engine = new StorageEngineOptions(options.KvName + engineSuffix, options.SegmentGrowthLimit,
                 enableSegmentation: true, preallocateFile: preallocate, deleteOnClose: false)
             .WithHints(options.Hints)
             .WithMetaTupleFlushInterval(options.MetaTupleFlushInterval);
+        // 调度器配置透传（#486——null = 引擎默认；非空 = 同实例双引擎同用该配置）
+        return options.WorkerScheduler is { } scheduler ? engine.WithWorkerScheduler(scheduler) : engine;
     }
 
     /// <summary>Ring 数据引擎 Settings（meta 策略随 Options——锚点 W 随水位落盘载体，W5 检查点依赖；

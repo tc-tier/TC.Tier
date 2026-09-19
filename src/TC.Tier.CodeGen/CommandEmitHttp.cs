@@ -69,6 +69,8 @@ public sealed partial class CommandGenerator
             ("HTTP_CLASS", httpClass),
             ("ROOT_CLASS", "global::" + root.Fqn),
             ("ROOT_TOKEN", root.Name),
+            ("JSON_CONTEXT", root.Fqn.Substring(root.Fqn.LastIndexOf('.') + 1) + "JsonContext"),
+            ("JSON_RESULTS", root.Fqn.Substring(root.Fqn.LastIndexOf('.') + 1) + "JsonResults"),
             ("ROUTE_BODY", routeBody.ToString().TrimEnd()),
             ("CUSTOM_ROUTES", customBody.ToString().TrimEnd()),
             ("COMMAND_FUNCS", commandFuncs.ToString().TrimEnd())));
@@ -213,12 +215,11 @@ public sealed partial class CommandGenerator
         }
 
         // body：JSON 反序列化（GetTypeInfo 查表非反射——AOT 契约）。
-        // 查表未命中 / JSON null 绑非可空声明 → 400 回执——消费方 context 注册面跨程序集不可编译期校验，
-        // 裸抛 ArgumentNullException / NRE 会逃出错误映射面成 500
+        // json 缺省 = 生成 JsonContext（#484——body 类型编译期自动登记）；消费方自建 context 未登记
+        // 该类型 / JSON null 绑非可空声明 → 400 回执，裸抛 ArgumentNullException / NRE 不逃出错误映射面
         if (bodyParam is not null)
         {
             var bodyType = bodyParam.TypeDisplay.Replace("global::", string.Empty);
-            sb.AppendLine($"{indent}if (__tcsg_json is null) return __tcsg_results.WriteError(400, \"命令含 body 参数——需 JsonSerializerContext\");");
             sb.AppendLine($"{indent}var __tcsg_ti = __tcsg_json.GetTypeInfo(typeof({bodyParam.TypeOfDisplay}));");
             sb.AppendLine($"{indent}if (__tcsg_ti is null) return __tcsg_results.WriteError(400, \"body 类型 {bodyType} 未注册于 JsonSerializerContext（需 [JsonSerializable(typeof({bodyType}))]）\");");
             sb.AppendLine($"{indent}try");

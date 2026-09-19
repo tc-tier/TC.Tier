@@ -16,16 +16,18 @@ public static class {{HTTP_CLASS}}
     /// <summary>单一分发入口：路由不匹配返回 null。</summary>
     /// <param name="request">传输中立请求。</param>
     /// <param name="service">命令服务实例。</param>
-    /// <param name="results">结果渲染器。</param>
-    /// <param name="json">JSON 序列化上下文（含 body 参数的命令必传——AOT 契约）。</param>
+    /// <param name="results">结果渲染器（缺省 = {{JSON_RESULTS}}.Default——生成 context 渲染，#484）。</param>
+    /// <param name="json">JSON 序列化上下文（缺省 = {{JSON_CONTEXT}}.Default——body 类型已自动登记，#484）。</param>
     /// <param name="ct">取消令牌。</param>
     /// <returns>应答；路由不匹配 = null。</returns>
     public static async global::System.Threading.Tasks.ValueTask<global::TC.Tier.CodeGen.CommandHttpResponse?>
         TryHandleAsync(global::TC.Tier.CodeGen.CommandHttpRequest request, {{ROOT_CLASS}} service,
-            global::TC.Tier.CodeGen.ICommandResults results,
+            global::TC.Tier.CodeGen.ICommandResults? results = null,
             global::System.Text.Json.Serialization.JsonSerializerContext? json = null,
             global::System.Threading.CancellationToken ct = default)
     {
+        results ??= {{JSON_RESULTS}}.Default;
+        json ??= {{JSON_CONTEXT}}.Default;
         var path = request.EncodedPath.Trim('/');
         if (path.Length == 0) return null;
         var segs = path.Split('/');

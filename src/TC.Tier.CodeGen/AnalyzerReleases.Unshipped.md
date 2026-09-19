@@ -40,3 +40,4 @@ TCSG058 | CodeGeneration | Error | GET command with CommandBody parameter
 TCSG059 | CodeGeneration | Error | Illegal command attribute host (non-group type, multiple bodies, non-exception CommandError)
 TCSG060 | CodeGeneration | Error | Command parameter name uses generator-reserved local identifier prefix (__tcsg_)
 TCSG053 | CodeGeneration | Error | WireMessageTag outside a message family
+TCSG061 | CodeGeneration | Error | Nested command group without member link on any ancestor and without accessible parameterless constructor

@@ -1,4 +1,5 @@
 using TC.Tier.Contracts.Structures;
+using TC.Tier.Core.Execution;
 using TC.Tier.Runtime.Structures.Ring.Contracts;
 
 namespace TC.Tier.Products.Kv;
@@ -108,6 +109,28 @@ public sealed record TierKvOptions
 
     /// <summary>IO hints（默认 DIO——TierWal 同款介质适配；磁盘部署建议叠加 WriteThrough）。</summary>
     public FileOpenHints Hints { get; private init; } = FileOpenHints.NoBuffering;
+
+    /// <summary>
+    /// 引擎 worker 调度器选项（null = 全默认——每引擎 <see cref="IsolatedTaskScheduler.RecommendedThreadCount"/>
+    /// 专用线程，诊断名 "engine-worker"）。
+    /// <para>★ TierKv 一个实例装配两个引擎（-data/-index），默认形态线程数与实例数线性绑定（#486）：
+    ///   嵌入式/多实例/测试场景 <see cref="WithSchedulerThreads"/> 调小（2~4 即够）——同一配置同实例
+    ///   双引擎同用；跨 KV 实例共享一组线程 = 经 <see cref="StorageEngineOptions.Builder"/> 注入
+    ///   <see cref="IsolatedTaskScheduler.Shared"/>（引擎层装配面）。</para>
+    /// </summary>
+    public IsolatedSchedulerOptions? WorkerScheduler { get; private init; }
+
+    /// <summary>With 链——引擎 worker 调度器专用线程数（同实例双引擎同用该配置）。</summary>
+    /// <param name="threadCount">专用线程数 M（1 ≤ M ≤ ProcessorCount——越界由引擎建调度器时校验抛出）。</param>
+    /// <returns>新的 TierKvOptions（不可变）。</returns>
+    public TierKvOptions WithSchedulerThreads(int threadCount)
+        => this with { WorkerScheduler = new IsolatedSchedulerOptions { Name = "engine-worker", ThreadCount = threadCount } };
+
+    /// <summary>With 链——引擎 worker 调度器选项（完整旋钮：队列容量/watchdog/重启策略等）。</summary>
+    /// <param name="schedulerOptions">调度器选项，非空。</param>
+    /// <returns>新的 TierKvOptions（不可变）。</returns>
+    public TierKvOptions WithWorkerScheduler(IsolatedSchedulerOptions schedulerOptions)
+        => this with { WorkerScheduler = schedulerOptions };
 
     /// <summary>With 链——引擎名。</summary>
     /// <param name="name">引擎子目录名（Ring 数据引擎名前缀）。</param>

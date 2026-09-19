@@ -143,6 +143,25 @@ public class CommandSourceGenTests
 
     internal static string FamilySampleForProbe => FamilySample;
 
+    private static readonly ImmutableArray<ISourceGenerator> s_stjGenerators = LoadStjGenerators();
+
+    /// <summary>STJ 源生成器（targeting pack 分析器装配——真实消费工程 SDK 编译同款）：
+    /// 生成物 JsonContext 的 Default/元数据成员由其落地，harness 内存编译必须同链装配。</summary>
+    private static ImmutableArray<ISourceGenerator> LoadStjGenerators()
+    {
+        var runtimeDir = Path.GetDirectoryName(typeof(object).Assembly.Location)!;
+        var dotnetRoot = Path.GetFullPath(Path.Combine(runtimeDir, "..", "..", ".."));
+        var packsDir = Path.Combine(dotnetRoot, "packs", "Microsoft.NETCore.App.Ref");
+        if (!Directory.Exists(packsDir))
+            throw new InvalidOperationException("未找到 Microsoft.NETCore.App.Ref packs——STJ 生成器装配面缺失");
+        var genPath = Directory.EnumerateDirectories(packsDir)
+            .Select(v => Path.Combine(v, "analyzers", "dotnet", "cs", "System.Text.Json.SourceGeneration.dll"))
+            .FirstOrDefault(File.Exists)
+            ?? throw new InvalidOperationException("targeting pack 内未找到 System.Text.Json.SourceGeneration.dll");
+        var fileRef = new Microsoft.CodeAnalysis.Diagnostics.AnalyzerFileReference(genPath, new TestAnalyzerAssemblyLoader());
+        return fileRef.GetGenerators(LanguageNames.CSharp);
+    }
+
     private static (ImmutableArray<Diagnostic> Diagnostics, Compilation Compilation) Run(string source)
     {
         var tree = CSharpSyntaxTree.ParseText(source);
@@ -155,6 +174,7 @@ public class CommandSourceGenTests
                 MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Runtime.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "netstandard.dll")),
                 MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Text.Json.dll")),
+                MetadataReference.CreateFromFile(Path.Combine(runtimeDir, "System.Text.Encodings.Web.dll")),
                 MetadataReference.CreateFromFile(typeof(CommandGroupAttribute).Assembly.Location),
                 MetadataReference.CreateFromFile(typeof(CommandSourceGenTests).Assembly.Location),
                 // 生成物消费的框架面（Uri/集合）——真实消费方项目引用全集，此处对齐
@@ -168,6 +188,14 @@ public class CommandSourceGenTests
                 nullableContextOptions: NullableContextOptions.Enable));
         var driver = CSharpGeneratorDriver.Create(new CommandGenerator());
         driver.RunGeneratorsAndUpdateCompilation(comp, out var output, out var diagnostics);
+        // 阶段二：STJ 源生成器消费命令生成器产物（JsonContext partial）——与真实消费工程多代生成一致；
+        // 生成物引用 JsonContext.Default，未装配 STJ 面 = 生成物编译必然失败
+        if (!s_stjGenerators.IsEmpty)
+        {
+            CSharpGeneratorDriver.Create(s_stjGenerators)
+                .RunGeneratorsAndUpdateCompilation(output, out var stjOutput, out _);
+            output = stjOutput;
+        }
         return (diagnostics, output);
     }
 
@@ -550,6 +578,7 @@ public class CommandSourceGenTests
     [InlineData("stray-command")]
     [InlineData("error-not-exception")]
     [InlineData("reserved-param-name")]
+    [InlineData("unlinked-group-no-ctor")]
     public void Diagnostics_NegativeCases_ReportsExpectedId(string caseName)
     {
         var source = caseName switch
@@ -637,6 +666,20 @@ public class CommandSourceGenTests
                     [Command("x")] public void X([CommandArg(0)] string __tcsg_key) { }
                 }
                 """,
+            "unlinked-group-no-ctor" => """
+                using TC.Tier.CodeGen;
+                namespace Sample;
+                [CommandGroup("app")]
+                public sealed class A
+                {
+                    [CommandGroup("sub")]
+                    public sealed class Sub
+                    {
+                        public Sub(string p) { }
+                        [Command("go")] public string Go([CommandArg(0)] string m) => m;
+                    }
+                }
+                """,
             _ => """
                 using System;
                 using TC.Tier.CodeGen;
@@ -677,4 +720,163 @@ public class CommandSourceGenTests
         diags.Should().ContainSingle(d => d.Id == "TCSG060",
             "保留前缀参数名必须精确报 TCSG060（生成代码自有标识符命名空间）");
     }
+
+    [Fact]
+    public void Diagnostics_UnlinkedGroupNoCtor_ExactTCSG061()
+    {
+        const string source = """
+            using TC.Tier.CodeGen;
+            namespace Sample;
+            [CommandGroup("app")]
+            public sealed class A
+            {
+                [Command("x")] public void X() { }
+
+                [CommandGroup("sub")]
+                public sealed class Sub
+                {
+                    private readonly string _p;
+                    public Sub(string p) => _p = p;
+                    [Command("go")] public string Go([CommandArg(0)] string m) => _p + m;
+                }
+            }
+            """;
+        var (genDiags, comp) = Run(source);
+        Tcsg(genDiags).Should().ContainSingle(d => d.Id == "TCSG061",
+            "全链无同型成员且无可访问无参构造必须精确报 TCSG061，位置在组声明处");
+        comp.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error
+                && d.Id.StartsWith("CS", System.StringComparison.Ordinal))
+            .Should().BeEmpty("获取表达式已落占位——生成物不再产生 CS7036 形态的生成文件错误");
+    }
+
+    [Fact]
+    public void NestedGroup_ParameterlessCtorFallback_StillWorks()
+    {
+        const string source = """
+            using TC.Tier.CodeGen;
+            namespace Sample;
+            [CommandGroup("app")]
+            public sealed class TrafficCommands
+            {
+                [CommandGroup("util")]
+                public sealed class Util
+                {
+                    [Command("ping")] public string Ping() => "pong";
+                }
+            }
+            """;
+        var (asm, diags) = EmitAssembly(source);
+        diags.Should().BeEmpty("无参构造回落是文档契约（服务注入与嵌套深度解耦）——不报诊断");
+        var r = RunCli(asm, "util", "ping");
+        r.Rc.Should().Be(0, r.Err);
+        r.Out.Trim().Should().Be("pong");
+    }
+
+    // ══════════ 命令 I/O JSON 契约（#484——回执序列化编译期闭合）══════════
+
+    [Fact]
+    public void JsonContext_RegistersAllReturnAndBodyTypes()
+    {
+        var (_, comp) = Run(FamilySample);
+        var tree = comp.SyntaxTrees.Single(t =>
+            t.FilePath.EndsWith("TrafficCommandsJsonResults.g.cs", System.StringComparison.Ordinal));
+        var text = tree.ToString();
+        text.Should().Contain("class TrafficCommandsJsonContext", "生成 context 类在位");
+        text.Should().Contain("class TrafficCommandsJsonResults", "默认渲染器在位");
+        text.Should().Contain("readonly record struct TrafficCommandsJsonErrorEnvelope", "错误信封在位");
+        // 返回类型 + body 类型全量登记（含未进消费方 TestJsonContext 的 UnregisteredBody）
+        const string attr = "[global::System.Text.Json.Serialization.JsonSerializable(typeof(";
+        text.Should().Contain(attr + "global::TC.Tier.CodeGen.Tests.UnregisteredBody))]");
+        text.Should().Contain(attr + "global::TC.Tier.CodeGen.Tests.RouteSpec))]");
+        text.Should().Contain(attr + "global::Sample.TrafficCommandsJsonErrorEnvelope))]");
+    }
+
+    [Fact]
+    public void Http_DefaultResultsAndJson_ZeroWiringReceipt()
+    {
+        var (asm, diags) = EmitAssembly(FamilySample);
+        diags.Should().BeEmpty();
+
+        // results/json 双缺省：生成 context 反序列化 body + 序列化回执（#484 零接线面）
+        var (rc, status, body) = InvokeHttpDefaults(asm, "POST", "/traffic/spec", "level=High",
+            System.Text.Encoding.UTF8.GetBytes("""{"Name":"n1"}"""));
+        rc.Should().Be(0);
+        status.Should().Be(200);
+        body.Should().Contain("spec High n1");
+
+        // 用法错误 → 生成信封（Code/Message JSON；非 ASCII 由 STJ 默认编码器转义）
+        var (rcErr, statusErr, bodyErr) = InvokeHttpDefaults(asm, "POST", "/traffic/set", "key=k1",
+            Array.Empty<byte>());
+        statusErr.Should().Be(400);
+        bodyErr.Should().StartWith("{\"Code\":400").And.Contain("\"Message\":\"");
+    }
+
+    [Fact]
+    public void Cli_DefaultJsonContext_AutoRegistersBodyType()
+    {
+        var (asm, diags) = EmitAssembly(FamilySample);
+        diags.Should().BeEmpty();
+
+        // json 缺省 = 生成 JsonContext——UnregisteredBody（不进消费方 TestJsonContext）由生成器
+        // 自动登记：登记拦截不再触发，stdin 空载荷走到 JSON 语法错误（#484 旗舰面）
+        var (rc, _, stderr) = RunCliNoJson(asm, "raw");
+        stderr.ToString().Should().NotContain("未注册", "生成 context 已自动登记全部 body 类型");
+        rc.Should().Be(2, "stdin 空载荷 = JSON 语法错误路径");
+        stderr.ToString().Should().Contain("解析失败");
+    }
+
+    [Fact]
+    public void Cli_Http_DefaultResults_NewCommandFamilyZeroRegistration()
+    {
+        const string source = """
+            using TC.Tier.CodeGen;
+            namespace Sample;
+            public sealed class Receipt { public string Name { get; set; } = ""; }
+            [CommandGroup("app")]
+            public sealed class TrafficCommands
+            {
+                [Command("issue")] public Receipt Issue([CommandArg(0)] string name) => new Receipt { Name = name };
+            }
+            """;
+        var (asm, diags) = EmitAssembly(source);
+        diags.Should().BeEmpty();
+
+        // 新命令族零登记：CLI stdout 走生成 JsonResults（源生成序列化），HTTP 双缺省同路径
+        var cli = RunCliNoJson(asm, "issue", "k1");
+        cli.Rc.Should().Be(0, cli.Err);
+        cli.Out.Trim().Should().Be("{\"Name\":\"k1\"}");
+
+        var http = InvokeHttpDefaults(asm, "POST", "/app/issue/k1", null, Array.Empty<byte>());
+        http.Status.Should().Be(200);
+        http.Body.Should().Be("{\"Name\":\"k1\"}");
+    }
+
+    /// <summary>HTTP 调用（results/json 双缺省——生成 JsonResults/JsonContext 消费面）。</summary>
+    private static (int Rc, int? Status, string Body) InvokeHttpDefaults(
+        System.Reflection.Assembly asm, string method, string path, string? query, byte[] body)
+    {
+        var httpType = asm.GetType("Sample.TrafficCommandsHttp")!;
+        var handle = httpType.GetMethod("TryHandleAsync")!;
+        var request = new CommandHttpRequest
+        {
+            Method = method, EncodedPath = path, Query = query, Body = body,
+        };
+        var service = System.Activator.CreateInstance(asm.GetType("Sample.TrafficCommands")!)!;
+        var raw = handle.Invoke(null,
+            new object?[] { request, service, null, null, default(System.Threading.CancellationToken) })!;
+        var task = (System.Threading.Tasks.ValueTask<CommandHttpResponse?>)raw;
+        var response = task.AsTask().GetAwaiter().GetResult();
+        return response is null
+            ? (404, null, string.Empty)
+            : (0, response.Value.Status, System.Text.Encoding.UTF8.GetString(response.Value.Body));
+    }
+}
+
+/// <summary>分析器装配加载器（harness 装配 targeting pack 的 STJ 源生成器——最小实现）。</summary>
+internal sealed class TestAnalyzerAssemblyLoader : IAnalyzerAssemblyLoader
+{
+    public void AddDependencyLocation(string fullPath) { }
+
+    public System.Reflection.Assembly LoadFromPath(string fullPath)
+        => System.Reflection.Assembly.LoadFrom(fullPath);
 }

@@ -48,6 +48,9 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
     /// </summary>
     private readonly IsolatedTaskScheduler _workerScheduler;
 
+    /// <summary>worker 调度器（白盒诊断面——IVT 测试断言线程数/共享形态；外部经 Builder 注入共享）。</summary>
+    internal IsolatedTaskScheduler WorkerScheduler => _workerScheduler;
+
     /// <summary>
     /// 运行期后台 worker loop——承载段生命周期事件（Create/Full）或低频后台任务。
     /// </summary>
@@ -92,7 +95,8 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         ILogger? logger = null,
         ObservabilityHub? hub = null,
         LightEpoch? epoch = null,
-        Func<ISegmentHandler, ISegmentHandler>? segmentHandlerDecorator = null)
+        Func<ISegmentHandler, ISegmentHandler>? segmentHandlerDecorator = null,
+        IsolatedTaskScheduler? workerScheduler = null)
         : base(logger: logger)
     {
         _options = options ??= StorageEngineOptions.Default;
@@ -150,8 +154,12 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         // ★ DefaultSegmentHandler 无状态（纯委托转发到引擎）——无需释放，不进 Resources
         //   （ResourceGroup 要求 IDisposable，注册即拒——ResourceGroup.Add:72 契约）。
         Resources.Add(_segmentTable);
-        _workerScheduler = IsolatedTaskScheduler.Create(new IsolatedSchedulerOptions { Name = "engine-worker" });
-        Resources.Add(_workerScheduler, "EngineWorkerScheduler");
+        // ★ worker 调度器两形态（#486）：外部注入 = 共享形态（多引擎/多实例共用一组线程，
+        //   所有权 Referenced 不释放）；未注入 = 按 WorkerScheduler 配置自建（null = 全默认）并 own
+        _workerScheduler = workerScheduler
+            ?? IsolatedTaskScheduler.Create(_options.WorkerScheduler ?? new IsolatedSchedulerOptions { Name = "engine-worker" });
+        Resources.Add(_workerScheduler, "EngineWorkerScheduler",
+            ownership: workerScheduler == null ? ResourceOwnership.Owned : ResourceOwnership.Referenced);
         // ★ VII-2 收口（）：消费者数读 Optimization.WorkerConsumers（默认 2）——此前硬编码 1
         //   且选项从未接线：N2/N4 压测与 SegmentSingleFlightTests 设的 WorkerConsumers 形同虚设，
         //   所谓"N=2 证据线"实际一直在 N=1 下跑（用户指认）。建段 single-flight / 池协议已多次

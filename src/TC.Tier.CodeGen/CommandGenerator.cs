@@ -15,7 +15,7 @@ namespace TC.Tier.CodeGen;
 ///   每根组生成 <c>&lt;RootClass&gt;Cli.g.cs</c>（Run/RunAsync/WriteHelp/CompleteNext/CommandPaths）
 ///   与 <c>&lt;RootClass&gt;Http.g.cs</c>（TryHandleAsync 单一入口＋编译期路由表）文件对——
 ///   多根组互不知晓，聚合归宿主（首 token switch / 首段路由分发）。</para>
-/// <para>★ 诊断（TCSG054-060）：路径冲突/非法命令名/参数未标注/不可绑定形态/GET 带 body/标注宿主非法/参数名占用保留前缀。</para>
+/// <para>★ 诊断（TCSG054-061）：路径冲突/非法命令名/参数未标注/不可绑定形态/GET 带 body/标注宿主非法/参数名占用保留前缀/嵌套组未链接线且不可实例化。</para>
 /// </summary>
 [Generator]
 public sealed partial class CommandGenerator : IIncrementalGenerator
@@ -72,6 +72,14 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
         id: "TCSG060",
         title: "参数名占用生成器保留前缀",
         messageFormat: "命令 '{0}' 的参数 '{1}' 以 '__tcsg_' 开头——生成代码自有标识符（形参＋局部变量）的保留命名空间，撞名即生成物编译失败，请改名",
+        category: "CodeGeneration",
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true);
+
+    private static readonly DiagnosticDescriptor GroupUnlinkedRule = new(
+        id: "TCSG061",
+        title: "嵌套组未链接线且不可实例化",
+        messageFormat: "{0}",
         category: "CodeGeneration",
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true);
@@ -150,13 +158,16 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
                 commands.Add(ExtractCommand(method, cmdAttr, cmdName, root));
             }
 
+            var (acquireExpr, memberLinked) = CommandModel.Acquire(type, root);
             builder.Add(new CommandModel.GroupModel(
                 type.ToDisplayString(),
                 CommandModel.GroupName(type, attribute),
                 CommandModel.GroupDescription(type, attribute),
                 isRoot,
                 type.ContainingType?.ToDisplayString() ?? string.Empty,
-                CommandModel.AcquireExpr(type, root),
+                acquireExpr,
+                memberLinked,
+                memberLinked || CommandModel.HasAccessibleParameterlessCtor(type),
                 commands.ToImmutable(),
                 attribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
                     ?? type.Locations[0]));
@@ -361,6 +372,7 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
             if (byFqn[root.Fqn] != root) continue;
             EmitRoot(spc, root, byFqn);
             EmitHttpRoot(spc, root, byFqn);
+            EmitJsonRoot(spc, root, byFqn);
         }
     }
 
@@ -368,6 +380,15 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
 
     private static void ValidateGroup(SourceProductionContext spc, CommandModel.GroupModel group)
     {
+        // 061：嵌套组全链无同型成员且无参构造不可达——获取表达式已落占位，组声明处给修法
+        if (!group.IsRoot && !group.MemberLinked && !group.FallbackInstantiable)
+        {
+            spc.ReportDiagnostic(Diagnostic.Create(GroupUnlinkedRule, group.Loc,
+                $"命令组 '{group.Fqn}' 未通过父属性链接线且无可访问无参构造——生成物无法获取组实例。" +
+                "修法：在任一祖辈组（根组在根类）声明该组类型的 public 属性/字段并接线" +
+                "（如 `public KeyGroup Key { get; } = new(services);`），或为组提供可访问无参构造"));
+        }
+
         foreach (var command in group.Commands)
         {
             // 055：非法命令名
