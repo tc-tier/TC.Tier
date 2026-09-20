@@ -302,6 +302,32 @@ await foreach (var frame in wal.ReadSnapshotEntriesAsync(ct)) { ... }
 <strong>磁盘 raft 部署建议 <code>NoBuffering | WriteThrough</code>（DIO+WT 全介质最优）</strong>——机械盘上 buffered
 与 DIO 单独在选举窗口口径不达标（DIO 单独是反模式，p99.9=178ms；DIO+WT p99.9=0.43ms），
 实测矩阵见<a href="perf/tierwal.html">性能</a>契约①。读侧不受影响（重放经游标自管页缓存吸收）。</p>
+<h2 id="线程模型引擎-worker-调度器">线程模型（引擎 worker 调度器）</h2>
+<p>一个 TierWal 装配多个引擎（主日志 + Managed meta + 镜像快照 + 快照 meta），每个引擎的
+后台 worker 跑在 <code>IsolatedTaskScheduler</code> 专用线程上：</p>
+<ul>
+<li><strong>缺省（自建形态）</strong>：每引擎自建 2~4 条（<code>RecommendedThreadCount</code>，随核数）——
+单实例最优并发；多实例（Multi-Raft 多组、测试多节点同进程）线程数与引擎数线性绑定。</li>
+<li><strong>共享注入形态</strong>：<code>WithWorkerScheduler(IsolatedTaskScheduler)</code> 一行注入——全部引擎共用
+该实例（所有权 Referenced：TierWal 释放不回收，生命周期归注入方），多实例线程数恒定：</li>
+</ul>
+<pre><code class="lang-csharp">var scheduler = IsolatedTaskScheduler.Create(
+    new IsolatedSchedulerOptions { Name = &quot;engine-shared&quot;, ThreadCount = 2 });
+var wal = await TierWalOptions.Default.WithWorkerScheduler(scheduler).Builder(fs).StartAsync();
+</code></pre>
+<ul>
+<li><strong>两形态词汇（全产品统一，#505）</strong>：实例形态 <code>WithWorkerScheduler(IsolatedTaskScheduler)</code>——跨实例
+共享一组线程；配置形态 <code>WithSchedulerThreads(n)</code> / <code>WithWorkerSchedulerOptions(...)</code>——每引擎
+<strong>自建</strong> n 线程（单实例压缩线程数用；实例注入时被忽略）。meta/快照等派生引擎随主引擎继承配置形态。</li>
+<li><strong>其余引擎旋钮</strong>：<code>WithOptimization</code>（worker 消费者数/节流双阈/段表容量全族）、
+<code>WithMetaTupleFlushInterval</code>（meta 耐久化泵周期）、<code>WithClock</code>（引擎时钟）、
+<code>WithLogPageSizeBits</code>（页模型，默认 22=4MB）、<code>WithSnapshotSegmentGrowthLimit</code>（快照引擎段上限）。</li>
+<li><strong>选型</strong>：mem/低频写 2 线程即够；磁盘高频写慎用过小容量（worker 排队拖慢组提交，
+2~4 起步按压测定）。产品节点档一行透传：<code>TierRaftNodeOptions.WithWorkerScheduler(scheduler)</code>；
+或直接档位声明 <code>TierRaftNodeOptions.Default.WithResourceProfile(TierRaftResourceProfile.LowResource)</code>
+——低资源档 = 引擎调度器收敛到进程级共享单例（只补缺省，显式注入恒优先）；高性能档（缺省）=
+每引擎自建，现网行为零变化。raft/apply/传输协议专用线程不受档位影响（共识活性地板）。</li>
+</ul>
 <h2 id="反模式">反模式</h2>
 <ul>
 <li><strong>租约跨 await 持有</strong>——<code>BeginAppendBatch</code> 租约持 WAL 写锁（ref struct 编译器强制不逃逸）；
