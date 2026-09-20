@@ -36,6 +36,7 @@ public sealed class TierQueue : LifecycleBase<TierQueueRecoveryHints>, ITierQueu
     private readonly VersionedMetadata _registry;
     private readonly TierQueueGroupMetaFactory? _groupMetaFactory;
     private readonly TierQueueStorageOptionsFactory? _storageOptionsFactory;
+    private readonly IsolatedTaskScheduler? _workerScheduler;   // 调度器共享注入（#505——运行时组状态域同用）
     private readonly TierQueueOptions _options;
     private readonly ILogger? _logger;
 
@@ -60,12 +61,13 @@ public sealed class TierQueue : LifecycleBase<TierQueueRecoveryHints>, ITierQueu
     /// <param name="idempotencyIndex">幂等生产索引（null = 档三关闭）。</param>
     /// <param name="groupMetaFactory">组状态 meta 装配工厂（null = 默认装配）。</param>
     /// <param name="storageOptionsFactory">引擎选项变换器（null = 原样 defaults）。</param>
+    /// <param name="workerScheduler">引擎 worker 调度器共享实例（null = 各引擎自建——运行时组状态域装配同用）。</param>
     /// <param name="options">TierQueue 选项（队列名/容量/治理/索引开关）。</param>
     /// <param name="logger">日志（缺省 null）。</param>
     internal TierQueue(RingOfQueueKey ring, VersionedMetadata registry, IFileSystem fs,
         TierQueue? dlq, DelayedIndex? delayIndex, HashOfQueueKey? idempotencyIndex,
         TierQueueGroupMetaFactory? groupMetaFactory, TierQueueStorageOptionsFactory? storageOptionsFactory,
-        TierQueueOptions options, ILogger? logger)
+        IsolatedTaskScheduler? workerScheduler, TierQueueOptions options, ILogger? logger)
         : base(recovery: null, logger)
     {
         _ring = ring;
@@ -78,6 +80,7 @@ public sealed class TierQueue : LifecycleBase<TierQueueRecoveryHints>, ITierQueu
         _clock = options.Clock;   // 时钟供给源（时钟缝 件一）
         _groupMetaFactory = groupMetaFactory;
         _storageOptionsFactory = storageOptionsFactory;
+        _workerScheduler = workerScheduler;
         _options = options;
         _logger = logger;
         Resources.Add(ring, ownership: ResourceOwnership.Owned);
@@ -713,6 +716,7 @@ public sealed class TierQueue : LifecycleBase<TierQueueRecoveryHints>, ITierQueu
             _storageOptionsFactory?.Invoke("group", defaults) ?? defaults)
         {
             PayloadSize = QueueGroupState.PayloadSize(_options.MaxInFlight),
+            WorkerScheduler = _workerScheduler,
         };
         if (_groupMetaFactory is { } f) return ValueTask.FromResult(f(_fs, settings));
         return ValueTask.FromResult(new VersionedMetadata(_fs, settings));

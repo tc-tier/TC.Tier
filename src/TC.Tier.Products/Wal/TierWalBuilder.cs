@@ -168,9 +168,15 @@ public sealed class TierWalBuilder : IDisposable, IAsyncDisposable
         //   池救不了），N 节点并发建段打爆 POH → CreateFile/CreateDirectory native 挂。
         //   mem 无磁盘对齐需求，稀疏按需增长零代价。
         var preallocate = fs is not TC.Tier.Core.IO.Mem.MemoryFileSystem;
+        // ★ 旋钮透传（#505）：Optimization 全族 + meta 耐久化泵周期 + 引擎时钟 + 调度器配置形态
+        //   （实例形态经 Settings 下发且恒优先——引擎构造先判实例参数后读选项配置）
         var engine = new StorageEngineOptions(options.WalName, options.SegmentGrowthLimit,
                 enableSegmentation: true, preallocateFile: preallocate, deleteOnClose: false)
-            .WithHints(options.Hints);
+            .WithHints(options.Hints)
+            .WithOptimization(options.Optimization)
+            .WithMetaTupleFlushInterval(options.MetaTupleFlushInterval)
+            .WithClock(options.Clock)
+            .WithWorkerScheduler(options.WorkerSchedulerOptions);
         return new EntryLogSettings(engine)
         {
             // ★ 三维度映射（EntryLog 后台时间循环 + TierWAL 包装策略共用同一组阈值）：
@@ -181,6 +187,10 @@ public sealed class TierWalBuilder : IDisposable, IAsyncDisposable
             MetaPolicyKind = options.MetaPolicyKind,
             // ★ TierWAL 必须显式配置 opaque 容量（Settings 基类默认 0 = 无 opaque 区，搭车通道不可用）
             MetaOpaqueBytes = options.MetaOpaqueBytes,
+            // ★ worker 调度器共享注入（null = 缺省自建）——主日志与 Managed meta 引擎共用
+            WorkerScheduler = options.WorkerScheduler,
+            // ★ 页模型旋钮（默认 22 = 4MB）
+            LogPageSizeBits = options.LogPageSizeBits,
         };
     }
 

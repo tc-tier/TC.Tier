@@ -82,9 +82,10 @@ public sealed record StorageEngineOptions
         => this with { WorkerScheduler = new IsolatedSchedulerOptions { Name = "engine-worker", ThreadCount = threadCount } };
 
     /// <summary>设置引擎 worker 调度器选项（返回新实例——完整旋钮：队列容量/watchdog/重启策略等）。</summary>
-    /// <param name="schedulerOptions">调度器选项，非空（诊断名建议保留 "engine-worker" 前缀）。</param>
+    /// <param name="schedulerOptions">调度器选项（诊断名建议保留 "engine-worker" 前缀）；null = 清除（回落引擎默认自建）——
+    /// 结构层 meta/溢出引擎自主引擎继承配置形态即经本语义（null 无害）。</param>
     /// <returns>替换 WorkerScheduler 后的新 <see cref="StorageEngineOptions"/> 实例。</returns>
-    public StorageEngineOptions WithWorkerScheduler(IsolatedSchedulerOptions schedulerOptions)
+    public StorageEngineOptions WithWorkerScheduler(IsolatedSchedulerOptions? schedulerOptions)
         => this with { WorkerScheduler = schedulerOptions };
 
     /// <summary>主构造（位置参数——便捷构造/结构 Settings 消费面在用；≤0 回落引擎默认）。</summary>

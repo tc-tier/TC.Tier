@@ -50,4 +50,15 @@ public abstract class Settings(StorageEngineOptions mainEngine)
     /// 主存储引擎选项（供子类访问和配置）。
     /// </summary>
     public StorageEngineOptions MainEngine => mainEngine;
+
+    /// <summary>
+    /// 引擎 worker 调度器（共享注入形态，null = 缺省自建）。
+    /// <para>★ 两形态（对齐 <see cref="StorageEngine"/> worker 调度器契约）：null = 结构内全部引擎
+    ///   （主/meta/溢出）按 <see cref="StorageEngineOptions.WorkerScheduler"/> 配置各自自建——多实例
+    ///   场景线程数与实例数线性绑定；注入 = 全部引擎共用该实例（所有权 Referenced——结构释放不回收，
+    ///   生命周期归注入方），多实例线程数恒定。</para>
+    /// <para>嵌入式/多实例（Multi-Raft 多组、测试多节点同进程）共享一组线程的入口：
+    ///   <c>IsolatedTaskScheduler.Shared</c> 或自建小容量实例（2~4 线程即够）。</para>
+    /// </summary>
+    public IsolatedTaskScheduler? WorkerScheduler { get; init; }
 }

@@ -1,3 +1,5 @@
+using TC.Tier.Core.Execution;
+
 namespace TC.Tier.Products.Wal;
 
 /// <summary>
@@ -58,6 +60,43 @@ public sealed record TierWalOptions
     /// <summary>条数维度（未提交条数 ≥ 此值触发）。默认 1000。</summary>
     public int MaxUnflushedCount { get; private init; } = 1000;
 
+    /// <summary>
+    /// 引擎 worker 调度器（共享注入形态，null = 缺省自建）。
+    /// <para>★ 一个 TierWal = 主日志 + Managed meta + 镜像快照（+快照 meta）多个引擎：null = 各引擎
+    ///   自建专用调度线程（2~4 条/引擎——多实例线程数与实例数线性绑定）；注入 = 全部引擎共用该实例
+    ///   （所有权 Referenced——TierWal 释放不回收，生命周期归注入方），多实例线程数恒定。</para>
+    /// <para>嵌入式/多节点同进程（Multi-Raft、测试拓扑）注入 <c>IsolatedTaskScheduler.Shared</c>
+    ///   或自建小容量实例——一组线程服务全部引擎。磁盘介质高频写场景慎用小容量（worker 排队
+    ///   会拖慢组提交），2~4 线程起步按压测定。显式实例恒优先于 <see cref="WorkerSchedulerOptions"/>
+    ///   配置形态（引擎构造：实例参数先于选项配置判定）。</para>
+    /// </summary>
+    public IsolatedTaskScheduler? WorkerScheduler { get; private init; }
+
+    /// <summary>
+    /// 引擎 worker 调度器选项（配置形态——每引擎按此**自建**专用线程，null = 全默认
+    /// <see cref="IsolatedTaskScheduler.RecommendedThreadCount"/>）。单实例想压缩线程数用
+    /// <see cref="WithSchedulerThreads"/>；跨实例共享一组线程用 <see cref="WithWorkerScheduler"/>
+    /// 实例形态。实例 <see cref="WorkerScheduler"/> 非空时本项被忽略。
+    /// </summary>
+    public IsolatedSchedulerOptions? WorkerSchedulerOptions { get; private init; }
+
+    /// <summary>日志页大小位宽（PageSize = 1 &lt;&lt; 此值）。默认 22（4MB——DIO 大块顺序写甜区，
+    /// 见 <see cref="Hints"/> 依据）。内存受限/小写入场景可调小（≥ 扇区位宽）。</summary>
+    public int LogPageSizeBits { get; private init; } = 22;
+
+    /// <summary>引擎优化参数（worker 消费者数/节流双阈/段表初始容量等——
+    /// <see cref="StorageEngineOptimization"/> 全族）。缺省 = 引擎默认。</summary>
+    public StorageEngineOptimization Optimization { get; private init; } = new();
+
+    /// <summary>引擎 meta 元组耐久化泵周期。默认 200ms（引擎默认）。</summary>
+    public TimeSpan MetaTupleFlushInterval { get; private init; } = TimeSpan.FromMilliseconds(200);
+
+    /// <summary>引擎时钟（节流自旋窗/meta 耐久化泵周期驱动源）。缺省 <see cref="TimeProvider.System"/>。</summary>
+    public TimeProvider Clock { get; private init; } = TimeProvider.System;
+
+    /// <summary>镜像快照引擎段增长上限。默认 64MB。</summary>
+    public long SnapshotSegmentGrowthLimit { get; private init; } = 64L * 1024 * 1024;
+
     // ★ 单条提交形态 = 三维度全 0（每次 Append 即触发提交）；显式同步点仍可随时调 ITierWal.CommitAsync
     //   （策略自动提交与显式提交并存）。
 
@@ -107,6 +146,49 @@ public sealed record TierWalOptions
     /// <param name="count">未提交条数阈值。</param>
     /// <returns>新的 TierWalOptions（不可变）。</returns>
     public TierWalOptions WithMaxUnflushedCount(int count) => this with { MaxUnflushedCount = count };
+
+    /// <summary>With 链——引擎 worker 调度器共享注入（null = 回落缺省自建）。</summary>
+    /// <param name="scheduler">全部引擎共用的调度器实例（生命周期归注入方——TierWal 释放不回收）。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithWorkerScheduler(IsolatedTaskScheduler? scheduler) => this with { WorkerScheduler = scheduler };
+
+    /// <summary>With 链——调度器配置形态：每引擎自建专用线程数（其余调度器选项全默认）。
+    /// 实例 <see cref="WithWorkerScheduler"/> 注入时本项被忽略。</summary>
+    /// <param name="threadCount">每引擎专用线程数（1 ≤ M ≤ ProcessorCount）。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithSchedulerThreads(int threadCount)
+        => this with { WorkerSchedulerOptions = new IsolatedSchedulerOptions { Name = "engine-worker", ThreadCount = threadCount } };
+
+    /// <summary>With 链——调度器配置形态完整旋钮（队列容量/watchdog/重启策略等）。</summary>
+    /// <param name="schedulerOptions">调度器选项（诊断名建议保留 "engine-worker" 前缀）。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithWorkerSchedulerOptions(IsolatedSchedulerOptions? schedulerOptions)
+        => this with { WorkerSchedulerOptions = schedulerOptions };
+
+    /// <summary>With 链——日志页大小位宽（默认 22 = 4MB；≥ 扇区位宽）。</summary>
+    /// <param name="pageSizeBits">页大小位宽。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithLogPageSizeBits(int pageSizeBits) => this with { LogPageSizeBits = pageSizeBits };
+
+    /// <summary>With 链——引擎优化参数（worker 消费者数/节流双阈等全族）。</summary>
+    /// <param name="optimization">引擎优化参数（<see cref="StorageEngineOptimization"/>）。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithOptimization(StorageEngineOptimization optimization) => this with { Optimization = optimization };
+
+    /// <summary>With 链——引擎 meta 元组耐久化泵周期（默认 200ms）。</summary>
+    /// <param name="interval">耐久化泵周期。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithMetaTupleFlushInterval(TimeSpan interval) => this with { MetaTupleFlushInterval = interval };
+
+    /// <summary>With 链——引擎时钟（节流自旋窗/meta 耐久化泵驱动源）。</summary>
+    /// <param name="clock">时钟供给源（非空）。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithClock(TimeProvider clock) => this with { Clock = clock };
+
+    /// <summary>With 链——镜像快照引擎段增长上限（默认 64MB）。</summary>
+    /// <param name="limit">快照引擎段增长上限（字节）。</param>
+    /// <returns>新的 TierWalOptions（不可变）。</returns>
+    public TierWalOptions WithSnapshotSegmentGrowthLimit(long limit) => this with { SnapshotSegmentGrowthLimit = limit };
 
     /// <summary>完整 builder——注入面开放 + StartAsync 一步到位。</summary>
     /// <param name="fs">文件系统抽象（介质面）。</param>

@@ -1,5 +1,6 @@
 using TC.Tier.Contracts.Meta;
 using TC.Tier.Core.Epochs;
+using TC.Tier.Core.Execution;
 using TC.Tier.Core.Logging;
 using TC.Tier.Runtime.Storage;
 using TC.Tier.Runtime.Structures.Metadata;
@@ -67,6 +68,7 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
     private MetaPolicyFactory<RingMetaHeader, RingMetaPayload>? _ringMetaPolicyFactory;
     private IKeyComparer<TimeKey>? _indexComparer;
     private LightEpoch? _epoch;
+    private IsolatedTaskScheduler? _workerScheduler;   // 调度器共享注入（#505——多实例一组线程）
     private ILogger? _logger;
 
     private TierTimeSeries? _series;
@@ -156,6 +158,18 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(epoch);
         _epoch = epoch;
+        return this;
+    }
+
+    /// <summary>注入引擎 worker 调度器共享实例（#505——ring/索引/水位 meta 全部引擎共用一组线程；
+    /// 多实例/嵌入式/测试拓扑线程数恒定；所有权 Referenced 归注入方——Series 释放不回收）。
+    /// 不注入 = 各引擎按 StorageOptionsFactory 配置自建。</summary>
+    /// <param name="scheduler">共享调度器实例（如 <see cref="IsolatedTaskScheduler.Shared"/>）。</param>
+    /// <returns>TierTimeSeriesBuilder（链式）。</returns>
+    public TierTimeSeriesBuilder WithWorkerScheduler(IsolatedTaskScheduler scheduler)
+    {
+        ArgumentNullException.ThrowIfNull(scheduler);
+        _workerScheduler = scheduler;
         return this;
     }
 
@@ -261,6 +275,7 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
             // ★ 水位持久化（Settings 基类默认 Disabled=no-op——不显式开则重启丢水位，
             //   回退 engine.CommittedTail=预分配假尾；2026-08-27 裸 Ring 探针实锤）
             MetaPolicyKind = MetaPolicyKind.Managed,
+            WorkerScheduler = _workerScheduler,
         };
         if (_ringFactory is { } f) return f(_fs, settings);
         return new RingOfTimeKey(settings, _fs, metaPolicyFactory: _ringMetaPolicyFactory,
@@ -283,6 +298,7 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
             // ★ 水位持久化（Settings 基类默认 Disabled=no-op——不显式开则重启丢水位，
             //   回退 engine.CommittedTail=预分配假尾；2026-08-27 裸 Ring 探针实锤）
             MetaPolicyKind = MetaPolicyKind.Managed,
+            WorkerScheduler = _workerScheduler,
         };
         return new RingOfDenseTimeKey(settings, _fs, metaPolicyFactory: _ringMetaPolicyFactory,
             epoch: _epoch, logger: _logger);
@@ -301,6 +317,7 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
         {
             PersistencePolicy = _options.IndexPersistencePolicy ?? new(),
             NodeSize = _options.IndexNodeSize,
+            WorkerScheduler = _workerScheduler,
         };
         return new BTreeOfDenseTimeKey(_fs, settings, epoch: _epoch,
             keyComparer: new DenseTimeKeyComparer(), keyResolver: resolver);
@@ -320,6 +337,7 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
             MaxPayloadSize = _options.DenseSeries
                 ? DenseSeriesWatermarkDoc.HeaderSize + checked((int)_options.SeriesCapacity) * DenseSeriesWatermarkBlock.BlockSize
                 : null,
+            WorkerScheduler = _workerScheduler,
         };
         return _watermarkMetaFactory?.Invoke(_fs, settings) ?? new VersionedMetadata(_fs, settings, epoch: _epoch);
     }
@@ -339,6 +357,7 @@ public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable
             // 持久化策略透传（锚点帧后台 dump 间隔/增量阈值——测试可收紧；null = BTree 缺省——与字段缺省同值）
             PersistencePolicy = _options.IndexPersistencePolicy ?? new(),
             NodeSize = _options.IndexNodeSize,
+            WorkerScheduler = _workerScheduler,
         };
         var comparer = _indexComparer ?? new TimeKeyComparer();
         return _indexFactory?.Invoke(_fs, settings, _epoch, resolver, comparer)

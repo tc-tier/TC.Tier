@@ -1,3 +1,4 @@
+using TC.Tier.Core.Execution;
 using TC.Tier.Core.Net.Raft;
 using TC.Tier.Core.Net.Swarm;
 using TC.Tier.Products.Wal;
@@ -57,6 +58,11 @@ public sealed record TierRaftNodeOptions
     /// 进程生命周期生效。Linux 原生高精度，此旋钮 no-op。</summary>
     public bool HighResolutionTimer { get; private init; } = true;
 
+    /// <summary>资源档位（装配期定性——缺省 <see cref="TierRaftResourceProfile.HighPerformance"/>）。
+    /// 展开语义 = 只补缺省：显式 <see cref="WithWorkerScheduler"/> 注入恒优先。
+    /// 档位不触碰 raft/apply/传输协议专用线程（活性地板）。</summary>
+    public TierRaftResourceProfile ResourceProfile { get; private init; } = TierRaftResourceProfile.HighPerformance;
+
     // === With 链 ===
 
     /// <summary>With 链——TierWal 配置。</summary>
@@ -112,6 +118,24 @@ public sealed record TierRaftNodeOptions
     /// <param name="enabled">是否启用 Windows timeBeginPeriod(1)（缺省 true；false = 保持 OS 默认 15.6ms）。</param>
     /// <returns>新配置实例（不可变 With 链）。</returns>
     public TierRaftNodeOptions WithHighResolutionTimer(bool enabled = true) => this with { HighResolutionTimer = enabled };
+
+    /// <summary>With 链——引擎 worker 调度器共享注入（经 <see cref="Wal"/> 透传至节点全部存储引擎）。
+    /// <para>多节点同进程（Multi-Raft/测试拓扑）注入 <c>IsolatedTaskScheduler.Shared</c> 或自建小容量
+    /// 实例——引擎 worker 线程从"节点数 × 每引擎 2~4 条"收敛为一组恒定线程；null = 回落缺省自建。</para></summary>
+    /// <param name="scheduler">全部引擎共用的调度器实例（生命周期归注入方——TierWal 释放不回收）。</param>
+    /// <returns>新配置实例（不可变 With 链）。</returns>
+    public TierRaftNodeOptions WithWorkerScheduler(IsolatedTaskScheduler? scheduler)
+        => this with { Wal = Wal.WithWorkerScheduler(scheduler) };
+
+    /// <summary>With 链——资源档位（装配期定性；缺省高性能档）。
+    /// <para>低资源档 = 引擎调度器收敛到进程级共享一组线程（只补缺省——显式
+    /// <see cref="WithWorkerScheduler"/> 注入恒优先）。需要进一步省电可链式
+    /// <see cref="WithHighResolutionTimer"/>（false = 撤销 Windows 1ms 定时器提升——
+    /// 心跳/选举窗时序粒度回落 15.6ms，共识活性边际变薄，自行权衡）。</para></summary>
+    /// <param name="profile">资源档位。</param>
+    /// <returns>新配置实例（不可变 With 链）。</returns>
+    public TierRaftNodeOptions WithResourceProfile(TierRaftResourceProfile profile)
+        => this with { ResourceProfile = profile };
 
     /// <summary>时钟供给源（故障注入面 件一——时钟缝 P1 落点；缺省 <see cref="TimeProvider.System"/> 行为零变化）。
     /// <para>宿主 tick 循环/快照限速窗/切换 deadline 经本源驱动——假钟下由快进确定性触发。</para></summary>
