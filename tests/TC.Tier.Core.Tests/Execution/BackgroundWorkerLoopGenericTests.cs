@@ -399,4 +399,17 @@ public class BackgroundWorkerLoopGenericTests
         worker.Dispose();   // Stop + WaitForExit(all 4)
         worker.ExitCount.Should().Be(1, "多消费者下末位退出者跑一次 OnLoopExitAsync");
     }
+
+    [Fact]
+    public void Enqueue_AfterDispose_ThrowsObjectDisposed()
+    {
+        // #479 回归：Dispose 后入队此前静默成功——工作项永无人消费，等待其完成信号的调用链
+        // 永久 park（全线程空闲挂死形态）。守卫改为响亮失败，把"静默腐烂"变可归因。
+        var worker = new ExitCountingWorker(consumerCount: 1, exitTimeout: TimeSpan.FromSeconds(120));
+        worker.Dispose();
+
+        var act = () => worker.Enqueue(1);
+        act.Should().Throw<ObjectDisposedException>()
+           .Which.Message.Should().Contain("永无人消费");
+    }
 }

@@ -64,19 +64,28 @@ internal static class TierConfigValues
         return true;
     }
 
-    /// <summary>左值匹配语义：以 <c>*</c> 结尾 = 前缀通配；否则精确匹配。</summary>
+    /// <summary>左值程序集名匹配语义（大小写不敏感——CLR 程序集名比较按规范即忽略大小写，
+    /// 配置左值与实际 AssemblyName 大小写不一致时规则静默失活是 #491 级缺陷）：以 <c>*</c>
+    /// 结尾 = 前缀通配；否则精确匹配。</summary>
     public static bool LeftMatches(string left, string candidate)
     {
         if (left.Length > 0 && left[left.Length - 1] == '*')
         {
             var prefix = left.Substring(0, left.Length - 1);
-            return candidate.StartsWith(prefix, StringComparison.Ordinal);
+            return candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase);
         }
 
-        return string.Equals(left, candidate, StringComparison.Ordinal);
+        return string.Equals(left, candidate, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>命名空间作用域匹配：相等或以其为前缀（<c>Ns.Sub</c> 形态）。</summary>
+    /// <summary>右值程序集名匹配语义（大小写不敏感，同左值）：相等或以其为前缀
+    /// （<c>Family.Sub</c> 形态的族前缀同命中）。</summary>
+    public static bool AssemblyNameMatches(string prefix, string candidate)
+        => string.Equals(candidate, prefix, StringComparison.OrdinalIgnoreCase)
+            || candidate.StartsWith(prefix + ".", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>命名空间作用域匹配（大小写敏感——C# 命名空间即区分大小写的标识符）：
+    /// 相等或以其为前缀（<c>Ns.Sub</c> 形态）。</summary>
     public static bool NamespaceMatches(string prefix, string target)
         => target == prefix || target.StartsWith(prefix + ".", StringComparison.Ordinal);
 }

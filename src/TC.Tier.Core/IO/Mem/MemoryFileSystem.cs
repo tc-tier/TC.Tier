@@ -218,6 +218,7 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
     public IFileHandle Open(string path, FileOpenOptions options)
     {
         ThrowIfDisposed();
+        options.EnsurePermissionsSupported(Capabilities, path, nameof(Open));   // #493：内存介质无 POSIX 权限——显式请求拒绝
         // 维护门闩：写意图打开按变异拒绝（All 档连读意图一并拒）——句柄打开本身是原子的，立即退出在途计数
         if (options.Access == AccessMode.Read)
             _maintenance.ThrowIfReadsRejected(nameof(Open), path);

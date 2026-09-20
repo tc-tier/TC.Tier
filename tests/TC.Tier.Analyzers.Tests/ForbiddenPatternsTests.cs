@@ -133,6 +133,90 @@ public class ForbiddenPatternsTests
     }
 
     [Fact]
+    public async Task BareThreads_NewTimer_ReportsTCSG134()
+    {
+        // #500 验收：System.Threading.Timer 构造入清单——BannedSymbols.txt 最后 1 行对账收口
+        var diags = await AnalyzePatternsAsync("new System.Threading.Timer(_ => { }, null, 1, 1);", pack: "bare_threads");
+        diags.Where(d => d.Id == "TCSG134").Should().HaveCount(1, "new Timer(...) 裸定时漏检收口");
+    }
+
+    [Fact]
+    public async Task BareThreads_Timer_ExemptPrefixStillWorks()
+    {
+        var config = new Dictionary<string, string>
+        {
+            ["tier_forbidden.pack"] = "bare_threads",
+            ["tier_forbidden.exempt.bare_threads"] = "App.Execution",
+        };
+
+        var exempt = await AnalyzerTestDriver.AnalyzeWithAsync("""
+            namespace App.Execution
+            {
+                public class Scheduler
+                {
+                    public void M() { new System.Threading.Timer(_ => { }, null, 1, 1); }
+                }
+            }
+            """, "App", config, new TierGovernanceAnalyzer());
+        exempt.Where(d => d.Id == "TCSG134").Should().BeEmpty("Timer 构造豁免照常生效");
+
+        var notExempt = await AnalyzerTestDriver.AnalyzeWithAsync("""
+            namespace App.Web
+            {
+                public class Scheduler
+                {
+                    public void M() { new System.Threading.Timer(_ => { }, null, 1, 1); }
+                }
+            }
+            """, "App", config, new TierGovernanceAnalyzer());
+        notExempt.Where(d => d.Id == "TCSG134").Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task BareThreads_AdditionalConfig_OrgTypeTriggers()
+    {
+        // 配置化扩展（#500 评审裁定）：追加类型零代码——.editorconfig/.globalconfig 一行即生效
+        var config = new Dictionary<string, string>
+        {
+            ["tier_forbidden.pack"] = "bare_threads",
+            ["tier_forbidden.bare_threads.additional"] = "Traffic.Infra.BareSpinner",
+        };
+
+        var diags = await AnalyzerTestDriver.AnalyzeMultiTreeAsync(
+        [
+            """
+            namespace Traffic.Infra;
+            public class BareSpinner { }
+            """,
+            "new Traffic.Infra.BareSpinner();",
+        ], "App", config, new Dictionary<string, string>());
+        diags.Where(d => d.Id == "TCSG134").Should().HaveCount(1, "追加清单精确全名命中");
+
+        var unconfigured = await AnalyzerTestDriver.AnalyzeMultiTreeAsync(
+        [
+            """
+            namespace Traffic.Infra;
+            public class BareSpinner { }
+            """,
+            "new Traffic.Infra.BareSpinner();",
+        ], "App",
+            new Dictionary<string, string> { ["tier_forbidden.pack"] = "bare_threads" },
+            new Dictionary<string, string>());
+        unconfigured.Where(d => d.Id == "TCSG134").Should().BeEmpty("未配置追加 = 内建底线不变（add-only 语义）");
+    }
+
+    [Fact]
+    public async Task BareThreads_AdditionalConfig_Wildcard_TCSG139()
+    {
+        var diags = await AnalyzePatternsAsync("var x = 1;", pack: "bare_threads",
+            extra: new Dictionary<string, string>
+            {
+                ["tier_forbidden.bare_threads.additional"] = "App.* | App.B?",
+            });
+        diags.Where(d => d.Id == "TCSG139").Should().NotBeEmpty("通配非精确全名——逐项 fail-fast 绝静默");
+    }
+
+    [Fact]
     public async Task BareThreads_LockStatement_NotReported()
     {
         var diags = await AnalyzePatternsAsync("""
@@ -310,9 +394,14 @@ public class ForbiddenPatternsTests
     // === 驱动便捷封装 ===
 
     private static Task<System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzePatternsAsync(
-        string bodyStatement, string pack = "reflection | sync_over_async | fire_and_forget")
-        => AnalyzeWithConfigAsync(new Dictionary<string, string> { ["tier_forbidden.pack"] = pack },
-            bodyStatement);
+        string bodyStatement, string pack = "reflection | sync_over_async | fire_and_forget",
+        IReadOnlyDictionary<string, string>? extra = null)
+    {
+        var config = new Dictionary<string, string> { ["tier_forbidden.pack"] = pack };
+        if (extra is not null)
+            foreach (var (key, value) in extra) config[key] = value;
+        return AnalyzeWithConfigAsync(config, bodyStatement);
+    }
 
     private static Task<System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.Diagnostic>> AnalyzeWithConfigAsync(
         Dictionary<string, string> config, string? bodyStatement = null)

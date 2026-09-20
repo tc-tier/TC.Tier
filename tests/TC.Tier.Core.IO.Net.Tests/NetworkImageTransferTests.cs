@@ -132,4 +132,65 @@ public sealed class NetworkImageTransferTests : IDisposable
         s.Write(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0x00, 0x00 });   // 坏 magic
         receiver.Wait(TimeSpan.FromSeconds(15)).Should().BeTrue();
     }
+
+    // ═══ Raw 档（#492——整卷字节镜像 dd 语义）═══
+
+    [Fact]
+    public void SendRaw_TvToTv_Loopback_ByteMirrorRoundtrip()
+    {
+        var src = TierVolumeFs.New(TierVolumeCarrier.File(Path.Combine(_dir, $"raw-s-{Guid.NewGuid():N}.tier")),
+            new TierVolumeFormatOptions { QuotaBytes = 8 << 20 });
+        var dst = TierVolumeFs.New(TierVolumeCarrier.File(Path.Combine(_dir, $"raw-d-{Guid.NewGuid():N}.tier")),
+            new TierVolumeFormatOptions { QuotaBytes = 8 << 20 });
+        _open.Add(src);
+        _open.Add(dst);
+
+        // 源卷装数据（经 fs 面——Raw 传送后目标 fs 面应见同一内容：OnMirrorCompleted 重建内存元数据）
+        src.EnsureRoot();
+        src.CreateDirectory("cfg");
+        using (var h = src.Open("keys.bin", RWO()))
+        {
+            var data = new byte[4096];
+            new Random(11).NextBytes(data);
+            h.Write(0, data);
+            h.Flush();
+        }
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var receiver = Task.Run(() => NetworkImageTransfer.ReceiveRawTo(dst, listener, cts.Token), cts.Token);
+        var sent = NetworkImageTransfer.SendRaw(src, "127.0.0.1", port, cts.Token);
+        receiver.Wait(TimeSpan.FromSeconds(30)).Should().BeTrue("接收端按时完成");
+        var received = receiver.Result;
+
+        sent.Verified.Should().BeTrue("对端回执端到端对账（字节数+聚合 CRC）一致");
+        received.Verified.Should().BeTrue("逐帧 CRC + 长度对账通过");
+        sent.RawBytes.Should().Be(received.RawBytes).And.BePositive("整卷原始字节数");
+        sent.EntryCount.Should().Be(0, "Raw 档无条目语义");
+
+        // 字节镜像后目标 fs 面等价（元数据从盘重建）
+        dst.EnumerateEntries(recursive: true).Select(e => e.Name).OrderBy(x => x)
+            .Should().BeEquivalentTo(["keys.bin", "cfg"], "整卷镜像携带全部文件");
+        using (var hs = src.Open("keys.bin", RO()))
+        using (var hd = dst.Open("keys.bin", RO()))
+        {
+            hd.Length.Should().Be(hs.Length);
+            var bs = new byte[hs.Length];
+            var bd = new byte[hd.Length];
+            hs.Read(0, bs);
+            hd.Read(0, bd);
+            bd.Should().BeEquivalentTo(bs, "镜像内容逐字节等价");
+        }
+    }
+
+    [Fact]
+    public void SendRaw_MemSource_ThrowsUnsupported_AllPlatforms()
+    {
+        using var mem = MemoryFileSystem.New();
+        var act = () => NetworkImageTransfer.SendRaw(mem, "127.0.0.1", 1);
+        act.Should().Throw<FileIOException>().Which.Error.Should().Be(IOError.Unsupported,
+            "Raw 档要求连续卷介质——结构化介质走 Structural 档");
+    }
 }

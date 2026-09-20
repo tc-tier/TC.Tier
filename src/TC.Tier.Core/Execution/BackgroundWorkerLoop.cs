@@ -35,6 +35,13 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
     private readonly TimeSpan _exitTimeout;       // Dispose 等退出超时，默认 5s
     private readonly ILogger? _logger;
 
+    /// <summary>worker 是否已 Dispose（子类入队面守卫用——Dispose 后入队 = 工作项静默腐烂，
+    /// 关联等待方永久挂起，必须响亮失败）。</summary>
+    protected bool IsWorkerDisposed => Volatile.Read(ref _disposed) != 0;
+
+    /// <summary>诊断名（子类异常消息/日志用）。</summary>
+    protected string WorkerName => _name;
+
     /// <summary>消费者数（构造时定）。1=单消费者（向后兼容）；>1=多执行体共 drain 同一信号源/队列。</summary>
     public int ConsumerCount => _consumerCount;
 
@@ -235,7 +242,9 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
             try
             {
 #pragma warning disable TCSG137 // 设计必需：Stop/等待退出必须同步（Dispose 路径，有界超时）
-                if (!t.Wait(_exitTimeout)) _logger?.LogWarning("{WorkerName} 等待退出超时 {timeout}", _name, _exitTimeout);
+                if (!t.Wait(_exitTimeout))
+                    _logger?.LogError("{WorkerName} 等待退出超时 {timeout}——worker 循环仍在飞，owner 将继续拆除资源；"
+                        + "在飞续体此后投递到已关停调度器会被丢弃（其等待方永久挂起，#479 挂死族第一现场）", _name, _exitTimeout);
 #pragma warning restore TCSG137
             }
             catch { /* 吞 worker 内异常（异常已在 OnCycleError 处理）+ OCE */ }
@@ -251,7 +260,11 @@ public abstract class BackgroundWorkerLoop : IDisposable, IAsyncDisposable
         var live = tasks.ToArray();
         if (live.Length == 0) return;
         try { await Task.WhenAll(live).WaitAsync(_exitTimeout).ConfigureAwait(false); }
-        catch (TimeoutException) { _logger?.LogWarning("{WorkerName} 等待退出超时 {timeout}", _name, _exitTimeout); }
+        catch (TimeoutException)
+        {
+            _logger?.LogError("{WorkerName} 等待退出超时 {timeout}——worker 循环仍在飞，owner 将继续拆除资源；"
+                + "在飞续体此后投递到已关停调度器会被丢弃（其等待方永久挂起，#479 挂死族第一现场）", _name, _exitTimeout);
+        }
         catch { /* 吞 worker 内异常 + OCE */ }
     }
 
@@ -351,11 +364,18 @@ public abstract class BackgroundWorkerLoop<T> : BackgroundWorkerLoop
     /// 入队——统一入口，所有生产者经此方法。
     /// <para>★ 内建 <see cref="BucketPriorityQueue{WorkerPriority, T}"/> 无锁入队 + 异步唤醒等待的消费者。</para>
     /// <para>★ 默认优先级 <see cref="WorkerPriority.Normal"/>（多数场景不关心优先级 = FIFO）。</para>
+    /// <para>★ Dispose 后入队抛 <see cref="ObjectDisposedException"/>——工作项将永无人消费（消费者已随
+    ///   worker 停机），生产方据此外观的完成信号永不出现（#479 挂死族）；Stop 未 Dispose 允许入队
+    ///   （CORE-19 重启语义，队列内容跨启停保留）。</para>
     /// </summary>
     /// <param name="item">入队元素。</param>
     /// <param name="priority">优先级（默认 Normal）。</param>
     public void Enqueue(T item, WorkerPriority priority = WorkerPriority.Normal)
-        => _queue.Enqueue(item, priority);
+    {
+        if (IsWorkerDisposed)
+            throw new ObjectDisposedException($"{GetType().Name}（{WorkerName}）", "worker 已 Dispose，禁止入队（工作项将永无人消费）");
+        _queue.Enqueue(item, priority);
+    }
 
     /// <summary>队列近似元素数（并发下非精确，诊断用）。</summary>
     public int QueueCount => _queue.Count;

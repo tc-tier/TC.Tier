@@ -36,8 +36,9 @@ internal static class LayerDependencyRules
     internal const string KeyNamespacePrefix = "tier_layer.namespace_prefix";
     internal const string KeyAllowedFrameworkPrefix = "tier_layer.allowed_framework_prefix";
 
-    /// <summary>已知键全集——键命名空间内出现未知键 = TCSG139（打错键名绝静默）。</summary>
-    private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal)
+    /// <summary>已知键全集——键命名空间内出现未知键 = TCSG139（打错键名绝静默）。
+    /// 编辑器配置键规范即大小写不敏感（真实通道解析时统一小写）——比较用 OrdinalIgnoreCase。</summary>
+    private static readonly HashSet<string> KnownKeys = new(StringComparer.OrdinalIgnoreCase)
     {
         KeyForbiddenReference, KeyZeroInternalRefs, KeyInternalAssemblyPrefix,
         KeyAllowedReference, KeyNamespacePrefix, KeyAllowedFrameworkPrefix,
@@ -188,10 +189,10 @@ internal static class LayerDependencyRules
 
         foreach (var key in global.Keys)
         {
-            if (!key.StartsWith(KeyNamespace, StringComparison.Ordinal)) continue;
+            if (!key.StartsWith(KeyNamespace, StringComparison.OrdinalIgnoreCase)) continue;
             if (!KnownKeys.Contains(key))
             {
-                errors.Add($"未知键 '{key}'（已知键：{string.Join(", ", KeyNamespace)} 内六键）");
+                errors.Add($"未知键 '{key}'（已知键：{string.Join(" | ", KnownKeys)}）");
                 continue;
             }
 
@@ -291,8 +292,8 @@ internal static class LayerDependencyRules
             {
                 foreach (var right in rule.Rights)
                 {
-                    // 右值双解释：程序集名或命名空间前缀（与 using 面同一判定——族前缀同样命中）
-                    if (TierConfigValues.NamespaceMatches(right, referencedName))
+                    // 右值双解释：程序集名或命名空间前缀——目标是程序集名，走程序集名语义（大小写不敏感）
+                    if (TierConfigValues.AssemblyNameMatches(right, referencedName))
                     {
                         context.ReportDiagnostic(Diagnostic.Create(ForbiddenReferenceRule,
                             Location.None, referencedName, rule.Raw));
@@ -308,7 +309,7 @@ internal static class LayerDependencyRules
             {
                 if (compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol referenced) continue;
                 var referencedName = referenced.Identity.Name;
-                if (referencedName.StartsWith(internalPrefix, StringComparison.Ordinal))
+                if (referencedName.StartsWith(internalPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     context.ReportDiagnostic(Diagnostic.Create(ZeroInternalRefsRule,
                         Location.None, assemblyName, referencedName, internalPrefix));
@@ -330,8 +331,8 @@ internal static class LayerDependencyRules
                 {
                     foreach (var right in rule.Rights)
                     {
-                        // 白名单右值同前缀语义（与禁用面一致——族子命名空间程序集同在白名单）
-                        if (TierConfigValues.NamespaceMatches(right, referencedName)) whitelisted = true;
+                        // 白名单右值同程序集名语义（大小写不敏感——族子程序集同在白名单）
+                        if (TierConfigValues.AssemblyNameMatches(right, referencedName)) whitelisted = true;
                     }
                 }
 
@@ -340,7 +341,7 @@ internal static class LayerDependencyRules
                 var isFramework = false;
                 foreach (var prefix in frameworkPrefixes)
                 {
-                    if (referencedName.StartsWith(prefix, StringComparison.Ordinal)) isFramework = true;
+                    if (referencedName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)) isFramework = true;
                 }
 
                 if (!isFramework)

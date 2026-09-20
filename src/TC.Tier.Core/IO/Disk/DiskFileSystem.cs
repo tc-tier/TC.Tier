@@ -305,6 +305,7 @@ public sealed class DiskFileSystem : IFileSystem
     /// <exception cref="FileIOException">父目录不存在（NotFound）或共享冲突（SharingViolation）。</exception>
     public IFileHandle Open(string path, FileOpenOptions options)
     {
+        options.EnsurePermissionsSupported(Capabilities, path, nameof(Open));   // #493：安全权限请求不降级
         AccessGate.CheckHandleOpen(_access, options.Access, path);   // G2 包络：构造期 fail-fast
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         // 维护门闩：写意图打开按变异拒绝（All 档连读意图一并拒）——句柄打开本身是原子的，立即退出在途计数
@@ -1068,6 +1069,10 @@ public sealed class DiskFileSystem : IFileSystem
                    | FileSystemCapabilities.EmptyDirectories        // 真目录（根空间层级）
                    | FileSystemCapabilities.AtomicDirectoryMove    // 同根内必同卷 rename 原子
                    | FileSystemCapabilities.MaintenanceGate;       // 维护门闩（设计 §8——三介质统一）
+
+        // Unix 权限位面（#493——创建期 UnixPermissions 生效）：Linux/macOS 置位；Windows 无 POSIX 权限语义不置
+        if (!OperatingSystem.IsWindows())
+            caps |= FileSystemCapabilities.UnixPermissions;
 
         if (OperatingSystem.IsLinux())
         {

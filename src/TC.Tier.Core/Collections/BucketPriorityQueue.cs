@@ -129,7 +129,11 @@ public sealed class BucketPriorityQueue<TPriority, T> : IDisposable where TPrior
         }
     }
 
-    /// <summary>释放——唤醒等待的消费者（消费者通常经 worker 的 ct 退出，此处兜底无 ct 调用者）。</summary>
+    /// <summary>释放——唤醒等待的消费者（消费者通常经 worker 的 ct 退出，此处兜底无 ct 调用者）。
+    /// <para>★ Dispose 后 1:1 许可不变量失效（本方法灌入的唤醒许可无对应项）：消费者拿到幽灵许可后
+    ///   <see cref="TryDequeue"/> 落空，下一轮循环顶部 <c>_disposed</c> 检查抛
+    ///   <see cref="ObjectDisposedException"/>——有界失败，非挂起；残余项不再被消费（Dispose 后入队
+    ///   由 worker 入队面守卫拦截）。</para></summary>
     public void Dispose()
     {
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) return;

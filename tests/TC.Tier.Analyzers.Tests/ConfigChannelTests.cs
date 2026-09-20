@@ -134,4 +134,27 @@ public class ConfigChannelTests
         diags.Where(d => d.Id == "TCSG139").Should().HaveCount(1, "同键异值 = 配置冲突，fail-fast 绝静默取一");
         diags.Where(d => d.Id == "TCSG130").Should().BeEmpty("配置非法不降级继续执法");
     }
+
+    [Fact]
+    public async Task CrossSource_KeyCaseDifferent_SameValue_SingleEnforcement_NoConflict()
+    {
+        var diags = await AnalyzeMultiTreeAsync(
+            ["""
+            using TC.Traffic.Proxy;
+            namespace App;
+            public class C { }
+            """], "TC.Traffic.Control",
+            new Dictionary<string, string>
+            {
+                ["tier_layer.forbidden_reference"] = "TC.Traffic.Control => TC.Traffic.Proxy",
+            },
+            new Dictionary<string, string>
+            {
+                // 编辑器配置键规范即大小写不敏感——跨源异大小写同键按同键合并（不误报冲突、不双记）
+                ["TIER_LAYER.FORBIDDEN_REFERENCE"] = "TC.Traffic.Control => TC.Traffic.Proxy",
+            });
+
+        diags.Where(d => d.Id == "TCSG130").Should().HaveCount(1, "同键（异大小写）同值 = 单次执法");
+        diags.Where(d => d.Id == "TCSG139").Should().BeEmpty("不误报配置冲突");
+    }
 }

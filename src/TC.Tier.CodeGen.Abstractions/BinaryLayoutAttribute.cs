@@ -20,6 +20,10 @@ public sealed class BinaryLayoutAttribute : System.Attribute
     /// <summary>对指定字段生成 IsEmptyRecord 方法（字段须为 uint，如 "MagicValue"）。</summary>
     public string? IsEmpty { get; set; }
 
-    /// <summary>生成额外能力（StructSize / FieldConstants / FieldReaders）。</summary>
+    /// <summary>生成额外能力（StructSize / FieldConstants / FieldReaders / FieldWriters）。</summary>
     public BinaryLayoutFeatures Features { get; set; }
+
+    /// <summary>字节序（缺省 <see cref="LayoutEndianness.LittleEndian"/>——既有铁律；
+    /// 网络字节序协议（DNS 等）声明 <see cref="LayoutEndianness.BigEndian"/>，生成物逐字段大端）。</summary>
+    public LayoutEndianness Endianness { get; set; }
 }

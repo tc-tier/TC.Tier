@@ -19,8 +19,9 @@
 | 文件 | 内容 |
 |------|------|
 | **BinaryLayout 族** | |
-| `BinaryLayoutAttribute.cs` | `[BinaryLayout(Features = BinaryLayoutFeatures.*)]`——标记 `[StructLayout]` struct 触发生成 `XxxCodec` |
+| `BinaryLayoutAttribute.cs` | `[BinaryLayout(Features = BinaryLayoutFeatures.*, Endianness = LayoutEndianness.*)]`——标记 `[StructLayout]` struct 触发生成 `XxxCodec` |
 | `BinaryLayoutFeatures.cs` | 生成开关 flags：`StructSize` / `FieldConstants` / `FieldReaders` / `FieldWriters` |
+| `LayoutEndianness.cs` | 字节序：`LittleEndian`（缺省铁律）/ `BigEndian`（网络字节序协议——DNS 等，#498 扩展） |
 | `LayoutValidationAttributes.cs` | `[ValidEquals(const)]`（== 常量，Magic/Version/Flags）——字段校验族基类 |
 | `ValidHasFlagsAttribute.cs` | `[ValidHasFlags(mask)]`——位掩码包含基线位 |
 | `ValidNonDefaultAttribute.cs` | `[ValidNonDefault]`——字段非默认零值 |
@@ -56,6 +57,7 @@
 - `FieldReaders` / `FieldWriters`——按偏移零拷贝读写的 `Read` / `Write`；
 - 校验——`Validate`（综合字段校验特性）；
 - **默认值——`Create()`**（2026-08-24 新增）：`[ValidEquals(const)]` 字段自动填常量（默认值 = 约束常量，无需独立 DefaultValue 特性——双声明重复）。写侧范式：`var h = XxxCodec.Create(); h.变化字段 = ...; XxxCodec.Write(dest, in h)`——规范字段（Magic/Version/Flags）零手填。
+- **字节序**（2026-09-20 新增——#498）：`Endianness = LayoutEndianness.BigEndian` 生成物逐字段大端（`BinaryPrimitives.*BigEndian`）——网络字节序协议（DNS RFC 1035 等）声明即用；缺省恒小端（既有铁律不变）。
 
 > 这**不是反射/runtime 校验**——是编译期源生成，零运行时开销、AOT 友好。
 

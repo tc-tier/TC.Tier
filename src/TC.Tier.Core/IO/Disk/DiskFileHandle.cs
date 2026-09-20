@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using Microsoft.Win32.SafeHandles;
 using TC.Tier.Core.IO.Shared;
 
@@ -72,6 +73,9 @@ internal sealed class DiskFileHandle : IFileHandle, IFileHandleMetaDurability, I
         var directIo = options.Hints.HasFlag(FileOpenHints.NoBuffering);
 
         var fullPath = fs.GetFullPath(path);
+        // Unix 权限位（创建期生效——#493）：先录存在性——OpenOrCreate/Append 需判"是否本次创建"
+        // （并发抢先建的落败方不应用——文件归抢先方；双方同值应用亦幂等，判据取快照近似）。
+        var fileExistedBeforeOpen = options.UnixPermissions is not null && File.Exists(fullPath);
         // 打开级联（两档 IO 意图共用）：目标模式首开；OpenOrCreate 失败但文件已存在（并发抢先建）→ Open 回退。
         SafeFileHandle OpenWithRaceGuard(FileMode m, bool dio)
         {
@@ -116,6 +120,22 @@ internal sealed class DiskFileHandle : IFileHandle, IFileHandleMetaDurability, I
             throw ex.Wrap("Open", path);
         }
 
+        // Unix 权限位应用（#493）——本次打开创建了文件才应用（CreateNew 恒创建；OpenOrCreate/Append
+        // 按打开前存在性快照）。应用失败 = 安全请求未履行，fail the open（文件已建——消费方可见失败重试）。
+        if (options.UnixPermissions is { } permissions && !fileExistedBeforeOpen)
+        {
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            {
+                ApplyUnixFileMode(fullPath, permissions);
+            }
+            else
+            {
+                // 平台守卫 else 支（纵深防御——能力位守卫已在 fs.Open 入口拒绝非 Unix 介质的显式请求）
+                throw new FileIOException(IOError.Unsupported,
+                    $"Unix 文件权限位在当前平台不支持（UnixPermissions={permissions}）", path, "Open");
+            }
+        }
+
         // ★ DIO 探测 + 对齐基准（open 时一次，缓存只读）：
         //   Win= max(扇区, 系统页)——buffer 地址须页对齐，扇区仅约束 offset；
         //   Linux= 逻辑块（≈扇区）；BestEffort/Ignored/NotRequested → 1（对齐非强制）。
@@ -149,6 +169,21 @@ internal sealed class DiskFileHandle : IFileHandle, IFileHandleMetaDurability, I
 
     /// <inheritdoc/>
     public string Path => _path;
+
+    /// <summary>Unix 权限位应用（#493——仅创建期路径调用；平台守卫在调用点）。</summary>
+    [SupportedOSPlatform("linux")]
+    [SupportedOSPlatform("macos")]
+    private static void ApplyUnixFileMode(string fullPath, UnixFileMode permissions)
+    {
+        try
+        {
+            File.SetUnixFileMode(fullPath, permissions);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw ex.Wrap("Open", fullPath);
+        }
+    }
 
     /// <inheritdoc/>
     public UnbufferedIoSupport UnbufferedSupport => _unbufferedSupport;
