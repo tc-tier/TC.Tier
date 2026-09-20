@@ -270,10 +270,15 @@ pattern 首字符 <code>.</code> 豁免；递归 Name = 相对所枚举目录的
     Sharing  = FileSharing.ReadWrite,      // advisory：None / Read / Write / ReadWrite / Delete
     Hints    = FileOpenHints.None,         // NoBuffering(DIO) / WriteThrough / SequentialScan / RandomAccess
     PreallocateSize = 64L &lt;&lt; 20,           // &gt;0 → open 即幂等预分配
+    UnixPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite,   // 可选：创建期权限位（0600 密钥形态）
 });
 </code></pre>
 <ul>
-<li>组合合法性构造时校验（写模式配 <code>Access=Read</code> → 抛）。</li>
+<li>组合合法性构造时校验（写模式配 <code>Access=Read</code> → 抛；权限位配非创建形态 OpenExisting/Truncate → 抛）。</li>
+<li><strong>Unix 权限位</strong>（<code>UnixPermissions</code>，#493 密钥 0600 场景）：null = 平台缺省零行为变化；非 null 时
+<strong>仅本次打开实际创建了文件才应用</strong>（CreateNew 恒创建；OpenOrCreate/Append 既有文件不复写——
+防重开静默改权限）。介质支持由能力位 <code>UnixPermissions</code> 协商：仅 Linux/macOS Disk 置位，
+<strong>未置位实现遇显式请求抛 <code>IOError.Unsupported</code>——安全权限请求绝不静默忽略</strong>。</li>
 <li><strong>DIO 语义链</strong>（<code>Hints.NoBuffering</code>）：句柄 <code>UnbufferedSupport</code>/<code>RequiredAlignment</code> = 三重对齐单一
 事实源——对齐 buffer 必须走 <code>AlignedMemoryManager</code>/<code>PinnedBufferPool</code>（§7 陷阱 1）。</li>
 </ul>

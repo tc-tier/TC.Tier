@@ -151,7 +151,8 @@ return exitCode;
 <ul>
 <li><strong>组（<code>[CommandGroup]</code>）</strong>：命令命名空间。根组 = 服务本身；嵌套组实例获取沿嵌套链逐级解析——
 父组 → 祖辈 → 根上首个持有同型 public 属性/字段的宿主即命中（链式取值 <code>service.Sys.Discovery</code>），
-全链未命中回落可访问无参构造——<strong>服务注入与嵌套深度解耦</strong>，组不必提升为根级属性。
+全链未命中回落可访问无参构造——<strong>服务注入与嵌套深度解耦</strong>，组不必提升为根级属性；
+无可访问无参构造 = TCSG061 编译期报在组声明处（生成物不落注定失败的 <code>new</code>）。
 组路径即 CLI 子命令路径（<code>traffic route add</code>）与 HTTP 路径段。</li>
 <li><strong>命令（<code>[Command(&quot;name&quot;)]</code>）</strong>：<strong>命令名必填</strong>（组内唯一——重名 = TCSG054，非法名 = TCSG055）；
 HTTP 缺省路由 = <code>/{各级组名}/{命令名}</code>（<code>[Command]</code> 的 <code>Route</code>/<code>Method</code> 可覆写）。</li>
@@ -181,13 +182,14 @@ public async Task&lt;Receipt&gt; SaveAsync(
     [CommandBody] OrchSaveBody body, ...)   // POCO 绑定——schema 可从类型反射派生
 </code></pre>
 <ul>
-<li><strong>JsonSerializerContext 注册（AOT 契约）</strong>：body 走 STJ source-gen 查表反序列化（零反射）——
-消费方在自家 <code>JsonSerializerContext</code> 标注 <code>[JsonSerializable(typeof(&lt;body 类型&gt;))]</code>，
-经调用点 <code>json:</code> 参数注入 <code>Run</code>/<code>RunAsync</code>/<code>TryHandleAsync</code>；含 body 的命令不注入 → 400 / exit 2。</li>
+<li><strong>命令 I/O JSON 契约（生成器自动登记——#484）</strong>：每根组生成 <code>JsonContext</code>
+（<code>[JsonSerializable]</code> 覆盖<strong>全部命令返回类型 + body 类型</strong>——新增命令零登记步骤，AOT 契约由
+生成器单点维护）与 <code>JsonResults</code>（默认 <code>ICommandResults</code>：成功载荷/错误信封 <code>{code,message}</code>
+经生成 context 源生成序列化）。<code>TryHandleAsync</code>/<code>Run</code>/<code>RunAsync</code> 的 <code>results</code>/<code>json</code> 参数
+<strong>缺省即消费生成面</strong>——零注入、零登记；自定义命名策略/错误信封 = 自建 JsonSerializerContext +
+ICommandResults 显式传入即覆盖（context 未登记的 body 类型 → 400 / exit 2 回执指名）。</li>
 <li><strong>错误回执语义</strong>（HTTP 400 / CLI exit 2）：
 <ul>
-<li>body 类型未注册于 context——<code>GetTypeInfo</code> 查表未命中即拦截（CLI 在读 stdin 前），
-回执指明 <code>[JsonSerializable]</code> 注册方式，不落 <code>ArgumentNullException</code>/NRE 逃出错误面；</li>
 <li>JSON 语法/形状非法——<code>JsonException</code> → <code>body JSON 解析失败: &lt;原因&gt;</code>；</li>
 <li>JSON null——非可空声明（<code>T</code>）→ <code>body 不能为 null</code>；可空声明（<code>T?</code>）→ 绑定为 null 传入命令。</li>
 </ul>
@@ -205,15 +207,17 @@ public async Task&lt;Receipt&gt; SaveAsync(
 <li><strong>参数忘标角色注解</strong>——编译期 TCSG056 直接报（不存在&quot;静默落 Body&quot;的宽容形态）；</li>
 <li><strong>参数名以 <code>__tcsg_</code> 开头</strong>——生成代码自有标识符（私有处理函数形参＋局部变量）的保留命名空间，
 占用即 TCSG060 编译期报；此外生成器标识符已全面保留前缀化，用户参数名任意取不撞名；</li>
-<li><strong>嵌套组全链无同型成员且无可访问无参构造</strong>——获取表达式回退 <code>new</code>，生成物直接编译失败
-（CS7036 形态）——把组实例暴露为任一祖辈组的 public 属性/字段即可；</li>
+<li><strong>嵌套组全链无同型成员且无可访问无参构造</strong>——TCSG061 编译期报在组声明处（生成物获取表达式
+落占位，不再产生生成文件里的 CS7036）——把组实例暴露为任一祖辈组的 public 属性/字段，或提供
+可访问无参构造；</li>
 <li><strong>命令重名/空名</strong>——编译期诊断 TCSG054/TCSG055，不要指望运行期覆盖；</li>
-<li><strong>body 类型忘了注册进 JsonSerializerContext</strong>——运行期 400/exit 2 回执会指名（编译期无法跨程序集校验），
-接线报错先查 <code>[JsonSerializable]</code> 收口与 <code>json:</code> 参数注入。</li>
+<li><strong>body 类型忘了注册进 JsonSerializerContext</strong>——生成 <code>JsonContext</code> 已自动登记全部命令 I/O
+类型（缺省注入面零登记）；仅当显式传入自建 context 且漏登记该类型时 400 / exit 2 回执指名，
+补 <code>[JsonSerializable]</code> 或改用缺省注入即可；</li>
 </ul>
 <h2 id="想深入">想深入</h2>
 <ul>
-<li>生成器与诊断码：<code>src/TC.Tier.CodeGen/CommandGenerator.cs</code>（TCSG054-060 族）</li>
+<li>生成器与诊断码：<code>src/TC.Tier.CodeGen/CommandGenerator.cs</code>（TCSG054-061 族）</li>
 <li>双面行为契约的权威样例：<code>tests/TC.Tier.CodeGen.Tests/CommandSourceGenTests.cs</code></li>
 <li>关联：#435（命令源生成立项）</li>
 </ul>

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>DNS Stub Resolver 使用指南（security-aware stub resolver——#498） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="DNS Stub Resolver 使用指南（security-aware stub resolver——#498） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/dns-stub-resolver.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="dns-stub-resolver-使用指南security-aware-stub-resolver498">DNS Stub Resolver 使用指南（security-aware stub resolver——#498）</h1>
+
+<blockquote>
+<p><strong>给谁看</strong>：需要 DNS 服务发现（K8s CoreDNS / Consul DNS 接口形态）的网关与服务组件开发者；
+不引入任何第三方 DNS 包的消费方。
+<strong>回答什么</strong>：怎么查 SRV/A/AAAA、TTL 缓存与负缓存语义、search/ndots 展开顺序、安全位（AD/CD/DO）怎么消费、边界与 Non-goal。</p>
+</blockquote>
+<hr>
+<h2 id="0-一句话总纲">0. 一句话总纲</h2>
+<p><strong><code>DnsStubResolver</code> = 零外部依赖的 security-aware DNS stub resolver（RFC 1035/2782/6891 客户端面）：
+查询 + 解析 + TTL 缓存 + EDNS0，AD/CD 位完整外显——DNS 的消费者契约到此为止。</strong></p>
+<hr>
+<h2 id="1-快速上手">1. 快速上手</h2>
+<pre><code class="lang-csharp">using TC.Tier.Core.Net.NameResolution;
+
+// SRV 服务发现（K8s headless / Consul DNS 主形态）
+using var resolver = new DnsStubResolver();
+var answer = await resolver.ResolveSrvAsync(&quot;_tcp.myapp.prod.svc.cluster.local&quot;);
+foreach (var srv in answer.SrvRecords)
+    Console.WriteLine($&quot;{srv.Target}:{srv.Port} prio={srv.Priority} weight={srv.Weight}&quot;);
+
+// A 地址查询（相对名走 search/ndots 展开）
+var addrs = await resolver.ResolveAddressesAsync(&quot;myapp.prod.svc.cluster.local&quot;);
+foreach (var ip in addrs.Addresses) Console.WriteLine(ip);
+</code></pre>
+<ul>
+<li>服务器列表 / search 域 / ndots 缺省<strong>操作系统自举</strong>（Unix：resolv.conf；Windows：网卡 DNS 配置）——
+K8s CoreDNS 形态零配置兼容；显式 <code>DnsStubResolverOptions.Servers</code> 永远优先。</li>
+<li>全异步、零线程创建；接收缓冲走池化（<code>ArrayPool</code>）低分配。</li>
+</ul>
+<hr>
+<h2 id="2-行为契约">2. 行为契约</h2>
+<h3 id="21-查询与解析">2.1 查询与解析</h3>
+<table>
+<thead>
+<tr>
+<th>面</th>
+<th>契约</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>记录类型</td>
+<td>SRV（priority/weight/port/target）、A、AAAA；CNAME 跟随（深度上限 8，聚合 MinTtl）；SRV 不跟随（RFC 2782：属主不得为别名）</td>
+</tr>
+<tr>
+<td>传输</td>
+<td>UDP:53 首选 → <strong>TC 置位 TCP 重试</strong>（2 字节大端长度前缀）；单次收发超时 + 重试（指数退避），每次尝试轮换下一 server（ServFail/超时跟随）</td>
+</tr>
+<tr>
+<td>TTL 缓存</td>
+<td>进程内 LRU（容量有界）；键 = (类型, 名) 大小写不敏感；CNAME 链各跳分别缓存</td>
+</tr>
+<tr>
+<td>负缓存</td>
+<td>NXDOMAIN 与 NODATA（NoError 空记录）按 <code>NegativeCacheTtl</code>（缺省 30s）短窗缓存</td>
+</tr>
+<tr>
+<td>应答码</td>
+<td><strong>NxDomain 以应答码外显（记录集空 + 负缓存 TTL），不抛异常</strong>；其余非 NoError 计失败跟随重试，耗尽抛 <code>IOException</code></td>
+</tr>
+<tr>
+<td>确定性</td>
+<td>同应答字节 → 同结果（记录保持应答节顺序，零顺序扰动）</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-名字展开searchndotsk8s-形态">2.2 名字展开（search/ndots——K8s 形态）</h3>
+<ul>
+<li><strong>绝对名</strong>（尾点）直查。</li>
+<li><strong>相对名</strong>：点数 ≥ ndots → 先绝对后 search 域逐个展开；点数 &lt; ndots → 先 search 后绝对。</li>
+<li>某候选 NXDOMAIN → 尝试下一候选；全部 NXDOMAIN → 返回最后一个负向结论（不抛）。</li>
+</ul>
+<h3 id="23-安全位security-aware-契约rfc-4033-8">2.3 安全位（security-aware 契约——RFC 4033 §8）</h3>
+<ul>
+<li>查询带 <strong>EDNS0 OPT</strong>（<code>EdnsPayloadSize</code> 缺省 4096）；<code>RequestDnsSecOk=true</code> 置 <strong>DO 位</strong>。</li>
+<li>应答 <strong>AD/CD 位随 <code>DnsSecurityStatus</code> 完整外显</strong>——AD = 递归层已验证的可信标注，
+<strong>采信与否是消费方决策</strong>（stub 不做签名验证链）。</li>
+</ul>
+<hr>
+<h2 id="3-边界与失败语义">3. 边界与失败语义</h2>
+<table>
+<thead>
+<tr>
+<th>边界</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>阻塞式异步</td>
+<td>全异步族；查询内部有超时/重试——调用方传 <code>ct</code> 级联取消</td>
+</tr>
+<tr>
+<td>单跳 UDP 应答</td>
+<td>事务 ID 不符的错包丢弃续收（≤4 个）；超时即该次尝试失败</td>
+</tr>
+<tr>
+<td>压缩指针</td>
+<td>跳转上限 100 + 单调回指守卫——环/越界/保留位型报文拒收（<code>IOException</code>）</td>
+</tr>
+<tr>
+<td>authority/additional 节</td>
+<td>不消费（stub 只取应答节）——SRV target 的地址请另行 A 查询（走缓存）</td>
+</tr>
+<tr>
+<td>resolv.conf 变更</td>
+<td>进程级一次自举——变更随进程重启生效（F9 漂移语义针对记录/端点，走 TTL 缓存过期）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>永久 Non-goal（#498 裁定）</strong>：DNSSEC 签名验证链（RRSIG/DNSKEY/DS/NSEC·NSEC3）与递归迭代解析
+（递归解析器职责——stub 以 AD 位消费验证结论）；DNS <strong>server</strong> 面（权威/转发/AXFR/RFC 2136 动态更新）；
+mDNS/LLMNR/DNS-SD 组播族（独立协议族，非 DNS 单播子集）。</p>
+<hr>
+<h2 id="4-反模式">4. 反模式</h2>
+<ol>
+<li><strong>自己缓存解析结果</strong>——resolver 内建 TTL 缓存，外层再缓存 = 双份过期语义；</li>
+<li><strong>忽略 <code>DnsSecurityStatus.ResponseCode</code></strong>——NxDomain 是正常返回（记录集空），不是异常，消费方必须判码；</li>
+<li><strong>拿 SRV target 直接当 IP 连</strong>——target 是主机名，须经地址解析（<code>ResolveAddressesAsync</code> 走缓存）。</li>
+</ol>
+<h2 id="5-想深入">5. 想深入</h2>
+<ul>
+<li>服务发现源集成（Tier 集群引导）：<code>Transport/PeerDiscovery.cs</code>（<code>DnsPeerDiscoverySource</code> A 记录引导源——与本 resolver 分工：引导走源契约，服务发现走本面）</li>
+<li>wire 契约与验收 fixture：<code>tests/TC.Tier.Core.Net.Tests/NameResolution/</code>（压缩指针防环/TC→TCP/SRV 多记录/负缓存/ndots 顺序/EDNS0+DO+AD 透传/确定性）</li>
+<li><strong>wire 布局面</strong>：<code>DnsMessageHeader</code>/<code>DnsRecordPrefix</code> 经 <code>[BinaryLayout(Endianness = BigEndian)]</code> 声明、<code>*Codec</code> 生成物读写（零手写偏移——头 12B/记录前缀 10B/OPT 前缀同一 codec）；位域语义归 <code>DnsHeaderFlags</code> 常量族；名字压缩指针/节游标为算法性推进（非可声明布局），由字节级 golden fixture 守漂移</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/dns-stub-resolver.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -161,8 +161,16 @@ dotnet_diagnostic.TCSG130.severity = none
 </tbody>
 </table>
 <p>声明语法：<code>tier_layer.forbidden_reference = &lt;源命名空间&gt; =&gt; &lt;禁止目标&gt; [| 更多目标] ; 分号分隔多条</code>。</p>
+<p>匹配语义（易踩坑面）：</p>
+<ul>
+<li><strong>左值/程序集目标匹配大小写不敏感</strong>（CLR 程序集名比较规范即忽略大小写）——左值先按
+AssemblyName 精确匹配（<code>Family.*</code> 后缀 <code>*</code> 为前缀通配），不命中任何程序集名的左值按命名空间
+前缀解释（仅 <code>using</code> 形态生效）。左值与实际 AssemblyName 大小写不一致不会静默失活；</li>
+<li><strong>命名空间匹配大小写敏感</strong>（C# 命名空间是区分大小写的标识符）——<code>using</code> 面与 TCSG133 归属
+判定均按原文比较。</li>
+</ul>
 <p>白名单扩展键：<code>tier_layer.allowed_framework_prefix = &lt;前缀1&gt; | &lt;前缀2&gt;</code>——在缺省框架豁免集
-（System / Microsoft / netstandard / mscorlib）之外追加豁免前缀。典型两例：</p>
+（System / Microsoft / netstandard / mscorlib）之外追加豁免前缀（程序集名语义，大小写不敏感）。典型两例：</p>
 <pre><code class="lang-ini"># 生态包前缀（本家族程序集不构成&quot;越界依赖&quot;）
 tier_layer.allowed_framework_prefix = TC.Tier.
 # Windows SDK 侧隐式框架程序集（不在 System.*/Microsoft.* 自动豁免内）
@@ -206,11 +214,16 @@ tier_layer.allowed_framework_prefix = TC.Tier. | WindowsBase
 </tbody>
 </table>
 <p>声明语法：<code>tier_forbidden.pack = reflection | sync_over_async | fire_and_forget | bare_threads | hotpath_discipline</code>（任选子集）。</p>
-<h2 id="豁免">豁免</h2>
+<h2 id="豁免与追加">豁免与追加</h2>
 <ul>
 <li><strong>个别调用点</strong>：标准 <code>#pragma warning disable TCSG138</code> + 相邻理由注释（写明为何此处形态有
 意——治理内核的受控丢弃即此形态）；</li>
 <li><strong>实现组件本体</strong>（TCSG134）：<code>.editorconfig</code> 键 <code>tier_forbidden.exempt.bare_threads = &lt;FQN 前缀列表&gt;</code> 声明豁免；</li>
+<li><strong>检测面追加</strong>（TCSG134，#500——加类型零改包）：<code>.editorconfig</code> 键
+<code>tier_forbidden.bare_threads.additional = &lt;精确类型全名列表&gt;</code>（<code>|</code> 分隔，无通配——通配 TCSG139
+fail-fast）。匹配 = 构造类型全名精确相等（含命名空间，零同名误伤）；<strong>add-only</strong>——内建清单
+（Thread/PeriodicTimer/Timer/SemaphoreSlim/Mutex/ManualResetEvent/ManualResetEventSlim）
+恒为安全底线不被覆盖；</li>
 <li><strong>整类降级</strong>：<code>dotnet_diagnostic.TCSGxxx.severity = none</code>（按路径节精细控制——tests 目录
 常见放行）。</li>
 </ul>

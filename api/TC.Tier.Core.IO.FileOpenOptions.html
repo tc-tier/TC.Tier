@@ -341,6 +341,45 @@ Class FileOpenOptions
 
 
 
+  <a id="TC_Tier_Core_IO_FileOpenOptions_UnixPermissions_" data-uid="TC.Tier.Core.IO.FileOpenOptions.UnixPermissions*"></a>
+
+  <h3 id="TC_Tier_Core_IO_FileOpenOptions_UnixPermissions" data-uid="TC.Tier.Core.IO.FileOpenOptions.UnixPermissions">
+  UnixPermissions
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Unix 文件权限位（创建期生效——#493 密钥 0600 场景）。null = 平台缺省（umask 决定），零行为变化。</p>
+<p>★ 生效语义：本次打开<b>实际创建了文件</b>时应用——<a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html#TC_Tier_Core_IO_FileOpenMode_CreateNew">CreateNew</a> 恒创建；
+  <a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html#TC_Tier_Core_IO_FileOpenMode_OpenOrCreate">OpenOrCreate</a>/<a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html#TC_Tier_Core_IO_FileOpenMode_Append">Append</a> 仅在文件不存在而由本次创建时
+  应用（并发抢先建的落败方不应用——文件归抢先方所有）。<a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html#TC_Tier_Core_IO_FileOpenMode_OpenExisting">OpenExisting</a>/
+  <a class="xref" href="TC.Tier.Core.IO.FileOpenMode.html#TC_Tier_Core_IO_FileOpenMode_Truncate">Truncate</a> 不可能创建——显式传值在 <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html#TC_Tier_Core_IO_FileOpenOptions_Validate_System_String_">Validate(string)</a> 拒绝（模式错配 fail-fast）。</p>
+<p>★ 平台语义：仅 Unix（Linux/macOS）Disk 支持（能力位 <a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html#TC_Tier_Core_IO_FileSystemCapabilities_UnixPermissions">UnixPermissions</a>）；
+  未置位实现遇到非 null 值抛 <code>IOError.Unsupported</code>——安全权限请求<b>绝不静默忽略</b>。
+  应用时点 = 打开返回前（消费者写内容之前）——空文件窗口极短且先于任何敏感数据落盘。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public UnixFileMode? UnixPermissions { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.unixfilemode">UnixFileMode</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
   <h2 class="section" id="methods">Methods
 </h2>
 
@@ -486,7 +525,7 @@ Class FileOpenOptions
   
   </h3>
 
-  <div class="markdown level1 summary"><p>组合合法性校验——非法抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>（Append 须写权限；写模式须写权限；Append 与 Truncate/CreateNew 互斥由枚举单值天然保证）。</p>
+  <div class="markdown level1 summary"><p>组合合法性校验——非法抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>（Append 须写权限；写模式须写权限；Append 与 Truncate/CreateNew 互斥由枚举单值天然保证；Unix 权限位仅创建形态可指定）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 

@@ -614,7 +614,43 @@ var node = await TierRaftNodeBuilder.Create(id, fs, config, machine)
 
 // 引擎形态：raft.JoinAsync(bootstrapPeers 或 bootstrapEndpoints, timeout, ct)
 </code></pre>
-<p>观察副本（只收日志可读、永不晋级）走引擎面 <code>Membership.AddLearnerAsync(member)</code>。</p>
+<p>引导档位三态（<code>JoinAsync</code> 尾参，进程内/已互联传输与 TCP 端点拨号两形态同语义）：</p>
+<table>
+<thead>
+<tr>
+<th>档位</th>
+<th>参数</th>
+<th>完成信号</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standby（缺省）</td>
+<td><code>autoPromote: true</code></td>
+<td><code>IsVoter</code> 翻真</td>
+<td>learner 入组，追平自动晋级 voter</td>
+</tr>
+<tr>
+<td>永久观察者</td>
+<td><code>autoPromote: false</code></td>
+<td>活动配置收敛含自身</td>
+<td>learner 永久只读，不投票不计多数派</td>
+</tr>
+<tr>
+<td>见证者</td>
+<td><code>asWitness: true</code></td>
+<td>leader 受理（即配置已提交）</td>
+<td>投票计多数派、不存日志体、永不晋级</td>
+</tr>
+</tbody>
+</table>
+<p>TCP 形态的成员表拨号加入：<code>JoinAsync</code> 尾参 <code>listenEndPoint</code> 通告本端监听地址
+（leader 受理后登记进配置条目并动态注册拨号表回连复制——不通告则 leader 无法回连，
+配置不收敛、Join 超时）。join 完成前引导循环对全部 bootstrap 对端补建链路
+（换届免疫——新 leader 与本端互发选举/复制请求不依赖单链）。</p>
+<p>便捷成员操作（leader 侧）：<code>Membership.AddLearnerAsync</code> / <code>Membership.AddWitnessAsync</code>
+（witness 角色单操作登记，投票计多数派、不存数据、永不晋级）。</p>
 <hr>
 <h2 id="7-身份与机制挂载">7. 身份与机制挂载</h2>
 <ul>

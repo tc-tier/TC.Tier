@@ -146,33 +146,63 @@ NetworkTransferResult recv = recvTask.GetAwaiter().GetResult();
 <td>调用方自建并 <code>Start()</code> 的监听器——绑定先于发送方存在，<strong>结构性消除&quot;接收端未就绪&quot;竞速</strong>；监听器生命周期由本方法收口（结束即 Stop）</td>
 </tr>
 <tr>
+<td><code>SendRaw</code>（Raw 档）</td>
+<td><code>(IFileSystem source, string host, int port, CancellationToken ct = default)</code></td>
+<td>整卷字节镜像（dd 档）：源须连续卷介质；源侧 <code>EnterMaintenance(WriteOperations)</code> = <strong>传输窗口只读冻结</strong>；分帧推送 + 聚合 CRC 端到端对账</td>
+</tr>
+<tr>
+<td><code>ReceiveRawTo</code>（端口/预绑定形态）</td>
+<td><code>(IFileSystem destination, int port \| TcpListener listener, CancellationToken ct = default)</code></td>
+<td>整卷字节镜像落盘：容量预检先于首字节写入（不足零受损）；逐帧 CRC + 长度对账；完成后 <code>OnMirrorCompleted</code> 重建内存元数据。<strong>整卷覆盖是破坏性操作（dd 语义）</strong></td>
+</tr>
+<tr>
 <td><code>TransferMode</code></td>
 <td>enum：<code>Structural = 0</code> / <code>Raw = 1</code></td>
-<td>握手 mode 字节。<strong>Structural 是当前唯一生效形态</strong>；<code>Raw</code> 裸字节流为 v1 预留值——接收端握手即拒</td>
+<td>握手 mode 字节。Structural = TCA1 结构流；Raw = 连续卷整卷字节流（两档入口各自校验 mode，错档即拒）</td>
 </tr>
 <tr>
 <td><code>NetworkTransferResult</code></td>
 <td><code>record(long EntryCount, long FrameCount, long RawBytes, bool Verified)</code></td>
-<td>传送摘要；<code>Verified</code> 双端各自视角的一致结论</td>
+<td>传送摘要；<code>Verified</code> 双端各自视角的一致结论（Raw 档 EntryCount 恒 0）</td>
 </tr>
 </tbody>
 </table>
 <p><code>ImageOptions</code> 与 <code>RootSpaceImage</code> 同一套（<code>Compression</code> None/ZLib/Zstd、<code>QuietSource</code> 静默源、
-<code>VerifyChecksums</code>）——见 <a href="io.html"><code>io.md</code></a> §5.2。</p>
+<code>VerifyChecksums</code>）——见 <a href="io.html"><code>io.md</code></a> §5.2（Raw 档不适用——字节镜像无压缩/过滤语义）。</p>
 <hr>
 <h2 id="3-工作方式tin1-协议">3. 工作方式（TIN1 协议）</h2>
 <pre><code>发送端                                接收端
-  │ 握手帧 [magic][版本][mode] ──────→ │ 校验 magic/版本（Raw 预留值拒读）
+  │ 握手帧 [magic][版本][mode] ──────→ │ 校验 magic/版本（错档即拒）
   │ TCA1 载荷（采集直写网络流） ──────→ │ 中转流适配（Restore 要求 seekable）
   │   逐帧 CRC                          │   还原 + 本地逐帧 CRC 校验
   │ 半关发送（Shutdown(Send)=EOF）───→ │ 尾对账（条目/字节/聚合 CRC）
   │ ←────────────── 回执帧（摘要+状态）── │
   │ 对账不符 → IOException              │ 回执已回传 → Verified=true
 </code></pre>
+<h3 id="31-raw-档载荷形态moderaw">3.1 Raw 档载荷形态（mode=Raw）</h3>
+<pre><code>发送端                                    接收端
+  │ 握手 [TIN1][ver][mode=Raw] ──────────→ │ 连续卷介质校验（非连续卷 Unsupported）
+  │ 声明帧 [源长 u64] ───────────────────→ │ 容量预检（不足写前拒绝——目标零字节受损）
+  │ 数据帧 [len u32][payload][crc32 u32]─→ │ 逐帧 CRC 校验 → 顺序落盘（聚合 CRC 累计）
+  │ 终结帧 [len=0] ──────────────────────→ │ 长度对账（实收==声明）→ OnMirrorCompleted
+  │ 半关发送 ────────────────────────────→ │ 回执（CRC 字段=对端聚合载荷 CRC）
+  │ 端到端对账（字节+聚合 CRC）→ Verified   │ Verified=true
+</code></pre>
 <ul>
-<li><strong>双向对称</strong>：同一 TCP 连接，发起端既可 <code>Send</code>（采集推送）也可 <code>ReceiveTo</code>（接收落盘）——对端运行互补方法。</li>
-<li><strong>端到端确认</strong>：TCA1 逐帧 CRC + 尾对账之上，接收端回执回传摘要——发送端确认对端落盘一致（不符抛异常）。</li>
-<li><strong>半关发送</strong>：发送侧 <code>Shutdown(Send)</code> 产生 EOF 信号（对端 <code>CopyTo</code> 自然结束）；回执走接收方向仍通。</li>
+<li><p><strong>dd 级语义</strong>：整卷原始字节顺序镜像，结构无关（WAL/快照/blob/配置全在 Fs 域全覆盖）；
+源侧只读冻结 = <code>EnterMaintenance(WriteOperations)</code> 租约随传送进出。</p>
+</li>
+<li><p><strong>介质前提</strong>：双端均须连续卷（能力位 <code>ContiguousCapture</code> + <code>IContiguousVolume</code>，TierVolume 族）——
+结构化介质（Disk 目录树/Mem/Remote）不满足，走 Structural 档。</p>
+</li>
+<li><p><strong>两档入口错档即拒</strong>：<code>ReceiveTo</code> 只收 Structural、<code>ReceiveRawTo</code> 只收 Raw——模式由对端入口显式选择。</p>
+</li>
+<li><p><strong>双向对称</strong>：同一 TCP 连接，发起端既可 <code>Send</code>（采集推送）也可 <code>ReceiveTo</code>（接收落盘）——对端运行互补方法。</p>
+</li>
+<li><p><strong>端到端确认</strong>：TCA1 逐帧 CRC + 尾对账之上，接收端回执回传摘要——发送端确认对端落盘一致（不符抛异常）。</p>
+</li>
+<li><p><strong>半关发送</strong>：发送侧 <code>Shutdown(Send)</code> 产生 EOF 信号（对端 <code>CopyTo</code> 自然结束）；回执走接收方向仍通。</p>
+</li>
 </ul>
 <hr>
 <h2 id="4-边界与失败语义v1">4. 边界与失败语义（v1）</h2>

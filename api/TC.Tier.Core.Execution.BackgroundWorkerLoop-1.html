@@ -175,6 +175,12 @@ Class BackgroundWorkerLoop&lt;T&gt;
       <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_DisposeAsync">BackgroundWorkerLoop.DisposeAsync()</a>
     </div>
     <div>
+      <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_IsWorkerDisposed">BackgroundWorkerLoop.IsWorkerDisposed</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_WorkerName">BackgroundWorkerLoop.WorkerName</a>
+    </div>
+    <div>
       <a class="xref" href="TC.Tier.Core.Execution.BackgroundWorkerLoop.html#TC_Tier_Core_Execution_BackgroundWorkerLoop_ConsumerCount">BackgroundWorkerLoop.ConsumerCount</a>
     </div>
     <div>
@@ -337,6 +343,9 @@ Class BackgroundWorkerLoop&lt;T&gt;
   <div class="markdown level1 summary"><p>入队——统一入口，所有生产者经此方法。</p>
 <p>★ 内建 <a class="xref" href="TC.Tier.Core.Collections.BucketPriorityQueue-2.html">BucketPriorityQueue&lt;TPriority, T&gt;</a> 无锁入队 + 异步唤醒等待的消费者。</p>
 <p>★ 默认优先级 <a class="xref" href="TC.Tier.Core.Execution.WorkerPriority.html#TC_Tier_Core_Execution_WorkerPriority_Normal">Normal</a>（多数场景不关心优先级 = FIFO）。</p>
+<p>★ Dispose 后入队抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>——工作项将永无人消费（消费者已随
+  worker 停机），生产方据此外观的完成信号永不出现（#479 挂死族）；Stop 未 Dispose 允许入队
+  （CORE-19 重启语义，队列内容跨启停保留）。</p>
 </div>
   <div class="markdown level1 conceptual"></div>
 

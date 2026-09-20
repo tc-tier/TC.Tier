@@ -298,6 +298,11 @@ Class BucketPriorityQueue&lt;TPriority, T&gt;
   </h3>
 
   <div class="markdown level1 summary"><p>释放——唤醒等待的消费者（消费者通常经 worker 的 ct 退出，此处兜底无 ct 调用者）。</p>
+<pre><code>        &lt;p&gt;★ Dispose 后 1:1 许可不变量失效（本方法灌入的唤醒许可无对应项）：消费者拿到幽灵许可后
+          &lt;xref href=&quot;TC.Tier.Core.Collections.BucketPriorityQueue%602.TryDequeue(%601%40)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 落空，下一轮循环顶部 &lt;code&gt;_disposed&lt;/code&gt; 检查抛
+          &lt;xref href=&quot;System.ObjectDisposedException&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;——有界失败，非挂起；残余项不再被消费（Dispose 后入队
+          由 worker 入队面守卫拦截）。&lt;/p&gt;
+</code></pre>
 </div>
   <div class="markdown level1 conceptual"></div>
 

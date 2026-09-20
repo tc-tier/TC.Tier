@@ -591,14 +591,51 @@ Class StorageEngineOptions
 
 
 
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WorkerScheduler_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WorkerScheduler*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WorkerScheduler" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WorkerScheduler">
+  WorkerScheduler
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>引擎 worker 调度器选项（null = 全默认——<a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_RecommendedThreadCount">RecommendedThreadCount</a>
+专用线程，诊断名 &quot;engine-worker&quot;）。</p>
+<p>★ 线程数与引擎实例数线性绑定是默认形态的存量成本（#486）：嵌入式/多实例（Multi-Raft 多配置组）
+  场景可 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html#TC_Tier_Runtime_Storage_StorageEngineOptions_WithSchedulerThreads_System_Int32_">WithSchedulerThreads(int)</a> 调小（2~4 即够）；跨实例共享一组线程 =
+  经 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineBuilder.html">StorageEngineBuilder</a> 注入 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Shared">Shared</a>（或自建实例）——
+  组数↑线程数恒定。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IsolatedSchedulerOptions? WorkerScheduler { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Execution.IsolatedSchedulerOptions.html">IsolatedSchedulerOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
   <h2 class="section" id="methods">Methods
 </h2>
 
 
   <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_Builder_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Builder*"></a>
 
-  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_Builder_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Storage_Compact_ICompact_TC_Tier_Runtime_Storage_Checkpoint_ICheckpoint_TC_Tier_Core_Logging_ILogger_TC_Tier_Core_Observability_ObservabilityHub_TC_Tier_Core_Epochs_LightEpoch_System_Func_TC_Tier_Runtime_AddressSpace_ISegmentHandler_TC_Tier_Runtime_AddressSpace_ISegmentHandler__" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Builder(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Storage.Compact.ICompact,TC.Tier.Runtime.Storage.Checkpoint.ICheckpoint,TC.Tier.Core.Logging.ILogger,TC.Tier.Core.Observability.ObservabilityHub,TC.Tier.Core.Epochs.LightEpoch,System.Func{TC.Tier.Runtime.AddressSpace.ISegmentHandler,TC.Tier.Runtime.AddressSpace.ISegmentHandler})">
-  Builder(IFileSystem, ICompact?, ICheckpoint?, ILogger?, ObservabilityHub?, LightEpoch?, Func&lt;ISegmentHandler, ISegmentHandler&gt;?)
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_Builder_TC_Tier_Core_IO_IFileSystem_TC_Tier_Runtime_Storage_Compact_ICompact_TC_Tier_Runtime_Storage_Checkpoint_ICheckpoint_TC_Tier_Core_Logging_ILogger_TC_Tier_Core_Observability_ObservabilityHub_TC_Tier_Core_Epochs_LightEpoch_System_Func_TC_Tier_Runtime_AddressSpace_ISegmentHandler_TC_Tier_Runtime_AddressSpace_ISegmentHandler__TC_Tier_Core_Execution_IsolatedTaskScheduler_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.Builder(TC.Tier.Core.IO.IFileSystem,TC.Tier.Runtime.Storage.Compact.ICompact,TC.Tier.Runtime.Storage.Checkpoint.ICheckpoint,TC.Tier.Core.Logging.ILogger,TC.Tier.Core.Observability.ObservabilityHub,TC.Tier.Core.Epochs.LightEpoch,System.Func{TC.Tier.Runtime.AddressSpace.ISegmentHandler,TC.Tier.Runtime.AddressSpace.ISegmentHandler},TC.Tier.Core.Execution.IsolatedTaskScheduler)">
+  Builder(IFileSystem, ICompact?, ICheckpoint?, ILogger?, ObservabilityHub?, LightEpoch?, Func&lt;ISegmentHandler, ISegmentHandler&gt;?, IsolatedTaskScheduler?)
   
   </h3>
 
@@ -608,7 +645,7 @@ Class StorageEngineOptions
   <div class="markdown level1 conceptual"></div>
 
   <div class="codewrapper">
-    <pre><code class="lang-csharp hljs">public StorageEngineBuilder Builder(IFileSystem root, ICompact? compact = null, ICheckpoint? checkpoint = null, ILogger? logger = null, ObservabilityHub? hub = null, LightEpoch? epoch = null, Func&lt;ISegmentHandler, ISegmentHandler&gt;? segmentHandlerDecorator = null)</code></pre>
+    <pre><code class="lang-csharp hljs">public StorageEngineBuilder Builder(IFileSystem root, ICompact? compact = null, ICheckpoint? checkpoint = null, ILogger? logger = null, ObservabilityHub? hub = null, LightEpoch? epoch = null, Func&lt;ISegmentHandler, ISegmentHandler&gt;? segmentHandlerDecorator = null, IsolatedTaskScheduler? workerScheduler = null)</code></pre>
   </div>
 
   <h4 class="section">Parameters</h4>
@@ -633,6 +670,11 @@ Class StorageEngineOptions
 </dd>
     <dt><code>segmentHandlerDecorator</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="TC.Tier.Runtime.AddressSpace.ISegmentHandler.html">ISegmentHandler</a>, <a class="xref" href="TC.Tier.Runtime.AddressSpace.ISegmentHandler.html">ISegmentHandler</a>&gt;</dt>
     <dd><p>可选的段处理器装饰器（包在默认委托外层——合成建段时序等取证/测试面）。</p>
+</dd>
+    <dt><code>workerScheduler</code> <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></dt>
+    <dd><p>可选的外部 worker 调度器（共享形态——多引擎/多实例共用一组专用线程，
+线程数随实例数恒定，#486；所有权归调用方，引擎只引用不释放。null = 引擎按
+<a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html#TC_Tier_Runtime_Storage_StorageEngineOptions_WorkerScheduler">WorkerScheduler</a> 配置自建并 own）。</p>
 </dd>
   </dl>
 
@@ -1128,6 +1170,45 @@ Class StorageEngineOptions
 
 
 
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithSchedulerThreads_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithSchedulerThreads*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithSchedulerThreads_System_Int32_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithSchedulerThreads(System.Int32)">
+  WithSchedulerThreads(int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>设置引擎 worker 调度器专用线程数（返回新实例；其余调度器选项全默认）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StorageEngineOptions WithSchedulerThreads(int threadCount)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>threadCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>专用线程数 M（1 ≤ M ≤ ProcessorCount——越界由 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Create_TC_Tier_Core_Execution_IsolatedSchedulerOptions_">Create(IsolatedSchedulerOptions?)</a> 校验抛出）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
+    <dd><p>替换 WorkerScheduler 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithSegment_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithSegment*"></a>
 
   <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithSegment_System_Int64_System_Boolean_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithSegment(System.Int64,System.Boolean)">
@@ -1157,6 +1238,45 @@ Class StorageEngineOptions
   <dl class="parameters">
     <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
     <dd><p>替换 SegmentGrowthLimit/EnableSegmentation 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithWorkerScheduler_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithWorkerScheduler*"></a>
+
+  <h3 id="TC_Tier_Runtime_Storage_StorageEngineOptions_WithWorkerScheduler_TC_Tier_Core_Execution_IsolatedSchedulerOptions_" data-uid="TC.Tier.Runtime.Storage.StorageEngineOptions.WithWorkerScheduler(TC.Tier.Core.Execution.IsolatedSchedulerOptions)">
+  WithWorkerScheduler(IsolatedSchedulerOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>设置引擎 worker 调度器选项（返回新实例——完整旋钮：队列容量/watchdog/重启策略等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public StorageEngineOptions WithWorkerScheduler(IsolatedSchedulerOptions schedulerOptions)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>schedulerOptions</code> <a class="xref" href="TC.Tier.Core.Execution.IsolatedSchedulerOptions.html">IsolatedSchedulerOptions</a></dt>
+    <dd><p>调度器选项，非空（诊断名建议保留 &quot;engine-worker&quot; 前缀）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a></dt>
+    <dd><p>替换 WorkerScheduler 后的新 <a class="xref" href="TC.Tier.Runtime.Storage.StorageEngineOptions.html">StorageEngineOptions</a> 实例。</p>
 </dd>
   </dl>
 

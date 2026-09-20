@@ -147,6 +147,57 @@ var node = await TierRaftNodeBuilder.Create(id, TierFs.New(&quot;local:///data/r
 </table>
 <p>二选一，双供给/零供给均 fail-fast（不偷偷选形态）。多节点同进程测试拓扑：
 每节点一个 <code>hub.Register(id)</code> 注入即可。</p>
+<h2 id="加入既有集群standby-引导三档">加入既有集群（Standby 引导三档）</h2>
+<p>空盘节点不以完整配置启动，而是向既有集群宣告加入（<code>JoinAsync</code> 随启动编排）：</p>
+<table>
+<thead>
+<tr>
+<th>档位</th>
+<th>Builder</th>
+<th>完成信号</th>
+<th>典型场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Standby（缺省）</td>
+<td><code>WithJoin(...)</code></td>
+<td><code>node.Raft.IsVoter</code> 翻真</td>
+<td>扩容新节点——追平自动晋级</td>
+</tr>
+<tr>
+<td>永久只读副本</td>
+<td><code>WithJoinAsLearner(...)</code></td>
+<td>配置收敛含自身</td>
+<td>DP 观察副本——永不晋级不影响选举面</td>
+</tr>
+<tr>
+<td>见证者（witness）</td>
+<td><code>WithJoinAsWitness(...)</code> + <code>StartWitnessAsync()</code></td>
+<td>受理即完成</td>
+<td>第三票防脑裂省全量副本</td>
+</tr>
+</tbody>
+</table>
+<p><code>WithJoin</code> / <code>WithJoinAsLearner</code> 各有 <code>NodeId[]</code>（进程内/已互联传输）与
+<code>IPEndPoint[]</code>（TCP 端点拨号）两个重载；两形态下 join 都会向 leader 通告本端
+监听地址（leader 回连复制），完成前对全部 bootstrap 对端补建链路（换届免疫）。</p>
+<pre><code class="lang-csharp">// 永久只读副本（TCP 端点拨号形态）
+var dpNode = await TierRaftNodeBuilder.Create(idDp, fs, config, machine)
+    .WithClusterTransport(listen, peers)
+    .WithJoinAsLearner(idA, idB)
+    .StartAsync(ct);
+
+// 见证者——无日志体/无状态机/无快照，非 TierRaftNode 形态：
+var witness = await TierRaftNodeBuilder.Create(idW, fs, config, machine)
+    .WithClusterTransport(listenW, peersW)
+    .WithJoinAsWitness(idA, idB)
+    .StartWitnessAsync(ct);
+// witness.Raft——投票/角色观测面；witness.Store——高水位断言流（LastLogIndex 单调不降）
+</code></pre>
+<p>witness 节点（<code>TierRaftWitnessNode</code>）以高水位断言流代替日志体：投票计入选主与提交
+多数派、不存全量数据、永不自荐/晋级——MongoDB arbitrator / PolarDB witness 同位。
+leader 侧单操作登记走 <code>node.Membership.AddWitnessAsync(member)</code>。</p>
 <h2 id="配置链tierraftnodeoptions">配置链（TierRaftNodeOptions）</h2>
 <table>
 <thead>
@@ -221,6 +272,13 @@ var node = await TierRaftNodeBuilder.Create(id, TierFs.New(&quot;local:///data/r
 拨号按表直连，缺表项 = 该成员不可达。</li>
 <li><strong>同步等待启动</strong>：<code>StartAsync()</code> 返回 <code>Task</code>——用 <code>await</code>，禁止
 <code>GetAwaiter().GetResult()</code>（线程池耗尽死锁风险）。</li>
+<li><strong>witness 档走错入口</strong>：<code>WithJoinAsWitness</code> 须配 <code>StartWitnessAsync</code>——
+<code>StartAsync</code> 检测到 witness 档直接抛（witness 无日志体/状态机，非完整节点形态）。</li>
+<li><strong>witness 配 autoPromote</strong>：<code>JoinAsync(asWitness: true, autoPromote: true)</code> 组合
+fail-fast——witness 投票不存数据、永不转 voter。</li>
+<li><strong>成员表拨号不通告地址</strong>：TCP 形态 <code>JoinAsync</code> 依赖本端监听地址通告
+（builder 自解析 <code>WithClusterTransport</code> 的 listen；注入传输形态解析不出时显式传
+<code>listenEndPoint</code>）——缺通告 leader 无法回连，配置不收敛、Join 超时。</li>
 <li><strong>Swarm 未装配却期待快照追赶</strong>：<code>WithSwarm</code> 缺省 = 快照安装传输面禁用，落后
 follower 越过快照边界后无法追平——生产集群装配 Swarm。</li>
 </ul>
