@@ -87,6 +87,7 @@ public sealed partial class TierVolumeFs
     public IFileHandle Open(string path, FileOpenOptions options)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
+        options.EnsurePermissionsSupported(Capabilities, path, nameof(Open));   // #493：卷介质无 POSIX 权限——显式请求拒绝
         if (options.Access == AccessMode.Read)
             _maintenance.ThrowIfReadsRejected(nameof(Open), path);
         else

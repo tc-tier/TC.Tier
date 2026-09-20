@@ -34,10 +34,11 @@ internal static class ForbiddenPatternRules
     internal const string KeyPack = "tier_forbidden.pack";
     internal const string KeyScopeHotPath = "tier_forbidden.scope.hotpath_discipline";
     internal const string KeyExemptBareThreads = "tier_forbidden.exempt.bare_threads";
+    internal const string KeyAdditionalBareThreads = "tier_forbidden.bare_threads.additional";
 
     private static readonly HashSet<string> KnownKeys = new(StringComparer.Ordinal)
     {
-        KeyPack, KeyScopeHotPath, KeyExemptBareThreads,
+        KeyPack, KeyScopeHotPath, KeyExemptBareThreads, KeyAdditionalBareThreads,
     };
 
     private static readonly HashSet<string> KnownPacks = new(StringComparer.Ordinal)
@@ -93,10 +94,11 @@ internal static class ForbiddenPatternRules
         "CreateInstance", "Load", "LoadFrom", "LoadFile", "Invoke", "GetValue", "SetValue", "GetGenericArguments",
     };
 
-    /// <summary>裸线程构造类型清单（System.Threading 命名空间）——语义确认构造类型才报。</summary>
+    /// <summary>裸线程构造类型清单（System.Threading 命名空间）——语义确认构造类型才报。
+    /// 消费方追加类型走 <see cref="KeyAdditionalBareThreads"/> 配置（精确全名、add-only），不改包。</summary>
     private static readonly HashSet<string> BareThreadConstructorNames = new(StringComparer.Ordinal)
     {
-        "Thread", "PeriodicTimer", "SemaphoreSlim", "Mutex", "ManualResetEvent", "ManualResetEventSlim",
+        "Thread", "PeriodicTimer", "Timer", "SemaphoreSlim", "Mutex", "ManualResetEvent", "ManualResetEventSlim",
     };
 
     private sealed class ForbiddenConfig
@@ -108,6 +110,7 @@ internal static class ForbiddenPatternRules
         public bool HotPathDiscipline;
         public string? HotPathAttributeFqn;
         public readonly List<string> BareThreadExemptPrefixes = [];
+        public readonly List<string> BareThreadAdditionalNames = [];
 
         public bool HasAny =>
             Reflection || SyncOverAsync || FireAndForget || BareThreads || HotPathDiscipline;
@@ -163,7 +166,8 @@ internal static class ForbiddenPatternRules
         if (config.BareThreads)
         {
             var exemptPrefixes = config.BareThreadExemptPrefixes.ToImmutableArray();
-            start.RegisterOperationAction(ctx => AnalyzeBareThreadCreation(ctx, exemptPrefixes),
+            var additionalNames = config.BareThreadAdditionalNames.ToImmutableArray();
+            start.RegisterOperationAction(ctx => AnalyzeBareThreadCreation(ctx, exemptPrefixes, additionalNames),
                 OperationKind.ObjectCreation);
             start.RegisterSyntaxNodeAction(ctx => AnalyzeBareThreadInvocation(ctx, exemptPrefixes),
                 SyntaxKind.InvocationExpression);
@@ -229,6 +233,16 @@ internal static class ForbiddenPatternRules
                 case KeyExemptBareThreads:
                     foreach (var prefix in TierConfigValues.SplitList(value))
                         config.BareThreadExemptPrefixes.Add(prefix);
+                    break;
+
+                case KeyAdditionalBareThreads:
+                    foreach (var typeName in TierConfigValues.SplitList(value))
+                    {
+                        if (typeName.IndexOfAny(['*', '?']) >= 0)
+                            errors.Add($"{KeyAdditionalBareThreads} 仅支持精确类型全名（无通配）：'{typeName}'");
+                        else
+                            config.BareThreadAdditionalNames.Add(typeName);
+                    }
                     break;
             }
         }
@@ -364,14 +378,23 @@ internal static class ForbiddenPatternRules
     // === TCSG134：裸线程 ===
 
     private static void AnalyzeBareThreadCreation(OperationAnalysisContext context,
-        ImmutableArray<string> exemptPrefixes)
+        ImmutableArray<string> exemptPrefixes, ImmutableArray<string> additionalNames)
     {
         if (context.Operation is not IObjectCreationOperation creation) return;
         var constructed = creation.Type;
         if (constructed is not INamedTypeSymbol named) return;
         var def = named.OriginalDefinition;
-        if (def.ContainingNamespace?.ToDisplayString() != "System.Threading") return;
-        if (!BareThreadConstructorNames.Contains(def.Name)) return;
+        var ns = def.ContainingNamespace?.ToDisplayString();
+        if (ns != "System.Threading")
+        {
+            // 追加清单 = 精确类型全名匹配（消费方配置追加，add-only——内建底线不被覆盖）
+            var fqn = ns is null ? def.Name : ns + "." + def.Name;
+            if (!additionalNames.Contains(fqn)) return;
+        }
+        else if (!BareThreadConstructorNames.Contains(def.Name))
+        {
+            return;
+        }
 
         if (IsExempt(context.ContainingSymbol, exemptPrefixes)) return;
         context.ReportDiagnostic(Diagnostic.Create(BareThreadsRule,

@@ -261,7 +261,17 @@ public sealed class IsolatedTaskScheduler : TaskScheduler, IDisposable
         {
             _tasks.Add(task);
         }
-        catch (InvalidOperationException) { return; }   // CompleteAdding 后丢弃孤儿 Task
+        catch (InvalidOperationException)
+        {
+            // CompleteAdding 后入队（Dispose 竞态/超时遗留 continuation）——丢弃孤儿 Task，不抛回入队线程。
+            // ★ 丢弃必须 ERROR 可见：被丢弃的 Task 永不完成，其等待链将永久 park（#479 挂死族根因——
+            //   静默丢弃使这类挂死不可归因）；本日志即下次挂死的第一现场（附 owner 关停顺序契约提示）。
+            _logger?.LogError(
+                "IsolatedTaskScheduler {Name} 已关停（Dispose/CompleteAdding）仍收到任务入队——孤儿 Task 已丢弃，"
+                + "其等待方将永久挂起。owner 关停契约：先停 worker 并确认退出（超时即违序信号），再 Dispose 调度器",
+                _name);
+            return;
+        }
         if (!timing.IsActive) return;
         metrics.Counter("scheduler.task.enqueued", _nameTag);
         var blockedMicros = timing.ElapsedMicros();   // Add 阻塞耗时（有界满时 = 背压等待）

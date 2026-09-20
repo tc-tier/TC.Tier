@@ -94,6 +94,41 @@ public sealed class FileOpenOptionsTests
         var act = () => new FileOpenOptions { Mode = FileOpenMode.OpenExisting, Access = AccessMode.Read }.Validate();
         act.Should().NotThrow();
     }
+
+    [Theory]
+    [InlineData(FileOpenMode.OpenExisting)]
+    [InlineData(FileOpenMode.Truncate)]
+    public void Validate_PermissionsWithNonCreationMode_Throws(FileOpenMode mode)
+    {
+        // Unix 权限位仅创建形态可指定（OpenExisting/Truncate 不可能创建——模式错配 fail-fast，不静默忽略）
+        var act = () => new FileOpenOptions
+        {
+            Mode = mode, Access = AccessMode.ReadWrite,
+            UnixPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+        }.Validate();
+        act.Should().Throw<ArgumentException>().Which.Message.Should().Contain("creation-capable");
+    }
+
+    [Theory]
+    [InlineData(FileOpenMode.CreateNew)]
+    [InlineData(FileOpenMode.OpenOrCreate)]
+    [InlineData(FileOpenMode.Append)]
+    public void Validate_PermissionsWithCreationMode_Legal(FileOpenMode mode)
+    {
+        var act = () => new FileOpenOptions
+        {
+            Mode = mode, Access = AccessMode.Write,
+            UnixPermissions = UnixFileMode.UserRead | UnixFileMode.UserWrite,
+        }.Validate();
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Validate_NullPermissionsAnyMode_Legal()
+    {
+        var act = () => new FileOpenOptions { Mode = FileOpenMode.OpenExisting, Access = AccessMode.Read, UnixPermissions = null }.Validate();
+        act.Should().NotThrow();
+    }
 }
 
 /// <summary>

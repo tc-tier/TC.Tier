@@ -90,4 +90,12 @@ public enum FileSystemCapabilities
     ///   p99.9 ≥150ms 不达标（perf/tierwal-contracts.md）——TierWalBuilder.StartAsync 据此 fail-fast。</para>
     /// </summary>
     CarrierWriteThrough = 1 << 18,
+
+    /// <summary>
+    /// Unix 文件权限位面（创建期 <see cref="FileOpenOptions.UnixPermissions"/> 生效）——仅 Disk Unix 侧
+    /// （Linux/macOS）置位；Windows Disk / Mem / Remote / TierVolume 不置位。
+    /// <para>★ 安全面语义：未置位实现遇到显式权限请求抛 <see cref="IOError.Unsupported"/>
+    ///   （<b>绝不静默忽略</b>——消费者以为 0600 实际 0644 是安全漏洞，不是回退）。</para>
+    /// </summary>
+    UnixPermissions = 1 << 19,
 }

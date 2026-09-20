@@ -27,7 +27,8 @@ internal static class TierConfigChannel
         IEnumerable<SyntaxTree> trees, string tierKeyPrefix, List<string> conflicts)
     {
         var global = provider.GlobalOptions;
-        var merged = new Dictionary<string, string>(StringComparer.Ordinal);
+        // 编辑器配置键规范即大小写不敏感——跨源同键异大小写按同键合并/冲突检测（不按异键双记）
+        var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in global.Keys)
         {
             if (global.TryGetValue(key, out var value)) merged[key] = value;
@@ -35,7 +36,7 @@ internal static class TierConfigChannel
 
         // 同一 options 实例只消费一次（同目录树共享 editorconfig 作用域——实例引用相同）
         var seen = new HashSet<AnalyzerConfigOptions>();
-        var conflictingKeys = new HashSet<string>(StringComparer.Ordinal);
+        var conflictingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var tree in trees)
         {
             var treeOptions = provider.GetOptions(tree);
@@ -43,7 +44,7 @@ internal static class TierConfigChannel
 
             foreach (var key in treeOptions.Keys)
             {
-                if (!key.StartsWith(tierKeyPrefix, StringComparison.Ordinal)) continue;
+                if (!key.StartsWith(tierKeyPrefix, StringComparison.OrdinalIgnoreCase)) continue;
                 if (!treeOptions.TryGetValue(key, out var value)) continue;
 
                 if (merged.TryGetValue(key, out var existing))

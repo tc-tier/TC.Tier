@@ -292,6 +292,78 @@ public class LayerDependencyTests
         diags.Where(d => d.Id == "TCSG133").Should().BeEmpty("非公开类型不在契约面");
     }
 
+    // === 程序集名大小写不敏感（#491 回归——左值/右值与实际 AssemblyName 大小写不一致
+    //     曾导致 131/132 规则整体静默失活，配置校验 139 却正常开火）===
+
+    [Fact]
+    public async Task ZeroInternalRefs_AssemblyNameCaseMismatch_StillReportsTCSG131()
+    {
+        var siblingRef = BuildLibraryReference("tc.traffic.engine",
+            "namespace Traffic.Engine { public class E { } }");
+
+        var diags = await AnalyzeAsync("""
+            namespace Traffic.Contracts;
+            public class C { }
+            """, "tc.traffic.contracts", new Dictionary<string, string>
+        {
+            ["tier_layer.zero_internal_refs"] = "TC.Traffic.Contracts",
+            ["tier_layer.internal_assembly_prefix"] = "TC.Traffic.",
+        }, siblingRef);
+
+        diags.Where(d => d.Id == "TCSG131").Should().HaveCount(1,
+            "CLR 程序集名比较大小写不敏感——左值与 AssemblyName 大小写不一致不得静默失活");
+    }
+
+    [Fact]
+    public async Task AllowedReference_AssemblyNameCaseMismatch_StillReportsTCSG132()
+    {
+        var allowedRef = BuildLibraryReference("app.allowed", "namespace App.Allowed { public class A { } }");
+        var strangerRef = BuildLibraryReference("App.Stranger", "namespace App.Stranger { public class S { } }");
+
+        var diags = await AnalyzeAsync("""
+            namespace App.Main;
+            public class C { }
+            """, "app.main", new Dictionary<string, string>
+        {
+            ["tier_layer.allowed_reference"] = "App.Main => App.Allowed",
+        }, allowedRef, strangerRef);
+
+        var violations = diags.Where(d => d.Id == "TCSG132").ToList();
+        violations.Should().HaveCount(1, "左值大小写不匹配仍激活规则；右值大小写不匹配仍入白名单");
+        violations[0].GetMessage().Should().Contain("App.Stranger");
+    }
+
+    [Fact]
+    public async Task AllowedReference_WildcardLeftCaseMismatch_StillReportsTCSG132()
+    {
+        var strangerRef = BuildLibraryReference("App.Stranger", "namespace App.Stranger { public class S { } }");
+
+        var diags = await AnalyzeAsync("""
+            namespace App.Main;
+            public class C { }
+            """, "app.main", new Dictionary<string, string>
+        {
+            ["tier_layer.allowed_reference"] = "APP.MAIN* => App.Nothing",
+        }, strangerRef);
+
+        diags.Where(d => d.Id == "TCSG132").Should().HaveCount(1, "前缀通配左值同样大小写不敏感");
+    }
+
+    [Fact]
+    public async Task NamespacePrefix_NamespaceCaseMismatch_IsOutsidePrefix_ReportsTCSG133()
+    {
+        var diags = await AnalyzeAsync("""
+            namespace other;
+            public class Leaked { }
+            """, "App", new Dictionary<string, string>
+        {
+            ["tier_layer.namespace_prefix"] = "App => Other",
+        });
+
+        diags.Where(d => d.Id == "TCSG133").Should().HaveCount(1,
+            "命名空间是区分大小写的 C# 标识符——大小写不匹配 = 越界（与程序集名语义有意相反）");
+    }
+
     // === 零默认诊断 ===
 
     [Fact]
@@ -322,6 +394,17 @@ public class LayerDependencyTests
 
         diags.Where(d => d.Id == "TCSG139").Should().HaveCount(1);
         diags.First(d => d.Id == "TCSG139").Severity.Should().Be(Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public async Task UnknownKey_DifferentCase_StillReportsTCSG139()
+    {
+        var diags = await AnalyzeAsync("namespace App; public class C { }", "App", new Dictionary<string, string>
+        {
+            ["TIER_LAYER.TOTALY_BOGUS_KEY"] = "A => B",   // 编辑器配置键大小写不敏感——仍属未知键
+        });
+
+        diags.Where(d => d.Id == "TCSG139").Should().HaveCount(1, "键比较大小写不敏感，改大小写不绕过校验");
     }
 
     [Fact]

@@ -24,7 +24,19 @@ public sealed record FileOpenOptions
     /// <summary>预分配大小——&gt;0 时 open 即幂等预分配（两步舞收拢；预分配是创建期动作，不参与池 key）。</summary>
     public long PreallocateSize { get; init; }
 
-    /// <summary>组合合法性校验——非法抛 <see cref="ArgumentException"/>（Append 须写权限；写模式须写权限；Append 与 Truncate/CreateNew 互斥由枚举单值天然保证）。</summary>
+    /// <summary>
+    /// Unix 文件权限位（创建期生效——#493 密钥 0600 场景）。null = 平台缺省（umask 决定），零行为变化。
+    /// <para>★ 生效语义：本次打开<b>实际创建了文件</b>时应用——<see cref="FileOpenMode.CreateNew"/> 恒创建；
+    ///   <see cref="FileOpenMode.OpenOrCreate"/>/<see cref="FileOpenMode.Append"/> 仅在文件不存在而由本次创建时
+    ///   应用（并发抢先建的落败方不应用——文件归抢先方所有）。<see cref="FileOpenMode.OpenExisting"/>/
+    ///   <see cref="FileOpenMode.Truncate"/> 不可能创建——显式传值在 <see cref="Validate"/> 拒绝（模式错配 fail-fast）。</para>
+    /// <para>★ 平台语义：仅 Unix（Linux/macOS）Disk 支持（能力位 <see cref="FileSystemCapabilities.UnixPermissions"/>）；
+    ///   未置位实现遇到非 null 值抛 <c>IOError.Unsupported</c>——安全权限请求<b>绝不静默忽略</b>。
+    ///   应用时点 = 打开返回前（消费者写内容之前）——空文件窗口极短且先于任何敏感数据落盘。</para>
+    /// </summary>
+    public UnixFileMode? UnixPermissions { get; init; }
+
+    /// <summary>组合合法性校验——非法抛 <see cref="ArgumentException"/>（Append 须写权限；写模式须写权限；Append 与 Truncate/CreateNew 互斥由枚举单值天然保证；Unix 权限位仅创建形态可指定）。</summary>
     /// <param name="paramName">参数名（默认 "options"）</param>
     public void Validate(string paramName = "options")
     {
@@ -36,5 +48,21 @@ public sealed record FileOpenOptions
 
         if (PreallocateSize < 0)
             throw new ArgumentException($"PreallocateSize must be >= 0, got {PreallocateSize}.", paramName);
+
+        if (UnixPermissions is not null
+            && Mode is not (FileOpenMode.CreateNew or FileOpenMode.OpenOrCreate or FileOpenMode.Append))
+            throw new ArgumentException(
+                $"UnixPermissions requires a creation-capable FileOpenMode (CreateNew/OpenOrCreate/Append), got FileOpenMode.{Mode}.",
+                paramName);
+    }
+
+    /// <summary>权限位介质支持守卫（各 IFileSystem.Open 入口调）——能力位未置位且显式请求权限 = 抛
+    /// Unsupported（安全面绝不静默忽略；能力位契约的"无回退族"形态）。</summary>
+    internal void EnsurePermissionsSupported(FileSystemCapabilities capabilities, string path, string operationName)
+    {
+        if (UnixPermissions is not null && (capabilities & FileSystemCapabilities.UnixPermissions) == 0)
+            throw new FileIOException(IOError.Unsupported,
+                $"Unix 文件权限位在本介质不支持（能力位 UnixPermissions 未置位），显式请求 UnixPermissions={UnixPermissions} 被拒绝——安全权限请求不降级: {path}",
+                path, operationName);
     }
 }

@@ -54,6 +54,15 @@ public sealed class BinaryLayoutGoldenTests : GoldenTestBase
                 [FieldOffset(44), ValidRange(0, 255)] public ushort Len;
             }
 
+            [BinaryLayout(Features = BinaryLayoutFeatures.All, Endianness = LayoutEndianness.BigEndian)]
+            [StructLayout(LayoutKind.Explicit, Size = 8)]
+            public struct BigEndianFixture
+            {
+                [FieldOffset(0)] public ushort Id;
+                [FieldOffset(2)] public ushort Flags;
+                [FieldOffset(4)] public uint Value;
+            }
+
             [BinaryLayout]
             [StructLayout(LayoutKind.Explicit, Size = 16)]
             public readonly struct ReadonlyFixture

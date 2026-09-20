@@ -49,6 +49,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         {"OrFlags","OrFlags"},
         {"IsEmpty","IsEmpty"},
         {"Features","Features"},
+        {"Endianness","Endianness"},
     };
 
     // BinaryLayoutFeatures flag values (must match BinaryLayoutFeatures enum)
@@ -150,7 +151,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                     if (ctx.TargetNode is RecordDeclarationSyntax)
                         return new LayoutInfo(
                             structSymbol.ContainingNamespace.IsGlobalNamespace ? "" : structSymbol.ContainingNamespace.ToDisplayString(),
-                            structSymbol.Name, [], 0, null, null, 0,
+                            structSymbol.Name, [], 0, null, null, 0, 0,
                             Diagnostic.Create(UnsupportedRecordStructRule, ctx.TargetNode.GetLocation(), structSymbol.Name),
                             false, false, "", false, ctx.TargetNode.GetLocation());
                     return ParseLayout(structSymbol, ctx.TargetNode.GetLocation(), ct);
@@ -335,6 +336,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         string? isEmptyField = null;
         int featureFlags = 0;
 
+        var endianness = 0;   // LayoutEndianness.LittleEndian（缺省——既有铁律）
         var layoutAttr = structSymbol.GetAttributes().FirstOrDefault(
             a => a.AttributeClass?.Name == BinaryLayoutName);
         if (layoutAttr is not null)
@@ -347,6 +349,16 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                     isEmptyField = ie;
                 if (na.Key == BinaryLayoutFieldNames["Features"] && na.Value.Value is int ff)
                     featureFlags = ff;
+                if (na.Key == BinaryLayoutFieldNames["Endianness"])
+                {
+                    // Roslyn 对枚举型 named arg 装箱形态在 int/enum 间有版本差异——双形态兼容
+                    endianness = na.Value.Value switch
+                    {
+                        int i => i,
+                        Enum e => Convert.ToInt32(e),
+                        _ => 0,
+                    };
+                }
             }
         }
 
@@ -386,6 +398,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             orFlagsField,
             isEmptyField,
             featureFlags,
+            endianness,
             unsupportedFieldType ?? sizeMismatch,
             isReadOnly,
             canConstruct,
@@ -491,6 +504,8 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         var structRefName = layout.ContainingType + structName;
         var codecName = structName + "Codec";
 
+        // 字节序 token（缺省小端——既有铁律；BigEndian 面向网络字节序协议）
+        var endianToken = layout.Endianness == 1 ? "BigEndian" : "LittleEndian";
         var sections = new System.Text.StringBuilder();
 
         // ── StructSize ──
@@ -517,6 +532,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                 layout.Fields.Select(f =>
                 {
                     var tokens = ExprTokens(f);
+                    tokens["ENDIAN"] = endianToken;
                     tokens["TYPE"] = f.Type.ToDisplayString();
                     tokens["NAME"] = f.Name;
                     tokens["EXPR"] = RenderTpl(ReadExprTpl(FormOf(f).Kind), tokens);
@@ -533,6 +549,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                 layout.Fields.Select(f =>
                 {
                     var tokens = StmtTokens(f, "value");
+                    tokens["ENDIAN"] = endianToken;
                     tokens["TYPE"] = f.Type.ToDisplayString();
                     tokens["NAME"] = f.Name;
                     tokens["STMT"] = RenderTpl(WriteStmtTpl(FormOf(f).Kind), tokens);
@@ -582,7 +599,9 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             string valueExpr = f.Constraint is { Kind: ConstraintKind.Equals } c
                 ? "validate ? " + FormatConst(c.EqExpected, f.Type) + " : value." + f.Name
                 : "value." + f.Name;
-            writeStmts.Add(RenderTpl(WriteStmtTpl(FormOf(f).Kind), StmtTokens(f, valueExpr)));
+            var tokens = StmtTokens(f, valueExpr);
+            tokens["ENDIAN"] = endianToken;
+            writeStmts.Add(RenderTpl(WriteStmtTpl(FormOf(f).Kind), tokens));
         }
         var guard = RenderGuard(layout.SizeConstValue, "dest");
         var writeBody = string.Join("\n",
@@ -605,7 +624,12 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
             {
                 // readonly + CanConstruct：构造调用（字段按 offset 排序对应构造函数参数序）
                 var args = string.Join(", ", layout.Fields.OrderBy(f => f.Offset)
-                    .Select(f => RenderTpl(ReadExprTpl(FormOf(f).Kind), ExprTokens(f))));
+                    .Select(f =>
+                    {
+                        var tokens = ExprTokens(f);
+                        tokens["ENDIAN"] = endianToken;
+                        return RenderTpl(ReadExprTpl(FormOf(f).Kind), tokens);
+                    }));
                 body = RenderTpl(TplReadCtorBody, Tokens(
                     ("STRUCTREF", structRefName),
                     ("ARGS", args)));
@@ -615,6 +639,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                 var fields = string.Join("\n", layout.Fields.Select((f, i) =>
                 {
                     var tokens = ExprTokens(f);
+                    tokens["ENDIAN"] = endianToken;
                     tokens["NAME"] = f.Name;
                     tokens["EXPR"] = RenderTpl(ReadExprTpl(FormOf(f).Kind), tokens);
                     tokens["COMMA"] = i == layout.Fields.Count - 1 ? "" : ",";
@@ -643,6 +668,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                 sections.Append(RenderTpl(TplOrFlags, Tokens(
                     ("STRUCTNAME", structName),
                     ("FIELD", f.Name),
+                    ("ENDIAN", endianToken),
                     ("OFFSET", f.Offset.ToString()))));
         }
         if (!string.IsNullOrEmpty(layout.IsEmptyField))
@@ -652,6 +678,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
                 sections.Append(RenderTpl(TplIsEmpty, Tokens(
                     ("STRUCTNAME", structName),
                     ("FIELD", f.Name),
+                    ("ENDIAN", endianToken),
                     ("OFFSET", f.Offset.ToString()))));
         }
 
@@ -998,6 +1025,7 @@ public sealed class BinaryLayoutGenerator : IIncrementalGenerator
         string? OrFlagsField,
         string? IsEmptyField,
         int FeatureFlags,
+        int Endianness,
         Diagnostic? Diagnostic,
         bool IsReadOnly,
         bool CanConstruct,
