@@ -88,7 +88,7 @@ public abstract partial class MirrorBase : LifecycleBase<MirrorRecoveryHints>, I
         _fs = fs;
         _settings = settings;
         _metaTransport = metaTransport;
-        _engine = new StorageEngine(fs, settings.MainEngine);
+        _engine = new StorageEngine(fs, settings.MainEngine, workerScheduler: settings.WorkerScheduler);
         Resources.Add(_engine, ownership: ResourceOwnership.Owned);
         if (settings.MetaPolicyKind == MetaPolicyKind.Managed)
         {
@@ -104,8 +104,10 @@ public abstract partial class MirrorBase : LifecycleBase<MirrorRecoveryHints>, I
                     enableSegmentation: false,
                     preallocateFile: false,
                     deleteOnClose: _settings.MainEngine.DeleteOnClose)
-                .WithHints(_settings.MainEngine.Hints);
-            _metaEngine = new StorageEngine(_fs, metaOptions);
+                .WithHints(_settings.MainEngine.Hints)
+                // ★ 调度器配置形态随主引擎继承（null = no-op）
+                .WithWorkerScheduler(_settings.MainEngine.WorkerScheduler);
+            _metaEngine = new StorageEngine(_fs, metaOptions, workerScheduler: settings.WorkerScheduler);
             // ★ meta 引擎进 Resources（owned）——ManagedMetaPolicy.Dispose 只释放自身 buffer，不管引擎
             Resources.Add(_metaEngine, "metaEngine");
             logger?.LogInformation("Managed meta engine created: {MetaEngineName}", _metaEngine.EngineName);

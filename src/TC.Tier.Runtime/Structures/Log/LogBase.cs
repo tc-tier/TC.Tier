@@ -105,7 +105,7 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
         _metaTransport = metaTransport;
         _cursorFactory = cursorFactory;
 
-        _engine = new StorageEngine(fs, settings.MainEngine);
+        _engine = new StorageEngine(fs, settings.MainEngine, workerScheduler: settings.WorkerScheduler);
         Resources.Add(_engine, ownership: ResourceOwnership.Owned);
 
         // ★ Managed meta 引擎构造期内联构建（纯 Create 零 IO——启动在 OnInitializeBegin，与主引擎并行）。
@@ -116,8 +116,10 @@ public abstract partial class LogBase : LifecycleBase<LogRecoveryHints>, ITransa
                     preallocateFile: false,
                     deleteOnClose: settings.MainEngine.DeleteOnClose)
                 .WithSegment(Math.Max(4096, 1L << 20), enableSegmentation: false)
-                .WithHints(settings.MainEngine.Hints);
-            _metaEngine = new StorageEngine(_fs, metaOptions);
+                .WithHints(settings.MainEngine.Hints)
+                // ★ 调度器配置形态随主引擎继承（null = no-op）——否则配置形态只到主引擎，meta 引擎回落默认
+                .WithWorkerScheduler(settings.MainEngine.WorkerScheduler);
+            _metaEngine = new StorageEngine(_fs, metaOptions, workerScheduler: settings.WorkerScheduler);
             // ★ meta 引擎进 Resources（owned）——ManagedMetaPolicy.Dispose 只释放自身 buffer，不管引擎
             Resources.Add(_metaEngine, "metaEngine");
             logger?.LogInformation("Managed meta engine created: {MetaEngineName}", _metaEngine.EngineName);

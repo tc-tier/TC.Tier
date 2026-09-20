@@ -1,3 +1,5 @@
+using TC.Tier.Core.Execution;
+
 namespace TC.Tier.Products.Blob;
 
 /// <summary>
@@ -33,4 +35,13 @@ public sealed record TierBlobOptions
     /// TotalLength 对账——捕获截断/撕裂）；true = 整帧读回 + CRC64 全量校验（TB 级对象恢复耗时线性，
     /// 仅运维深检场景开启）。</summary>
     public bool DeepVerifyOnRecovery { get; init; }
+
+    /// <summary>引擎 worker 调度器（共享注入形态——data/meta 两引擎共用一组线程；所有权 Referenced
+    /// 归注入方——TierBlob 释放不回收）。null = 缺省自建；非空时 <see cref="WorkerSchedulerOptions"/>
+    /// 配置形态被忽略（#505 两形态词汇统一）。</summary>
+    public IsolatedTaskScheduler? WorkerScheduler { get; init; }
+
+    /// <summary>引擎 worker 调度器选项（配置形态——每引擎按此自建，null = 全默认 RecommendedThreadCount）。
+    /// 实例 <see cref="WorkerScheduler"/> 非空时本项被忽略。</summary>
+    public IsolatedSchedulerOptions? WorkerSchedulerOptions { get; init; }
 }

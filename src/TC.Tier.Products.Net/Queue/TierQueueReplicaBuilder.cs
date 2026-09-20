@@ -189,6 +189,16 @@ public sealed class TierQueueReplicaBuilder : IDisposable, IAsyncDisposable
         return this;
     }
 
+    /// <summary>注入引擎 worker 调度器共享实例（#505——本地核心全部引擎共用一组线程；
+    /// 多副本同进程/测试拓扑线程数恒定；所有权归注入方）。</summary>
+    /// <param name="scheduler">共享调度器实例（如 <see cref="TC.Tier.Core.Execution.IsolatedTaskScheduler.Shared"/>）。</param>
+    /// <returns>TierQueueReplicaBuilder（链式）。</returns>
+    public TierQueueReplicaBuilder WithWorkerScheduler(TC.Tier.Core.Execution.IsolatedTaskScheduler scheduler)
+    {
+        _coreBuilder.WithWorkerScheduler(scheduler);
+        return this;
+    }
+
     /// <summary>注入 raft 装配参数（组身份/初始配置/组持久卷——必填才能 StartAsync）。</summary>
     /// <param name="raftOptions">raft 装配参数。</param>
     /// <returns>TierQueueReplicaBuilder（链式）。</returns>

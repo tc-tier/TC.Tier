@@ -33,8 +33,9 @@ public static class TierKvAssembly
                 enableSegmentation: true, preallocateFile: preallocate, deleteOnClose: false)
             .WithHints(options.Hints)
             .WithMetaTupleFlushInterval(options.MetaTupleFlushInterval);
-        // 调度器配置透传（#486——null = 引擎默认；非空 = 同实例双引擎同用该配置）
-        return options.WorkerScheduler is { } scheduler ? engine.WithWorkerScheduler(scheduler) : engine;
+        // 调度器配置形态透传（#486——null = 引擎默认；非空 = 同实例双引擎同用该配置；
+        // 实例共享形态不经此处——经 Settings.WorkerScheduler 直达结构内全部引擎含 meta）
+        return options.WorkerSchedulerOptions is { } scheduler ? engine.WithWorkerScheduler(scheduler) : engine;
     }
 
     /// <summary>Ring 数据引擎 Settings（meta 策略随 Options——锚点 W 随水位落盘载体，W5 检查点依赖；
@@ -55,6 +56,7 @@ public static class TierKvAssembly
             Preallocate = options.RingPreallocate,
             OverflowPolicy = options.RingOverflowPolicy,
             MinOverflowSize = options.RingMinOverflowSize,
+            WorkerScheduler = options.WorkerScheduler,
         };
 
     /// <summary>Hash 主索引 Settings（表容量/溢出池随 Options）。</summary>
@@ -66,6 +68,7 @@ public static class TierKvAssembly
         {
             HashTableCapacity = options.HashTableCapacity,
             OverflowPoolCapacity = options.OverflowPoolCapacity,
+            WorkerScheduler = options.WorkerScheduler,
         };
 
     /// <summary>
@@ -87,12 +90,18 @@ public static class TierKvAssembly
     /// <param name="options">TierKv 选项。</param>
     /// <returns>BTree 主索引 Settings。</returns>
     public static BTreeIndexSettings BTreeSettings(IFileSystem fs, TierKvOptions options)
-        => new(EngineOptions(fs, options, IndexEngineSuffix));
+        => new(EngineOptions(fs, options, IndexEngineSuffix))
+        {
+            WorkerScheduler = options.WorkerScheduler,
+        };
 
     /// <summary>SkipList 主索引 Settings（缺省几何——Options 无 SkipList 专属轴）。</summary>
     /// <param name="fs">文件系统抽象（介质面）。</param>
     /// <param name="options">TierKv 选项。</param>
     /// <returns>SkipList 主索引 Settings。</returns>
     public static SkipListIndexSettings SkipListSettings(IFileSystem fs, TierKvOptions options)
-        => new(EngineOptions(fs, options, IndexEngineSuffix));
+        => new(EngineOptions(fs, options, IndexEngineSuffix))
+        {
+            WorkerScheduler = options.WorkerScheduler,
+        };
 }

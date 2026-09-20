@@ -58,7 +58,7 @@ public abstract partial class ProbingIndexBase<TKey> : LifecycleBase<ProbingInde
         ProbingIndexCodec = codec;
 
         // ★ 主引擎（构造期 Create 纯装配零 IO——对齐 RingBase/LogBase；启动在 OnInitializeBegin，就绪等待在恢复核心）
-        _engine = new StorageEngine(fs, settings.MainEngine);
+        _engine = new StorageEngine(fs, settings.MainEngine, workerScheduler: settings.WorkerScheduler);
         Resources.Add(_engine, ownership: ResourceOwnership.Owned);
         SectorSize = (int)_engine.SectorSize;
 

@@ -61,7 +61,8 @@ public abstract class GoldenTestBase
         return diagnostics;
     }
 
-    /// <summary>生成产物 ↔ golden 目录逐字比对（GOLDEN_DUMP=1 时先写回快照）。</summary>
+    /// <summary>生成产物 ↔ golden 目录逐字比对（GOLDEN_DUMP=1 时先写回快照；行尾不变式——
+    /// checkout 的 autocrlf 不参与断言，#503 战役实证 CRLF 污染的单文件让全量 golden 假红）。</summary>
     protected static void AssertMatchesGolden(GeneratorDriver? driver, string goldenSubdir)
     {
         driver.Should().NotBeNull("生成器不应抛异常（fail-fast 缺陷形态）");
@@ -83,10 +84,13 @@ public abstract class GoldenTestBase
         var expected = Directory.GetFiles(goldenDir)
             .ToDictionary(name => Path.GetFileName(name) ?? "", path => File.ReadAllText(path));
 
+        static string NormalizeEol(string text) => text.Replace("\r\n", "\n", StringComparison.Ordinal);
+
         generated.Keys.Should().BeEquivalentTo(expected.Keys,
             "生成产物集合应与 golden 文件集合一致（缺/多即生成器输出面漂移）");
 
         foreach (var (name, expectedText) in expected)
-            generated[name].Should().Be(expectedText, "生成产物应与 golden 文件逐字一致：{0}", name);
+            NormalizeEol(generated[name]).Should().Be(NormalizeEol(expectedText),
+                "生成产物应与 golden 文件逐字一致（行尾无关）：{0}", name);
     }
 }

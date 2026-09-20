@@ -175,7 +175,7 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
         PageCountMask = PageCount - 1;
 
         // ★ 主引擎（构造期 Create 纯装配零 IO——对齐 LogBase；启动在 OnInitializeBegin，就绪等待在恢复核心）
-        _engine = new StorageEngine(fs, settings.MainEngine);
+        _engine = new StorageEngine(fs, settings.MainEngine, workerScheduler: settings.WorkerScheduler);
         Resources.Add(_engine, ownership: ResourceOwnership.Owned);
         SectorSize = (int)_engine.SectorSize;
         if (PageSize < SectorSize)
@@ -192,8 +192,10 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
                 deleteOnClose: settings.MainEngine.DeleteOnClose)
                 .WithSegment(Math.Max(settings.PageSize, settings.MainEngine.SegmentGrowthLimit),
                     enableSegmentation: true)
-                .WithHints(settings.MainEngine.Hints);
-            _overflowEngine = new StorageEngine(fs, ovOptions);
+                .WithHints(settings.MainEngine.Hints)
+                // ★ 调度器配置形态随主引擎继承（null = no-op）
+                .WithWorkerScheduler(settings.MainEngine.WorkerScheduler);
+            _overflowEngine = new StorageEngine(fs, ovOptions, workerScheduler: settings.WorkerScheduler);
             Resources.Add(_overflowEngine, ownership: ResourceOwnership.Owned);
         }
 
@@ -210,8 +212,10 @@ public abstract partial class RingBase<TKey> : LifecycleBase<RingRecoveryHints>,
                     preallocateFile: false,
                     deleteOnClose: settings.MainEngine.DeleteOnClose)
                 .WithSegment(Math.Max(4096, 1L << 20), enableSegmentation: false)
-                .WithHints(settings.MainEngine.Hints);
-            _metaEngine = new StorageEngine(_fs, metaOptions);
+                .WithHints(settings.MainEngine.Hints)
+                // ★ 调度器配置形态随主引擎继承（null = no-op）
+                .WithWorkerScheduler(settings.MainEngine.WorkerScheduler);
+            _metaEngine = new StorageEngine(_fs, metaOptions, workerScheduler: settings.WorkerScheduler);
             // ★ meta 引擎进 Resources（owned）——ManagedMetaPolicy.Dispose 只释放自身 buffer，不管引擎
             Resources.Add(_metaEngine, "metaEngine");
             logger?.LogInformation("Managed meta engine created: {MetaEngineName}", _metaEngine.EngineName);

@@ -1,5 +1,6 @@
 using TC.Tier.Contracts.Meta;
 using TC.Tier.Core.Epochs;
+using TC.Tier.Core.Execution;
 using TC.Tier.Core.Logging;
 using TC.Tier.Core.Lifecycle;
 using TC.Tier.Runtime.Storage;
@@ -89,6 +90,7 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
     private TierQueueStorageOptionsFactory? _storageOptionsFactory;
     private MetaPolicyFactory<RingMetaHeader, RingMetaPayload>? _ringMetaPolicyFactory;
     private LightEpoch? _epoch;
+    private IsolatedTaskScheduler? _workerScheduler;   // 调度器共享注入（#505——多实例一组线程）
     private ILogger? _logger;
 
     private TierQueue? _queue;
@@ -191,6 +193,18 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
         return this;
     }
 
+    /// <summary>注入引擎 worker 调度器共享实例（#505——ring/延迟/幂等/组注册表全部引擎共用一组线程；
+    /// 多实例/嵌入式/测试拓扑线程数恒定；所有权 Referenced 归注入方——Queue 释放不回收）。
+    /// 不注入 = 各引擎按 StorageOptionsFactory 配置自建。</summary>
+    /// <param name="scheduler">共享调度器实例（如 <see cref="IsolatedTaskScheduler.Shared"/>）。</param>
+    /// <returns>TierQueueBuilder（链式）。</returns>
+    public TierQueueBuilder WithWorkerScheduler(IsolatedTaskScheduler scheduler)
+    {
+        ArgumentNullException.ThrowIfNull(scheduler);
+        _workerScheduler = scheduler;
+        return this;
+    }
+
     /// <summary>注入日志器。</summary>
     /// <param name="logger">日志器实例。</param>
     /// <returns>TierQueueBuilder（链式）。</returns>
@@ -224,7 +238,7 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
             //   （OnInitializeBegin 并行启动 Ring/注册表 → 后台恢复核心 join + 组装配 + 延迟对账 +
             //   恢复自动截断）→ WaitForReady
             var queue = new TierQueue(ring, registry, _fs, dlq, delayIndex, idemIndex,
-                _groupMetaFactory, _storageOptionsFactory, _options, _logger);
+                _groupMetaFactory, _storageOptionsFactory, _workerScheduler, _options, _logger);
             queue.Initialize(hints);
             await queue.WaitForReadyAsync(ct).ConfigureAwait(false);
 
@@ -268,6 +282,7 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
             // ★ 水位持久化（Settings 基类默认 Disabled=no-op——不显式开则重启丢水位，
             //   回退 engine.CommittedTail=预分配假尾；2026-08-27 裸 Ring 探针实锤）
             MetaPolicyKind = MetaPolicyKind.Managed,
+            WorkerScheduler = _workerScheduler,
         };
         if (_ringFactory is { } f) return f(_fs, settings);
         return new RingOfQueueKey(settings, _fs, metaPolicyFactory: _ringMetaPolicyFactory,
@@ -284,6 +299,7 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
             enableSegmentation: true, preallocateFile: false)))
         {
             PayloadSize = _options.GroupRegistryPayloadSize,
+            WorkerScheduler = _workerScheduler,
         };
         return _registryMetaFactory?.Invoke(_fs, settings) ?? new VersionedMetadata(_fs, settings, epoch: _epoch);
     }
@@ -335,6 +351,7 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
             PersistencePolicy = _options.Delayed.PersistencePolicy ?? new(),
             NodeSize = _options.Delayed.NodeSize,
             MinFillPercent = _options.Delayed.MinFillPercent,
+            WorkerScheduler = _workerScheduler,
         };
         // ★ 构造零 IO——Initialize 延迟到主队列恢复核心（Ring 就绪后；resolver 依赖 Ring Ready）
         var resolver = new DelayedKeyResolver(ring);
@@ -359,6 +376,7 @@ public sealed class TierQueueBuilder : IDisposable, IAsyncDisposable
         {
             HashTableCapacity = o.HashTableCapacity,
             OverflowPoolCapacity = o.OverflowPoolCapacity,
+            WorkerScheduler = _workerScheduler,
         };
         // ★ 构造零 IO——Initialize 延迟到主队列恢复核心（Ring 就绪后；resolver 依赖 Ring Ready）
         var resolver = new IdemKeyResolver(ring);

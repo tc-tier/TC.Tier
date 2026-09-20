@@ -137,7 +137,7 @@ public abstract partial class MetadataBase
 
         // ★ 引擎构造 = 配置（对齐 LogBase）：fs 注入 + settings.MainEngine（Metadata 版本链默认单段模式）。
         //   SectorSize 属性读 _fs.Volume（构造即可用，不依赖 Initialize）——padding/热区分配安全。
-        _engine = new StorageEngine(fs, settings.MainEngine);
+        _engine = new StorageEngine(fs, settings.MainEngine, workerScheduler: settings.WorkerScheduler);
         Resources.Add(_engine, ownership: ResourceOwnership.Owned);
         // epoch（注入或内部 new 自管）——LightEpoch 实现 IDisposable，进 Resources 统一释放
         _epoch = epoch ?? new LightEpoch();
@@ -166,8 +166,10 @@ public abstract partial class MetadataBase
                     enableSegmentation: false,
                     preallocateFile: false,
                     deleteOnClose: _settings.MainEngine.DeleteOnClose)
-                .WithHints(_settings.MainEngine.Hints);
-            _metaEngine = new StorageEngine(_fs, metaOptions);
+                .WithHints(_settings.MainEngine.Hints)
+                // ★ 调度器配置形态随主引擎继承（null = no-op）
+                .WithWorkerScheduler(_settings.MainEngine.WorkerScheduler);
+            _metaEngine = new StorageEngine(_fs, metaOptions, workerScheduler: settings.WorkerScheduler);
             // ★ meta 引擎进 Resources（owned）——ManagedMetaPolicy.Dispose 只释放自身 buffer，不管引擎
             Resources.Add(_metaEngine, "metaEngine");
             logger?.LogInformation("Managed meta engine created: {MetaEngineName}", _metaEngine.EngineName);

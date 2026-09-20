@@ -90,13 +90,20 @@ public sealed class TierWal : LifecycleBase<WalRecoveryHints>, ITierWal
         // ★ 镜像快照部件（第三部件）——本地存储恒为 IncrementalSnapshot（raft 冷启动必须本地载入）：
         //   SnapshotAsync 写它（增量段——方案 A 落地面）；Export/Import 经注入传输面（默认无注入 = 单机不导出）。
         //   ★ hints 随主引擎（DIO 最优默认——镜像写同为顺序大块形态，见 TierWalOptions.Hints 文档）。
+        //   ★ 旋钮透传（#505）：快照几何/Optimization/耐久化泵周期/时钟随 Options——与主引擎同源。
         _snapshot = new IncrementalSnapshot(fs, new IncrementalSnapshotSettings(
-            new StorageEngineOptions($"{options.WalName}.snapshot", 64L << 20,
+            new StorageEngineOptions($"{options.WalName}.snapshot", options.SnapshotSegmentGrowthLimit,
                 enableSegmentation: true, preallocateFile: false)
-                .WithHints(options.Hints))
+                .WithHints(options.Hints)
+                .WithOptimization(options.Optimization)
+                .WithMetaTupleFlushInterval(options.MetaTupleFlushInterval)
+                .WithClock(options.Clock)
+                .WithWorkerScheduler(options.WorkerSchedulerOptions))
         {
             MetaPolicyKind = MetaPolicyKind.Managed,
             MetaOpaqueBytes = options.MetaOpaqueBytes,
+            // ★ worker 调度器共享注入随 Options——快照引擎（+快照 meta）与主日志侧同组线程
+            WorkerScheduler = options.WorkerScheduler,
         });
         _snapshotPersistence = snapshotPersistence;
         // ★ EntryLog 与快照进资源组（Owned）——TierWal Dispose 随析构（生命周期统一）

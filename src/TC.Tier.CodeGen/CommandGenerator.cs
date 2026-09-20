@@ -372,7 +372,7 @@ public sealed partial class CommandGenerator : IIncrementalGenerator
             if (byFqn[root.Fqn] != root) continue;
             EmitRoot(spc, root, byFqn);
             EmitHttpRoot(spc, root, byFqn);
-            EmitJsonRoot(spc, root, byFqn);
+            EmitJsonRoot(spc, root);
         }
     }
 

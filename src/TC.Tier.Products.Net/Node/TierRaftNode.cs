@@ -175,6 +175,7 @@ public sealed class TierRaftNode : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(config);
         ArgumentNullException.ThrowIfNull(machine);
         options ??= TierRaftNodeOptions.Default;
+        options = ApplyResourceProfile(options);
         EnableHighResolutionTimer(options.HighResolutionTimer, logger);
 
         logger?.LogInformation("装配① TierWal 启动开始");
@@ -224,6 +225,15 @@ public sealed class TierRaftNode : IAsyncDisposable
     //   后全部收敛 ~1ms。进程生命周期生效不配对 timeEndPeriod（引用计数无害，进程退出统一清理）；
     //   Linux 原生高精度，no-op。
     private static int _highResolutionTimerEnabled;
+
+    /// <summary>资源档位展开（装配期一次定性——只补缺省）：低资源档在未显式注入调度器时把
+    /// <see cref="TierRaftNodeOptions.Wal"/> 收敛到进程级共享单例（全部引擎一组线程——多实例
+    /// 线程数恒定）；显式 <c>WithWorkerScheduler</c> 注入恒优先；高性能档 = 缺省自建形态零改动。
+    /// 协议专用线程（raft/apply/传输）不受档位影响——活性地板（2026-09-03 判例）。</summary>
+    private static TierRaftNodeOptions ApplyResourceProfile(TierRaftNodeOptions options)
+        => options.ResourceProfile == TierRaftResourceProfile.LowResource && options.Wal.WorkerScheduler is null
+            ? options.WithWorkerScheduler(IsolatedTaskScheduler.Shared)
+            : options;
 
     internal static void EnableHighResolutionTimer(bool enabled, ILogger? logger)
     {

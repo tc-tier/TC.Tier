@@ -154,6 +154,7 @@ public sealed class TierBlobBuilder : IDisposable, IAsyncDisposable
             // ★ 数据引擎 meta Disabled：对象帧自描述（footer magic 反扫找尾 O(1)），
             //   表是登记真相源——数据引擎水位持久化属 2PC 语义，TierBlob 单写通道下无悬干形态
             MetaPolicyKind = MetaPolicyKind.Disabled,
+            WorkerScheduler = _options.WorkerScheduler,
         };
         return _dataFactory?.Invoke(_fs, settings) ?? new StreamSnapshot(_fs, settings);
     }
@@ -167,13 +168,20 @@ public sealed class TierBlobBuilder : IDisposable, IAsyncDisposable
         {
             SessionBufferSize = _options.TableSessionBufferSize,
             MetaPolicyKind = MetaPolicyKind.Managed,
+            WorkerScheduler = _options.WorkerScheduler,
         };
         return _tableFactory?.Invoke(_fs, settings) ?? new StreamSnapshot(_fs, settings);
     }
 
-    /// <summary>引擎选项变换（注入工厂优先；null = 原样 defaults）。</summary>
+    /// <summary>引擎选项变换（注入工厂优先；null = 原样 defaults；配置形态调度器在此应用——
+    /// 共享实例形态经 Settings 直达）。</summary>
     private StorageEngineOptions EngineOptions(string componentName, StorageEngineOptions defaults)
-        => _storageOptionsFactory?.Invoke(componentName, defaults) ?? defaults;
+    {
+        var applied = _options.WorkerSchedulerOptions is { } scheduler
+            ? defaults.WithWorkerScheduler(scheduler)
+            : defaults;
+        return _storageOptionsFactory?.Invoke(componentName, applied) ?? applied;
+    }
 
     /// <inheritdoc/>
     public void Dispose()

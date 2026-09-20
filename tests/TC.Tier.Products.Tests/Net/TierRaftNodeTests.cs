@@ -13,6 +13,8 @@ namespace TC.Tier.Products.Tests.Net;
 /// <summary>
 /// TierRaftNode 产品装配集成测试（D6 接线收口）：3 节点 InProcess 全链——选举收敛 / 复制+apply /
 /// 宿主快照压缩调度（增长阈值 → SnapshotIndex 推进）/ 版本发布与反熵循环挂载（leader 门）。
+/// <para>★ 调度器共享注入形态（低资源档）的契约验证归 TierWalWorkerSchedulerTests——
+/// 本类是产品默认档（每引擎自建调度器）的时序敏感验证仪，不混注入变量。</para>
 /// </summary>
 public class TierRaftNodeTests
 {
