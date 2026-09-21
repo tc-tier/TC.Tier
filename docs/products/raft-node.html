@@ -253,8 +253,36 @@ leader 侧单操作登记走 <code>node.Membership.AddWitnessAsync(member)</code
 <td>true</td>
 <td>Windows 提升定时器分辨率至 1ms（时序敏感路径）</td>
 </tr>
+<tr>
+<td><code>WithWorkerScheduler</code></td>
+<td>null（自建）</td>
+<td>引擎 worker 调度器共享注入——多节点同进程全部引擎共用一组线程（跨实例线程数恒定；经 <code>WithWal</code> 亦可）</td>
+</tr>
+<tr>
+<td><code>WithResourceProfile</code></td>
+<td>HighPerformance</td>
+<td>资源档位（见下节）</td>
+</tr>
 </tbody>
 </table>
+<h2 id="资源档位线程与内存地板">资源档位（线程与内存地板）</h2>
+<p>嵌入式/多节点同进程/边缘部署的线程收缩入口（#505）：</p>
+<pre><code class="lang-csharp">var options = TierRaftNodeOptions.Default
+    .WithResourceProfile(TierRaftResourceProfile.LowResource);   // 或 WithWorkerScheduler(共享实例)
+</code></pre>
+<ul>
+<li><strong>HighPerformance（缺省）</strong>：每引擎自建 2~4 条专用调度线程——单实例并发最优，现网行为零变化。</li>
+<li><strong>LowResource</strong>：全部引擎（主日志/meta/快照）共用一组线程；Wal 未定制时几何随档收缩
+（页 4MB→1MB、快照段 64MB→8MB、worker 消费者 2→1）——<strong>用户主权</strong>：Wal 任一字段定制过
+则档位只补调度器缺省，几何不越权改写。</li>
+<li><strong>吞吐实测</strong>（8 实例并发写）：自建 898~3845 ops/s vs 共享 2 线程 921~4246 ops/s（mem/local 双介质
+持平略优），线程 -77%~-82%。</li>
+<li><strong>Host 级作用域</strong>：<code>TierRaftHost</code> 多宿主同进程时，低资源组各自持 Host 专属调度器实例
+（懒建、Dispose 随 Host）——宿主之间不互抢线程，无需手工装配。</li>
+<li><strong>活性地板不动</strong>：raft 共识循环/apply worker/复制 lane/传输收发循环的协议专用线程不受档位
+影响（2026-09-03 活性判例——上池 = 心跳停发 = 集群冻结）。</li>
+<li><strong>Witness 免疫</strong>：<code>TierRaftWitnessNode</code> 高水位存储为纯内存断言流（零引擎零线程）——无档位需求。</li>
+</ul>
 <h2 id="观测面">观测面</h2>
 <ul>
 <li><code>node.Raft.IsLeader</code> / <code>node.Raft.LeaderId</code> / <code>node.Raft.CommitIndex</code>——角色与进度；</li>

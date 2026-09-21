@@ -290,6 +290,48 @@ Interface IFileSystem
 
 
 
+  <a id="TC_Tier_Core_IO_IFileSystem_ApplyInodeMode_" data-uid="TC.Tier.Core.IO.IFileSystem.ApplyInodeMode*"></a>
+
+  <h3 id="TC_Tier_Core_IO_IFileSystem_ApplyInodeMode_System_String_System_IO_UnixFileMode_" data-uid="TC.Tier.Core.IO.IFileSystem.ApplyInodeMode(System.String,System.IO.UnixFileMode)">
+  ApplyInodeMode(string, UnixFileMode)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对既有 inode 置 Unix 权限位（path-based chmod——#508）。</p>
+<p>★ 与创建期 <a class="xref" href="TC.Tier.Core.IO.FileOpenOptions.html#TC_Tier_Core_IO_FileOpenOptions_UnixPermissions">UnixPermissions</a> 的分工：本原语面向<b>非文件打开路径</b>
+  产出的 inode——典型 = UDS socket（<code>Socket.Bind</code> 产物，权限由 umask 决定，须 bind 后显式收紧
+  至 0600 作 IPC 身份授权铁证）。path-based chmod（fchmodat）对任意 inode 适用——文件/socket/目录同语义。</p>
+<p>★ 能力位协商（#493 同款）：仅置 <a class="xref" href="TC.Tier.Core.IO.FileSystemCapabilities.html#TC_Tier_Core_IO_FileSystemCapabilities_UnixPermissions">UnixPermissions</a> 的实现支持
+  （Unix Disk）；缺省实现抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a>（mem/远程卷无真实 inode、Windows 无
+  POSIX 权限语义——安全权限绝不静默忽略）。平台守卫在实现调用点。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ApplyInodeMode(string path, UnixFileMode mode)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>path</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>相对路径（inode 须已存在）。</p>
+</dd>
+    <dt><code>mode</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.unixfilemode">UnixFileMode</a></dt>
+    <dd><p>目标权限位（典型 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.unixfilemode#system-io-unixfilemode-userread">UserRead</a> | <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.unixfilemode#system-io-unixfilemode-userwrite">UserWrite</a>= 0600）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
   <a id="TC_Tier_Core_IO_IFileSystem_CreateDirectory_" data-uid="TC.Tier.Core.IO.IFileSystem.CreateDirectory*"></a>
 
   <h3 id="TC_Tier_Core_IO_IFileSystem_CreateDirectory_System_String_" data-uid="TC.Tier.Core.IO.IFileSystem.CreateDirectory(System.String)">
