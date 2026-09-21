@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Net;
+using TC.Tier.Core.Execution;
 using TC.Tier.Core.IO;
 using TC.Tier.Core.Logging;
 using TC.Tier.Core.Net.Channels;
@@ -35,6 +36,7 @@ public sealed class TierRaftHost : IAsyncDisposable
     private Task? _reconcileLoop;
     private PeerDiscoveryService? _discovery;   // 二期-F9：发现汇聚循环
     private readonly IAsyncDisposable? _transportOwner;      // 自建传输所有权（Create 形态非空）
+    private IsolatedTaskScheduler? _hostScheduler;           // Host 级调度器作用域（#505——懒建，Dispose 链尾回收）
     private int _started;
     private int _disposed;
 
@@ -140,7 +142,7 @@ public sealed class TierRaftHost : IAsyncDisposable
         }
         var channel = _groupHost.CreateGroup(id);
         var node = await TierRaftNode.StartCoreAsync(_self, groupFs, channel, config, machine,
-            nodeOptions ?? _options.GroupDefaults, _logger, transportOwner: null, groupId: id).ConfigureAwait(false);
+            ApplyHostSchedulerScope(nodeOptions ?? _options.GroupDefaults), _logger, transportOwner: null, groupId: id).ConfigureAwait(false);
         var group = new TierRaftGroup(id, node);
         _groups[id] = group;
         _logger?.LogInformation("TierRaftHost 组装配完成：{Group} members={Count}", id, config.Count);
@@ -251,6 +253,29 @@ public sealed class TierRaftHost : IAsyncDisposable
         await _groupHost.DisposeAsync().ConfigureAwait(false);   // 组路由注销（§8.3：传输晚于宿主）
         if (_transportOwner is not null)
             await _transportOwner.DisposeAsync().ConfigureAwait(false);   // owned 传输链尾（外部传输不释放）
+        if (_hostScheduler is { } scheduler)
+        {
+            try { scheduler.Dispose(); }
+            catch (Exception ex) { _logger?.LogWarning("TierRaftHost 调度器释放异常：{Message}", ex.Message); }
+        }
+    }
+
+    /// <summary>Host 级调度器作用域（#505——低资源档多宿主同进程隔离）：低资源组未显式注入且
+    /// Wal 未定制时，补 Host 专属调度器实例（懒建一次，全组共用，Dispose 随 Host）——替代进程级
+    /// Shared，多 Host 之间不互抢线程。显式注入 / 高性能档 / 已展开组不触碰。</summary>
+    private TierRaftNodeOptions ApplyHostSchedulerScope(TierRaftNodeOptions options)
+    {
+        if (options.ResourceProfile != TierRaftResourceProfile.LowResource
+            || options.Wal.WorkerScheduler is not null
+            || options.Wal != TierWalOptions.Default)
+            return options;
+        var scheduler = _hostScheduler ??= IsolatedTaskScheduler.Create(
+            new IsolatedSchedulerOptions
+            {
+                Name = "raft-host-scheduler",
+                ThreadCount = IsolatedTaskScheduler.RecommendedThreadCount,
+            });
+        return options.WithWal(TierRaftResourceProfileExpander.ApplyLowResourceWal(options.Wal, scheduler));
     }
 
     /// <summary>组句柄实现（读面透传）。</summary>

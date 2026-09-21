@@ -1,5 +1,6 @@
 using System.Reflection;
 using TC.Tier.Core.Execution;
+using TC.Tier.Core.IO;
 using TC.Tier.Core.Net;
 using TC.Tier.Core.Net.Raft;
 using TC.Tier.Core.Net.Transport.InProcess;
@@ -62,6 +63,55 @@ public sealed class TierRaftResourceProfileTests
         }
     }
 
+    /// <summary>双 Host 低资源组：各组引擎持 Host 专属调度器实例（Host 间隔离、非进程 Shared、
+    /// 几何随档收缩）——Host 级作用域 vs 进程级 Shared 的判别面。</summary>
+    [Fact]
+    public async Task LowResource_TwoHosts_EachGroupUsesOwnHostScheduler()
+    {
+        var hubs = new List<InProcessTransportHub>();
+        var hosts = new List<TC.Tier.Products.Net.Host.TierRaftHost>();
+        var pageSizes = new List<int>();
+        var schedulers = new List<IsolatedTaskScheduler?>();
+        try
+        {
+            foreach (var hostIndex in new[] { 0, 1 })
+            {
+                var hub = new InProcessTransportHub();
+                hubs.Add(hub);
+                var id = NodeId.NewRandom();
+                var transport = hub.Register(id);
+                var host = new TC.Tier.Products.Net.Host.TierRaftHost(transport,
+                    new TC.Tier.Products.Net.Host.TierRaftHostOptions
+                    {
+                        GroupFileSystemFactory = _ => TierFs.New("memory:"),
+                        ReconcileInterval = TimeSpan.Zero,
+                    });
+                hosts.Add(host);
+                await host.StartAsync();
+
+                var groupOptions = TierRaftNodeOptions.Default
+                    .WithResourceProfile(TierRaftResourceProfile.LowResource);
+                await host.CreateGroupAsync(new RaftGroupId((ulong)(0x70 + hostIndex)),
+                    new ClusterConfig([new ClusterMember(id, "")]), new CountingMachine(), groupOptions);
+
+                var group = host.GetGroup(new RaftGroupId((ulong)(0x70 + hostIndex)));
+                schedulers.Add(MainEngineScheduler(group.Node));
+                pageSizes.Add(group.Node.Wal.DiagnosticLog.PageSize);
+            }
+
+            // Host 间隔离：各自专属实例（非进程 Shared、互不相同）
+            schedulers[0].Should().NotBeSameAs(IsolatedTaskScheduler.Shared, "Host 作用域 ≠ 进程级 Shared");
+            schedulers[1].Should().NotBeSameAs(IsolatedTaskScheduler.Shared);
+            schedulers[0].Should().NotBeSameAs(schedulers[1], "双 Host 各自专属实例——互不抢线程");
+            pageSizes.Should().OnlyContain(p => p == 1 << 20, "几何预设两 Host 同等生效");
+        }
+        finally
+        {
+            foreach (var h in hosts) { try { await h.DisposeAsync(); } catch { } }
+            foreach (var h in hubs) { try { await h.DisposeAsync(); } catch { } }
+        }
+    }
+
     [Fact]
     public void Options_ResourceProfile_DefaultAndImmutableWithChain()
     {
@@ -87,11 +137,34 @@ public sealed class TierRaftResourceProfileTests
             MainEngineScheduler(node).Should().BeSameAs(IsolatedTaskScheduler.Shared, "主日志引擎");
             SnapshotEngineScheduler(node).Should().BeSameAs(IsolatedTaskScheduler.Shared, "镜像快照引擎");
 
+            // 几何随档收缩（Wal 未定制 = 预设全量生效）：页 1MB / 快照段 8MB / worker 消费者 1
+            node.Wal.DiagnosticLog.PageSize.Should().Be(1 << 20, "低资源档页模型收缩 4MB→1MB");
+
             // 功能面零回归：共享调度器上复制提交照常收敛
             for (var i = 0; i < 3; i++)
                 await node.Raft.ReplicateCommittedAsync(BitConverter.GetBytes(i))
                     .AsTask().WaitAsync(TimeSpan.FromSeconds(30));
             node.Wal.PersistedIndex.Should().BeGreaterThanOrEqualTo(3);
+        }
+        finally
+        {
+            await node.DisposeAsync();
+            await hub.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task LowResource_CustomizedWal_GeometryUserSovereign()
+    {
+        // 用户已定制 Wal（页 18 位）+ 低资源档：调度器仍补缺省（Shared），几何不越权改写
+        var (node, hub) = await StartStandaloneAsync(
+            TierRaftNodeOptions.Default
+                .WithResourceProfile(TierRaftResourceProfile.LowResource)
+                .WithWal(TC.Tier.Products.Wal.TierWalOptions.Default.WithLogPageSizeBits(18)));
+        try
+        {
+            MainEngineScheduler(node).Should().BeSameAs(IsolatedTaskScheduler.Shared, "调度器缺省仍补");
+            node.Wal.DiagnosticLog.PageSize.Should().Be(1 << 18, "用户主权——几何保持用户指定值");
         }
         finally
         {

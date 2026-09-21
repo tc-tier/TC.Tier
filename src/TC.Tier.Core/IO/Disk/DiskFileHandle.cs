@@ -170,7 +170,10 @@ internal sealed class DiskFileHandle : IFileHandle, IFileHandleMetaDurability, I
     /// <inheritdoc/>
     public string Path => _path;
 
-    /// <summary>Unix 权限位应用（#493——仅创建期路径调用；平台守卫在调用点）。</summary>
+    /// <summary>Unix 权限位应用（#493——仅创建期路径调用；平台守卫在调用点）。
+    /// ★ #508 改判：实现为 path-based chmod（<c>File.SetUnixFileMode(string, UnixFileMode)</c>=fchmodat）——
+    /// 对任意 inode 适用（含 UDS socket bind 产物）。公共原语 = <see cref="DiskFileSystem.ApplyInodeMode"/>
+    /// （本私有实现语义与其同源；非文件打开路径的 chmod 场景走公共原语）。</summary>
     [SupportedOSPlatform("linux")]
     [SupportedOSPlatform("macos")]
     private static void ApplyUnixFileMode(string fullPath, UnixFileMode permissions)

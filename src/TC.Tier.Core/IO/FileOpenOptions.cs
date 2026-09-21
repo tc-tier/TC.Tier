@@ -33,6 +33,8 @@ public sealed record FileOpenOptions
     /// <para>★ 平台语义：仅 Unix（Linux/macOS）Disk 支持（能力位 <see cref="FileSystemCapabilities.UnixPermissions"/>）；
     ///   未置位实现遇到非 null 值抛 <c>IOError.Unsupported</c>——安全权限请求<b>绝不静默忽略</b>。
     ///   应用时点 = 打开返回前（消费者写内容之前）——空文件窗口极短且先于任何敏感数据落盘。</para>
+    /// <para>★ 非「文件打开」路径产出的 inode（UDS socket bind 产物等）不走本项——用
+    ///   <see cref="IFileSystem.ApplyInodeMode"/>（path-based chmod 任意 inode，#508）。</para>
     /// </summary>
     public UnixFileMode? UnixPermissions { get; init; }
 

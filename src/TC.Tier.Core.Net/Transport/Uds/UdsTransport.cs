@@ -68,6 +68,7 @@ public sealed class UdsTransport : IProtocolTransport, ICoreProtocolPort
     private readonly NodeId _self;
     private readonly string? _ownPath;
     private readonly IReadOnlyDictionary<NodeId, string> _peerPaths;
+    private readonly UnixFileMode? _socketFileMode;
     private readonly ILogger? _logger;
 
     private readonly ConcurrentDictionary<byte, IRequestHandler> _handlers = new();
@@ -89,14 +90,19 @@ public sealed class UdsTransport : IProtocolTransport, ICoreProtocolPort
     /// <param name="ownPath">本端 socket 文件路径（Dispose unlink）。</param>
     /// <param name="peerPaths">对端路径表（NodeId → socket 路径——拨号目标）。</param>
     /// <param name="logger">日志（可选）。</param>
+    /// <param name="socketFileMode">socket inode 权限位（#508——bind 后收紧，IPC 身份授权铁证面；
+    /// 典型 0600=仅属主可连，替代「本机即信任域」免鉴权）。null = 不置（umask 决定，零行为变化）。
+    /// 仅 Unix（Linux/macOS）生效——Windows 无 POSIX inode 语义，非 null 值在 Start 抛
+    /// <see cref="NotSupportedException"/>（安全权限请求绝不静默忽略）。</param>
     public UdsTransport(NodeId self, string? ownPath, IReadOnlyDictionary<NodeId, string>? peerPaths = null,
-        ILogger? logger = null)
+        ILogger? logger = null, UnixFileMode? socketFileMode = null)
     {
         if (self == NodeId.Empty) throw new ArgumentException("本端节点 ID 不能为 Empty 哨兵。", nameof(self));
         _self = self;
         _ownPath = ownPath;
         _peerPaths = peerPaths ?? new Dictionary<NodeId, string>();
         _logger = logger;
+        _socketFileMode = socketFileMode;
         _inboundSink = new TaskSink("uds-inbound", logger: logger);
     }
 
@@ -130,6 +136,21 @@ public sealed class UdsTransport : IProtocolTransport, ICoreProtocolPort
         UnlinkOwnSocket();   // 残留 socket 清理（进程崩溃遗留）
         _listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
         _listener.Bind(new UnixDomainSocketEndPoint(_ownPath));
+        // ★ #508：bind 后收紧 socket inode 权限位（bind 权限由 umask 决定——典型 0755 世界可连；
+        //   path-based chmod 对 socket inode 适用，安全权限请求绝不静默忽略）
+        if (_socketFileMode is { } mode)
+        {
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            {
+                File.SetUnixFileMode(_ownPath, mode);
+                _logger?.LogInformation("UDS socket 权限位已收紧：{Path} → {Mode}", _ownPath, mode);
+            }
+            else
+            {
+                throw new NotSupportedException(
+                    $"socketFileMode 需 POSIX inode 权限语义（Linux/macOS）——当前平台不支持（值 {mode} 不允许静默忽略）。");
+            }
+        }
         _listener.Listen(16);
         // ★ 专用线程 + AsyncPump 泵域（TCSG138 存量清扫——长稳定生命周期循环不入池，
         //   对齐共识循环先例）：accept 环 = 传输活性源，域内续体回流泵线程，池抖动不断链。

@@ -75,6 +75,45 @@ public sealed class Membership : IDisposable
     }
 
     /// <summary>
+    /// 批量加 learner（#507c——机群批量引导：一条配置条目携多节点，N 节点入队 = O(1) 轮协议）。
+    /// <para>★ 安全性：learner 不投票不计多数派——批量加入不改变投票成员集，quorum 交集论证平凡成立
+    ///   （<see cref="ClusterConfig.AddLearners"/> 头注释）。单条上限 200（wire Count 1B）——更大批次
+    ///   在本 API 内自动分多条批量条目顺序提交（每条都是合法配置快照，串行化门保证无并发交错）。</para>
+    /// <para>★ 幂等：已存在的成员跳过；全部已存在 = 零提案直接返回。</para>
+    /// </summary>
+    /// <param name="learners">批量 learner（ID + 端点；端点空串 = 进程内传输）。</param>
+    /// <param name="cancellationToken">取消令牌（提交中取消——已提交条目不回退，重调续走）。</param>
+    /// <returns>完成时批量条目已 committed 且 applied——活动配置已含全部新 learner。</returns>
+    /// <exception cref="NotLeaderException">本节点非 Leader（无权提案）。</exception>
+    public async Task AddLearnersAsync(
+        IEnumerable<(NodeId Id, string EndPoint)> learners, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(learners);
+        await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            // 分批（每条 ≤200——wire 上限余量）：每批前重读活动配置（幂等收敛——前批已入的跳过）
+            var batch = new List<(NodeId Id, string EndPoint)>(200);
+            foreach (var l in learners)
+            {
+                if (_machine.Config.Contains(l.Id)) continue;   // 幂等（含本批前序条目已提交的）
+                batch.Add(l);
+                if (batch.Count == 200)
+                {
+                    await ProposeAsync(_machine.Config.AddLearners(batch), cancellationToken).ConfigureAwait(false);
+                    batch.Clear();
+                }
+            }
+            if (batch.Count > 0)
+                await ProposeAsync(_machine.Config.AddLearners(batch), cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>
     /// 加 witness（见证者——投票计入选主/提交多数派，不存日志体不自荐、永不晋级；
     /// 三期-F2 装配面便捷操作）：提案 [当前配置 ∪ {member(witness)}]。已存在 = 幂等返回。
     /// </summary>

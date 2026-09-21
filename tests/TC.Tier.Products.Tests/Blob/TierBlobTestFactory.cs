@@ -1,3 +1,4 @@
+using TC.Tier.Core.Execution;
 using TC.Tier.Runtime.Tests;
 
 namespace TC.Tier.Products.Tests.Blob;
@@ -15,11 +16,14 @@ internal static class TierBlobTestFactory
         TableSessionBufferSize = 8 << 10,
     };
 
+    /// <summary>工厂缺省注入共享调度器（#505——configure with 覆盖 = 测试主权；Shared 契约 = 不 Dispose）。</summary>
+    private static TierBlobOptions BaseOptions => DefaultOptions with { WorkerScheduler = IsolatedTaskScheduler.Shared };
+
     public static Task<TierBlob> StartAsync(TestVolume vol,
         Func<TierBlobOptions, TierBlobOptions>? configure = null,
         Action<TierBlobBuilder>? build = null)
     {
-        var options = configure?.Invoke(DefaultOptions) ?? DefaultOptions;
+        var options = configure?.Invoke(BaseOptions) ?? BaseOptions;
         var b = new TierBlobBuilder(vol.Fs, options);
         build?.Invoke(b);
         return b.StartAsync();

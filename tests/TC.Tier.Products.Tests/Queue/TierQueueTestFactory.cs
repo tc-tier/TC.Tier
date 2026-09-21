@@ -17,6 +17,8 @@ internal static class TierQueueTestFactory
     {
         var options = configure?.Invoke(DefaultOptions) ?? DefaultOptions;
         var b = new TierQueueBuilder(vol.Fs, options);
+        // 工厂缺省注入共享调度器（#505——多实例一组引擎线程；Shared 契约 = 调用方不 Dispose）
+        b.WithWorkerScheduler(TC.Tier.Core.Execution.IsolatedTaskScheduler.Shared);
         build?.Invoke(b);
         return b.StartAsync();
     }

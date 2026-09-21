@@ -1,3 +1,4 @@
+using TC.Tier.Core.Execution;
 using TC.Tier.Products.Tests.Wal;
 
 namespace TC.Tier.Products.Tests;
@@ -5,9 +6,14 @@ namespace TC.Tier.Products.Tests;
 /// <summary>TierWAL 测试工厂——默认 mem 介质卷 + Options 配置链。</summary>
 internal static class WalTestFactory
 {
+    /// <summary>工厂缺省注入共享调度器（#505——全测试进程一组引擎线程，多实例线程账地板；
+    /// configure 内显式 WithWorkerScheduler(...) 覆盖 = 测试主权。Shared 契约 = 调用方不 Dispose）。</summary>
+    private static TierWalOptions DefaultOptions { get; } =
+        TierWalOptions.Default.WithWorkerScheduler(IsolatedTaskScheduler.Shared);
+
     public static Task<TierWal> StartAsync(TestVolume vol, Func<TierWalOptions, TierWalOptions>? configure = null)
     {
-        var options = configure?.Invoke(TierWalOptions.Default) ?? TierWalOptions.Default;
+        var options = configure?.Invoke(DefaultOptions) ?? DefaultOptions;
         return options.Builder(vol.Fs).StartAsync();
     }
 
@@ -15,7 +21,7 @@ internal static class WalTestFactory
     public static Task<TierWal> StartAsync(TestVolume vol, Func<TierWalOptions, TierWalOptions>? configure,
         Action<TierWalBuilder> builder)
     {
-        var options = configure?.Invoke(TierWalOptions.Default) ?? TierWalOptions.Default;
+        var options = configure?.Invoke(DefaultOptions) ?? DefaultOptions;
         var b = options.Builder(vol.Fs);
         builder(b);
         return b.StartAsync();
