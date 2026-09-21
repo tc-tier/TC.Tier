@@ -7,13 +7,13 @@
       <meta name="title" content="TC.Tier.Contracts 协调文档 | TC.Tier — .NET 可组合存储运行时 ">
       
       
-      <link rel="icon" href="../../../../favicon.ico">
-      <link rel="stylesheet" href="../../../../public/docfx.min.css">
-      <link rel="stylesheet" href="../../../../public/main.css">
-      <meta name="docfx:navrel" content="../../../../toc.html">
-      <meta name="docfx:tocrel" content="../../../../toc.html">
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
       
-      <meta name="docfx:rel" content="../../../../">
+      <meta name="docfx:rel" content="../../../">
       
       
       <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Contracts/COORDINATION.md/#L1">
@@ -30,7 +30,7 @@
       <meta name="loc:copy" content="Copy">
       <meta name="loc:downloadPdf" content="Download PDF">
 
-      <script type="module" src="./../../../../public/docfx.min.js"></script>
+      <script type="module" src="./../../../public/docfx.min.js"></script>
 
       <script>
         const theme = localStorage.getItem('theme') || 'auto'
@@ -43,8 +43,8 @@
     <header class="bg-body border-bottom">
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
-          <a class="navbar-brand" href="../../../../index.html">
-            <img id="logo" class="svg" src="../../../../logo.svg" alt="TC.Tier">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="TC.Tier">
             TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,9 +63,23 @@
     </header>
 
     <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
 
       <div class="content">
         <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
 
           <nav id="breadcrumb"></nav>
         </div>
@@ -157,7 +171,7 @@
 <hr>
 <h2 id="4-binarylayout-在-contracts-触发核对项">4. <code>[BinaryLayout]</code> 在 Contracts 触发（核对项）</h2>
 <p>Contracts 的 <code>Layout/</code> 与 <code>Storage/LogicalAddress</code> 标了 <code>[BinaryLayout]</code>，经 <code>TC.Tier.CodeGen</code> 产出（<code>obj/.../generated/TC.Tier.CodeGen/TC.Tier.CodeGen.BinaryLayoutGenerator/</code>）：<code>LogicalAddressCodec</code>、<code>Crc32FooterCodec</code>、<code>Crc64FooterCodec</code>。</p>
-<p>源生成器的<strong>用法与注意事项</strong>见 <a href="../TC.Tier.CodeGen.Abstractions/COORDINATION.html"><code>../TC.Tier.CodeGen.Abstractions/COORDINATION.md</code></a> §3。</p>
+<p>源生成器的<strong>用法与注意事项</strong>见 <a href="../codegen-abstractions/COORDINATION.html"><code>../TC.Tier.CodeGen.Abstractions/COORDINATION.md</code></a> §3。</p>
 <hr>
 <h2 id="5-契约红线详解使用易错点">5. 契约红线详解（使用易错点）</h2>
 <blockquote>
@@ -176,7 +190,7 @@
 <li>⚠️ <strong><code>WaitForReady()</code> 禁止在 UI/ASP.NET 等同步上下文调</strong>（同步阻塞后台 Task = 经典死锁）→ 必须 <code>WaitForReadyAsync</code>。<code>Failed</code> 时重抛恢复异常。</li>
 <li><code>IRecovery</code>：统一 <code>RecoverAsync</code>；<code>CancelRecovery()</code> 是 DIM 默认空（纯 ct 轮询取消可不动，需显式停扫盘/释放才 override）。</li>
 <li><code>RecoveryPhase</code>：<strong>控制流只认终态</strong>（Completed/Failed/NotStarted），<code>Recovering</code> 中间态仅供进度展示——别在中间态做业务分支。</li>
-<li>正确实现/继承见 <a href="../../../core/lifecycle.html"><code>../TC.Tier.Core/docs/lifecycle.md</code></a>（Core 的 <code>LifecycleBase</code>/<code>RecoveryBase</code>）。</li>
+<li>正确实现/继承见 <a href="../../core/lifecycle.html"><code>../TC.Tier.Core/docs/lifecycle.md</code></a>（Core 的 <code>LifecycleBase</code>/<code>RecoveryBase</code>）。</li>
 </ul>
 <h3 id="53-存储引擎契约-istorageengine三水位最易错">5.3 存储引擎契约 <code>IStorageEngine</code>（★★三水位最易错）</h3>
 <ul>
@@ -205,7 +219,7 @@
 <li><code>ISequentialReader</code>：越界返回<strong>实际所读字节数</strong>（0=EOF），<strong>不抛</strong>；<code>Seek</code> 到已删除段抛 <code>PartitionInvalidException</code>（硬错误）。</li>
 <li><code>IRecordStore&lt;TKey&gt;</code>：<code>TKey</code> 必须 <code>unmanaged</code>（blittable）；<strong>key 单份原则</strong>（只在 record 存一份，HashIndex tag-only 桶不存 key，tag 命中后回 record 判等）；<code>ReadKeys</code> <strong>必须聚簇 IO</strong>（按地址排序批量，非逐条回源——契约要求非建议）。</li>
 <li>Scan Cursor（<code>IRecordScanCursor</code>/<code>IStructureScanCursor</code>）：零拷贝 Span <strong>仅在下一次 <code>MoveNext</code> 前有效</strong>，用完即弃。</li>
-<li>注：索引 key 比较器 <code>IKeyComparer&lt;TKey&gt;</code> 在 Core/Primitives（见 <a href="../TC.Tier.Core/COORDINATION.html"><code>../TC.Tier.Core/COORDINATION.md</code></a>）。</li>
+<li>注：索引 key 比较器 <code>IKeyComparer&lt;TKey&gt;</code> 在 Core/Primitives（见 <a href="../core/COORDINATION.html"><code>../TC.Tier.Core/COORDINATION.md</code></a>）。</li>
 </ul>
 <h3 id="56-事务-2pcitransactionlog--itransactionparticipant">5.6 事务 2PC（<code>ITransactionLog</code> / <code>ITransactionParticipant</code>）</h3>
 <ul>

@@ -7,13 +7,13 @@
       <meta name="title" content="TC.Tier.Core 协调框架使用指南 | TC.Tier — .NET 可组合存储运行时 ">
       
       
-      <link rel="icon" href="../../../../favicon.ico">
-      <link rel="stylesheet" href="../../../../public/docfx.min.css">
-      <link rel="stylesheet" href="../../../../public/main.css">
-      <meta name="docfx:navrel" content="../../../../toc.html">
-      <meta name="docfx:tocrel" content="../../../../toc.html">
+      <link rel="icon" href="../../../favicon.ico">
+      <link rel="stylesheet" href="../../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../../public/main.css">
+      <meta name="docfx:navrel" content="../../../toc.html">
+      <meta name="docfx:tocrel" content="../toc.html">
       
-      <meta name="docfx:rel" content="../../../../">
+      <meta name="docfx:rel" content="../../../">
       
       
       <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core/COORDINATION.md/#L1">
@@ -30,7 +30,7 @@
       <meta name="loc:copy" content="Copy">
       <meta name="loc:downloadPdf" content="Download PDF">
 
-      <script type="module" src="./../../../../public/docfx.min.js"></script>
+      <script type="module" src="./../../../public/docfx.min.js"></script>
 
       <script>
         const theme = localStorage.getItem('theme') || 'auto'
@@ -43,8 +43,8 @@
     <header class="bg-body border-bottom">
       <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
         <div class="container-xxl flex-nowrap">
-          <a class="navbar-brand" href="../../../../index.html">
-            <img id="logo" class="svg" src="../../../../logo.svg" alt="TC.Tier">
+          <a class="navbar-brand" href="../../../index.html">
+            <img id="logo" class="svg" src="../../../logo.svg" alt="TC.Tier">
             TC.Tier
           </a>
           <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
@@ -63,9 +63,23 @@
     </header>
 
     <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
 
       <div class="content">
         <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
 
           <nav id="breadcrumb"></nav>
         </div>
@@ -79,24 +93,24 @@
 <p><strong>Core 的范围</strong>（五层架构的第三层）：<code>LifecycleBase</code>/<code>RecoveryBase</code>（实现 <code>TC.Tier.Contracts</code> 的 <code>ILifecycle</code>/<code>IRecovery</code>——依赖倒置）+ 基础设施目录（Epochs/NativeInterop/Logging/Metrics/Tracing/Observability）+ <code>Primitives/</code>（底层叶子积木：<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>SectorAlignment</code>/<code>AlignmentConst</code>/<code>SpinLockScope</code>/<code>IKeyComparer</code>/<code>KeyComparer</code> + 原生内存/异步同步原语/计算计时叶子）+ <code>Collections/</code>（容器型复合体：队列/缓存/池）+ <code>Execution/</code>（执行模型：TaskSink/SyncAsyncBridge/IsolatedTaskScheduler/BackgroundWorkerLoop/AsyncPump/CpuSampler）+ <code>Lifecycle/</code>（生命周期骨架）+ <code>Resources/</code>（资源治理：ResourceGroup/InstanceTracker）。接口/数据契约在 Contracts，源生成器特性在 <code>TC.Tier.CodeGen.Abstractions</code>。</p>
 <p>配合阅读（项目内深读）：</p>
 <ul>
-<li><a href="../../../core/lifecycle.html"><code>docs/lifecycle.md</code></a> —— 生命周期 前→中→后 三阶段正确拼装（<code>LifecycleBase</code>/<code>RecoveryBase</code>）</li>
-<li><a href="../../../core/resource-management.html"><code>docs/resource-management.md</code></a> —— 资源统一管理（<code>ResourceGroup</code>，强制）</li>
-<li><a href="../../../core/worker-loop.html"><code>docs/worker-loop.md</code></a> —— 后台循环统一设计（<code>BackgroundWorkerLoop</code>）</li>
-<li><a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> —— 互斥/回收/原子更新（<code>SpinRWLock</code>/<code>FairGate</code>/<code>LightEpoch</code>/<code>Atomic128</code>，epoch 易和锁混淆）</li>
-<li><a href="../../../core/version-scheme.html"><code>docs/version-scheme.md</code></a> —— 版本号协调状态机（<code>EpochProtectedVersionScheme</code>，epoch 保护下分阶段过渡版本；当前 Core 就绪、上层引擎未接入）</li>
-<li><a href="../../../core/memory.html"><code>docs/memory.md</code></a> —— 原生内存与对象池（<code>AlignedMemoryManager</code>/<code>NativeArena</code>/<code>PinnedBufferPool</code>/<code>OverflowPool</code>，⚠️ 全部非托管必须 Dispose）</li>
-<li><a href="../../../core/async-primitives.html"><code>docs/async-primitives.md</code></a> —— 异步同步原语与队列（<code>AsyncManualResetEvent</code>/<code>AsyncCountDown</code>/<code>AsyncQueue</code>；实测见 <a href="../../../core/perf/core-primitives-perf.html">docs/perf/core-primitives-perf.md</a>）</li>
-<li><a href="../../../core/priority-queues.html"><code>docs/priority-queues.md</code></a> —— 优先队列族（<code>BucketPriorityQueue</code>/<code>SkipListPriorityQueue</code>/<code>AsyncPriorityQueue</code>，Linux 完整验证；实测见 <a href="../../../core/perf/priority-queues-performance.html">docs/perf/priority-queues-performance.md</a>）</li>
-<li><a href="../../../core/cache-and-compute.html"><code>docs/cache-and-compute.md</code></a> —— 缓存/弱引用字典/CRC/计时/位运算/异常（<code>ClockCache</code>/<code>ShardLockWeakReference</code>/<code>UnifiedCrc</code>/<code>MicroTimer</code>/<code>Utility</code>/<code>ThrowHelper</code>）</li>
-<li><a href="../../../core/native-interop.html"><code>docs/native-interop.md</code></a> —— 原生 syscall facade（<code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code>，IO/预分配/打洞/刷盘/内存锁；★ Core.IO 的内部实现底座，<strong>不对外</strong>——能力已由 Core.IO 全部封口）</li>
-<li><a href="../../../core/io.html"><code>docs/io.md</code></a> —— 文件 IO 原语层（<code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>MemoryFileSystem</code>/<code>FaultInjectingFileSystem</code>，两平面×四类文件系统×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）</li>
-<li><a href="../../../core/virtual-file-system.html"><code>docs/virtual-file-system.md</code></a> —— <strong>虚拟文件系统 TierVolume</strong>（<code>TierVolumeFs</code>：<code>.tier</code> 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 <a href="../../../core/perf/io-performance.html">docs/perf/io-performance.md</a> §8）</li>
-<li><a href="../TC.Tier.Core.IO.S3/COORDINATION.html"><code>../TC.Tier.Core.IO.S3/COORDINATION.md</code></a> —— S3 兼容对象存储客户端层（<code>S3ObjectStore</code>：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；S3 协议使用指南 <a href="../../../core/s3-protocol.html"><code>../TC.Tier.Core.IO.S3/docs/s3-protocol.md</code></a>；网络文件系统桥层语义见 <a href="../../../core/network-file-system.html"><code>docs/network-file-system.md</code></a>）</li>
-<li><a href="../TC.Tier.Core.Net/COORDINATION.html"><code>../TC.Tier.Core.Net/COORDINATION.md</code></a> —— 网络与共识层（<code>IProtocolTransport</code> 三形态 × 三介质、<code>RaftStateMachine</code> 共识引擎、HyParView/Swarm、ClusterBuilder 装配；使用指南 <a href="../../../core/net.html"><code>../TC.Tier.Core.Net/docs/net.md</code></a>——Net 层的执行/日志/可观测全部消费本层积木）</li>
-<li><a href="../../../core/observability.html"><code>docs/observability.md</code></a> —— 可观测（<code>ObservabilityHub</code>/<code>IMetricsSink</code>/<code>ITracer</code>：视图全景/采样/零开销契约/测试场景）</li>
-<li><a href="../../../core/logging.html"><code>docs/logging.md</code></a> —— 日志（<code>ILogger</code>/<code>LoggerExtensions</code>：重载矩阵/热路径规则/与 Hub 的边界）</li>
-<li><a href="../../../core/dedicated-task-scheduler.html"><code>docs/dedicated-task-scheduler.md</code></a> —— 专用线程调度器（<code>IsolatedTaskScheduler</code>；性能实测见 <a href="../../../core/perf/dedicated-task-scheduler-perf.html"><code>docs/perf/dedicated-task-scheduler-perf.md</code></a>）</li>
-<li><a href="../TC.Tier.Contracts/COORDINATION.html"><code>../TC.Tier.Contracts/COORDINATION.md</code></a> —— 接口/数据契约（Core 实现它们的 <code>ILifecycle</code>/<code>IRecovery</code>）</li>
+<li><a href="../../core/lifecycle.html"><code>docs/lifecycle.md</code></a> —— 生命周期 前→中→后 三阶段正确拼装（<code>LifecycleBase</code>/<code>RecoveryBase</code>）</li>
+<li><a href="../../core/resource-management.html"><code>docs/resource-management.md</code></a> —— 资源统一管理（<code>ResourceGroup</code>，强制）</li>
+<li><a href="../../core/worker-loop.html"><code>docs/worker-loop.md</code></a> —— 后台循环统一设计（<code>BackgroundWorkerLoop</code>）</li>
+<li><a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> —— 互斥/回收/原子更新（<code>SpinRWLock</code>/<code>FairGate</code>/<code>LightEpoch</code>/<code>Atomic128</code>，epoch 易和锁混淆）</li>
+<li><a href="../../core/version-scheme.html"><code>docs/version-scheme.md</code></a> —— 版本号协调状态机（<code>EpochProtectedVersionScheme</code>，epoch 保护下分阶段过渡版本；当前 Core 就绪、上层引擎未接入）</li>
+<li><a href="../../core/memory.html"><code>docs/memory.md</code></a> —— 原生内存与对象池（<code>AlignedMemoryManager</code>/<code>NativeArena</code>/<code>PinnedBufferPool</code>/<code>OverflowPool</code>，⚠️ 全部非托管必须 Dispose）</li>
+<li><a href="../../core/async-primitives.html"><code>docs/async-primitives.md</code></a> —— 异步同步原语与队列（<code>AsyncManualResetEvent</code>/<code>AsyncCountDown</code>/<code>AsyncQueue</code>；实测见 <a href="../../core/perf/core-primitives-perf.html">docs/perf/core-primitives-perf.md</a>）</li>
+<li><a href="../../core/priority-queues.html"><code>docs/priority-queues.md</code></a> —— 优先队列族（<code>BucketPriorityQueue</code>/<code>SkipListPriorityQueue</code>/<code>AsyncPriorityQueue</code>，Linux 完整验证；实测见 <a href="../../core/perf/priority-queues-performance.html">docs/perf/priority-queues-performance.md</a>）</li>
+<li><a href="../../core/cache-and-compute.html"><code>docs/cache-and-compute.md</code></a> —— 缓存/弱引用字典/CRC/计时/位运算/异常（<code>ClockCache</code>/<code>ShardLockWeakReference</code>/<code>UnifiedCrc</code>/<code>MicroTimer</code>/<code>Utility</code>/<code>ThrowHelper</code>）</li>
+<li><a href="../../core/native-interop.html"><code>docs/native-interop.md</code></a> —— 原生 syscall facade（<code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code>，IO/预分配/打洞/刷盘/内存锁；★ Core.IO 的内部实现底座，<strong>不对外</strong>——能力已由 Core.IO 全部封口）</li>
+<li><a href="../../core/io.html"><code>docs/io.md</code></a> —— 文件 IO 原语层（<code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>MemoryFileSystem</code>/<code>FaultInjectingFileSystem</code>，两平面×四类文件系统×能力协商；DIO 对齐/映射生命周期/memfs 模式选型等陷阱清单）</li>
+<li><a href="../../core/virtual-file-system.html"><code>docs/virtual-file-system.md</code></a> —— <strong>虚拟文件系统 TierVolume</strong>（<code>TierVolumeFs</code>：<code>.tier</code> 文件 / Linux 块设备——自持一致性 + 自管页缓存 + 多载体 + 采集还原管线；本地持久化推荐位；两档 IO/维护门闩/dd 快道/常见配方；性能见 <a href="../../core/perf/io-performance.html">docs/perf/io-performance.md</a> §8）</li>
+<li><a href="../core-io-s3/COORDINATION.html"><code>../TC.Tier.Core.IO.S3/COORDINATION.md</code></a> —— S3 兼容对象存储客户端层（<code>S3ObjectStore</code>：SigV4 自写/零外部包，一个客户端覆盖 S3/COS/MinIO/OSS/R2；S3 协议使用指南 <a href="../../core/s3-protocol.html"><code>../TC.Tier.Core.IO.S3/docs/s3-protocol.md</code></a>；网络文件系统桥层语义见 <a href="../../core/network-file-system.html"><code>docs/network-file-system.md</code></a>）</li>
+<li><a href="../core-net/COORDINATION.html"><code>../TC.Tier.Core.Net/COORDINATION.md</code></a> —— 网络与共识层（<code>IProtocolTransport</code> 三形态 × 三介质、<code>RaftStateMachine</code> 共识引擎、HyParView/Swarm、ClusterBuilder 装配；使用指南 <a href="../../core/net.html"><code>../TC.Tier.Core.Net/docs/net.md</code></a>——Net 层的执行/日志/可观测全部消费本层积木）</li>
+<li><a href="../../core/observability.html"><code>docs/observability.md</code></a> —— 可观测（<code>ObservabilityHub</code>/<code>IMetricsSink</code>/<code>ITracer</code>：视图全景/采样/零开销契约/测试场景）</li>
+<li><a href="../../core/logging.html"><code>docs/logging.md</code></a> —— 日志（<code>ILogger</code>/<code>LoggerExtensions</code>：重载矩阵/热路径规则/与 Hub 的边界）</li>
+<li><a href="../../core/dedicated-task-scheduler.html"><code>docs/dedicated-task-scheduler.md</code></a> —— 专用线程调度器（<code>IsolatedTaskScheduler</code>；性能实测见 <a href="../../core/perf/dedicated-task-scheduler-perf.html"><code>docs/perf/dedicated-task-scheduler-perf.md</code></a>）</li>
+<li><a href="../contracts/COORDINATION.html"><code>../TC.Tier.Contracts/COORDINATION.md</code></a> —— 接口/数据契约（Core 实现它们的 <code>ILifecycle</code>/<code>IRecovery</code>）</li>
 </ul>
 </blockquote>
 <hr>
@@ -162,49 +176,49 @@
 <td><code>DiskNative</code>/<code>FileNative</code>/<code>MemoryNative</code></td>
 <td><code>NativeInterop/</code></td>
 <td>跨平台 syscall facade（扇区探测/无缓冲 IO/预分配/打洞/刷盘/内存锁/扩展属性）</td>
-<td>🔒 <strong><code>internal</code>（编译期封堵，仅 Core.IO 消费）</strong>；需要 IO 的组件用 <code>TC.Tier.Core.IO</code>（<a href="../../../core/io.html"><code>docs/io.md</code></a>），外部业务经 <code>IStorageEngine</code>；syscall→Core.IO 映射表与仓内过渡 IVT 例外见 <a href="../../../core/native-interop.html"><code>docs/native-interop.md</code></a></td>
+<td>🔒 <strong><code>internal</code>（编译期封堵，仅 Core.IO 消费）</strong>；需要 IO 的组件用 <code>TC.Tier.Core.IO</code>（<a href="../../core/io.html"><code>docs/io.md</code></a>），外部业务经 <code>IStorageEngine</code>；syscall→Core.IO 映射表与仓内过渡 IVT 例外见 <a href="../../core/native-interop.html"><code>docs/native-interop.md</code></a></td>
 <td></td>
 </tr>
 <tr>
 <td><code>IFileSystem</code>/<code>IFileHandle</code>/<code>FileHandlePool</code>/<code>DiskFileSystem</code>/<code>MemoryFileSystem</code></td>
 <td><code>IO/</code>（单一命名空间 + 职责子目录 Disk/Mem/Shared/Testing——★ 本层目录≠命名空间，全仓唯一例外）</td>
 <td><strong>文件 IO 原语层</strong>（两平面 × 介质多态；能力协商、DIO 逐句柄探测对齐、文件级 Append 预留、字节范围锁、内存映射、memfs 双分配模式、池 Acquire/Release 归还协议）。<strong>公开面=契约+枚举+错误+池+两介质 fs 工厂；句柄实现/FaultInjecting/共享工具全部 internal</strong>（facade 纪律——FaultInjecting 是测试设施，生产禁用）</td>
-<td>需要文件级 IO 的所有组件；外部通常经 <code>IStorageEngine</code> 间接用，直接用先读 <a href="../../../core/io.html"><code>docs/io.md</code></a> 陷阱清单（⚠️ mem Dispose=拔盘方向差异置顶）</td>
+<td>需要文件级 IO 的所有组件；外部通常经 <code>IStorageEngine</code> 间接用，直接用先读 <a href="../../core/io.html"><code>docs/io.md</code></a> 陷阱清单（⚠️ mem Dispose=拔盘方向差异置顶）</td>
 <td></td>
 </tr>
 <tr>
 <td><code>Atomic128&lt;T&gt;</code></td>
 <td><code>Primitives/Atomic128.cs</code></td>
 <td><strong>标准 128 位 CAS 单槽封装</strong>（16B 对齐背板 + 探测降级 + 裸读不撕裂）——<code>NativeAtomic128</code> 之上的易用层</td>
-<td><strong>优先用它</strong>（别裸调 <code>NativeAtomic128</code>）；<code>T</code> 须 16B blittable struct；标准范式见 <a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §3</td>
+<td><strong>优先用它</strong>（别裸调 <code>NativeAtomic128</code>）；<code>T</code> 须 16B blittable struct；标准范式见 <a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §3</td>
 <td></td>
 </tr>
 <tr>
 <td><code>SpinRWLock</code></td>
 <td><code>Primitives/SpinRWLock.cs</code></td>
 <td><strong>写偏向</strong> CAS 自旋 RW 锁原语（bit63 写持有 + <strong>bit62 写等待挡新读者</strong> + 读计数递增；下溢绊线 + Debug 值示波器）。任何需要 RW 互斥的对象挂一个 <code>SpinRWLock</code> 字段即获得协调锁——写者不被持续读者流饿死（2026-08-20 自 LockWord 重构，读优先→写偏向，Monitor 等待-通知职责删除）</td>
-<td>对象读写互斥：读 <code>AcquireShared</code>，写/销毁 <code>AcquireExclusive</code>（标准范式见 <a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §1）</td>
+<td>对象读写互斥：读 <code>AcquireShared</code>，写/销毁 <code>AcquireExclusive</code>（标准范式见 <a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §1）</td>
 <td></td>
 </tr>
 <tr>
 <td><code>FairGate</code></td>
 <td><code>Primitives/FairGate.cs</code></td>
 <td><strong>到达顺序公平门</strong>——重试循环获取资源的协调器：fast path 查 <code>HasWaiters</code> 让位、慢路径 <code>TryAcquireSlow</code>、资源可获取后 <code>Wake</code>（PulseAll + 5ms 让渡先手）</td>
-<td>多写者竞争同资源不插队（现使用方：AcquireExtent 区间占用）；见 <a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §1.5</td>
+<td>多写者竞争同资源不插队（现使用方：AcquireExtent 区间占用）；见 <a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §1.5</td>
 <td></td>
 </tr>
 <tr>
 <td><code>CpuSampler</code></td>
 <td><code>Execution/CpuSampler.cs</code></td>
 <td>CPU 采样限流（进程口径 EMA + 三档 <code>ThrottleFactor</code>）</td>
-<td>写热路径 CPU 背压；用法见 <a href="../../../core/worker-loop.html"><code>docs/worker-loop.md</code></a> §7</td>
+<td>写热路径 CPU 背压；用法见 <a href="../../core/worker-loop.html"><code>docs/worker-loop.md</code></a> §7</td>
 <td></td>
 </tr>
 <tr>
 <td><code>IsolatedTaskScheduler</code></td>
 <td><code>Execution/IsolatedTaskScheduler.cs</code></td>
 <td>隔离线程 Task 调度器（M 私有线程 + watchdog + 死亡重启 + 指标）</td>
-<td>高频/关键 worker 的执行器（引擎 own 实例）；见 <a href="../../../core/dedicated-task-scheduler.html"><code>docs/dedicated-task-scheduler.md</code></a></td>
+<td>高频/关键 worker 的执行器（引擎 own 实例）；见 <a href="../../core/dedicated-task-scheduler.html"><code>docs/dedicated-task-scheduler.md</code></a></td>
 <td></td>
 </tr>
 <tr>
@@ -218,7 +232,7 @@
 <td><code>SyncAsyncBridge</code></td>
 <td><code>Execution/SyncAsyncBridge.cs</code></td>
 <td><strong>同步 API 桥接异步实现</strong>：独立池推进 + 有界等待 + 再入防护（&quot;Start 早、Wait 晚&quot;高级形态）</td>
-<td>同步面必须调异步的唯一出口（Remote/S3 IO）；设计见 <a href="../../../core/sync-async-bridge.html"><code>docs/sync-async-bridge.md</code></a></td>
+<td>同步面必须调异步的唯一出口（Remote/S3 IO）；设计见 <a href="../../core/sync-async-bridge.html"><code>docs/sync-async-bridge.md</code></a></td>
 <td></td>
 </tr>
 <tr>
@@ -246,7 +260,7 @@
 <td><code>ILogger</code> / <code>ILoggerFactory</code></td>
 <td><code>Logging/</code></td>
 <td>极简日志（去掉 M.E.Logging 的 <code>TState</code>/<code>formatter</code>）；全 36 重载 null 安全 + <code>IsEnabled</code> 短路；<code>NullLogger</code> 零开销默认</td>
-<td>上层注入 factory；用法见 <a href="../../../core/logging.html"><code>docs/logging.md</code></a></td>
+<td>上层注入 factory；用法见 <a href="../../core/logging.html"><code>docs/logging.md</code></a></td>
 <td></td>
 </tr>
 <tr>
@@ -267,7 +281,7 @@
 <td><code>ObservabilityHub</code></td>
 <td><code>Observability/</code></td>
 <td><strong>唯一可观测接入点</strong>：聚合 Metrics + Tracing（⚠️ <strong>不含 Logging</strong>），两级短路 + 采样 + 7 维度视图（Metrics/Storage/Log/Index/<strong>SegmentAllocator</strong>/Net/Raft）</td>
-<td><code>ObservabilityHub.Create(sink, tracer, opts)</code> 或 <code>Disabled</code>；完整指南 <a href="../../../core/observability.html"><code>docs/observability.md</code></a></td>
+<td><code>ObservabilityHub.Create(sink, tracer, opts)</code> 或 <code>Disabled</code>；完整指南 <a href="../../core/observability.html"><code>docs/observability.md</code></a></td>
 <td></td>
 </tr>
 <tr>
@@ -295,7 +309,7 @@
 <td><code>Primitives/</code></td>
 <td><code>Primitives/</code></td>
 <td><strong>Core 原语</strong>：<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>SectorAlignment</code>/<code>AlignmentConst</code>/<code>SpinLockScope</code>/<code>IKeyComparer</code>/<code>KeyComparer</code></td>
-<td>§5（<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>LightEpoch</code>）+ §6（<code>KeyComparer</code>/对齐/<code>SpinLockScope</code>）。⚠️ 接口/数据契约（<code>ILifecycle</code>/<code>IStorageEngine</code>/<code>LogicalAddress</code>…）在 Contracts，使用红线见 <a href="../TC.Tier.Contracts/COORDINATION.html"><code>../TC.Tier.Contracts/COORDINATION.md</code></a> §5</td>
+<td>§5（<code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>LightEpoch</code>）+ §6（<code>KeyComparer</code>/对齐/<code>SpinLockScope</code>）。⚠️ 接口/数据契约（<code>ILifecycle</code>/<code>IStorageEngine</code>/<code>LogicalAddress</code>…）在 Contracts，使用红线见 <a href="../contracts/COORDINATION.html"><code>../TC.Tier.Contracts/COORDINATION.md</code></a> §5</td>
 <td></td>
 </tr>
 </tbody>
@@ -356,7 +370,7 @@
 <li><code>Owned</code>（默认）：本实例拥有的，Dispose 时组释放。</li>
 <li><code>Referenced</code>：外部注入的共享资源，只跟踪诊断、<strong>不释放</strong>（防双释放）。</li>
 </ul>
-<p>正确拼法、所有权判定、范式见 <a href="../../../core/resource-management.html"><code>docs/resource-management.md</code></a>。</p>
+<p>正确拼法、所有权判定、范式见 <a href="../../core/resource-management.html"><code>docs/resource-management.md</code></a>。</p>
 <h3 id="24-backgroundworkerloop--后台执行唯一合法的后台循环">2.4 <code>BackgroundWorkerLoop</code> —— 后台执行（<strong>唯一</strong>合法的后台循环）</h3>
 <p>两层：</p>
 <ul>
@@ -384,7 +398,7 @@ ConfigureBackgroundWorker(new MyFlusher(scheduler: myScheduler, name: &quot;meta
 <p>Core 的另一条线——<strong>不参与协调，但同样是所有上层共享的底层积木</strong>。
 核心原则：日志/指标/追踪<strong>三信号各自独立配置</strong>；指标 + 追踪经 <code>ObservabilityHub</code> 统一接入、两级短路。
 <strong>完整指南（视图方法清单 / 采样算法 / 零开销契约 / 测试场景 / 自定义 sink）：
-<a href="../../../core/observability.html"><code>docs/observability.md</code></a>（可观测）+ <a href="../../../core/logging.html"><code>docs/logging.md</code></a>（日志）。</strong></p>
+<a href="../../core/observability.html"><code>docs/observability.md</code></a>（可观测）+ <a href="../../core/logging.html"><code>docs/logging.md</code></a>（日志）。</strong></p>
 <h3 id="31-日志-ilogger独立不经-hub">3.1 日志 <code>ILogger</code>（独立，<strong>不经</strong> Hub）</h3>
 <ul>
 <li>极简接口（<code>Log</code> / <code>IsEnabled</code>），刻意去掉 <code>Microsoft.Extensions.Logging</code> 的 <code>TState</code>/<code>formatter</code>。</li>
@@ -392,7 +406,7 @@ ConfigureBackgroundWorker(new MyFlusher(scheduler: myScheduler, name: &quot;meta
 <li>命名占位符 <code>{name}</code> 自动按顺序映射 <code>{0},{1},...</code>（源生成正则）。</li>
 <li><code>NullLogger</code>/<code>NullLoggerFactory</code> 单例——无注入时零开销。</li>
 <li>⚠️ <strong>Logging 不归 <code>ObservabilityHub</code> 管</strong>——由上层独立注入 <code>ILoggerFactory</code>，<code>ObservabilityOptions</code> 明确不控制日志级别。</li>
-<li>★ <strong>宿主桥接很简单</strong>：<code>LogLevel</code> 与 M.E.Logging 枚举值 1:1（直接强转），控制台 / MEL 全家桶 / 可观测后端十几行适配完——现成范例见 <a href="../../../core/logging.html"><code>docs/logging.md</code></a> §4。</li>
+<li>★ <strong>宿主桥接很简单</strong>：<code>LogLevel</code> 与 M.E.Logging 枚举值 1:1（直接强转），控制台 / MEL 全家桶 / 可观测后端十几行适配完——现成范例见 <a href="../../core/logging.html"><code>docs/logging.md</code></a> §4。</li>
 </ul>
 <pre><code class="lang-csharp">logger.LogInformation(&quot;append ok entry={entry} size={size}&quot;, entryId, size);   // 命名占位
 if (logger.IsEnabled(LogLevel.Debug))                                         // 仅热路径 4+ 参需要手动保护
@@ -418,7 +432,7 @@ if (logger.IsEnabled(LogLevel.Debug))                                         //
 <ul>
 <li><strong>聚合 Metrics + Tracing</strong>（⚠️ <strong>不含 Logging</strong>——见 §3.1）。</li>
 <li><strong>两级短路</strong>：<code>Options.Enabled × sink/tracer.IsEnabled × 维度开关</code> 三重 AND 在<strong>构造期折叠成单个 bool</strong>，热路径只读一个 bool（<code>ObservabilityHub.cs:47-53</code>）。</li>
-<li>维度视图（方法清单与指标名见 <a href="../../../core/observability.html"><code>docs/observability.md</code></a> §2）：
+<li>维度视图（方法清单与指标名见 <a href="../../core/observability.html"><code>docs/observability.md</code></a> §2）：
 <ul>
 <li><code>Metrics</code>——三原语透传（自定义指标走这）；</li>
 <li><code>Storage</code>——Read/Write/Flush/Compact/Reclaim/Throttle/QueueDepth（<code>storage.*</code>）；</li>
@@ -593,7 +607,7 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 <li><strong><code>AsyncCountDown</code></strong>：<code>Add()</code>/<code>Remove()</code> 计数到 0 唤醒；纯 <code>Interlocked</code> 无锁。</li>
 <li><strong><code>AsyncQueue&lt;T&gt;</code></strong>：<code>ConcurrentQueue&lt;T&gt;</code> + 池化等待节点，队列非空时出队零分配。⚠️ <strong>不是通用 Channel</strong>——不支持 <code>Complete</code>/背压，适合&quot;持续运行永不关闭&quot;。</li>
 </ul>
-<h3 id="43-优先级队列三个递进选型完整指南-docspriority-queuesmd">4.3 优先级队列（三个递进选型；完整指南 <a href="../../../core/priority-queues.html"><code>docs/priority-queues.md</code></a>）</h3>
+<h3 id="43-优先级队列三个递进选型完整指南-docspriority-queuesmd">4.3 优先级队列（三个递进选型；完整指南 <a href="../../core/priority-queues.html"><code>docs/priority-queues.md</code></a>）</h3>
 <ul>
 <li><strong><code>BucketPriorityQueue</code></strong>：N 个 <code>ConcurrentQueue</code> 桶，离散枚举优先级，无锁入队，最快。约束 <code>TPriority : struct, Enum</code>。⚠️ 严格优先级 → 高优先级非空时低优先级<strong>饥饿</strong>。</li>
 <li><strong><code>SkipListPriorityQueue</code></strong>：任意 <code>long</code> 优先级，lazy skip-list + 细粒度 hand-over-hand SpinLock，<code>TryPeek</code> 完全不加锁，<code>[ThreadStatic]</code> xorshift PRNG。⚠️ SpinLock 不可重入。</li>
@@ -622,7 +636,7 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 </ul>
 <hr>
 <h2 id="5-互斥回收与原子更新spinrwlock--fairgate--lightepoch--atomic128">5. 互斥、回收与原子更新（SpinRWLock / FairGate / LightEpoch / Atomic128）</h2>
-<p>这四者<strong>职责不同、不可互相替代</strong>，是 Core 里<strong>最易拼错的地方</strong>（epoch 和锁尤其易混）。完整决策矩阵、标准范式、反模式见 <a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a>——本节只给速查。</p>
+<p>这四者<strong>职责不同、不可互相替代</strong>，是 Core 里<strong>最易拼错的地方</strong>（epoch 和锁尤其易混）。完整决策矩阵、标准范式、反模式见 <a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a>——本节只给速查。</p>
 <table>
 <thead>
 <tr>
@@ -663,7 +677,7 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 <hr>
 <h2 id="6-core-原语primitives">6. Core 原语（Primitives）</h2>
 <blockquote>
-<p><code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>LightEpoch</code>/<code>SpinLockScope</code> 见 §5 与 <a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a>。本节讲 <code>IKeyComparer</code>/<code>KeyComparer</code>、<code>SectorAlignment</code>。</p>
+<p><code>SpinRWLock</code>/<code>FairGate</code>/<code>Atomic128</code>/<code>LightEpoch</code>/<code>SpinLockScope</code> 见 §5 与 <a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a>。本节讲 <code>IKeyComparer</code>/<code>KeyComparer</code>、<code>SectorAlignment</code>。</p>
 </blockquote>
 <h3 id="61-索引-key-比较器-ikeycomparertkey--keycomparertkey">6.1 索引 key 比较器 <code>IKeyComparer&lt;TKey&gt;</code> / <code>KeyComparer&lt;TKey&gt;</code></h3>
 <ul>
@@ -694,7 +708,7 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 <ul>
 <li><strong>症状</strong>：线程没 <code>Resume</code>/<code>Acquire</code> 就调 <code>Epoch.BumpCurrentEpoch(action)</code>。</li>
 <li><strong>后果</strong>：违反 LightEpoch 协议 → <strong>Debug 立即抛 <code>InvalidOperationException</code></strong>（绊线已从 <code>Debug.Assert</code> 升级为立即抛，异常携带线程/entry/epoch 状态 + 32 次协议操作示波器）；Release 下 <code>ProtectAndDrain</code> 写入保留 entry0（静默腐败）。</li>
-<li><strong>正解</strong>：<code>BumpCurrentEpoch</code> 的调用线程必须先 <code>Resume()</code>（= <code>Acquire + ProtectAndDrain</code>），用完 <code>Suspend()</code>（完整骨架见 <a href="../../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §2.3）。</li>
+<li><strong>正解</strong>：<code>BumpCurrentEpoch</code> 的调用线程必须先 <code>Resume()</code>（= <code>Acquire + ProtectAndDrain</code>），用完 <code>Suspend()</code>（完整骨架见 <a href="../../core/locking-and-epoch.html"><code>docs/locking-and-epoch.md</code></a> §2.3）。</li>
 </ul>
 <h3 id="-反模式-4互斥双轨制同需求上-spinrwlock--epoch-两套">❌ 反模式 4：互斥&quot;双轨制&quot;——同需求上 SpinRWLock + epoch 两套</h3>
 <ul>
@@ -737,17 +751,17 @@ using var span = hub.BeginSpan(&quot;wal.append&quot;, SpanKind.Producer);  // T
 <ul>
 <li><strong>症状</strong>：持<strong>排他</strong>锁时调 <code>await</code>——线程切换后 <code>ReleaseExclusive</code> 线程 ID 不匹配，锁永久泄漏（Debug 释放线程校验会抓）。</li>
 <li><strong>根因</strong>：排他持有是线程关联的同步原语，不支持异步上下文跨越。</li>
-<li><strong>正解</strong>：<strong>排他</strong>临界区内绝对禁止 await；异步互斥用 <code>AsyncManualResetEvent</code> 等异步原语（见 <a href="../../../core/async-primitives.html"><code>docs/async-primitives.md</code></a>）。共享锁可长持/跨 await（计数语义无线程亲和——读计划锁持共享做 IO 即此用法），但持得越久写者与被挡读者等待越久，能锁外做的移到锁外。</li>
+<li><strong>正解</strong>：<strong>排他</strong>临界区内绝对禁止 await；异步互斥用 <code>AsyncManualResetEvent</code> 等异步原语（见 <a href="../../core/async-primitives.html"><code>docs/async-primitives.md</code></a>）。共享锁可长持/跨 await（计数语义无线程亲和——读计划锁持共享做 IO 即此用法），但持得越久写者与被挡读者等待越久，能锁外做的移到锁外。</li>
 </ul>
 <h3 id="-反模式-12恢复过程中直接修改运行时状态">❌ 反模式 12：恢复过程中直接修改运行时状态</h3>
 <ul>
 <li><strong>症状</strong>：<code>OnRecoveryCoreAsync</code> 中直接修改引擎共享字段、挂接数据结构——恢复失败回滚时状态无法复原 → 对象半可用。</li>
-<li><strong>正解</strong>：恢复中间结果存本地上下文，恢复成功后在 <code>OnInitializeComplete</code> 原子提交到运行时状态；失败则本地上下文丢弃，无副作用（见 <a href="../../../core/lifecycle.html"><code>docs/lifecycle.md</code></a>）。</li>
+<li><strong>正解</strong>：恢复中间结果存本地上下文，恢复成功后在 <code>OnInitializeComplete</code> 原子提交到运行时状态；失败则本地上下文丢弃，无副作用（见 <a href="../../core/lifecycle.html"><code>docs/lifecycle.md</code></a>）。</li>
 </ul>
 <h3 id="-反模式-13跨组件直接调用-nativeinterop">❌ 反模式 13：跨组件直接调用 NativeInterop</h3>
 <ul>
 <li><strong>症状</strong>：上层结构组件 / 业务直接调 <code>DiskNative</code>/<code>FileNative</code>——绕开 IO 引擎的生命周期、错误处理、指标埋点。</li>
-<li><strong>正解</strong>：原生 syscall 仅 Core.IO 调用（NativeInterop 是其实现底座）；Core 内组件经 <code>TC.Tier.Core.IO</code>，外部业务再经 <code>IStorageEngine</code> 抽象（见 <a href="../../../core/native-interop.html"><code>docs/native-interop.md</code></a> §0 映射表）。</li>
+<li><strong>正解</strong>：原生 syscall 仅 Core.IO 调用（NativeInterop 是其实现底座）；Core 内组件经 <code>TC.Tier.Core.IO</code>，外部业务再经 <code>IStorageEngine</code> 抽象（见 <a href="../../core/native-interop.html"><code>docs/native-interop.md</code></a> §0 映射表）。</li>
 </ul>
 <h3 id="-反模式-14对齐计算使用硬编码常量">❌ 反模式 14：对齐计算使用硬编码常量</h3>
 <ul>
