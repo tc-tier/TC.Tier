@@ -215,6 +215,28 @@ public class UdsTransportTests : IAsyncDisposable
             => _ = reply.ReplyAsync(payload.ToArray()).AsTask();
     }
 
+    /// <summary>socket inode 权限位接线（#508——bind 后收紧，IPC 身份授权铁证面）：
+    /// Unix 腿断言 0600 落盘；Windows 腿断言 NotSupported 拒绝（安全权限不静默忽略）。</summary>
+    [Fact]
+    public void SocketFileMode_0600_AppliedOnBind_PerPlatform()
+    {
+        Directory.CreateDirectory(_dir);
+        var path = PathOf("mode0600");
+        var mode0600 = System.IO.UnixFileMode.UserRead | System.IO.UnixFileMode.UserWrite;
+        var t = new UdsTransport(NodeId.NewRandom(), path, socketFileMode: mode0600);
+        _transports.Add(t);   // §4.4——创建即登记（失败路径统一收尾）
+
+        if (OperatingSystem.IsWindows())
+        {
+            t.Invoking(x => x.Start()).Should().Throw<NotSupportedException>(
+                "Windows 无 POSIX inode 语义——安全权限请求不静默忽略");
+            return;
+        }
+        Skip.IfNot(UdsBindSupported(), "沙箱限制 AF_UNIX bind");
+        t.Start();
+        File.GetUnixFileMode(path).Should().Be(mode0600, "bind 后 socket inode 0600 落盘（#508 IPC 授权铁证面）");
+    }
+
     public async ValueTask DisposeAsync()
     {
         GC.SuppressFinalize(this);

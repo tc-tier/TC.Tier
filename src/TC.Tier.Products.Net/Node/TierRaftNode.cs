@@ -226,14 +226,17 @@ public sealed class TierRaftNode : IAsyncDisposable
     //   Linux 原生高精度，no-op。
     private static int _highResolutionTimerEnabled;
 
-    /// <summary>资源档位展开（装配期一次定性——只补缺省）：低资源档在未显式注入调度器时把
-    /// <see cref="TierRaftNodeOptions.Wal"/> 收敛到进程级共享单例（全部引擎一组线程——多实例
-    /// 线程数恒定）；显式 <c>WithWorkerScheduler</c> 注入恒优先；高性能档 = 缺省自建形态零改动。
-    /// 协议专用线程（raft/apply/传输）不受档位影响——活性地板（2026-09-03 判例）。</summary>
+    /// <summary>资源档位展开（装配期一次定性——只补缺省，展开内核见
+    /// <see cref="TierRaftResourceProfileExpander"/>）：低资源档调度器收敛到进程级共享单例 +
+    /// Wal 几何随档收缩（未定制时）；显式注入恒优先；高性能档零改动。协议专用线程
+    /// （raft/apply/传输）不受档位影响——活性地板（2026-09-03 判例）。</summary>
     private static TierRaftNodeOptions ApplyResourceProfile(TierRaftNodeOptions options)
-        => options.ResourceProfile == TierRaftResourceProfile.LowResource && options.Wal.WorkerScheduler is null
-            ? options.WithWorkerScheduler(IsolatedTaskScheduler.Shared)
-            : options;
+    {
+        if (options.ResourceProfile != TierRaftResourceProfile.LowResource)
+            return options;
+        return options.WithWal(TierRaftResourceProfileExpander.ApplyLowResourceWal(
+            options.Wal, IsolatedTaskScheduler.Shared));
+    }
 
     internal static void EnableHighResolutionTimer(bool enabled, ILogger? logger)
     {

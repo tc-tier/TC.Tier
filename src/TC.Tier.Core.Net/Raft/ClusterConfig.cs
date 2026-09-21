@@ -120,13 +120,38 @@ public sealed class ClusterConfig
     }
 
     /// <summary>加 learner（观察副本/引导形态——收日志复制可读，不投票不计多数派；已存在 = 原样返回）。</summary>
-    /// <param name="id">新 learner 节点 ID。</param>
+    /// <param name="id">新成员节点 ID。</param>
     /// <param name="endPoint">端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</param>
     /// <returns>新配置（已含新成员，角色为 learner）；若已存在则返回原配置。</returns>
     public ClusterConfig AddLearner(NodeId id, string endPoint = "")
     {
         if (Contains(id)) return this;
         return new ClusterConfig(_members.Concat([new ClusterMember(id, endPoint, ClusterMemberRole.Learner)]));
+    }
+
+    /// <summary>
+    /// 批量加 learner（#507c——一条配置条目携多节点，机群批量引导 O(1) 轮协议）。
+    /// <para>★ 安全性：learner 不投票不计多数派——批量加入<b>不改变投票成员集</b>，新旧配置的多数派
+    ///   完全重合，single-server 变更的 quorum 交集论证平凡成立（论文 §4.2 一次一节点的动机在投票成员
+    ///   变更，learner 批量不在其约束域）。已存在的成员跳过（幂等）；全跳过 = 原样返回（零提案）。</para>
+    /// <para>★ 上限 200：配置条目 wire 格式 Count 字段 1B（≤255）——留余量；更大的引导批次分多条
+    ///   批量条目（万级拓扑的配置面扩容见 #507a/b 立项的格式 v3）。</para>
+    /// </summary>
+    /// <param name="learners">批量 learner（ID + 端点；端点空串 = 进程内传输）。</param>
+    /// <returns>新配置（已含全部新 learner，角色 learner）；无新增则返回原配置。</returns>
+    /// <exception cref="ArgumentOutOfRangeException">单条批量超过 200（wire 格式上限 255 留余量——分批引导）。</exception>
+    public ClusterConfig AddLearners(IEnumerable<(NodeId Id, string EndPoint)> learners)
+    {
+        ArgumentNullException.ThrowIfNull(learners);
+        var additions = learners
+            .Where(l => !Contains(l.Id))
+            .Select(l => new ClusterMember(l.Id, l.EndPoint, ClusterMemberRole.Learner))
+            .ToArray();
+        if (additions.Length == 0) return this;
+        if (additions.Length > 200)
+            throw new ArgumentOutOfRangeException(nameof(learners), additions.Length,
+                "单条批量 learner 上限 200（配置条目 wire Count 1B ≤255 留余量）——更大批次请分多条批量条目。");
+        return new ClusterConfig(_members.Concat(additions));
     }
 
     /// <summary>加 witness（见证者——投票计入选主/提交多数派，不存日志体不自荐；已存在 = 原样返回）。</summary>

@@ -185,6 +185,82 @@ public class RaftJoinTests
         leader.Raft.Config.IsVoter(idD).Should().BeFalse();
     }
 
+    // ═══ #507c 批量成员变更（learner 无票——一条配置条目携多节点，quorum 交集平凡成立）═══
+
+    [Fact]
+    public void AddLearners_BatchConfig_SerializationRoundtrip_AndWireCap()
+    {
+        var idA = NodeId.NewRandom();
+        var idB = NodeId.NewRandom();
+        var config = new ClusterConfig([new ClusterMember(idA, ""), new ClusterMember(idB, "")]);
+
+        var learners = Enumerable.Range(0, 150).Select(i => (NodeId.NewRandom(), $"ep-{i}"));
+        var batched = config.AddLearners(learners);
+        batched.Count.Should().Be(152, "批量 learner 全部入配置");
+        batched.VoterCount.Should().Be(2, "learner 不改变投票成员集——quorum 交集论证平凡成立");
+        batched.MajorityThreshold.Should().Be(config.MajorityThreshold, "多数派阈值不变");
+
+        // wire 往返（配置条目 payload——150 成员远超单成员形态）
+        var restored = ClusterConfig.Deserialize(batched.Serialize());
+        restored.Count.Should().Be(152);
+        restored.VoterCount.Should().Be(2);
+        restored.Members.Count(m => m.Role == ClusterMemberRole.Learner).Should().Be(150);
+
+        // 幂等：已存在全跳过 = 原样返回（零提案前提）
+        config.AddLearners([(idA, "")]).Should().BeSameAs(config, "voter 不被批量 learner 误改/已存在跳过");
+
+        // wire 上限：单条 >200 拒绝（配置条目 Count 1B ≤255 留余量）
+        var over = Enumerable.Range(0, 201).Select(i => (NodeId.NewRandom(), ""));
+        var act = () => config.AddLearners(over);
+        act.Should().Throw<ArgumentOutOfRangeException>();
+    }
+
+    [Fact]
+    public async Task AddLearners_BatchBootstrap_OneRound_AllLearnersReceive()
+    {
+        await using var fx = new Rig(new InProcessTransportHub(), [], []);
+        var idA = NodeId.NewRandom();
+        var idB = NodeId.NewRandom();
+        var voterConfig = new ClusterConfig([new ClusterMember(idA, ""), new ClusterMember(idB, "")]);
+        var a = await CreateNodeAsync(fx.Hub, idA, voterConfig, seed: 1);
+        var b = await CreateNodeAsync(fx.Hub, idB, voterConfig, seed: 2);
+        fx.Nodes.AddRange([a, b]);
+        fx.Owned.AddRange([.. a.Owned, .. b.Owned]);
+        await WaitForAsync(() => a.Raft.IsLeader || b.Raft.IsLeader);
+        var leader = a.Raft.IsLeader ? a : b;
+
+        // 批量引导：3 个 learner 节点对象 + 一次 AddLearnersAsync（O(1) 轮协议——非 3 轮串行）
+        var learners = new List<(NodeId Id, TestNode Node)>();
+        for (var i = 0; i < 3; i++)
+        {
+            var id = NodeId.NewRandom();
+            var n = await CreateNodeAsync(fx.Hub, id,
+                new ClusterConfig([new ClusterMember(id, "", ClusterMemberRole.Learner)]), seed: 10 + i);
+            fx.Nodes.Add(n);
+            fx.Owned.AddRange(n.Owned);
+            learners.Add((id, n));
+        }
+
+        await leader.Membership.AddLearnersAsync(learners.Select(l => (l.Id, "")));
+
+        // 单轮生效：一次调用后 leader 配置同时含全部 learner（同一条配置条目 apply 产物）
+        leader.Raft.Config.Count.Should().Be(5, "2 voter + 3 learner");
+        leader.Raft.Config.VoterCount.Should().Be(2, "批量加入不改变投票集——多数派阈值不变");
+        foreach (var (id, node) in learners)
+        {
+            leader.Raft.Config.IsVoter(id).Should().BeFalse("learner 永久只读");
+            node.Raft.Config.Contains(id).Should().BeTrue("learner 侧活动配置已收敛（同条目 apply）");
+        }
+
+        // 稳态复制：后续条目全 learner 可达
+        var index = await leader.Raft.ReplicateAsync(new byte[] { 0x50, 0x51 });
+        foreach (var (_, node) in learners)
+        {
+            await WaitForAsync(() => node.Machine.Applied.ContainsKey(index), TimeSpan.FromSeconds(10));
+            node.Machine.Applied[index].Should().Equal(new byte[] { 0x50, 0x51 }, "批量 learner 全路径复制");
+        }
+    }
+
     [Fact]
     public async Task Join_ByEndpoints_OnInProcessTransport_FailsFast()
     {

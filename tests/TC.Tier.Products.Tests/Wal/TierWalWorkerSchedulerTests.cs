@@ -136,7 +136,8 @@ public sealed class TierWalWorkerSchedulerTests
     {
         using var vol = new TestVolume();
         await using var wal = await WalTestFactory.StartAsync(vol,
-            o => WalTestFactory.ManualCommit(o.WithSchedulerThreads(2)));
+            // 工厂缺省注入 Shared 实例——配置形态断言需显式清空实例（引擎构造先判实例后读配置）
+            o => WalTestFactory.ManualCommit(o.WithSchedulerThreads(2).WithWorkerScheduler(null)));
 
         // 配置形态 = 每引擎各自自建 2 线程（互不同实例——与共享注入形态的判别点）
         var main = SchedulerOf(LogEngineOf(wal, LogEngineField));

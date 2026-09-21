@@ -384,6 +384,34 @@ public sealed class DiskFileSystem : IFileSystem
         finally { _appendCursors.TryRemove(path, out _); }   // 追加预留盒摘除（下次重建按新 Length）
     }
 
+    /// <summary>对既有 inode 置 Unix 权限位（path-based chmod——#508：文件/socket/目录任意 inode 同语义，
+    /// UDS bind 产物收紧 0600 的 IPC 授权铁证面）。能力位 UnixPermissions 门控（Unix Disk 置位）。</summary>
+    /// <inheritdoc/>
+    public void ApplyInodeMode(string path, UnixFileMode mode)
+    {
+        AccessGate.RejectWrite(_access, nameof(ApplyInodeMode));
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
+        if (!Capabilities.HasFlag(FileSystemCapabilities.UnixPermissions))
+            throw new NotSupportedException(
+                $"ApplyInodeMode 需 UnixPermissions 能力位——当前平台/介质无 POSIX inode 权限语义（path={path}）。");
+        var full = GetFullPath(path);
+        // 平台守卫正形式（#493 DiskFileHandle 同款——CA1416 识别面）
+        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        {
+            try
+            {
+                File.SetUnixFileMode(full, mode);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            { throw ex.Wrap(nameof(ApplyInodeMode), path); }
+        }
+        else
+        {
+            throw new NotSupportedException(
+                $"ApplyInodeMode 在当前平台不支持（POSIX inode 权限语义仅 Linux/macOS）——安全权限请求不静默忽略（path={path}）。");
+        }
+    }
+
     /// <summary>移动/重命名文件（耐久换名 + sidecar 伴生随迁）。</summary>
     /// <param name="source">源文件相对路径。</param>
     /// <param name="dest">目标文件相对路径。</param>

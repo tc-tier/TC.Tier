@@ -191,4 +191,19 @@ public interface IFileSystem : IDisposable
     /// <param name="ct">在途收敛等待的取消令牌。</param>
     /// <returns>维护租约</returns>
     IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default);
+
+    /// <summary>
+    /// 对既有 inode 置 Unix 权限位（path-based chmod——#508）。
+    /// <para>★ 与创建期 <see cref="FileOpenOptions.UnixPermissions"/> 的分工：本原语面向<b>非文件打开路径</b>
+    ///   产出的 inode——典型 = UDS socket（<c>Socket.Bind</c> 产物，权限由 umask 决定，须 bind 后显式收紧
+    ///   至 0600 作 IPC 身份授权铁证）。path-based chmod（fchmodat）对任意 inode 适用——文件/socket/目录同语义。</para>
+    /// <para>★ 能力位协商（#493 同款）：仅置 <see cref="FileSystemCapabilities.UnixPermissions"/> 的实现支持
+    ///   （Unix Disk）；缺省实现抛 <see cref="NotSupportedException"/>（mem/远程卷无真实 inode、Windows 无
+    ///   POSIX 权限语义——安全权限绝不静默忽略）。平台守卫在实现调用点。</para>
+    /// </summary>
+    /// <param name="path">相对路径（inode 须已存在）。</param>
+    /// <param name="mode">目标权限位（典型 <see cref="UnixFileMode.UserRead"/> | <see cref="UnixFileMode.UserWrite"/>= 0600）。</param>
+    void ApplyInodeMode(string path, UnixFileMode mode)
+        => throw new NotSupportedException(
+            $"ApplyInodeMode 需要 UnixPermissions 能力位（仅 Unix Disk 支持）——本实现（{GetType().Name}）无真实 POSIX inode 语义。");
 }
