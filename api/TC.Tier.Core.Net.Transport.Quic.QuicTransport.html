@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class QuicTransport | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class QuicTransport | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="QUIC 介质传输（spec-11 W5 / spec-12 W-QUIC 波——System.Net.Quic 直映射，消费面与 InProcess/TCP/UDP 零差别）。运行依赖 MsQuic（—— Windows 11/Server 2022+ 内置，Linux 须 libmsquic）；TLS1.3 强制 = 加密+完整性免费。 ★ 三形态映射（.NET 8 System.Net.Quic 仅 stream 面——无 datagram API，映射语义差异见下）： 请求回调 = 每请求一条双向短命 stream：stream 即关联（无需 CorrId 关联表）；   写载荷 → half-close → 读 [4B len] 应答 → 关。流式会话 = 双向长命 stream（ 流控 = 背压天然传导）。数据报 = 单向短命 stream（send-and-forget）。★语义差异（明示非静默）：   .NET 8 无 QUIC datagram（RFC 9221）API——spec-12 &#167;5&quot;datagram 帧&quot;映射不可行，以单流承载；   丢弃面 = 连接死/流失败（流内可靠有序、流控满时发送 await——非 UDP 级无序尽力）。 ★ 应用层流头（每条 stream 首字节起）：[1B kind][1B protocolId][载荷]—— kind 0x00 请求 / 0x01 流式 / 0x02 数据报 / 0xFE 握手。 ★ 身份与信任：对称握手 stream（0xFE）交换 [NodeId 16B][ClusterTag 4B]—— 错集群 fail-fast、拨号方校验对端身份；证书 = 运行时自签（内网模式，证书链/SAN nid 防伪造随 mTLS 体系后置集成）。连接 = 节点对单连接（惰性拨号 + 断连清理，无后台重连循环—— 发送时按需重建）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport" class="text-break">
+Class QuicTransport  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.html">Transport</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.Quic.html">Quic</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>QUIC 介质传输（spec-11 W5 / spec-12 W-QUIC 波——System.Net.Quic 直映射，消费面与
+InProcess/TCP/UDP 零差别）。运行依赖 MsQuic（<a class="xref" href="TC.Tier.Core.Net.Transport.Quic.QuicCertificates.html#TC_Tier_Core_Net_Transport_Quic_QuicCertificates_IsSupported">IsSupported</a>——
+Windows 11/Server 2022+ 内置，Linux 须 libmsquic）；TLS1.3 强制 = 加密+完整性免费。</p>
+<p>★ 三形态映射（.NET 8 System.Net.Quic 仅 stream 面——无 datagram API，映射语义差异见下）：</p>
+<ul><li>请求回调 = 每请求一条<b>双向短命 stream</b>：stream 即关联（无需 CorrId 关联表）；
+  写载荷 → half-close → 读 [4B len] 应答 → 关。</li><li>流式会话 = 双向长命 stream（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.quic.quicstream">QuicStream</a> 流控 = 背压天然传导）。</li><li>数据报 = <b>单向短命 stream</b>（send-and-forget）。★语义差异（明示非静默）：
+  .NET 8 无 QUIC datagram（RFC 9221）API——spec-12 §5"datagram 帧"映射不可行，以单流承载；
+  丢弃面 = 连接死/流失败（流内可靠有序、流控满时发送 await——非 UDP 级无序尽力）。</li></ul>
+<p>★ 应用层流头（每条 stream 首字节起）：<code>[1B kind][1B protocolId][载荷]</code>——
+kind 0x00 请求 / 0x01 流式 / 0x02 数据报 / 0xFE 握手。</p>
+<p>★ 身份与信任：对称握手 stream（0xFE）交换 <code>[NodeId 16B][ClusterTag 4B]</code>——
+错集群 fail-fast、拨号方校验对端身份；证书 = 运行时自签（内网模式，证书链/SAN nid
+防伪造随 mTLS 体系后置集成）。连接 = 节点对单连接（惰性拨号 + 断连清理，无后台重连循环——
+发送时按需重建）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class QuicTransport : IProtocolTransport, IProtocol, ITransport, IAsyncDisposable, IPeerRegistry</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">QuicTransport</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html">IProtocol</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.ITransport.html">ITransport</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Transport.IPeerRegistry.html">IPeerRegistry</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Net.Channels.RequestBatchClient.html#TC_Tier_Core_Net_Channels_RequestBatchClient_SendBatchAsync_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_NodeId_System_Byte_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Nullable_System_TimeSpan__System_Threading_CancellationToken_">RequestBatchClient.SendBatchAsync(IProtocolTransport, NodeId, byte, IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, TimeSpan?, CancellationToken)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport__ctor_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport__ctor_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Transport_TransportOptions_TC_Tier_Core_Logging_ILogger_System_Security_Cryptography_X509Certificates_X509Certificate2Collection_System_Boolean_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.#ctor(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Transport.TransportOptions,TC.Tier.Core.Logging.ILogger,System.Security.Cryptography.X509Certificates.X509Certificate2Collection,System.Boolean)">
+  QuicTransport(NodeId, TransportOptions, ILogger?, X509Certificate2Collection?, bool)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（零 IO——监听/拨号经 <a class="xref" href="TC.Tier.Core.Net.Transport.Quic.QuicTransport.html#TC_Tier_Core_Net_Transport_Quic_QuicTransport_Start">Start()</a>；MsQuic 不可用 = 构造即抛 fail-fast）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public QuicTransport(NodeId self, TransportOptions options, ILogger? logger = null, X509Certificate2Collection? caBundle = null, bool mutualTls = false)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本端节点 ID。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>传输参数（复用 TransportOptions——ListenEndPoint/Peers/ClusterTag/超时面同 TCP）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+    <dt><code>caBundle</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.security.cryptography.x509certificates.x509certificate2collection">X509Certificate2Collection</a></dt>
+    <dd><p>CA 信任集（mTLS 链校验用——null = 系统信任库；默认 null）。</p>
+</dd>
+    <dt><code>mutualTls</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否启用 mTLS（true = 要求对端证书 + CA/SAN nid 校验——二期-E6；默认 false）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Faults_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Faults*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Faults" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Faults">
+  Faults
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>故障注入（常设面——延迟/分区/丢包；乱序对 QUIC 不适用=有意 no-op）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITransportFaultInjector Faults { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.ITransportFaultInjector.html">ITransportFaultInjector</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_LocalEndPoint_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.LocalEndPoint*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_LocalEndPoint" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.LocalEndPoint">
+  LocalEndPoint
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>QUIC 监听端点（实际绑定端口——0 端口装配后回读；未监听 = null）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IPEndPoint? LocalEndPoint { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Options_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Options*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Options" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Options">
+  Options
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>传输参数。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions Options { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Peers_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Peers*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Peers" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Peers">
+  Peers
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端表快照（IPeerRegistry）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt; Peers { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Self_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Self*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Self" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Self">
+  Self
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Self { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_AddPeer_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.AddPeer*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_AddPeer_TC_Tier_Core_Net_NodeId_System_Net_IPEndPoint_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.AddPeer(TC.Tier.Core.Net.NodeId,System.Net.IPEndPoint)">
+  AddPeer(NodeId, IPEndPoint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加入对端（同 ID = 更新端点并解除入站黑名单；自端抛）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void AddPeer(NodeId id, IPEndPoint endpoint)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>endpoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_DisposeAsync_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_DisposeAsync" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时 listener/连接/循环线程/证书均已释放（幂等——重复调用立即完成）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_OpenStreamAsync_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.OpenStreamAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.OpenStreamAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开流式会话（双向 stream 直映射——帧边界 [4B len] 由 <span class="xref">TC.Tier.Core.Net.Transport.Quic.QuicWireStream</span> 承载）。</p>
+<pre><code>        &lt;p&gt;★ 开流确认：写头后读对端 1B ack（[0x01]——accept 分派成功由传输回写，帧数据之外）；
+          未注册 acceptor = 对端 Abort → 此处抛 &lt;xref href=&quot;TC.Tier.Core.Net.NetIOException&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;（同构语义：开流失败）。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;IWireStream&gt; OpenStreamAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; openPayload = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点（须在对端地址表）。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>openPayload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>开流载荷（随流建立透传给对端 acceptor；组路由场景 = host 剥前缀后的内层载荷——二期-C1）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html">IWireStream</a>&gt;</dt>
+    <dd><p>完成后的流式会话（双向 QUIC stream 直映射；对端拒绝/链路异常抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterCoreProtocol_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterCoreProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterCoreProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterCoreProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterCoreProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·内部口（数据报 handler——只放行内部核心区 0x00-0x4F）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>发送承载声明（内存介质恒承载——声明语义在进程内退化为直派）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterCoreRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterCoreRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterCoreRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterCoreRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterCoreRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·内部口（只放行内部核心区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterCoreStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterCoreStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterCoreStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterCoreStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterCoreStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册·内部口（只放行内部核心区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterProtocol_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·公开口（spec-12 §3.5 注册面分流）——只放行注册区 0x60-0xAF
+（<a class="xref" href="TC.Tier.Core.Net.Wire.ProtocolIds.html#TC_Tier_Core_Net_Wire_ProtocolIds_IsUserRegistrable_System_Byte_">IsUserRegistrable(byte)</a>）；同 ID 重复注册抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>发送承载声明（默认 TCP 帧流；内存介质恒承载——尽力语义不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·公开口（spec-12 §5.2——只放行注册区 0x60-0xAF，同 §3.5 分流）；
+同 ID 重复注册抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RegisterStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RegisterStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册（只放行注册区 0x60-0xAF；未注册协议域的开流 = 对端 Reset 拒绝）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>协议域不在注册区。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>该协议域已注册。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RemovePeer_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RemovePeer*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_RemovePeer_TC_Tier_Core_Net_NodeId_System_Boolean_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.RemovePeer(TC.Tier.Core.Net.NodeId,System.Boolean)">
+  RemovePeer(NodeId, bool)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>移除对端（停拨号循环 + 入站黑名单；closeLink 默认关闭既有链路；未知 ID 幂等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RemovePeer(NodeId id, bool closeLink = true)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>closeLink</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_SendDatagramAsync_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.SendDatagramAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_SendDatagramAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.SendDatagramAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  SendDatagramAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>数据报发送（尽力送达——spec-12 §5.1）：对端未连/注入丢弃 = 静默丢弃；
+仅参数错误（超帧上限/取消）抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask SendDatagramAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>载荷（≤帧协议上限——大块走流式通道）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时数据报已写入单向短命 stream（尽力送达——对端不可达/流级失败 = 静默丢弃，不抛；参数错误/取消抛）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_SendRequestAsync_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.SendRequestAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_SendRequestAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_Net_Channels_RequestOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.SendRequestAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},TC.Tier.Core.Net.Channels.RequestOptions,System.Threading.CancellationToken)">
+  SendRequestAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, RequestOptions?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调发送（spec-12 §5.2——单请求 → 关联应答 → 超时；CorrId 传输生成）。</p>
+<p>★ 目标未连 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>（调用方有应答期待，不静默浪费超时窗）；
+  注入丢弃 = 超时；取消传播；应答到达返回载荷（空应答合法）。</p>
+<p>★ 投递语义缺省 at-most-once（单发 + 超时）；重传/确认 = 显式选择
+  （RetryPolicy——at-least-once）。</p>
+<p>★ ValueTask 单次消费契约（await 恰一次）；参数校验（未连接/载荷超限/已释放）
+  在调用点同步抛（非 async 直通形态——调用方 try/catch 即达）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;byte[]&gt; SendRequestAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, RequestOptions? options = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>请求载荷。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Channels.RequestOptions.html">RequestOptions</a></dt>
+    <dd><p>per-call 选项（null = 传输缺省）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt;</dt>
+    <dd><p>应答载荷。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Start_" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Start*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_Start" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.Start">
+  Start()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动：监听（配置非空时）+ 证书就绪。幂等。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Start()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_PeerConnected" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.PeerConnected">
+  PeerConnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端可达（应用层握手完成——身份交换+ClusterTag 校验通过）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerConnected</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_Quic_QuicTransport_PeerGone" data-uid="TC.Tier.Core.Net.Transport.Quic.QuicTransport.PeerGone">
+  PeerGone
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端离线（连接关闭/异常——事件链与 TCP 同型）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerGone</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

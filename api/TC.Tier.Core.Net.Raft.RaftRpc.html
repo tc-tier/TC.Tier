@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RaftRpc | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RaftRpc | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="Raft RPC 消息族（spec-01..05 消息语义 &#215; spec-12 &#167;6/&#167;10——[WireMessage] 声明即线格式； RPC 族走请求回调形态：RpcId 取消——CorrId 由传输承载，消息族不携带（spec-12 &#167;6 形态映射）。 ★ 线格式（生成物：[Tag 1B][Term 8B 公共前缀][子类字段声明序]，全部小端；NodeId = 16B   不透明字节串原序嵌套件）：tag 沿用类型码 0x01-0x08（PreVoteReq…InstallSnapshotResp）。   ★ 线格式 v3（信封之死——序列化 v3，件 B 配置 v2 先例）：AppendEntries 条目区由   [Terms 表][Payloads 表]（v2，载荷 = 引擎信封）改为    单 blob（区内 [Count 4B][&#215;N:  13B + Content]——   kind 升格条目结构字段，存储直写单拷贝）。内部协议未发布，无跨版本共存。 ★ 无响应超时重发机制（raft RPC 幂等——丢失由心跳/选举定时器自然补偿；请求回调   缺省 at-most-once 投递语义与此天然对齐）。 ★ 降级统一规则（spec-01 &#167;3.2）：任何状态收到更高 term 的 RPC → 先落盘再应答；   应答恒回带 （应答方 currentTerm——对端据此发现自己落后）。 ★ 解码防御：未知 tag / 截断 / Count 超上限 = false（畸形报文丢弃）；已知 tag 尾部   扩展字节容忍（前向兼容）。条目表防御上限 （旧手写   codec 只查负数——生成化补齐截断防御）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.RaftRpc">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_RaftRpc" data-uid="TC.Tier.Core.Net.Raft.RaftRpc" class="text-break">
+Class RaftRpc  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Raft RPC 消息族（spec-01..05 消息语义 × spec-12 §6/§10——[WireMessage] 声明即线格式；
+RPC 族走请求回调形态：<strong>RpcId 取消——CorrId 由传输承载，消息族不携带</strong>（spec-12 §6 形态映射）。</p>
+<p>★ 线格式（生成物：[Tag 1B][Term 8B 公共前缀][子类字段声明序]，全部小端；NodeId = 16B
+  不透明字节串原序嵌套件）：tag 沿用类型码 0x01-0x08（PreVoteReq…InstallSnapshotResp）。
+  ★ 线格式 v3（信封之死——序列化 v3，件 B 配置 v2 先例）：AppendEntries 条目区由
+  [Terms 表][Payloads 表]（v2，载荷 = 引擎信封）改为 <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesReq.html#TC_Tier_Core_Net_Raft_AppendEntriesReq_EntriesRegion">EntriesRegion</a>
+  单 blob（区内 [Count 4B][×N: <a class="xref" href="TC.Tier.Core.Net.Raft.RaftAppendEntryHeader.html">RaftAppendEntryHeader</a> 13B + Content]——
+  kind 升格条目结构字段，存储直写单拷贝）。内部协议未发布，无跨版本共存。</p>
+<p>★ 无响应超时重发机制（raft RPC 幂等——丢失由心跳/选举定时器自然补偿；请求回调
+  缺省 at-most-once 投递语义与此天然对齐）。</p>
+<p>★ 降级统一规则（spec-01 §3.2）：任何状态收到更高 term 的 RPC → 先落盘再应答；
+  应答恒回带 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_Term">Term</a>（应答方 currentTerm——对端据此发现自己落后）。</p>
+<p>★ 解码防御：未知 tag / 截断 / Count 超上限 = false（畸形报文丢弃）；已知 tag 尾部
+  扩展字节容忍（前向兼容）。条目表防御上限 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesPerAppend">MaxEntriesPerAppend</a>（旧手写
+  codec 只查负数——生成化补齐截断防御）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[WireMessage]
+public abstract record RaftRpc : IEquatable&lt;RaftRpc&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RaftRpc</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a>&gt;</div>
+    </dd>
+  </dl>
+
+  <dl class="typelist derived">
+    <dt>Derived</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesReq.html">AppendEntriesReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html">InstallSnapshotReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotResp.html">InstallSnapshotResp</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.JoinResp.html">JoinResp</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.PreVoteReq.html">PreVoteReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.PreVoteResp.html">PreVoteResp</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.ReadIndexReq.html">ReadIndexReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.ReadIndexResp.html">ReadIndexResp</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.RequestVoteReq.html">RequestVoteReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.RequestVoteResp.html">RequestVoteResp</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.TransferLeaderReq.html">TransferLeaderReq</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.TransferLeaderResp.html">TransferLeaderResp</a></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc__ctor_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc__ctor" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.#ctor">
+  RaftRpc()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected RaftRpc()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc__ctor_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc__ctor_TC_Tier_Core_Net_Raft_RaftRpc_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.#ctor(TC.Tier.Core.Net.Raft.RaftRpc)">
+  RaftRpc(RaftRpc)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[SetsRequiredMembers]
+protected RaftRpc(RaftRpc original)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>original</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesPerAppend" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.MaxEntriesPerAppend">
+  MaxEntriesPerAppend
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单次 AppendEntries 条目表防御上限（发送侧批受 ReplicationPolicy 约束（缺省 1000）；
+线协议上限为畸形报文拦截界——帧 16MB 同时约束总字节）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int MaxEntriesPerAppend = 8192</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesRegionBytes" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.MaxEntriesRegionBytes">
+  MaxEntriesRegionBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>EntriesRegion blob 字节防御上限（畸形报文拦截界——与传输帧上限同量级）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int MaxEntriesRegionBytes = 16777216</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_MaxSnapshotBlocks" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.MaxSnapshotBlocks">
+  MaxSnapshotBlocks
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>快照块清单校验和表防御上限（畸形报文拦截界——正常形态受块大小与内容规模约束）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int MaxSnapshotBlocks = 262144</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_MaxSnapshotHolders" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.MaxSnapshotHolders">
+  MaxSnapshotHolders
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>快照块持有者表防御上限（集群规模畸形报文拦截界）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int MaxSnapshotHolders = 256</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_WireFormatVersion" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.WireFormatVersion">
+  WireFormatVersion
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>线格式版本（v3 = AppendEntries 条目区 blob 化 + kind 结构字段化——信封之死）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int WireFormatVersion = 3</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_EqualityContract_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.EqualityContract*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_EqualityContract" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.EqualityContract">
+  EqualityContract
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual Type EqualityContract { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_Term_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.Term*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_Term" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.Term">
+  Term
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>发起方 currentTerm（应答回带应答方 currentTerm——降级统一规则）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required long Term { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_Equals_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_Equals_System_Object_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_Equals_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_Equals_TC_Tier_Core_Net_Raft_RaftRpc_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.Equals(TC.Tier.Core.Net.Raft.RaftRpc)">
+  Equals(RaftRpc?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public virtual bool Equals(RaftRpc? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_GetHashCode_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_GetHashCode" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_PrintMembers_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.PrintMembers*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_PrintMembers_System_Text_StringBuilder_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.PrintMembers(System.Text.StringBuilder)">
+  PrintMembers(StringBuilder)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected virtual bool PrintMembers(StringBuilder builder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_ToString_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_ToString" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_op_Equality_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_op_Equality_TC_Tier_Core_Net_Raft_RaftRpc_TC_Tier_Core_Net_Raft_RaftRpc_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.op_Equality(TC.Tier.Core.Net.Raft.RaftRpc,TC.Tier.Core.Net.Raft.RaftRpc)">
+  operator ==(RaftRpc?, RaftRpc?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(RaftRpc? left, RaftRpc? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftRpc_op_Inequality_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftRpc_op_Inequality_TC_Tier_Core_Net_Raft_RaftRpc_TC_Tier_Core_Net_Raft_RaftRpc_" data-uid="TC.Tier.Core.Net.Raft.RaftRpc.op_Inequality(TC.Tier.Core.Net.Raft.RaftRpc,TC.Tier.Core.Net.Raft.RaftRpc)">
+  operator !=(RaftRpc?, RaftRpc?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(RaftRpc? left, RaftRpc? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

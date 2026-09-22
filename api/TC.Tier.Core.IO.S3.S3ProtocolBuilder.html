@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class S3ProtocolBuilder | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class S3ProtocolBuilder | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="s3 协议构建器（medium-protocol-and-parity-design &#167;2.2 两级注册表的二级开放轴）—— spec network:///s3/host[:port]/bucket/prefix → S3ObjectStore + RemoteFileSystem 全栈组装。 ★ 依赖方向合法：IO.S3 → Core（注册表在 Core，实现在此——引用本程序集即自动注册，   ModuleInitializer 挂载，消费方零代码）。 ★ spec 映射：endpoint=host[:port]（tls 缺省 https，tls=0 → http——本地 MinIO 类）；   vhost/region → S3ClientOptions；prefix → KeyPrefix；spill=local:///…→Spill.ToDisk、   spill=memory:→Spill.ToMemory（G7 收编：单一概念两形态）；cred=env:NAME → 环境变量 NAME   （值格式 accessKey:secretKey——引用永不携值）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder">
+
+
+
+  <h1 id="TC_Tier_Core_IO_S3_S3ProtocolBuilder" data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder" class="text-break">
+Class S3ProtocolBuilder  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a>.<a class="xref" href="TC.Tier.Core.IO.S3.html">S3</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.IO.S3.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>s3 协议构建器（medium-protocol-and-parity-design §2.2 两级注册表的二级开放轴）——
+spec <code>network:///s3/host[:port]/bucket/prefix</code> → S3ObjectStore + RemoteFileSystem 全栈组装。</p>
+<p>★ 依赖方向合法：IO.S3 → Core（注册表在 Core，实现在此——引用本程序集即自动注册，
+  ModuleInitializer 挂载，消费方零代码）。</p>
+<p>★ spec 映射：endpoint=host[:port]（tls 缺省 https，tls=0 → http——本地 MinIO 类）；
+  vhost/region → S3ClientOptions；prefix → KeyPrefix；spill=local:///…→Spill.ToDisk、
+  spill=memory:→Spill.ToMemory（G7 收编：单一概念两形态）；cred=env:NAME → 环境变量 NAME
+  （值格式 <code>accessKey:secretKey</code>——引用永不携值）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[NetworkProtocol(&quot;s3&quot;)]
+public sealed class S3ProtocolBuilder : ITierProtocolBuilder</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">S3ProtocolBuilder</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.IO.ITierProtocolBuilder.html">ITierProtocolBuilder</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ProtocolBuilder__ctor_" data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ProtocolBuilder__ctor" data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder.#ctor">
+  S3ProtocolBuilder()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无参构造（协议注册生成走此路径；<a class="xref" href="TC.Tier.Core.IO.S3.S3ProtocolBuilder.html#TC_Tier_Core_IO_S3_S3ProtocolBuilder_Instance">Instance</a> 兼容既有显式引用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public S3ProtocolBuilder()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ProtocolBuilder_Instance" data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder.Instance">
+  Instance
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单例（兼容既有引用；注册生成走无参构造）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly S3ProtocolBuilder Instance</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.S3.S3ProtocolBuilder.html">S3ProtocolBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ProtocolBuilder_Build_" data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder.Build*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ProtocolBuilder_Build_TC_Tier_Core_IO_TierSpec_TC_Tier_Core_IO_FileSystemOptions_TC_Tier_Core_IO_TierFsVerb_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.IO.S3.S3ProtocolBuilder.Build(TC.Tier.Core.IO.TierSpec,TC.Tier.Core.IO.FileSystemOptions,TC.Tier.Core.IO.TierFsVerb,TC.Tier.Core.Logging.ILogger)">
+  Build(TierSpec, FileSystemOptions?, TierFsVerb, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>按解析后的 s3 spec + 用户 options 组装 S3ObjectStore + RemoteFileSystem 全栈：
+endpoint/凭证/寻址映射（spec 显式胜出 → options 同名值）、spill 挂载、动词路由
+（New = 前缀有内容即抛 / Open = 既有视图 + label 断言 / OpenOrCreate = bind-any 零探测）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IFileSystem Build(TierSpec spec, FileSystemOptions? options, TierFsVerb verb, ILogger? logger)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>spec</code> <a class="xref" href="TC.Tier.Core.IO.TierSpec.html">TierSpec</a></dt>
+    <dd><p>解析后的 s3 spec（endpoint/bucket/cred/tls/prefix/spill 等）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.IO.FileSystemOptions.html">FileSystemOptions</a></dt>
+    <dd><p>用户调优选项（同名字段兜底；null = 类型缺省）。</p>
+</dd>
+    <dt><code>verb</code> <a class="xref" href="TC.Tier.Core.IO.TierFsVerb.html">TierFsVerb</a></dt>
+    <dd><p>挂载动词（New/Open/OpenOrCreate）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志器（可空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>组装完成的远程文件系统（挂载语义按 verb 路由）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

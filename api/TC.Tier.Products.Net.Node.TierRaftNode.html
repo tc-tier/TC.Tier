@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierRaftNode | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierRaftNode | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierRaftNode——raft &#215; Tier 产品装配节点（D6 产品接线收口件）：存储（TierWal → TierWalRaftStore）、 协议（RaftStateMachine + ApplyPipeline）、多源与反熵（SwarmSync + SwarmAntiEntropy）、 宿主调度（快照压缩 + 反熵周期 + 换届接线）——一个入口装配完整产品节点。 ★ 装配链：TierWal.Builder → TierWalRaftStore → ApplyPipeline(业务状态机) → RaftStateMachine →   传输（调用方组装根——ClusterTransport/InProcess 皆可）；宿主循环承载三件调度：  ① 快照压缩（全角色）：日志增长 ≥    → （一体：镜像 [Head..N₀] + 截头——raft 日志压缩惯例）；  ② 快照发布（全角色，Swarm 装配时）：N₀ 变更 → 块化内容挂源（holder 侧——供给拉取与对账）；  ③ 反熵（仅 leader 发起、对端轮转——SwarmOptions.AntiEntropyInterval 契约）：   与对端比对已发布快照内容 → 漂移块定向修复（机制 = ）； ★ 换届接线： false →  （持有表清空）+ 反熵停发；true → 恢复发起资格。非 leader 持基线时向已知 leader 上报（启动/换届触发③）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Net.Node.TierRaftNode">
+
+
+
+  <h1 id="TC_Tier_Products_Net_Node_TierRaftNode" data-uid="TC.Tier.Products.Net.Node.TierRaftNode" class="text-break">
+Class TierRaftNode  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Net.html">Net</a>.<a class="xref" href="TC.Tier.Products.Net.Node.html">Node</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierRaftNode——raft × Tier 产品装配节点（D6 产品接线收口件）：存储（TierWal → TierWalRaftStore）、
+协议（RaftStateMachine + ApplyPipeline）、多源与反熵（SwarmSync + SwarmAntiEntropy）、
+宿主调度（快照压缩 + 反熵周期 + 换届接线）——一个入口装配完整产品节点。</p>
+<p>★ 装配链：TierWal.Builder → TierWalRaftStore → ApplyPipeline(业务状态机) → RaftStateMachine →
+  传输（调用方组装根——ClusterTransport/InProcess 皆可）；宿主循环承载三件调度：</p>
+<p> ① 快照压缩（全角色）：日志增长 ≥ <a class="xref" href="TC.Tier.Products.Net.Node.TierRaftNodeOptions.html#TC_Tier_Products_Net_Node_TierRaftNodeOptions_SnapshotGrowthThresholdEntries">SnapshotGrowthThresholdEntries</a>
+  → <a class="xref" href="TC.Tier.Products.Wal.TierWal.html#TC_Tier_Products_Wal_TierWal_SnapshotAsync_System_Threading_CancellationToken_">SnapshotAsync(CancellationToken)</a>（一体：镜像 [Head..N₀] + 截头——raft 日志压缩惯例）；</p>
+<p> ② 快照发布（全角色，Swarm 装配时）：N₀ 变更 → 块化内容挂源（holder 侧——供给拉取与对账）；</p>
+<p> ③ 反熵（仅 leader 发起、对端轮转——SwarmOptions.AntiEntropyInterval 契约）：
+  与对端比对已发布快照内容 → 漂移块定向修复（机制 = <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmAntiEntropy.html#TC_Tier_Core_Net_Swarm_SwarmAntiEntropy_RunOnceAsync_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Swarm_SwarmManifest_System_Threading_CancellationToken_">RunOnceAsync(ISwarmBlockSource, NodeId, SwarmManifest, CancellationToken)</a>）；</p>
+<p>★ 换届接线：<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_LeaderChanged">LeaderChanged</a> false → <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_OnLeaderLost">OnLeaderLost()</a>
+（持有表清空）+ 反熵停发；true → 恢复发起资格。非 leader 持基线时向已知 leader 上报（启动/换届触发③）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierRaftNode : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierRaftNode</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_Apply_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Apply*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_Apply" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Apply">
+  Apply
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>apply 管道（状态机重建/位点推进）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ApplyPipeline Apply { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ApplyPipeline.html">ApplyPipeline</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_FileSystem_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.FileSystem*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_FileSystem" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.FileSystem">
+  FileSystem
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组合根文件系统（二期-F10 备份数据面入口——RootSpaceImage 采集/网络镜像传输）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IFileSystem FileSystem { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_GroupId_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.GroupId*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_GroupId" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.GroupId">
+  GroupId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组标识（二期-I6——多组装配区分；单组 = Empty）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftGroupId GroupId { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_Id_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Id*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_Id" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Id">
+  Id
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>节点标识。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Id { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_Membership_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Membership*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_Membership" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Membership">
+  Membership
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>成员资格编排（二期-D8——Add/Remove/Promote 的封装面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Membership Membership { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.Membership.html">Membership</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_Raft_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Raft*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_Raft" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Raft">
+  Raft
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>raft 状态机（复制/提交/角色面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftStateMachine Raft { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html">RaftStateMachine</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_Swarm_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Swarm*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_Swarm" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Swarm">
+  Swarm
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>多源同步组件（null = 未装配）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SwarmSync? Swarm { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html">SwarmSync</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_Wal_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Wal*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_Wal" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.Wal">
+  Wal
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>TierWal 存储（读面/快照/截断进阶操作入口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierWal Wal { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Wal.TierWal.html">TierWal</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_BackupToAsync_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.BackupToAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_BackupToAsync_System_IO_Stream_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.BackupToAsync(System.IO.Stream,System.Threading.CancellationToken)">
+  BackupToAsync(Stream, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>备份（二期-F10——一致性点冻结内 Fs 根空间镜像采集）：append 门内冻结写入 →
+<a class="xref" href="TC.Tier.Core.IO.Image.RootSpaceImage.html#TC_Tier_Core_IO_Image_RootSpaceImage_Capture_TC_Tier_Core_IO_IFileSystem_System_IO_Stream_TC_Tier_Core_IO_Image_ImageOptions_">Capture(IFileSystem, Stream, ImageOptions?)</a>（TCA1 帧 + 摘要对账）写入归档流——数据面走 Fs（裁定③）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;ImageSummary&gt; BackupToAsync(Stream archive, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>archive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></dt>
+    <dd><p>归档流（调用方提供——文件/网络镜像传输均骨架兼容）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（append 门内——取消即放弃本次备份，节点不受影响）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a>&gt;</dt>
+    <dd><p>镜像摘要（条目/帧/CRC——恢复侧对账校验用）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_DeprovisionAsync_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.DeprovisionAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_DeprovisionAsync_System_Nullable_TC_Tier_Core_Net_NodeId__System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.DeprovisionAsync(System.Nullable{TC.Tier.Core.Net.NodeId},System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  DeprovisionAsync(NodeId?, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>节点退役编排（二期-D8——decommission）：①在位 leader = 停新/排空（D3）+ 可选定向转让（D2）；
+②raft 配置移除自身（leader 任内提案；follower 退役 = 由 leader 侧 RemoveMember 编排——
+幸存者对账循环自动黑名单+断链该节点，§8.2）；③物理面清理由调用方 DisposeAsync 有界收尾。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DeprovisionAsync(NodeId? transferTarget = null, TimeSpan? drainWindow = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transferTarget</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>?</dt>
+    <dd><p>转让目标（null = 自降级 Resign；仅 leader 任内生效）。</p>
+</dd>
+    <dt><code>drainWindow</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>排空窗（缺省 500ms）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>编排步骤走完（leader 排空/转让 + 在位时配置移除自身）即完成；物理面清理由调用方随后 DisposeAsync 有界收尾。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_DisposeAsync_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_DisposeAsync" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>停宿主循环 → raft → apply → 多源 → TierWal。
+★ 每段有界（超时=资源滞留换安全——registry Shard.DisposeAsync 同款）：换届风暴下
+复制 lane 可能滞留在 WAL 提交路径上（W4 persist 下环前的已知形态），Dispose 不因
+单段滞留挂死。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>任务在各段有界释放（单段超时不阻断后续段）全部走完后完成。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_GetStateSnapshot_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.GetStateSnapshot*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_GetStateSnapshot" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.GetStateSnapshot">
+  GetStateSnapshot()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>统一状态导出（二期-D1 NETGAP-005——healthz/readyz/管理面数据源）：
+Role/LeaderId/Term/Commit/Applied/日志尾/快照覆盖点/成员复制进度 + 探针语义。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftStateSnapshot GetStateSnapshot()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateSnapshot.html">RaftStateSnapshot</a></dt>
+    <dd><p>当前 raft 状态快照（管理面/探针的数据源——字段语义见 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateSnapshot.html">RaftStateSnapshot</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_RestoreArchive_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.RestoreArchive*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_RestoreArchive_System_IO_Stream_TC_Tier_Core_IO_IFileSystem_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.RestoreArchive(System.IO.Stream,TC.Tier.Core.IO.IFileSystem)">
+  RestoreArchive(Stream, IFileSystem)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>恢复（二期-F10——归档流解封入目标 fs；摘要返回供调用方对账——随后即可
+以目标 fs 装配节点/组）。静态数据面（Fs 能力透传——RootSpaceImage.Restore）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ImageSummary RestoreArchive(Stream archive, IFileSystem destinationFs)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>archive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.stream">Stream</a></dt>
+    <dd><p>归档流（<a class="xref" href="TC.Tier.Products.Net.Node.TierRaftNode.html#TC_Tier_Products_Net_Node_TierRaftNode_BackupToAsync_System_IO_Stream_System_Threading_CancellationToken_">BackupToAsync(Stream, CancellationToken)</a> 产出的 TCA1 帧流——读取至尾）。</p>
+</dd>
+    <dt><code>destinationFs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>目标文件系统（解封落点——随后可据此装配节点/组）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.Image.ImageSummary.html">ImageSummary</a></dt>
+    <dd><p>镜像摘要（条目/帧/CRC——与备份侧对账校验用）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_StartAsync_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_StartAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_IO_IFileSystem_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_Raft_ClusterConfig_TC_Tier_Core_Net_Raft_IStateMachine_TC_Tier_Products_Net_Node_TierRaftNodeOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.StartAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.IO.IFileSystem,TC.Tier.Core.Net.Channels.IProtocolTransport,TC.Tier.Core.Net.Raft.ClusterConfig,TC.Tier.Core.Net.Raft.IStateMachine,TC.Tier.Products.Net.Node.TierRaftNodeOptions,TC.Tier.Core.Logging.ILogger)">
+  StartAsync(NodeId, IFileSystem, IProtocolTransport, ClusterConfig, IStateMachine, TierRaftNodeOptions?, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动完整节点：TierWal 恢复 → 存储适配 → apply 管道 → raft（选举/复制循环）→ 宿主调度循环。
+薄壳（兼容存量调用/测试/探针——签名不变）；传输组装根收口走 <a class="xref" href="TC.Tier.Products.Net.Node.TierRaftNodeBuilder.html">TierRaftNodeBuilder</a>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static Task&lt;TierRaftNode&gt; StartAsync(NodeId id, IFileSystem fs, IProtocolTransport transport, ClusterConfig config, IStateMachine machine, TierRaftNodeOptions? options = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>节点标识（须 ∈ config.Members）。</p>
+</dd>
+    <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>组合根文件系统（每节点私有卷——TierFs 组合根）。</p>
+</dd>
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>本节点传输（ClusterTransport / InProcess 注册代理）。</p>
+</dd>
+    <dt><code>config</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>集群配置。</p>
+</dd>
+    <dt><code>machine</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html">IStateMachine</a></dt>
+    <dd><p>业务状态机（ApplyAsync——日志即状态机）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Products.Net.Node.TierRaftNodeOptions.html">TierRaftNodeOptions</a></dt>
+    <dd><p>装配配置（缺省 = 产品默认）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Products.Net.Node.TierRaftNode.html">TierRaftNode</a>&gt;</dt>
+    <dd><p>已启动的完整产品节点（装配完毕，宿主调度循环已运行）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Node_TierRaftNode_TriggerSnapshotAsync_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.TriggerSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Node_TierRaftNode_TriggerSnapshotAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Node.TierRaftNode.TriggerSnapshotAsync(System.Threading.CancellationToken)">
+  TriggerSnapshotAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>快照压缩公开触发（二期-F4——引擎层公开触发）：绕过增长阈值直接压缩（运维/工具面）；
+仍走 apply 追平守卫（≤ 持久化尾才压缩——T6 结构契约）与 append 门串行。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; TriggerSnapshotAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>新快照覆盖点 N₀。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

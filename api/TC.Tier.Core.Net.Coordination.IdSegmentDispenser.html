@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class IdSegmentDispenser | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class IdSegmentDispenser | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="段客户端分发器（二期-G2——leaf-segment 形态）：本地持有 [Start..End] 段内发号， 耗尽自动向服务端补段——raft 往返按段长摊薄（10 万 ID 仅 10 次段请求 @ 段长 1 万）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser" class="text-break">
+Class IdSegmentDispenser  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Coordination.html">Coordination</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>段客户端分发器（二期-G2——leaf-segment 形态）：本地持有 [Start..End] 段内发号，
+耗尽自动向服务端补段——raft 往返按段长摊薄（10 万 ID 仅 10 次段请求 @ 段长 1 万）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class IdSegmentDispenser</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">IdSegmentDispenser</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser__ctor_" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser__ctor_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_NodeId_System_Byte_System_String_System_Int64_" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser.#ctor(TC.Tier.Core.Net.Channels.IProtocolTransport,TC.Tier.Core.Net.NodeId,System.Byte,System.String,System.Int64)">
+  IdSegmentDispenser(IProtocolTransport, NodeId, byte, string, long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IdSegmentDispenser(IProtocolTransport transport, NodeId server, byte domain, string key, long segmentSize = 10000)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>发起端传输。</p>
+</dd>
+    <dt><code>server</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>ID 服务节点。</p>
+</dd>
+    <dt><code>domain</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>服务域。</p>
+</dd>
+    <dt><code>key</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>段键（业务自定——如 &quot;order-id&quot;）。</p>
+</dd>
+    <dt><code>segmentSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>段长（每次 raft 补段获得的 ID 数）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser_NextAsync_" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser.NextAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser_NextAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser.NextAsync(System.Int64,System.Threading.CancellationToken)">
+  NextAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取一个全局单调 ID（指定补段长）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; NextAsync(long refetchSegment, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>refetchSegment</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>补段长度（≥ 1——仅本地段耗尽向服务端申请时使用）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>下一全局单调 ID（补段时为新段 [Start..End] 起始）；非 leader 应答 = 上抛 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>，应答畸形抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser_NextAsync_" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser.NextAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_IdSegmentDispenser_NextAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Coordination.IdSegmentDispenser.NextAsync(System.Threading.CancellationToken)">
+  NextAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取一个全局单调 ID（本地段耗尽 → 自动补段；NotLeader 由调用方重试/重路由）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; NextAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>下一全局单调 ID（段内顺序发放；段耗尽经 raft 补段后从新段续发）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace TC.Tier.Core.Net.Raft | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace TC.Tier.Core.Net.Raft | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft">
+
+  <h1 id="TC_Tier_Core_Net_Raft" data-uid="TC.Tier.Core.Net.Raft" class="text-break">Namespace TC.Tier.Core.Net.Raft</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesReq.html">AppendEntriesReq</a></dt>
+      <dd><p>AppendEntries 请求（spec-02——心跳 = 条目空；携带 leaderCommit 传播提交推进）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+      <dd><p>AppendEntries 应答（spec-02 §3 持久化先于应答 + ★ 汇报 N₀ = 快照 index 扩展——spec-03 §4：
+follower 应答回带本地 <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html#TC_Tier_Core_Net_Raft_AppendEntriesResp_SnapshotIndex">SnapshotIndex</a>，leader 发现 nextIndex ≤ N₀ 时改走快照安装）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ApplyPipeline.html">ApplyPipeline</a></dt>
+      <dd><p>提交→应用管道（spec-05 §3 定案）——与共识循环解耦的独立单 worker：</p>
+<ul><li>按 index 序取 committed 批次 [lastApplied+1, commitIndex] → ApplyAsync 逐条（严格与日志序一致）；</li><li>appliedIndex 节流落盘（spec-05 §2——每 N 条/每 T 毫秒，断电损失 ≤ 节流窗口重放成本）；</li><li>配置条目分流（spec-04——配置切换 = apply 产物，经回调通知状态机；判别 =
+条目结构字段 Kind（<a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntryKind.html">RaftEntryKind</a>——wire v3 信封之死））；</li><li>应用完成 → <a class="xref" href="TC.Tier.Core.Net.Raft.ApplyPipeline.html#TC_Tier_Core_Net_Raft_ApplyPipeline_AppliedTo">AppliedTo</a> 事件（状态机完成 ReplicateAsync pending——spec-05 契约②）。</li></ul>
+<p>★ 正确性（spec-05 §3）：raft 安全性 = 多数派提交，与本地 apply 无关——apply 落后安全
+（只延迟读服务，不产生错误状态）；单消费者 FIFO 保序 → 按序恰好一次（重复仅发生在重启重放——
+at-least-once 契约，业务幂等）。</p>
+<p>★ 存储经 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 端口（spec-12 §8.1）：★ 双源读（spec-03 §7）——
+applied &lt; N₀ 的跨界区间由 <a class="xref" href="TC.Tier.Core.Net.Raft.RebuildCoordinator.html">RebuildCoordinator</a> 经快照读面补齐（快照 =
+可导出的日志前缀镜像），管道无需感知快照面。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ApplyPipelineOptions.html">ApplyPipelineOptions</a></dt>
+      <dd><p>ApplyPipeline 参数（spec-05 §3/§6——appliedIndex 落盘节流 + 队列背压）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+      <dd><p>集群配置（spec-04 §1 定案）——节点有序列表；版本 = 承载它的日志 index；meta 槽不存配置
+（恢复 = 重放日志/快照帧流至配置条目——配置与状态机同构，日志即状态机）。</p>
+<p>★ 稳定序列化（<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html#TC_Tier_Core_Net_Raft_ClusterConfig_Serialize">Serialize()</a>——配置条目 payload 格式）：配置变更经日志复制
+跨节点传播、重启经快照/重放恢复——格式必须稳定。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator.html">GroupMoveOrchestrator</a></dt>
+      <dd><p>组搬迁编排器（二期-F5——DDR-F5）：把某成员从组内迁出至目标节点的四步编排——
+目标入组 → 等追平 → leader 迁移（若在源）→ 源出组。</p>
+<p>★ 数据面归 Fs（裁定③——镜像/迁移通道归 Fs 既有能力）；本面只做时序调度 +
+配置变更——日志复制追平是缺省搬迁形态，镜像通道由装配方在入组前预热（接口不变）。</p>
+<p>★ 恢复语义（F3 变更链同款）：每步都是已提交的合法配置态；任一步失败保留
+中间态，重调幂等续走（已入组跳过、已迁 leader 跳过、已出组跳过）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html">InstallSnapshotReq</a></dt>
+      <dd><p>InstallSnapshot 请求（spec-03 §2）——快照已经注入传输面送达，本 RPC 只做同步点握手：
+follower 收到后导入（读注入面）+ 重建业务状态 → 应答 N₀ → leader nextIndex = N₀+1 推增量。</p>
+<p>★ 握手面协调数据（spec-12 §6.1 SwarmSync × T6 接线）：<a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html#TC_Tier_Core_Net_Raft_InstallSnapshotReq_Swarm">Swarm</a> = true 时
+携带多源块清单（<a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html#TC_Tier_Core_Net_Raft_InstallSnapshotReq_ManifestId">ManifestId</a>/<a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html#TC_Tier_Core_Net_Raft_InstallSnapshotReq_BlockSize">BlockSize</a>/<a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html#TC_Tier_Core_Net_Raft_InstallSnapshotReq_TotalBytes">TotalBytes</a>/
+<a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html#TC_Tier_Core_Net_Raft_InstallSnapshotReq_Checksums">Checksums</a>）+ 持有者表（<a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotReq.html#TC_Tier_Core_Net_Raft_InstallSnapshotReq_Holders">Holders</a>）——follower 据此多源拉取；
+false = 单源流式（数据面自带一切，协调字段为零值）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.InstallSnapshotResp.html">InstallSnapshotResp</a></dt>
+      <dd><p>InstallSnapshot 应答（成功 = 快照已导入 + 业务状态已重建到 N₀）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></dt>
+      <dd><p>加入集群请求（Standby 引导——新节点向 leader 递；leader 按申请档入组：
+缺省 learner（<a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html#TC_Tier_Core_Net_Raft_JoinReq_AutoPromote">AutoPromote</a> 追平后晋级）∥ <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html#TC_Tier_Core_Net_Raft_JoinReq_AsWitness">AsWitness</a> witness 档
+（投票不存数据，永不晋级））。bootstrap 端点非 leader = 应答携带其已知 leader
+提示（Accepted=false——调用方轮转重试）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.JoinResp.html">JoinResp</a></dt>
+      <dd><p>加入集群应答。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.LeaderPlacementPolicy.html">LeaderPlacementPolicy</a></dt>
+      <dd><p>优先 Leader 放置策略（二期-F7——DDR-F7）：偏好序声明 + 观测循环 + 既有
+<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_TransferLeadershipAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_">TransferLeadershipAsync(NodeId, CancellationToken)</a>（编排面——选举协议零改动）。</p>
+<p>★ 迁移三要素（齐备才发起，防抖）：① 当前 leader 偏好位置劣于某存活 voter；
+② 该成员已追平（leader 视角 matchIndex == commitIndex——数据安全搬迁）；
+③ 无在途转让（同目标未完成不重复发起——转让超时由引擎自愈回退）。</p>
+<p>★ 偏好序语义：列表顺序即优先级（越前越优）；不在列表中的 voter 视为最低优先；
+成员宕机 = 追平判定自然跳过。witness 因 IsFullVoter 门天然不可承接（F2）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.Membership.html">Membership</a></dt>
+      <dd><p>成员变更协调器（spec-04 §2 定案——single-server 变更：一次一个节点，API 层串行化）。</p>
+<ul><li><b>加节点</b>：提案配置条目 [C_old ∪ {new}]（旧多数派提交）→ apply 切换活动配置
+  → 新节点经快照/增量追赶（追赶期无投票权——配置驱动成员关系，spec-04 §3）。</li><li><b>移除节点</b>：提案配置条目 [C_new]（移除）→ apply 切换 → 被移除 leader 自杀降级
+  （状态机 HandleConfigChanged——spec-04 §4）。</li><li><b>串行化</b>（spec-08 §7）：并发 Add/Remove 排队执行——一次一个变更（joint consensus
+  不做——论文原话 single-server"更简单"，spec-04 §5 定案）。</li></ul>
+<p>★ 配置切换 = apply 产物（日志即状态机）：提案返回 = committed 且 applied——返回时
+活动配置已切换（经 ApplyPipeline 配置条目分流 → 状态机 ConfigChanged）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+      <dd><p>非 Leader 写入异常（spec-08 §1——ReplicateAsync 非 Leader 立即抛，不等待超时；调用方经 LeaderId 重路由）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.PreVoteReq.html">PreVoteReq</a></dt>
+      <dd><p>PreVote 请求（spec-01 §3.3——不抬任期、零持久化；参数与真实投票相同，选举限制同样适用）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.PreVoteResp.html">PreVoteResp</a></dt>
+      <dd><p>PreVote 应答（不落盘、不记 votedFor——spec-01 §3.3 选民处理）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.Quorum.html">Quorum</a></dt>
+      <dd><p>多数派判定（spec-01 §5.3——多数派 = ⌊N/2⌋+1；spec-02 §5 commitIndex 推进依据）。</p>
+<p>纯函数——活动配置决定集群大小（spec-04：任意时刻多数派恰为当时活动配置的多数派）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftAppendEntryHeaderCodec.html">RaftAppendEntryHeaderCodec</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntriesRegion.html">RaftEntriesRegion</a></dt>
+      <dd><p>AppendEntries 条目区（线格式 v3——信封之死后的单拷贝直写区）。</p>
+<p>★ 区布局（全部小端）：<code>[Count 4B][×N: <a class="xref" href="TC.Tier.Core.Net.Raft.RaftAppendEntryHeader.html">RaftAppendEntryHeader</a> 13B + Content]</code>。
+嵌入 <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesReq.html#TC_Tier_Core_Net_Raft_AppendEntriesReq_EntriesRegion">EntriesRegion</a> blob 随生成 codec 上线（blob 外壳
+[Len 4B][bytes] 归 WireMessageGenerator 管辖）；区内布局在本文件单点声明。</p>
+<p>★ 写面 = <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html#TC_Tier_Core_Net_Raft_IRaftStore_WriteEntriesToAsync_System_Int64_System_Int32_System_Buffers_IBufferWriter_System_Byte__System_Int64___System_Threading_CancellationToken_">WriteEntriesToAsync(long, int, IBufferWriter&lt;byte&gt;, long[], CancellationToken)</a>（存储直写帧缓冲——单拷贝：
+存储页 → 帧，消灭 ReadEntriesAsync 逐条枚举 + Tuple + 逐条 EncodeInto 拷贝）；
+读面 = <a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntriesRegion.html#TC_Tier_Core_Net_Raft_RaftEntriesRegion_TryReadCount_System_ReadOnlyMemory_System_Byte__System_Int32__System_Int32__">TryReadCount(ReadOnlyMemory&lt;byte&gt;, out int, out int)</a>/<a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntriesRegion.html#TC_Tier_Core_Net_Raft_RaftEntriesRegion_TryReadEntry_System_ReadOnlyMemory_System_Byte__System_Int32__System_Int64__System_Byte__System_ReadOnlyMemory_System_Byte___">TryReadEntry(ReadOnlyMemory&lt;byte&gt;, ref int, out long, out byte, out ReadOnlyMemory&lt;byte&gt;)</a> 游标式零拷贝切片。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntryKind.html">RaftEntryKind</a></dt>
+      <dd><p>日志条目种类（wire/storage 稳定值——kind 升格为条目结构字段后在此单点声明；
+旧 <code>[Kind 1B][内容]</code> 引擎内信封格式已消灭——条目三元组
+<code>(Term, Kind, Content)</code> 的 Kind 即本常量，Content 恒为去信封原字节）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupChannel.html">RaftGroupChannel</a></dt>
+      <dd><p>组作用域传输视图（二期-C1 §4.3——每组一枚，引擎经其挂载三域而<strong>零组感知</strong>）：</p>
+<ul><li>出站加前缀：请求回调（0x01/0x03）物理发送 <code>[GroupId][inner]</code>，返回剥前缀并校验本组
+  （不符 = 畸形应答——跨组串包防御）；流式（0x04）open payload = <code>[GroupId][调用方载荷]</code>。</li><li>入站面：核心注册口写入宿主组绑定表（三域各自至多一个——重复抛）；公开注册口/数据报面
+  一律抛（Raft 家族零数据报——已验证；产品协议域注册在物理传输上）。</li><li>Self/PeerConnected/PeerGone/Faults 委托共享传输；Start/DisposeAsync no-op（生命周期归
+  装配层/宿主——§2.3 不变量④）。</li></ul>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupHost.html">RaftGroupHost</a></dt>
+      <dd><p>Multi-Raft 组宿主（二期-C1 §4.1——一个传输上 N 组的独占注册者）：在物理传输上独占注册
+Raft 家族三域（0x01 请求 / 0x03 请求 / 0x04 流接受）各一次，按载荷首部 <code>[GroupId 8B]</code>
+前缀路由到各组的绑定（§2.1 统一组路由——无特例、无双轨）。</p>
+<p>★ 关键不变量（§2.3）：①三域注册者唯一 = 本宿主；②组前缀在组通道边界加/剥，引擎
+零感知；③组 ID 宿主内唯一，未注册组入站丢弃 + 计数（不致命、不断链）；④宿主不拥有传输
+（装配层拥有——Dispose 不释放传输）；⑤动态成员只增删物理可达性，组内成员集合以各组
+ClusterConfig 为准。</p>
+<p>★ 分发快进快出：入站仅"解 8B + 查表 + 委派"（引擎 OnRequest 皆同步快退）——无跨组
+失败传染面。统计（in/out/丢弃）组维度可观测（二期-I6 组标签的挂点）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupHost.RaftGroupHostStats.html">RaftGroupHost.RaftGroupHostStats</a></dt>
+      <dd><p>宿主统计（Interlocked 计数——任意线程）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+      <dd><p>Raft 状态机参数（spec-01 §8 参数化——契约① 数字推导；spec-02 §6 心跳约束）。</p>
+<p>★ 选举超时 [150ms, 300ms] 是配置默认值（最终默认由 spec-09 压测稳定性裁决，非设计决策）；
+  心跳 ≤50ms（≪ T₀ 下界 150ms÷3——丢 1–2 个心跳不触发误选举）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+      <dd><p>Raft RPC 消息族（spec-01..05 消息语义 × spec-12 §6/§10——[WireMessage] 声明即线格式；
+RPC 族走请求回调形态：<strong>RpcId 取消——CorrId 由传输承载，消息族不携带</strong>（spec-12 §6 形态映射）。</p>
+<p>★ 线格式（生成物：[Tag 1B][Term 8B 公共前缀][子类字段声明序]，全部小端；NodeId = 16B
+  不透明字节串原序嵌套件）：tag 沿用类型码 0x01-0x08（PreVoteReq…InstallSnapshotResp）。
+  ★ 线格式 v3（信封之死——序列化 v3，件 B 配置 v2 先例）：AppendEntries 条目区由
+  [Terms 表][Payloads 表]（v2，载荷 = 引擎信封）改为 <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesReq.html#TC_Tier_Core_Net_Raft_AppendEntriesReq_EntriesRegion">EntriesRegion</a>
+  单 blob（区内 [Count 4B][×N: <a class="xref" href="TC.Tier.Core.Net.Raft.RaftAppendEntryHeader.html">RaftAppendEntryHeader</a> 13B + Content]——
+  kind 升格条目结构字段，存储直写单拷贝）。内部协议未发布，无跨版本共存。</p>
+<p>★ 无响应超时重发机制（raft RPC 幂等——丢失由心跳/选举定时器自然补偿；请求回调
+  缺省 at-most-once 投递语义与此天然对齐）。</p>
+<p>★ 降级统一规则（spec-01 §3.2）：任何状态收到更高 term 的 RPC → 先落盘再应答；
+  应答恒回带 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_Term">Term</a>（应答方 currentTerm——对端据此发现自己落后）。</p>
+<p>★ 解码防御：未知 tag / 截断 / Count 超上限 = false（畸形报文丢弃）；已知 tag 尾部
+  扩展字节容忍（前向兼容）。条目表防御上限 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesPerAppend">MaxEntriesPerAppend</a>（旧手写
+  codec 只查负数——生成化补齐截断防御）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpcCodec.html">RaftRpcCodec</a></dt>
+      <dd><p>RaftRpc 消息族线编码——[WireMessage] 派生。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html">RaftStateMachine</a></dt>
+      <dd><p>Raft 状态机（spec-01 全量——状态集合/转换/任期语义/选举含 PreVote/超时随机化/事件循环骨架；
+spec-02 follower 侧——AppendEntries 应用与 commitIndex 推进；spec-12 §6 形态映射——RPC 族走
+请求回调（CorrId 传输承载、at-most-once 缺省 + raft 定时器自愈）。</p>
+<p>★ Actor 形态（spec-01 §6.2）：单 worker 循环——取事件 → await handler → 取下一事件；
+  同一时刻一个状态转换在处理（状态机串行化 + 存储端口单写者契约天然满足）。
+  handler 只做快路径（状态判定 + 本地持久化 await）；网络应答/定时器 = 新事件入队或请求任务回投，
+  handler 从不 await 网络应答。</p>
+<p>★ 挂载（spec-12 §3.5）：StartAsync 经 <span class="xref">TC.Tier.Core.Net.Channels.ICoreProtocolPort</span> 内部口注册
+  <a class="xref" href="TC.Tier.Core.Net.Wire.ProtocolIds.html#TC_Tier_Core_Net_Wire_ProtocolIds_Raft">Raft</a>（0x01）请求 handler——与使用方协议域同一分发路径（机制零特权）；
+  传输端点生命周期归装配层。</p>
+<p>★ 复制发送已出循环（spec-10 D1）：Leader 侧 AppendEntries 发送/应答处理/心跳在
+  <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html">ReplicationProcess</a> per-peer 续体链（peer 间并行）；commit 推进经
+  <span class="xref">TC.Tier.Core.Net.Raft.RaftStateMachine.AdvanceCommit(System.Int64)</span> 并发单调化回投本机。</p>
+<p>★ 定时器（spec-01 §6.3）：每状态至多一个活动定时器——循环按最近截止 await（选举超时/
+  心跳），到期入队对应事件；每次触发后重掷随机超时（spec-01 §4.1 规则 4）。</p>
+<p>★ 降级统一规则（spec-01 §3.2）：任何状态收到更高 term 的 RPC → 先落盘（term, votedFor=∅）
+  → 再应答/转换；应答恒回带 currentTerm。</p>
+<p>★ 持久化经 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 端口（spec-12 §8.1——条目 = (Term, Kind, Content)
+  三元组（wire v3 信封之死——kind 结构字段），双水位模型：追加即分配 +
+  <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html#TC_Tier_Core_Net_Raft_IRaftStore_WaitForPersistedAsync_System_Int64_System_Threading_CancellationToken_">WaitForPersistedAsync(long, CancellationToken)</a> 应答前同步点）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateSnapshot.html">RaftStateSnapshot</a></dt>
+      <dd><p>统一状态导出快照（二期-D1 NETGAP-005——健康/就绪/管理面的数据面）：
+Role/LeaderId/Term/CommitIndex/AppliedIndex/日志尾/快照覆盖点/成员与复制进度 + healthz/readyz 语义。</p>
+<p>★ readyz 语义：<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateSnapshot.html#TC_Tier_Core_Net_Raft_RaftStateSnapshot_Ready">Ready</a> = 本端角色为 Leader 或已知 leader（LeaderId 非空）——
+分区/选举中 = not ready（探针语义：不返回过期承诺）。</p>
+<p>★ healthz 语义：<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateSnapshot.html#TC_Tier_Core_Net_Raft_RaftStateSnapshot_Healthy">Healthy</a> = 循环存活（无 LoopException）且已启动——停摆/故障 = unhealthy。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReadIndexReq.html">ReadIndexReq</a></dt>
+      <dd><p>follower 线性读转发请求（二期-B §6.2——本地非 leader 时转发当前已知 leader；
+根 Term 供 leader 侧任期核对/转发方抬任期）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReadIndexResp.html">ReadIndexResp</a></dt>
+      <dd><p>ReadIndex 转发应答（二期-B §6.2——ReadIndex &lt; 0 = 应答方非 leader/任期落后，
+调用方按 leader 变更重试）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RebuildCoordinator.html">RebuildCoordinator</a></dt>
+      <dd><p>冷启动重建协调器（spec-05 §5 定案——日志即状态机：重建 = 重放）。</p>
+<p>★ 存储经 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 端口（spec-12 §8.1）——★ 双源读（spec-03 §7 快照区
+重放归位）：跨界区间 [from..N₀] 经快照读面（快照 = 可导出的日志前缀镜像），(N₀..to] 经
+主数据读面——applied &lt; N₀ 的重启/快照安装场景由本协调器一次补齐，业务状态不依赖
+快照面之外的镜像语义。</p>
+<p>★ 配置条目在重放中按序 apply（spec-04 §6 配置恢复——配置与成员关系全部由 apply 管道产物决定，
+无独立配置持久化面）；判别 = 条目结构字段 Kind（<a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntryKind.html">RaftEntryKind</a>——wire v3 信封之死）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationPolicy.html">ReplicationPolicy</a></dt>
+      <dd><p>复制策略（spec-02 复制层配置化——条数/字节/时间三维度任一触发一次 AppendEntries 批量发送）。</p>
+<p>★ 默认全零 = 立即推送（append 即通知发送、窗口 1 流水线）。</p>
+<p>★ 三维度语义：</p>
+<p> - BatchSize：单次 AppendEntries 批上限（条数维度，默认 1000——spec-02 §2 攒批形态）</p>
+<p> - BatchWindow：攒批时间窗口（时间维度——窗口内到达的 append 合并为一次发送；
+  0 = 立即推。真实网络下摊销 RTT 的关键参数；进程内场景收益小）</p>
+<p> - MaxBatchBytes：批字节上限（字节维度；0 = 不限）</p>
+<p>★ 窗口判定粒度 = 状态机 tick（5ms）——窗口配置自由，到期误差 ≤ tick 周期。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html">ReplicationProcess</a></dt>
+      <dd><p>复制引擎（spec-02 Leader 侧全量）——nextIndex/matchIndex 管理、AppendEntries 构造与应答处理、
+冲突回退（hint 加速）、commitIndex 推进（Figure 8 约束）、心跳循环。</p>
+<p>★ per-peer 续体链（spec-10 D1）：复制发送从共识循环线程抽出，每 peer 一条独立续体链
+（线程池续体——不占专属线程，peer 间并行：发 A 时可处理 B 的 ack）；peer 状态
+（nextIndex/matchIndex/在途）只被本链读写（raft 本要求每 peer 单在途 AppendEntries——
+串行是协议本性，单写者零锁）。信号驱动：新条目（<a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_NotifyAppended_System_Int32_System_Int64_">NotifyAppended(int, long)</a>）/
+应答投槽（<a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_CancellationToken_">HandleRespAsync(NodeId, AppendEntriesResp, CancellationToken)</a>）/ 心跳 tick（<a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleTick">HandleTick()</a>）→
+lane 唤醒 → 消费应答槽 → 发送判定（滞后 / 心跳到期 / 在途超时重试）→ 回挂等待。</p>
+<p>★ 请求回调形态（spec-12 §6）：发送 = 出站请求任务（per-call 超时对齐在途重试窗——
+应答由传输 CorrId 配对）；应答到达经 <span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess._onRespArrived</span> 路由（状态机 term/ReadIndex
+前处理）→ <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_CancellationToken_">HandleRespAsync(NodeId, AppendEntriesResp, CancellationToken)</a> 投槽/直跑——lane 单写者不变式与旧事件面同构。</p>
+<p>★ 快照判定：nextIndex ≤ 本地快照覆盖点 → 经 <span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess._onSnapshotNeeded</span> 通知状态机
+改走快照安装（spec-03 §2 触发条件——增量复制无法接续）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RequestVoteReq.html">RequestVoteReq</a></dt>
+      <dd><p>RequestVote 请求（spec-01 §5.2——候选广播；携带日志新鲜度裁决参数）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RequestVoteResp.html">RequestVoteResp</a></dt>
+      <dd><p>RequestVote 应答（授权前已落盘 votedFor——契约① 应答前持久化）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotBlockizer.html">SnapshotBlockizer</a></dt>
+      <dd><p>快照条目流块化（spec-12 §6.1 多源增强——快照条目流 → 内容寻址的块清单：
+SwarmSync 装配的内容源。与单源流式路径（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html">SnapshotStreamTransfer</a>）共用同一
+条目帧格式（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotEntryHeader.html">SnapshotEntryHeader</a> v2 21B 头 + content），保证两种路径的内容
+逐字节同构——多源与单源产物对拍的基础）。</p>
+<p>★ 内容 = 帧化条目字节流（[头][content]×N 顺序拼接——每条目自描述长度，块边界几何
+切分落中间也自愈）；manifest Id = 快照覆盖点 N₀ 承载（spec-12 §6.1 "快照 = 覆盖点
+index 承载"）；块大小由装配方定（≤ <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmMessage.html#TC_Tier_Core_Net_Swarm_SwarmMessage_MaxBlockBytes">MaxBlockBytes</a> 线协议防御界）。</p>
+<p>★ 持有者侧物化一次（O(快照字节) 缓存——随机块访问的换取）；传输线经 SwarmSync
+逐块流式（O(块) 驻留——GB 级不驻内存承诺由 SwarmSync 承载，本物化缓存是 holder 侧的
+装配选择，磁盘背衬形态后续接 Core.IO）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a></dt>
+      <dd><p>快照握手协调数据（spec-12 §6.1 × spec-03 §2——InstallSnapshot RPC 握手面携带的
+manifest + holders 交换；swarm 形态专用——单源流式形态无协调数据（数据面自带一切，
+接口以 null 表示）。</p>
+<p>★ 生产方 = leader 导出（块化后供给块清单与持有者表）；消费方 = follower 导入
+（重建 manifest 多源拉取）。持有者表可含本端（SwarmSync 本端源支持——下载方自我供给）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotEntryHeaderCodec.html">SnapshotEntryHeaderCodec</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotPreambleCodec.html">SnapshotPreambleCodec</a></dt>
+      <dd></dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html">SnapshotStreamTransfer</a></dt>
+      <dd><p>快照流式传输（spec-03 §7 × spec-12 §6 单源基线——快照数据面走流式会话 0x04；
+ISnapshotTransfer 的机制面内建实现——存储经 IRaftStore 快照读/导入面，传输零格式知识）。</p>
+<p>★ 时序（spec-03 §2）：leader 先导出（开流 → 逐条帧写 → End）→ 再发 InstallSnapshotReq
+握手；★ follower 在 acceptor 回调即启动消费循环<b>边收边导</b>（流式背压契约：读端不读 =
+写端挂起——IStreamAcceptor"重活自起消费循环"），<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html#TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_ImportSnapshotAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_SnapshotCoordination_System_Threading_CancellationToken_">ImportSnapshotAsync(NodeId, SnapshotCoordination?, CancellationToken)</a> 等待导入完成
+（"快照已经注入传输面送达，本 RPC 只做同步点握手"语义）。</p>
+<p>★ 挂载：StartAsync 经 <span class="xref">TC.Tier.Core.Net.Channels.ICoreProtocolPort</span> 内部口注册 0x04 acceptor。
+每 peer 至多一个在途导入（引擎快照安装防重入保证）。</p>
+<p>★ 流式纪律：导出/导入均逐帧 O(单帧) 驻留（GB 级快照不驻内存）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.html">SnapshotSwarmBlockSource</a></dt>
+      <dd><p>快照块源（spec-12 §6.1 装配——<a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmBlockSource.html">ISwarmBlockSource</a> 的 holder 侧实现：
+按内容标识 + 块号从物化内容做几何切片）。</p>
+<p>★ 内容知识归使用方（快照安装装配）——本件只认 <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmContent.html">SnapshotSwarmContent</a>
+的字节流，几何定位（块偏移 = 块号 × 块大小，末块截短）由 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a> 承载。</p>
+<p>★ 单 manifest 源（与 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_">SetSource(ISwarmBlockSource?)</a> 单槽语义对齐——一次发布一个
+快照；多快照并存的 holder 后续按需扩多 manifest 源）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmContent.html">SnapshotSwarmContent</a></dt>
+      <dd><p>块化快照内容（manifest + 物化字节流——holder 侧随机块访问的缓存）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.html">SnapshotSwarmSync</a></dt>
+      <dd><p>快照多源同步装配（spec-12 §6.1 消费者——SwarmSync 首消费件）：把快照条目流块化
+（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotBlockizer.html">SnapshotBlockizer</a>）后走多源并行拉取；与单源流式路径
+（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html">SnapshotStreamTransfer</a>）共享同一存储端口（IRaftStore 快照读/导入面），
+产物（目标快照区）逐字节一致——对拍契约见测试。</p>
+<p>★ 角色对称（spec-12 §4 对称节点）：每节点既可作为 holder（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.html#TC_Tier_Core_Net_Raft_SnapshotSwarmSync_PublishSnapshotAsync_System_Int64_System_Int32_System_Threading_CancellationToken_">PublishSnapshotAsync(long, int, CancellationToken)</a>
+发布块化内容供拉取）也可作为下载方（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.html#TC_Tier_Core_Net_Raft_SnapshotSwarmSync_InstallSnapshotAsync_TC_Tier_Core_Net_Swarm_SwarmManifest_System_Collections_Generic_IReadOnlyList_TC_Tier_Core_Net_NodeId__System_Action_System_Int64_TC_Tier_Core_Net_NodeId__System_Threading_CancellationToken_">InstallSnapshotAsync(SwarmManifest, IReadOnlyList&lt;NodeId&gt;, Action&lt;long, NodeId&gt;?, CancellationToken)</a> 多源拉取重装导入）；
+holder 列表与 manifest 的交换是装配/握手面（InstallSnapshot RPC 携带——归 T6 引擎接线），
+本件只提供机制（发布 → 取 manifest；收到 manifest + holders → 安装）。</p>
+<p>★ 下载侧重装 O(快照字节) 缓冲（无序块按几何偏移落位后顺序解析导入——导入面仍逐条流式消费）；
+传输线经 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html">SwarmSync</a> 逐块流式（O(块) 驻留）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmTransfer.html">SnapshotSwarmTransfer</a></dt>
+      <dd><p>快照多源传输（spec-12 §6.1 × spec-03 §2——ISnapshotTransfer 的 swarm 数据面实现：
+导出 = 块化当前快照发布供拉取 + 握手协调数据（manifest + holders）；导入 = 按握手面
+收到的协调数据多源拉取重装导入 + 完成后向 source 上报持有（多源从字面成立））。</p>
+<p>★ 时序（与单源同构）：leader 先导出（发布块源）→ 再发 InstallSnapshotReq 握手
+（manifest+holders 随 RPC）→ follower 多源拉取导入 → 应答；产物与单源流式路径逐字节
+一致（对拍契约见测试）。</p>
+<p>★ 持有者表：leader 导出 = 换代 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_ResetHolders_TC_Tier_Core_Net_Swarm_SwarmContentDomain_TC_Tier_Core_Net_Opaque16_">ResetHolders(SwarmContentDomain, Opaque16)</a>（清表+登记本端）→
+Holders = <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_GetHolders_TC_Tier_Core_Net_Swarm_SwarmContentDomain_TC_Tier_Core_Net_Opaque16_">GetHolders(SwarmContentDomain, Opaque16)</a>（含本端兜底）；follower 导入完成 = Announce
+上报（spec-12 §6.1 增量——多源候选由持有表供给，块内容寻址 + CRC32C 校验保证任意
+持有者副本等价）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.TransferLeaderReq.html">TransferLeaderReq</a></dt>
+      <dd><p>领导权定向转让（二期-D2——leader → 目标的 TimeoutNow：目标跳过预票立即发起
+真选举；根 Term 供目标核对在位权威）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.TransferLeaderResp.html">TransferLeaderResp</a></dt>
+      <dd><p>领导权转让应答（Accepted = 目标已受理并发起选举——诊断面，调用方经换届观察完成）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.html">WitnessHighWaterStore</a></dt>
+      <dd><p>Witness 高水位存储（二期-F2——DDR-F2）：witness 节点的 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 形态。</p>
+<p>★ 只持久化「日志存在性证明」——高水位对 (LastIndex, LastTerm) + (Term, VotedFor)
+选举契约；日志体/状态机/快照全部缺席（witness 永不成为 leader，故永不提供日志体，
+永不导出/安装快照——无体日志不会被读取）。</p>
+<p>★ 本实现为内存版（测试/嵌入式/内存形态）；生产持久化（高水位断电丢失 = 退回
+旧高水位，投票保守方向安全但可能阻塞当选——建议装配方 fsync 持久化）归装配方按
+本接口封装。</p>
+</dd>
+    </dl>
+    <h3 id="structs">
+Structs
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterMember.html">ClusterMember</a></dt>
+      <dd><p>集群成员——(节点 ID, 端点, 角色) 映射（spec-04 §1 配置模型：节点端点有序列表 + ★ NodeId↔EndPoint 映射
+由配置承载——传输按 NodeId 路由，端点为装配层解析目标）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftAppendEntryHeader.html">RaftAppendEntryHeader</a></dt>
+      <dd><p>AppendEntries 条目固定头（13B——[Term 8B][Kind 1B][ContentLength 4B]，内容紧随）。
+线格式 v3：kind 升格为条目结构字段（信封格式消灭——引擎内/wire/存储帧均不再有
+[Kind 1B][内容] 前缀字节）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+      <dd><p>Raft 组标识（二期-C1 §3.1——Multi-Raft 组路由的组键）：8B 小端无符号整数，线上以
+<code>[GroupId 8B]</code> 固定宽前缀承载于 Raft 家族协议域（0x01/0x03/0x04）载荷首部
+（§2.1 统一组路由——无特例、无双轨）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html#TC_Tier_Core_Net_Raft_RaftGroupId_Empty">Empty</a>（0）为默认组——同样带前缀；非零组由产品/元数据层分配
+  （Net 只承载与路由，spec 组语义归产品）。8B 取值空间消除元数据层 ID 碰撞焦虑，
+  每消息 8B 开销可忽略（帧头 16B v1 不动的既定前提下载荷内前缀为最小入侵面）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftMemberState.html">RaftMemberState</a></dt>
+      <dd><p>成员复制状态（二期-D1 状态导出——leader 视角的复制进度；非 leader 节点该成员表为空/零值）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotEntryHeader.html">SnapshotEntryHeader</a></dt>
+      <dd><p>快照条目帧头（v2——21B：[Index 8B][Term 8B][Kind 1B][PayloadLength 4B]，payload 紧随；
+v1 20B 无 Kind——信封之死后 kind 升格条目结构字段，快照流同构升格；内部协议未发布无共存）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotPreamble.html">SnapshotPreamble</a></dt>
+      <dd><p>快照传输帧（spec-03/T5 快照流式承载——0x04 协议域会话内的帧格式，Core.Net 自有声明式布局）。</p>
+<p>★ 流结构：首帧 <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotPreamble.html">SnapshotPreamble</a>（8B 快照覆盖点 N₀——流内自描述，
+<a class="xref" href="TC.Tier.Core.Net.Raft.ISnapshotTransfer.html">ISnapshotTransfer</a> 契约无 index 参数）→ 后续每帧一个快照条目
+（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotEntryHeader.html">SnapshotEntryHeader</a> v2 + payload——(index, term, kind, content) 四元组上线）。</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.IApplySink.html">IApplySink</a></dt>
+      <dd><p>提交 → 应用管道接口（spec-05 契约——共识循环与 apply 解耦）。</p>
+<p>状态机（共识循环单 worker）commitIndex 推进 → <a class="xref" href="TC.Tier.Core.Net.Raft.IApplySink.html#TC_Tier_Core_Net_Raft_IApplySink_Submit_System_Int64_">Submit(long)</a> 投递 committed 批次；
+  apply 管道（独立单 worker）按序 apply → 经 <a class="xref" href="TC.Tier.Core.Net.Raft.IApplySink.html#TC_Tier_Core_Net_Raft_IApplySink_AppliedTo">AppliedTo</a> 通知状态机
+  （完成 ReplicateAsync 的 pending——spec-05 契约②：返回 = committed 且 applied）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+      <dd><p>raft 引擎对持久化的全部需求面（spec-12 §8.1——从引擎消费面提取的端口；实现 =
+适配器（组装层 TierWAL）/ 夹具（测试项目 InMemoryRaftStore·FsRaftStore）。
+Core.Net 零存储自有——数据持久化端口唯一。</p>
+<p>★ 条目 = (Term, Kind, Content) 三元组（wire v3——kind 升格结构字段，信封格式消灭；
+Kind 取值 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntryKind.html">RaftEntryKind</a>）——日志帧格式知识归适配器（引擎与存储互不泄露布局）。</p>
+<p>★ 双水位模型：AllocatedIndex = 追加即分配（含未持久化窗口）；
+  PersistedIndex = 已持久化尾（<a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html#TC_Tier_Core_Net_Raft_IRaftStore_WaitForPersistedAsync_System_Int64_System_Threading_CancellationToken_">WaitForPersistedAsync(long, CancellationToken)</a> 推进——fsync 时机由协议层控制，
+  应答前同步点）。</p>
+<p>★ 不变量：term 单调不降；<a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html#TC_Tier_Core_Net_Raft_IRaftStore_AppendAsync_System_Int64_System_Collections_Generic_IReadOnlyList_System_ValueTuple_System_Int64_System_Byte_System_ReadOnlyMemory_System_Byte____System_Threading_CancellationToken_">AppendAsync(long, IReadOnlyList&lt;(long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt;, CancellationToken)</a> 的 prevIndex 为前置断言
+  （冲突回退一体——prevIndex &lt; 当前尾 = 截断后重写）；快照区（≤ SnapshotIndex）不可回写。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.IRebuildableApplySink.html">IRebuildableApplySink</a></dt>
+      <dd><p>可重建 apply 管道标记（spec-03——follower 快照安装后重建业务状态：导入 → 重放快照帧流
+→ appliedIndex 重置到 N₀ → 增量接管）。ApplyPipeline 实现。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ISnapshotTransfer.html">ISnapshotTransfer</a></dt>
+      <dd><p>快照传输协调器（spec-03 §7——协议层实现网络版传输面注入存储：导出/导入经注入面开会话；
+目标绑定 = 装配层内部细节——每 follower 一次调用 = 一个新会话）。</p>
+<p>★ 装配（Builder/测试组合根）实现：设置当前目标（写/读会话路由）→ 调存储适配器
+ExportSnapshotAsync/ImportSnapshotAsync。状态机只依赖本接口——传输形态零耦合。</p>
+<p>★ 握手协调面（spec-12 §6.1）：导出返回 <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a>（swarm 形态
+的 manifest+holders——由状态机装入 InstallSnapshot RPC 握手面随行）；null = 单源流式形态
+（数据面自带一切，RPC 协调字段零值）。导入对称消费协调数据。两形态不可混装（集群装配
+一致——swarm 导入方收到 null 协调数据 = 装配错误快速失败）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html">IStateMachine</a></dt>
+      <dd><p>业务状态机接口（spec-05 §1 定案）——日志即状态机：业务状态 = 已提交日志前缀的确定性函数；重建 = 重放。</p>
+<p>★ 业务方唯一必须实现 <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ApplyAsync_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ApplyAsync(long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>（按序应用已提交命令——index 单调递增、与日志序一致；
+  只被 ApplyPipeline 单 worker 调用——业务存储无并发写，结构层积木直接可用）。</p>
+<p>★ at-least-once 契约：apply 可能重复（断电重放 appliedIndex 之后区间）——实现须幂等/容忍重复
+  （raft 标准语义；at-most-once 会话去重归用户面 spec-08）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ExportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferWriter_System_Threading_CancellationToken_">ExportStateAsync(IAsyncTransferWriter, CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ImportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferReader_System_Threading_CancellationToken_">ImportStateAsync(IAsyncTransferReader, CancellationToken)</a> = 可选优化路径（业务状态导出/导入，
+  冷启动免全量重放——存储与传输由使用方自理，协议层零绑定）；不使用不阻塞任何正确性。</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterMemberRole.html">ClusterMemberRole</a></dt>
+      <dd><p>集群成员角色（spec-12 §6 增量——复制家族设计件 B：raft learner）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftRole.html">RaftRole</a></dt>
+      <dd><p>节点角色（spec-01 §3.1 状态集合——Follower/PreCandidate/Candidate/Leader）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationAck.html">ReplicationAck</a></dt>
+      <dd><p>复制应答档（spec-12 §6 增量——复制家族设计件 A）：完成等待者的水位选择。</p>
+<p>档位只影响"该等待者何时被完成"，不影响日志复制/commitIndex 推进/apply 管道本身
+（commitIndex 照旧由多数派推进）。</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierQueueReplicaBuilder | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierQueueReplicaBuilder | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierQueueReplica 构建者（tierqueue-replicated-spec &#167;3——QueueBuilder 全注入面 + .WithRaft(组/传输/peers)（TierRaftHost 多组挂载）三段式装配）。 ★ 队列引擎介质由调用方给定（缺省建议 MemoryFileSystem——复制版队列引擎为易失物化， raft 日志 = 持久真相；重启经业务快照导入 + 增量重放重建）。幂等索引快照窗口说明：快照导入后 判重窗口自导入点重建（快照前的幂等条目不进索引——at-least-once 契约不变，首地址语义窗口收窄）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder">
+
+
+
+  <h1 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder" class="text-break">
+Class TierQueueReplicaBuilder  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Net.html">Net</a>.<a class="xref" href="TC.Tier.Products.Net.Queue.html">Queue</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierQueueReplica 构建者（tierqueue-replicated-spec §3——QueueBuilder 全注入面 +
+.WithRaft(组/传输/peers)（TierRaftHost 多组挂载）三段式装配）。</p>
+<p>★ 队列引擎介质由调用方给定（<b>缺省建议 MemoryFileSystem</b>——复制版队列引擎为易失物化，
+raft 日志 = 持久真相；重启经业务快照导入 + 增量重放重建）。幂等索引快照窗口说明：快照导入后
+判重窗口自导入点重建（快照前的幂等条目不进索引——at-least-once 契约不变，首地址语义窗口收窄）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierQueueReplicaBuilder : IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierQueueReplicaBuilder</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder__ctor_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.#ctor*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Products_Queue_TierQueueOptions_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Products.Queue.TierQueueOptions)">
+  TierQueueReplicaBuilder(IFileSystem, TierQueueOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（= 配置，零 IO）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder(IFileSystem queueFs, TierQueueOptions options)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>queueFs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>队列引擎介质（缺省建议 MemoryFileSystem——易失物化，持久真相在 raft 日志）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueOptions.html">TierQueueOptions</a></dt>
+    <dd><p>TierQueue 选项（队列名/容量/治理/索引开关——语义面同本地档）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_Dispose_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.Dispose*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_Dispose" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_DisposeAsync_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_DisposeAsync" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_StartAsync_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_StartAsync_TC_Tier_Products_Net_Host_TierRaftHost_TC_Tier_Products_Net_Queue_TierQueueReplicaOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.StartAsync(TC.Tier.Products.Net.Host.TierRaftHost,TC.Tier.Products.Net.Queue.TierQueueReplicaOptions,System.Threading.CancellationToken)">
+  StartAsync(TierRaftHost, TierQueueReplicaOptions?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>一步到位：本地核心启动 → 复制状态机装配 → TierRaftHost 组挂载 → warmup（复制恢复追平）→ 就绪。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TierQueueReplica&gt; StartAsync(TierRaftHost host, TierQueueReplicaOptions? replicaOptions = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>host</code> <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHost.html">TierRaftHost</a></dt>
+    <dd><p>已启动的多组宿主（TierRaftHost.StartAsync 已完成）。</p>
+</dd>
+    <dt><code>replicaOptions</code> <a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaOptions.html">TierQueueReplicaOptions</a></dt>
+    <dd><p>副本行为面配置（null = 缺省）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplica.html">TierQueueReplica</a>&gt;</dt>
+    <dd><p>就绪的 TierQueueReplica（提案/辖权/复制面全部可用）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>WithRaft 未注入 / 宿主未启动 / 重复启动。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithDeadLetterTarget_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithDeadLetterTarget*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithDeadLetterTarget_TC_Tier_Products_Queue_ITierQueue_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithDeadLetterTarget(TC.Tier.Products.Queue.ITierQueue)">
+  WithDeadLetterTarget(ITierQueue?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入跨组死信目标（另一 raft 组的副本实例——死信写入经该组共识复制）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithDeadLetterTarget(ITierQueue? target)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html">ITierQueue</a></dt>
+    <dd><p>死信目标队列（null = 关闭档：达上限仅推进位点 + 告警）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithDelayedIndexFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithDelayedIndexFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithDelayedIndexFactory_TC_Tier_Products_Queue_TierQueueDelayedIndexFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithDelayedIndexFactory(TC.Tier.Products.Queue.TierQueueDelayedIndexFactory)">
+  WithDelayedIndexFactory(TierQueueDelayedIndexFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入延迟 BTree 工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithDelayedIndexFactory(TierQueueDelayedIndexFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueDelayedIndexFactory.html">TierQueueDelayedIndexFactory</a></dt>
+    <dd><p>延迟索引工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithEpoch_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithEpoch*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithEpoch_TC_Tier_Core_Epochs_LightEpoch_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithEpoch(TC.Tier.Core.Epochs.LightEpoch)">
+  WithEpoch(LightEpoch)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入共享 epoch（组合域多结构共用读保护域）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithEpoch(LightEpoch epoch)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
+    <dd><p>共享 epoch 实例。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithGroupMetaFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithGroupMetaFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithGroupMetaFactory_TC_Tier_Products_Queue_TierQueueGroupMetaFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithGroupMetaFactory(TC.Tier.Products.Queue.TierQueueGroupMetaFactory)">
+  WithGroupMetaFactory(TierQueueGroupMetaFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入组状态 meta 装配工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithGroupMetaFactory(TierQueueGroupMetaFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueGroupMetaFactory.html">TierQueueGroupMetaFactory</a></dt>
+    <dd><p>组 meta 工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithIdempotencyIndexFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithIdempotencyIndexFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithIdempotencyIndexFactory_TC_Tier_Products_Queue_TierQueueIdempotencyIndexFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithIdempotencyIndexFactory(TC.Tier.Products.Queue.TierQueueIdempotencyIndexFactory)">
+  WithIdempotencyIndexFactory(TierQueueIdempotencyIndexFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入幂等 HashIndex 工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithIdempotencyIndexFactory(TierQueueIdempotencyIndexFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueIdempotencyIndexFactory.html">TierQueueIdempotencyIndexFactory</a></dt>
+    <dd><p>幂等索引工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithLogger_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithLogger*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithLogger_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithLogger(TC.Tier.Core.Logging.ILogger)">
+  WithLogger(ILogger)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入日志器（透传本地核心 + 副本面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithLogger(ILogger logger)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志器实例。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithMetaPolicyFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithMetaPolicyFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithMetaPolicyFactory_TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaPayload__" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithMetaPolicyFactory(TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader,TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload})">
+  WithMetaPolicyFactory(MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入 Ring meta 策略工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithMetaPolicyFactory(MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt; factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</dt>
+    <dd><p>meta 策略工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithRaft_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithRaft*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithRaft_TC_Tier_Products_Net_Queue_TierQueueReplicaRaftOptions_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithRaft(TC.Tier.Products.Net.Queue.TierQueueReplicaRaftOptions)">
+  WithRaft(TierQueueReplicaRaftOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入 raft 装配参数（组身份/初始配置/组持久卷——必填才能 StartAsync）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithRaft(TierQueueReplicaRaftOptions raftOptions)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>raftOptions</code> <a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaRaftOptions.html">TierQueueReplicaRaftOptions</a></dt>
+    <dd><p>raft 装配参数。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithRegistryMetaFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithRegistryMetaFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithRegistryMetaFactory_TC_Tier_Products_Queue_TierQueueRegistryMetaFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithRegistryMetaFactory(TC.Tier.Products.Queue.TierQueueRegistryMetaFactory)">
+  WithRegistryMetaFactory(TierQueueRegistryMetaFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入组注册表 metadata 工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithRegistryMetaFactory(TierQueueRegistryMetaFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueRegistryMetaFactory.html">TierQueueRegistryMetaFactory</a></dt>
+    <dd><p>注册表 meta 工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithRingFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithRingFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithRingFactory_TC_Tier_Products_Queue_TierQueueRingFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithRingFactory(TC.Tier.Products.Queue.TierQueueRingFactory)">
+  WithRingFactory(TierQueueRingFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入数据 Ring 装配工厂（QueueBuilder 全注入面透传）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithRingFactory(TierQueueRingFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueRingFactory.html">TierQueueRingFactory</a></dt>
+    <dd><p>Ring 工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithStorageOptionsFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithStorageOptionsFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithStorageOptionsFactory_TC_Tier_Products_Queue_TierQueueStorageOptionsFactory_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithStorageOptionsFactory(TC.Tier.Products.Queue.TierQueueStorageOptionsFactory)">
+  WithStorageOptionsFactory(TierQueueStorageOptionsFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入各组件的 StorageEngineOptions 变换器。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithStorageOptionsFactory(TierQueueStorageOptionsFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.Queue.TierQueueStorageOptionsFactory.html">TierQueueStorageOptionsFactory</a></dt>
+    <dd><p>引擎选项变换器。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithWorkerScheduler_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithWorkerScheduler*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Queue_TierQueueReplicaBuilder_WithWorkerScheduler_TC_Tier_Core_Execution_IsolatedTaskScheduler_" data-uid="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.WithWorkerScheduler(TC.Tier.Core.Execution.IsolatedTaskScheduler)">
+  WithWorkerScheduler(IsolatedTaskScheduler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入引擎 worker 调度器共享实例（#505——本地核心全部引擎共用一组线程；
+多副本同进程/测试拓扑线程数恒定；所有权归注入方）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierQueueReplicaBuilder WithWorkerScheduler(IsolatedTaskScheduler scheduler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>scheduler</code> <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></dt>
+    <dd><p>共享调度器实例（如 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Shared">Shared</a>）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Queue.TierQueueReplicaBuilder.html">TierQueueReplicaBuilder</a></dt>
+    <dd><p>TierQueueReplicaBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class BlobSwarmBlockSource | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class BlobSwarmBlockSource | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="Blob 块源（#436 件一——holder 侧）：DP 节点把本地已导入对象挂上 Swarm 分发面。 ★ v1 形态 = 显式  预载（对象经 ITierBlob.GetAsync 一次读入   进程内缓存——不可变对象缓存安全）：Swarm 取块接口是同步面而 Blob 读会话是异步面，   流式 seek 切块留待读会话异步化（阶段二，按带宽实测驱动）。缓存内容不动整对象——   Checksums/Manifest 首次实算后按 Id 缓存（&quot;任何 holder 可重算&quot;权威语义）。 ★ 只读源：TryWriteBlock 不覆写（默认实现）——不可变对象修复走整对象重拉（定案 3）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource">
+
+
+
+  <h1 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource" class="text-break">
+Class BlobSwarmBlockSource  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Net.html">Net</a>.<a class="xref" href="TC.Tier.Products.Net.Blob.html">Blob</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Blob 块源（#436 件一——holder 侧）：DP 节点把本地已导入对象挂上 Swarm 分发面。</p>
+<p>★ v1 形态 = 显式 <a class="xref" href="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.html#TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_AttachAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_">AttachAsync(LogicalAddress, CancellationToken)</a> 预载（对象经 <code>ITierBlob.GetAsync</code> 一次读入
+  进程内缓存——不可变对象缓存安全）：Swarm 取块接口是同步面而 Blob 读会话是异步面，
+  流式 seek 切块留待读会话异步化（阶段二，按带宽实测驱动）。缓存内容不动整对象——
+  Checksums/Manifest 首次实算后按 Id 缓存（"任何 holder 可重算"权威语义）。</p>
+<p>★ 只读源：TryWriteBlock 不覆写（默认实现）——不可变对象修复走整对象重拉（定案 3）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class BlobSwarmBlockSource : ISwarmBlockSource, ISwarmManifestSource</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">BlobSwarmBlockSource</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmBlockSource.html">ISwarmBlockSource</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmManifestSource.html">ISwarmManifestSource</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource__ctor_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.#ctor*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource__ctor_TC_Tier_Products_Blob_ITierBlob_System_Int32_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.#ctor(TC.Tier.Products.Blob.ITierBlob,System.Int32)">
+  BlobSwarmBlockSource(ITierBlob, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public BlobSwarmBlockSource(ITierBlob blob, int blockSize = 65536)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>blob</code> <a class="xref" href="TC.Tier.Products.Blob.ITierBlob.html">ITierBlob</a></dt>
+    <dd><p>本地 Blob 实例（Attach 的对象来源）。</p>
+</dd>
+    <dt><code>blockSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>分发块大小（缺省 64 KiB，与 raft 缺省对齐；单块 ≤ 1 MiB 防御界）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_AttachedCount_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.AttachedCount*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_AttachedCount" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.AttachedCount">
+  AttachedCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已挂载内容数（观测面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int AttachedCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_AttachAsync_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.AttachAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_AttachAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.AttachAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  AttachAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>挂载本地对象进分发缓存（导入完成/本端发布后调用——显式面，不扫库）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask AttachAsync(LogicalAddress objectId, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>对象句柄。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_HasManifest_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.HasManifest*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_HasManifest_TC_Tier_Core_Net_Opaque16_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.HasManifest(TC.Tier.Core.Net.Opaque16)">
+  HasManifest(Opaque16)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>是否持有该内容（未持有 = 全部请求 HasBlock=false——快速路径）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HasManifest(Opaque16 manifestId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>持有内容。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_TryGetBlock_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.TryGetBlock*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_TryGetBlock_TC_Tier_Core_Net_Opaque16_System_Int64_System_ReadOnlyMemory_System_Byte___" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.TryGetBlock(TC.Tier.Core.Net.Opaque16,System.Int64,System.ReadOnlyMemory{System.Byte}@)">
+  TryGetBlock(Opaque16, long, out ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取块（持有内容但块号超界/缺失 = false——与未持有同语义，下载方换源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetBlock(Opaque16 manifestId, long blockIndex, out ReadOnlyMemory&lt;byte&gt; block)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识。</p>
+</dd>
+    <dt><code>blockIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>块号。</p>
+</dd>
+    <dt><code>block</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>块字节（调用方只读；本实现返回底层缓冲须确保跨调用稳定——快照安装逐块读形态）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>持有该块。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_TryGetChecksums_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.TryGetChecksums*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_TryGetChecksums_TC_Tier_Core_Net_Opaque16_System_ReadOnlyMemory_System_UInt32___" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.TryGetChecksums(TC.Tier.Core.Net.Opaque16,System.ReadOnlyMemory{System.UInt32}@)">
+  TryGetChecksums(Opaque16, out ReadOnlyMemory&lt;uint&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetChecksums(Opaque16 manifestId, out ReadOnlyMemory&lt;uint&gt; checksums)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd></dd>
+    <dt><code>checksums</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_TryGetManifest_" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.TryGetManifest*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Blob_BlobSwarmBlockSource_TryGetManifest_TC_Tier_Core_Net_Opaque16_TC_Tier_Core_Net_Swarm_SwarmManifest__" data-uid="TC.Tier.Products.Net.Blob.BlobSwarmBlockSource.TryGetManifest(TC.Tier.Core.Net.Opaque16,TC.Tier.Core.Net.Swarm.SwarmManifest@)">
+  TryGetManifest(Opaque16, out SwarmManifest)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取内容清单（未持有 = false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetManifest(Opaque16 manifestId, out SwarmManifest manifest)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识。</p>
+</dd>
+    <dt><code>manifest</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a></dt>
+    <dd><p>清单（Id/TotalBytes/BlockSize/Checksums 全量）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否持有。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

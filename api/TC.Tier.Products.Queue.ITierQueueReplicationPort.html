@@ -1,0 +1,1306 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ITierQueueReplicationPort | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ITierQueueReplicationPort | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierQueue 复制 apply 端口（tierqueue-replicated-spec &#167;8 定案——Products 显式公开端口， 复制状态机经端口驱动写路径/组游标，避免 InternalsVisibleTo 蔓延）。 ★ 全部方法 = 确定性核心：同一命令序列在任一副本上产生同一状态（地址分配 = apply 序 ——Ring 尾分配串行；判定依据全部取自命令载荷或已复制状态，禁止本地时钟/本地水位参与判定）。 ★ 生命周期：由已就绪的  实现（显式接口实现——不出现在公共面）；   调用方须保证单线程串行（raft apply 管道单 worker 契约）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort">
+
+
+
+  <h1 id="TC_Tier_Products_Queue_ITierQueueReplicationPort" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort" class="text-break">
+Interface ITierQueueReplicationPort  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Queue.html">Queue</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierQueue 复制 apply 端口（tierqueue-replicated-spec §8 定案——Products 显式公开端口，
+复制状态机经端口驱动写路径/组游标，避免 InternalsVisibleTo 蔓延）。</p>
+<p>★ 全部方法 = <b>确定性核心</b>：同一命令序列在任一副本上产生同一状态（地址分配 = apply 序
+——Ring 尾分配串行；判定依据全部取自命令载荷或已复制状态，禁止本地时钟/本地水位参与判定）。</p>
+<p>★ 生命周期：由已就绪的 <a class="xref" href="TC.Tier.Products.Queue.TierQueue.html">TierQueue</a> 实现（显式接口实现——不出现在公共面）；
+  调用方须保证单线程串行（raft apply 管道单 worker 契约）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ITierQueueReplicationPort</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_DelayWindow_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.DelayWindow*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_DelayWindow" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.DelayWindow">
+  DelayWindow
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>延迟档窗口（Options.Delayed 未开启 = null；开启 = MaxDelay 锚定治理上限）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">TimeSpan? DelayWindow { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>延迟跨度上限；null = 延迟未开启。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_IdempotencyEnabled_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.IdempotencyEnabled*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_IdempotencyEnabled" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.IdempotencyEnabled">
+  IdempotencyEnabled
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>幂等生产是否开启（Options.Idempotency）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool IdempotencyEnabled { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = (ProducerId, Seq) 判重可用。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyAckAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyAckAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyAckAsync_System_String_System_Int64_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyAckAsync(System.String,System.Int64,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress},System.Threading.CancellationToken)">
+  ApplyAckAsync(string, long, IReadOnlyList&lt;LogicalAddress&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>确认推进（游标/skip 前缀计算 + 数据 flush 先行 + 原子持久 + 截断下界推进）。
+<code class="paramref">epoch</code> 落后当前组代次抛 <a class="xref" href="TC.Tier.Products.Queue.StaleDeliveryException.html">StaleDeliveryException</a>（接管 fencing——spec ③）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyAckAsync(string name, long epoch, IReadOnlyList&lt;LogicalAddress&gt; addresses, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。不存在抛。</p>
+</dd>
+    <dt><code>epoch</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>命令携带的组代次（提案时辖权节点视图）。</p>
+</dd>
+    <dt><code>addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>确认地址列表（缓冲确认已由提案侧并入批）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（flush/持久 IO）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyEnqueueAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyEnqueueAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyEnqueueAsync_System_Boolean_System_Int64_System_Boolean_System_Int64_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyEnqueueAsync(System.Boolean,System.Int64,System.Boolean,System.Int64,System.Int64,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  ApplyEnqueueAsync(bool, long, bool, long, long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>确定性入队：幂等命中返回首次地址（不追加）；否则 Ring 分配地址写入 +
+延迟/幂等索引登记。delayed/由命令载荷携带（提案侧已校验 MaxDelay——apply 不看时钟）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;LogicalAddress&gt; ApplyEnqueueAsync(bool delayed, long dueTime, bool idempotent, long producerId, long seq, ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>delayed</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否延迟消息（命令已定案）。</p>
+</dd>
+    <dt><code>dueTime</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>延迟时刻（UTC Ticks；非延迟忽略）。</p>
+</dd>
+    <dt><code>idempotent</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否幂等生产（pid/seq 槽有效且索引开启）。</p>
+</dd>
+    <dt><code>producerId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>幂等生产者 ID。</p>
+</dd>
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>幂等序号。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>原 payload 字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（溢出引擎异步写路径）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>分配（或命中）的消息地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyEpochBumpAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyEpochBumpAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyEpochBumpAsync_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyEpochBumpAsync(System.String)">
+  ApplyEpochBumpAsync(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组代次 +1（Claim 抢占/HomeCmd 接管的 fencing 递增面——spec ③/⑤）。不存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyEpochBumpAsync(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyExpireAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyExpireAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyExpireAsync_System_String_System_Collections_Generic_IReadOnlyList_TC_Tier_Products_Queue_QueueExpireEntry__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyExpireAsync(System.String,System.Collections.Generic.IReadOnlyList{TC.Tier.Products.Queue.QueueExpireEntry},System.Threading.CancellationToken)">
+  ApplyExpireAsync(string, IReadOnlyList&lt;QueueExpireEntry&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>到期/否认记账 apply：计数置为命令终值 + 死信项 skip 原位终结（DLQ 写入已由提案侧完成）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyExpireAsync(string name, IReadOnlyList&lt;QueueExpireEntry&gt; entries, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。不存在抛。</p>
+</dd>
+    <dt><code>entries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.QueueExpireEntry.html">QueueExpireEntry</a>&gt;</dt>
+    <dd><p>回收条目（确定性结果——spec §2 ExpireCmd）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（持久 IO）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupCreateAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupCreateAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupCreateAsync_TC_Tier_Products_Queue_GroupOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupCreateAsync(TC.Tier.Products.Queue.GroupOptions,System.Threading.CancellationToken)">
+  ApplyGroupCreateAsync(GroupOptions, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>创建消费组（组状态域装配 + 注册表登记 + 截断下界参与）。已存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyGroupCreateAsync(GroupOptions opt, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>opt</code> <a class="xref" href="TC.Tier.Products.Queue.GroupOptions.html">GroupOptions</a></dt>
+    <dd><p>组配置（创建时定格；RetryBackoff 为节点本地调度面，不随命令复制）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（组状态域装配 IO）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupDeleteAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupDeleteAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupDeleteAsync_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupDeleteAsync(System.String)">
+  ApplyGroupDeleteAsync(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>删除消费组（状态域销毁 + 注册表移除 + 截断下界抬升）。不存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyGroupDeleteAsync(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupResetAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupResetAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupResetAsync_System_String_TC_Tier_Products_Queue_GroupStartAt_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupResetAsync(System.String,TC.Tier.Products.Queue.GroupStartAt,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  ApplyGroupResetAsync(string, GroupStartAt, LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复位组（fence 解除 + 位点按 startAt 重置 + 代次 +1）。不存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyGroupResetAsync(string name, GroupStartAt startAt, LogicalAddress startAddress, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+    <dt><code>startAt</code> <a class="xref" href="TC.Tier.Products.Queue.GroupStartAt.html">GroupStartAt</a></dt>
+    <dd><p>复位起点形态。</p>
+</dd>
+    <dt><code>startAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>Address 形态起点。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupRestoreAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupRestoreAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyGroupRestoreAsync_System_String_System_TimeSpan_System_Int32_TC_Tier_Products_Queue_QueueGroupState_State_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyGroupRestoreAsync(System.String,System.TimeSpan,System.Int32,TC.Tier.Products.Queue.QueueGroupState.State,System.Threading.CancellationToken)">
+  ApplyGroupRestoreAsync(string, TimeSpan, int, State, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>恢复态建组/更新组（快照导入路径——upsert：已存在组（本地恢复自举的 $default）直载
+状态覆写；不存在组按恢复核心同构装配。两路均零 epoch 递增）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyGroupRestoreAsync(string name, TimeSpan visibilityTimeout, int maxRedeliveries, QueueGroupState.State state, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+    <dt><code>visibilityTimeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>可见性超时。</p>
+</dd>
+    <dt><code>maxRedeliveries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>重投上限。</p>
+</dd>
+    <dt><code>state</code> <a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.html">QueueGroupState</a>.<a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.State.html">State</a></dt>
+    <dd><p>导入的组持久状态。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyRetention_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyRetention*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ApplyRetention_System_Nullable_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ApplyRetention(System.Nullable{TC.Tier.Contracts.Storage.LogicalAddress})">
+  ApplyRetention(LogicalAddress?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>回收推进：截断下界 = min(组 Cursor) 与 Durable 尾取小（spec ⑥——慢组钉住回收线）。
+target 非空时夹取到目标（TruncateAsync 守卫语义继承）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ApplyRetention(LogicalAddress? target)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>?</dt>
+    <dd><p>截断目标（null = 仅按回收线推进）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_DequeueLocalAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.DequeueLocalAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_DequeueLocalAsync_System_String_System_Int32_System_Guid_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.DequeueLocalAsync(System.String,System.Int32,System.Guid,System.Threading.CancellationToken)">
+  DequeueLocalAsync(string, int, Guid, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>辖权出队（扫描可投递 + 登记 pending + 发 token——<b>无 inline 到期回收</b>：
+计数/死信是复制状态，到期处理经 ExpireCmd 提案走共识，禁本地直改）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;QueueDelivery&gt;&gt; DequeueLocalAsync(string name, int maxCount, Guid consumerId, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。不存在抛。</p>
+</dd>
+    <dt><code>maxCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>单批最大条数。</p>
+</dd>
+    <dt><code>consumerId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.guid">Guid</a></dt>
+    <dd><p>消费端标识。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.QueueDelivery.html">QueueDelivery</a>&gt;&gt;</dt>
+    <dd><p>投递列表。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_EnforceBacklogAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.EnforceBacklogAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_EnforceBacklogAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.EnforceBacklogAsync(System.Threading.CancellationToken)">
+  EnforceBacklogAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>积压治理（MaxBacklogBytes——Block/Reject/EvictOldest 本地视图执行；副本场景建议 Reject 语义）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask EnforceBacklogAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（Block 等待响应）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_FlushRingAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.FlushRingAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_FlushRingAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.FlushRingAsync(System.Threading.CancellationToken)">
+  FlushRingAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Ring 全量落盘（快照导入后调用——导入页进设备面，冷读路径可服务）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask FlushRingAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupCursor_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupCursor*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupCursor_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupCursor(System.String)">
+  GetGroupCursor(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组游标（连续已确认前缀的下一地址——已复制状态的本地镜像）。不存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress GetGroupCursor(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>组游标。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupEpoch_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupEpoch*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupEpoch_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupEpoch(System.String)">
+  GetGroupEpoch(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组当前代次（fencing 校验数据源——已复制状态的本地镜像）。不存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long GetGroupEpoch(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>当前组代次。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupNames_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupNames*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupNames" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupNames">
+  GetGroupNames()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已注册组名快照。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IReadOnlyList&lt;string&gt; GetGroupNames()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd><p>组名列表。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupState_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupState*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetGroupState_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetGroupState(System.String)">
+  GetGroupState(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组持久状态捕获（快照导出面——gate 内一致切片）。不存在抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">QueueGroupState.State GetGroupState(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.html">QueueGroupState</a>.<a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.State.html">State</a></dt>
+    <dd><p>组持久状态（cursor/skip/retry/epoch/fenced）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetRingBounds_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetRingBounds*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_GetRingBounds" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.GetRingBounds">
+  GetRingBounds()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Ring 地址界（快照导出面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">(LogicalAddress Begin, LogicalAddress Tail) GetRingBounds()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,tc.tier.contracts.storage.logicaladdress-.begin">Begin</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.contracts.storage.logicaladdress,tc.tier.contracts.storage.logicaladdress-.tail">Tail</a>)</dt>
+    <dd><p>(数据头, 已分配尾)。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_OpenRingReader_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.OpenRingReader*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_OpenRingReader_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.OpenRingReader(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  OpenRingReader(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开 Ring 快照读取器（地址区间像导出——[begin, end) 原始字节）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRingSnapshotReader OpenRingReader(LogicalAddress begin, LogicalAddress end)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>begin</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>区间起点。</p>
+</dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>区间终点（不含）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshotReader.html">IRingSnapshotReader</a></dt>
+    <dd><p>快照读取器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_OpenRingWriter_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.OpenRingWriter*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_OpenRingWriter_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.OpenRingWriter(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Contracts.Storage.LogicalAddress)">
+  OpenRingWriter(LogicalAddress, LogicalAddress)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开 Ring 快照写入器（地址区间像导入——绝对地址回填 + 写尾推进）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IRingSnapshotWriter OpenRingWriter(LogicalAddress begin, LogicalAddress end)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>begin</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>区间起点。</p>
+</dd>
+    <dt><code>end</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>区间终点（不含）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.IRingSnapshotWriter.html">IRingSnapshotWriter</a></dt>
+    <dd><p>快照写入器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_PendingLocalAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.PendingLocalAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_PendingLocalAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.PendingLocalAsync(System.String,System.Threading.CancellationToken)">
+  PendingLocalAsync(string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>pending 在途窥视（辖权到期扫描数据源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;PendingInfo&gt;&gt; PendingLocalAsync(string name, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.PendingInfo.html">PendingInfo</a>&gt;&gt;</dt>
+    <dd><p>在途项列表。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ReadPayloadAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ReadPayloadAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ReadPayloadAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ReadPayloadAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  ReadPayloadAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>读 record 原 payload（解 envelope 剥头——死信回放面）。地址无效/不可读抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;byte[]&gt; ReadPayloadAsync(LogicalAddress address, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>消息地址。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt;</dt>
+    <dd><p>原 payload 字节。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ReconcileDelayIndexAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ReconcileDelayIndexAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ReconcileDelayIndexAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ReconcileDelayIndexAsync(System.Threading.CancellationToken)">
+  ReconcileDelayIndexAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>延迟索引对账（快照导入后调用——清理已终结条目 + 重建快照窗口缺失的索引项）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ReconcileDelayIndexAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_RemovePendingLocalAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.RemovePendingLocalAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_RemovePendingLocalAsync_System_String_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.RemovePendingLocalAsync(System.String,System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress},System.Threading.CancellationToken)">
+  RemovePendingLocalAsync(string, IReadOnlyList&lt;LogicalAddress&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>摘除 pending（ExpireCmd apply 完成后的辖权本地簿记收尾——回卷投递游标）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask RemovePendingLocalAsync(string name, IReadOnlyList&lt;LogicalAddress&gt; addresses, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+    <dt><code>addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>已终局（重投/死信）的地址列表。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ResolveDelayedAddressesAsync_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ResolveDelayedAddressesAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_ResolveDelayedAddressesAsync_TC_Tier_Products_Queue_CancelDelayedFilter_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.ResolveDelayedAddressesAsync(TC.Tier.Products.Queue.CancelDelayedFilter,System.Threading.CancellationToken)">
+  ResolveDelayedAddressesAsync(CancelDelayedFilter, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>延迟消息地址解析（CancelDelayed 前置——按过滤条件解析命中地址，本地已应用视图）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;LogicalAddress&gt;&gt; ResolveDelayedAddressesAsync(CancelDelayedFilter filter, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filter</code> <a class="xref" href="TC.Tier.Products.Queue.CancelDelayedFilter.html">CancelDelayedFilter</a></dt>
+    <dd><p>取消过滤。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;&gt;</dt>
+    <dd><p>命中地址列表（空 = 无命中）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_TryFindIdempotent_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.TryFindIdempotent*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_TryFindIdempotent_System_Int64_System_Int64_TC_Tier_Contracts_Storage_LogicalAddress__" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.TryFindIdempotent(System.Int64,System.Int64,TC.Tier.Contracts.Storage.LogicalAddress@)">
+  TryFindIdempotent(long, long, out LogicalAddress)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>幂等命中窥视（入口快路径——已应用视图判重；未命中仍须提案由 apply 终判）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool TryFindIdempotent(long producerId, long seq, out LogicalAddress address)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>producerId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>幂等生产者 ID。</p>
+</dd>
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>幂等序号。</p>
+</dd>
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>输出：命中地址。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 命中（首次地址）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueueReplicationPort_TryGetGroupConfig_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.TryGetGroupConfig*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueueReplicationPort_TryGetGroupConfig_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueueReplicationPort.TryGetGroupConfig(System.String)">
+  TryGetGroupConfig(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组配置窥视（快照导出面）。不存在 = null。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">(TimeSpan VisibilityTimeout, int MaxRedeliveries)? TryGetGroupConfig(string name)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.timespan,system.int32-.visibilitytimeout">VisibilityTimeout</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.timespan,system.int32-.maxredeliveries">MaxRedeliveries</a>)?</dt>
+    <dd><p>(可见性超时, 重投上限)；组不存在 = null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

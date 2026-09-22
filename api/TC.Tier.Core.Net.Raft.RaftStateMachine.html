@@ -1,0 +1,1621 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RaftStateMachine | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RaftStateMachine | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="Raft 状态机（spec-01 全量——状态集合/转换/任期语义/选举含 PreVote/超时随机化/事件循环骨架； spec-02 follower 侧——AppendEntries 应用与 commitIndex 推进；spec-12 &#167;6 形态映射——RPC 族走 请求回调（CorrId 传输承载、at-most-once 缺省 + raft 定时器自愈）。 ★ Actor 形态（spec-01 &#167;6.2）：单 worker 循环——取事件 → await handler → 取下一事件；   同一时刻一个状态转换在处理（状态机串行化 + 存储端口单写者契约天然满足）。   handler 只做快路径（状态判定 + 本地持久化 await）；网络应答/定时器 = 新事件入队或请求任务回投，   handler 从不 await 网络应答。 ★ 挂载（spec-12 &#167;3.5）：StartAsync 经  内部口注册   （0x01）请求 handler——与使用方协议域同一分发路径（机制零特权）；   传输端点生命周期归装配层。 ★ 复制发送已出循环（spec-10 D1）：Leader 侧 AppendEntries 发送/应答处理/心跳在    per-peer 续体链（peer 间并行）；commit 推进经    并发单调化回投本机。 ★ 定时器（spec-01 &#167;6.3）：每状态至多一个活动定时器——循环按最近截止 await（选举超时/   心跳），到期入队对应事件；每次触发后重掷随机超时（spec-01 &#167;4.1 规则 4）。 ★ 降级统一规则（spec-01 &#167;3.2）：任何状态收到更高 term 的 RPC → 先落盘（term, votedFor=∅）   → 再应答/转换；应答恒回带 currentTerm。 ★ 持久化经  端口（spec-12 &#167;8.1——条目 = (Term, Kind, Content)   三元组（wire v3 信封之死——kind 结构字段），双水位模型：追加即分配 +    应答前同步点）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_RaftStateMachine" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine" class="text-break">
+Class RaftStateMachine  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Raft 状态机（spec-01 全量——状态集合/转换/任期语义/选举含 PreVote/超时随机化/事件循环骨架；
+spec-02 follower 侧——AppendEntries 应用与 commitIndex 推进；spec-12 §6 形态映射——RPC 族走
+请求回调（CorrId 传输承载、at-most-once 缺省 + raft 定时器自愈）。</p>
+<p>★ Actor 形态（spec-01 §6.2）：单 worker 循环——取事件 → await handler → 取下一事件；
+  同一时刻一个状态转换在处理（状态机串行化 + 存储端口单写者契约天然满足）。
+  handler 只做快路径（状态判定 + 本地持久化 await）；网络应答/定时器 = 新事件入队或请求任务回投，
+  handler 从不 await 网络应答。</p>
+<p>★ 挂载（spec-12 §3.5）：StartAsync 经 <span class="xref">TC.Tier.Core.Net.Channels.ICoreProtocolPort</span> 内部口注册
+  <a class="xref" href="TC.Tier.Core.Net.Wire.ProtocolIds.html#TC_Tier_Core_Net_Wire_ProtocolIds_Raft">Raft</a>（0x01）请求 handler——与使用方协议域同一分发路径（机制零特权）；
+  传输端点生命周期归装配层。</p>
+<p>★ 复制发送已出循环（spec-10 D1）：Leader 侧 AppendEntries 发送/应答处理/心跳在
+  <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html">ReplicationProcess</a> per-peer 续体链（peer 间并行）；commit 推进经
+  <span class="xref">TC.Tier.Core.Net.Raft.RaftStateMachine.AdvanceCommit(System.Int64)</span> 并发单调化回投本机。</p>
+<p>★ 定时器（spec-01 §6.3）：每状态至多一个活动定时器——循环按最近截止 await（选举超时/
+  心跳），到期入队对应事件；每次触发后重掷随机超时（spec-01 §4.1 规则 4）。</p>
+<p>★ 降级统一规则（spec-01 §3.2）：任何状态收到更高 term 的 RPC → 先落盘（term, votedFor=∅）
+  → 再应答/转换；应答恒回带 currentTerm。</p>
+<p>★ 持久化经 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 端口（spec-12 §8.1——条目 = (Term, Kind, Content)
+  三元组（wire v3 信封之死——kind 结构字段），双水位模型：追加即分配 +
+  <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html#TC_Tier_Core_Net_Raft_IRaftStore_WaitForPersistedAsync_System_Int64_System_Threading_CancellationToken_">WaitForPersistedAsync(long, CancellationToken)</a> 应答前同步点）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class RaftStateMachine : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RaftStateMachine</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine__ctor_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine__ctor_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_IRaftStore_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_Raft_IApplySink_TC_Tier_Core_Net_Raft_RaftOptions_TC_Tier_Core_Net_Raft_ISnapshotTransfer_TC_Tier_Core_Logging_ILogger_TC_Tier_Core_Execution_DeadlineRegistry_TC_Tier_Core_Observability_ObservabilityHub_TC_Tier_Core_Net_Raft_RaftGroupId_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.#ctor(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.IRaftStore,TC.Tier.Core.Net.Channels.IProtocolTransport,TC.Tier.Core.Net.Raft.IApplySink,TC.Tier.Core.Net.Raft.RaftOptions,TC.Tier.Core.Net.Raft.ISnapshotTransfer,TC.Tier.Core.Logging.ILogger,TC.Tier.Core.Execution.DeadlineRegistry,TC.Tier.Core.Observability.ObservabilityHub,TC.Tier.Core.Net.Raft.RaftGroupId)">
+  RaftStateMachine(NodeId, IRaftStore, IProtocolTransport, IApplySink, RaftOptions, ISnapshotTransfer?, ILogger?, DeadlineRegistry?, ObservabilityHub?, RaftGroupId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（零 IO——启动经 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_StartAsync_TC_Tier_Core_Net_Raft_ClusterConfig_">StartAsync(ClusterConfig)</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftStateMachine(NodeId self, IRaftStore store, IProtocolTransport transport, IApplySink apply, RaftOptions options, ISnapshotTransfer? snapshotTransfer = null, ILogger? logger = null, DeadlineRegistry? registry = null, ObservabilityHub? hub = null, RaftGroupId groupId = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本节点 ID。</p>
+</dd>
+    <dt><code>store</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+    <dd><p>存储端口（spec-12 §8.1——夹具或组装层适配器）。</p>
+</dd>
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>节点端点完整面（请求回调收发 RPC）。</p>
+</dd>
+    <dt><code>apply</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IApplySink.html">IApplySink</a></dt>
+    <dd><p>提交→应用管道（spec-05）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>超时/队列参数（spec-01 §8）。</p>
+</dd>
+    <dt><code>snapshotTransfer</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ISnapshotTransfer.html">ISnapshotTransfer</a></dt>
+    <dd><p>快照传输协调器（spec-03——null = 快照安装禁用）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+    <dt><code>registry</code> <a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html">DeadlineRegistry</a></dt>
+    <dd><p>节拍注册表（null = 进程级 <a class="xref" href="TC.Tier.Core.Execution.DeadlineRegistry.html#TC_Tier_Core_Execution_DeadlineRegistry_Shared">Shared</a>——
+共享节拍线程；测试可注入独立实例）。</p>
+</dd>
+    <dt><code>hub</code> <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a></dt>
+    <dd><p>可观测枢纽（null = Disabled——共识维度视图 <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html#TC_Tier_Core_Observability_ObservabilityHub_Raft">Raft</a> 热路径短路）。</p>
+</dd>
+    <dt><code>groupId</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID（二期-I6 组维度标签——多组装配下状态导出/管理面区分组；default = 默认组）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_CommitIndex_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.CommitIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_CommitIndex" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.CommitIndex">
+  CommitIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前 commitIndex（本地已确认提交水位——复合对裸读，16B 对齐不撕裂）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long CommitIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_Config_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.Config*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_Config" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.Config">
+  Config
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前活动配置（apply 产物——spec-04 配置与状态机同构）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig Config { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_CurrentTerm_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.CurrentTerm*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_CurrentTerm" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.CurrentTerm">
+  CurrentTerm
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前任期（存储端口直读）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long CurrentTerm { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_IsLeader_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.IsLeader*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_IsLeader" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.IsLeader">
+  IsLeader
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>是否 Leader（当选发布——用户面快速失败判定）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsLeader { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_IsLeaseValid_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.IsLeaseValid*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_IsLeaseValid" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.IsLeaseValid">
+  IsLeaseValid
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>租约是否有效：多数派确认后 (选举窗下界 − 时钟漂移界) 窗口内——
+只读观测（调优/测试面；<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexAsync_System_Threading_CancellationToken_">ReadIndexAsync(CancellationToken)</a> 内部走同一判定）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsLeaseValid { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_IsVoter_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.IsVoter*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_IsVoter" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.IsVoter">
+  IsVoter
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本节点在当前活动配置中是否投票成员（learner = false——引导/观察副本的就绪信号）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsVoter { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_LeaderId_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LeaderId*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_LeaderId" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LeaderId">
+  LeaderId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前已知 leader（null = 未知/选举中——快照原子读 + 成员序表反查，任意线程高频）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId? LeaderId { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_LeadershipToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LeadershipToken*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_LeadershipToken" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LeadershipToken">
+  LeadershipToken
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>leadership 感知取消令牌：执政期有效（丢失 leadership 即取消）、非 leader = 已取消
+令牌、每任期一枚（重新当选换新）。随执政期运行的后台任务用它挂取消——替代手工
+<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_IsLeader">IsLeader</a> 轮询。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public CancellationToken LeadershipToken { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_LoopException_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LoopException*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_LoopException" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LoopException">
+  LoopException
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>循环异常（fail-fast——节点停摆，上层观察决定重启）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Exception? LoopException { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_Role_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.Role*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_Role" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.Role">
+  Role
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前角色（跨线程观测——volatile 发布）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftRole Role { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftRole.html">RaftRole</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_Self_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.Self*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_Self" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.Self">
+  Self
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Self { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_DisposeAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_DisposeAsync" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时循环/复制/任务组/领导权令牌等资源均已停止并释放（幂等）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_DrainAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.DrainAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_DrainAsync_System_Nullable_TC_Tier_Core_Net_NodeId__System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.DrainAsync(System.Nullable{TC.Tier.Core.Net.NodeId},System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  DrainAsync(NodeId?, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>优雅 drain（二期-D3——停新 + 排空 + 有界收尾）：置 drain 旗标后新提案立即以
+<a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a> 拒绝（客户端重路由语义）；等待在途收敛窗后按
+transferTarget 转让或自降级（滚动维护标准形态——零 leadership 真空）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DrainAsync(NodeId? transferTarget = null, TimeSpan? drainWindow = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transferTarget</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>?</dt>
+    <dd><p>转让目标（null = 自降级 Resign）。</p>
+</dd>
+    <dt><code>drainWindow</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>在途排空窗（缺省 500ms——客户端停止投递后在途自然收敛）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>drain 全流程完成（排空窗等待 + 转让/自降级收尾——drain 旗标已清，新提案恢复受理）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_GetStateSnapshot_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.GetStateSnapshot*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_GetStateSnapshot" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.GetStateSnapshot">
+  GetStateSnapshot()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>统一状态导出（二期-D1 NETGAP-005——healthz/readyz/管理面数据源）：
+Role/Term/LeaderId/Commit/Applied/日志尾/快照覆盖点/成员与复制进度 + 探针语义。
+各字段尽力一致快照（诊断/探针语义——非临界一致）；复制进度仅 leader 视角有义。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftStateSnapshot GetStateSnapshot()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateSnapshot.html">RaftStateSnapshot</a></dt>
+    <dd><p>尽力一致的状态快照（healthy = 已启动/未停止/循环无异常；ready = healthy 且 leader 在位（含自身）；members 仅 leader 视角非空）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_JoinAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.JoinAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_JoinAsync_System_Collections_Generic_IEnumerable_System_Net_IPEndPoint__System_Nullable_System_TimeSpan__System_Threading_CancellationToken_System_Boolean_System_Boolean_System_String_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.JoinAsync(System.Collections.Generic.IEnumerable{System.Net.IPEndPoint},System.Nullable{System.TimeSpan},System.Threading.CancellationToken,System.Boolean,System.Boolean,System.String)">
+  JoinAsync(IEnumerable&lt;IPEndPoint&gt;, TimeSpan?, CancellationToken, bool, bool, string?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加入既有集群（TCP 形态）：向 bootstrap 端点拨号（身份握手得知）后同
+<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_JoinAsync_System_Collections_Generic_IEnumerable_TC_Tier_Core_Net_NodeId__System_Nullable_System_TimeSpan__System_Threading_CancellationToken_System_Boolean_System_Boolean_System_String_">JoinAsync(IEnumerable&lt;NodeId&gt;, TimeSpan?, CancellationToken, bool, bool, string?)</a>。
+bootstrap 端点非 leader = 应答提示 + 轮转下一端点——建议覆盖全部成员。
+介质 = 内建 TCP 组装（NodeEndpoint）或注入 ClusterTransport；进程内传输不支持端点拨号。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task JoinAsync(IEnumerable&lt;IPEndPoint&gt; bootstrapEndpoints, TimeSpan? timeout = null, CancellationToken cancellationToken = default, bool autoPromote = true, bool asWitness = false, string? listenEndPoint = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>bootstrapEndpoints</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd><p>引导端点（至少一个当前集群成员的监听地址）。</p>
+</dd>
+    <dt><code>timeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>总时限（缺省 30s）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+    <dt><code>autoPromote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 追平后自动晋级 voter（缺省）；false = 保持 learner 永久只读。</p>
+</dd>
+    <dt><code>asWitness</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>witness 档——语义同 NodeId 重载。</p>
+</dd>
+    <dt><code>listenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>本端监听地址（缺省 null = 从传输监听配置自解析——
+解析不出须显式传入；随 JoinReq 通告 leader 回连复制）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时本节点已入组（autoPromote 形态另需已晋级 voter；总时限到抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>传输无地址制拨号介质（进程内形态——端点拨号加入不可用）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_JoinAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.JoinAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_JoinAsync_System_Collections_Generic_IEnumerable_TC_Tier_Core_Net_NodeId__System_Nullable_System_TimeSpan__System_Threading_CancellationToken_System_Boolean_System_Boolean_System_String_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.JoinAsync(System.Collections.Generic.IEnumerable{TC.Tier.Core.Net.NodeId},System.Nullable{System.TimeSpan},System.Threading.CancellationToken,System.Boolean,System.Boolean,System.String)">
+  JoinAsync(IEnumerable&lt;NodeId&gt;, TimeSpan?, CancellationToken, bool, bool, string?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加入既有集群（Standby 引导编排，进程内/已互联传输形态）：向 bootstrap 同伴
+轮转递 <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a>——缺席即以 learner 入组 + 登记追平晋级；已入组未晋级期间
+周期性重递（换届/新 leader 场景自愈），<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_IsVoter">IsVoter</a> 翻真返回。
+前置：本节点已以 [self learner] 配置 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_StartAsync_TC_Tier_Core_Net_Raft_ClusterConfig_">StartAsync(ClusterConfig)</a>（本地配置仅引导用——
+真实配置随复制收敛；重启节点 WAL 已载真实配置，宣告幂等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task JoinAsync(IEnumerable&lt;NodeId&gt; bootstrapPeers, TimeSpan? timeout = null, CancellationToken cancellationToken = default, bool autoPromote = true, bool asWitness = false, string? listenEndPoint = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>bootstrapPeers</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>引导同伴节点 ID（至少一个当前集群成员；本端自身忽略）。
+传输须可路由至这些成员（进程内 hub 注册 / TCP 形态拨号表含其地址）。</p>
+</dd>
+    <dt><code>timeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>总时限（缺省 30s——大基线追平的集群放宽）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+    <dt><code>autoPromote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 追平后自动晋级 voter（缺省，Standby 形态）；false = 保持
+learner 永久只读（DP 永久只读节点引导——完成条件 = 已入组且配置收敛含自身，永不晋级）。</p>
+</dd>
+    <dt><code>asWitness</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>witness 档（三期-F2 装配面）：受理即以 witness 入组——投票计多数派、
+不存日志体、永不晋级；完成条件 = leader 受理（受理即配置已提交——witness 无日志体，
+配置收敛不可本地观测）。与 <code class="paramref">autoPromote</code>=true 组合非法（fail-fast）。
+前置：本地配置须含本端 witness 角色（<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html#TC_Tier_Core_Net_Raft_ClusterConfig_IsWitness_TC_Tier_Core_Net_NodeId_">IsWitness(NodeId)</a>——引擎据此走断言流）。</p>
+</dd>
+    <dt><code>listenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>本端监听地址（host:port——随 JoinReq 通告，leader 注册拨号表
+回连复制；进程内/已互联形态缺省 null 不通告）。TCP 形态成员表拨号加入必填——否则 leader
+无法回连本端，复制不通、配置不收敛。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时本节点已入组（autoPromote 形态另需已晋级 voter；总时限到抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_PostConfigChanged_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.PostConfigChanged*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_PostConfigChanged_TC_Tier_Core_Net_Raft_ClusterConfig_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.PostConfigChanged(TC.Tier.Core.Net.Raft.ClusterConfig)">
+  PostConfigChanged(ClusterConfig)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>外部配置切换入口（ApplyPipeline 配置条目 apply 回调——spec-04 配置与状态机同构）。</p>
+<pre><code>        &lt;p&gt;★ 产品装配公共面（D6）：状态机构造在 apply 管道之后——装配经
+        &lt;code&gt;apply.SetConfigCallback(raft.PostConfigChanged)&lt;/code&gt; 晚绑定。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void PostConfigChanged(ClusterConfig config)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>config</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新的活动配置（apply 产物——已切换完毕）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ProposeConfigAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ProposeConfigAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ProposeConfigAsync_TC_Tier_Core_Net_Raft_ClusterConfig_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ProposeConfigAsync(TC.Tier.Core.Net.Raft.ClusterConfig,System.Threading.CancellationToken)">
+  ProposeConfigAsync(ClusterConfig, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>提案配置条目（spec-04 §2——single-server 变更第一步/第二步）：追加配置条目
+（Kind = <a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntryKind.html#TC_Tier_Core_Net_Raft_RaftEntryKind_Config">Config</a>，Content = <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a> 稳定序列化）
+→ 返回 = committed 且 applied（apply 时活动配置已切换——配置切换 = apply 产物）。
+非 Leader 立即抛 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ProposeConfigAsync(ClusterConfig config, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>config</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>提案的新配置（活动配置切换 = apply 产物）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（换届/显式取消——调用方感知为 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>配置条目落盘的日志 index（committed 且 applied——配置已切换）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（携带当前已知 leader——调用方重路由）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">config</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReadIndexAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReadIndexAsync(System.Threading.CancellationToken)">
+  ReadIndexAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>线性读（spec-08 §4 定案）：leader 向多数派确认身份（心跳往返一轮）→ 返回
+readIndex = commitIndex——分区期拿不到多数派确认 = 超时/取消（不返回过期 index）。
+Standalone（N=1）立即返回（多数派 = 自己）。非 Leader 立即抛 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReadIndexAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（多数派确认超时/换届——调用方感知为 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>线性读位点 readIndex（= 当前 commitIndex——读到的不低于此水位）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（携带当前已知 leader——调用方重路由）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexForwardedAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReadIndexForwardedAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexForwardedAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReadIndexForwardedAsync(System.Threading.CancellationToken)">
+  ReadIndexForwardedAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>线性读·follower 转发（二期-B §6.2）：本端非 leader 时把 ReadIndex 转发给当前已知
+leader——leader 侧多数派确认后应答 readIndex，本端等待 applied ≥ readIndex 后返回
+（读本地状态机 = 线性读的本地读段）。本端 leader → 直接 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexAsync_System_Threading_CancellationToken_">ReadIndexAsync(CancellationToken)</a>
+（含租约快路径）。leader 未知 = 立即 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>；转发重试有界
+（次数 + 总时限——leader 切换/抬任期后等收敛，超限 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReadIndexForwardedAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（覆盖转发全程——含本地 apply 等待段）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>线性读位点 readIndex（本地已 apply 到 ≥ 该位点）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本端非 leader 且无已知 leader（调用方重路由）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a></dt>
+    <dd><p>有界重试超限（leader 切换/网络未收敛）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  ReplicateAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复制一条命令（spec-05 契约②）：返回 index = committed 且 applied（调用方拿到返回值即可
+从业务存储读到效果——read-your-writes）。非 Leader 立即抛 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>。</p>
+<p>★ 事件路径：池化完成源 + 事件入队——循环线程单线程 append（存储端口单写者）
+  可取消/窗口打满走 TCS 兜底。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReplicateAsync(ReadOnlyMemory&lt;byte&gt; command, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>command</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>命令内容（帧 payload——业务方定义格式，零拷贝直入追加批）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（换届/窗口打满/显式取消——调用方感知为 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>命令落盘的日志 index（committed 且 applied——read-your-writes）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（携带当前已知 leader——调用方重路由）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateBatchAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateBatchAsync_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateBatchAsync(System.Collections.Generic.IReadOnlyList{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">
+  ReplicateBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>批复制（spec-08 §1 ReplicateBatchAsync）：一批命令作为一次追加——
+返回批尾 index = committed 且 applied（批内全部随批尾提交应用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReplicateBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt; commands, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>commands</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>命令批（顺序追加——批尾 index 即返回值）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（换届/显式取消——调用方感知为 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>批尾命令的日志 index（committed 且 applied——批内全部已应用）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（携带当前已知 leader——调用方重路由）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">commands</code> 为 null。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p><code class="paramref">commands</code> 为空批。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateCommittedAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateCommittedAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateCommittedAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateCommittedAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  ReplicateCommittedAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复制一条命令（committed 完成档）：返回 index = 多数派已提交（commitIndex 追上即完成——
+不等 apply 管道，完成早于/equal <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ReplicateAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>）。非 Leader 立即抛
+<a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>。</p>
+<p>★ 档位语义：拿到返回值<b>不保证</b>业务存储可读到效果（apply 可能滞后）——
+  read-your-writes 场景用默认档 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ReplicateAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>；本档面向吞吐优先
+  （纯复制/批量灌数据——省 apply 推进的完成等待一跳）。持久化语义不变（多数派落盘）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReplicateCommittedAsync(ReadOnlyMemory&lt;byte&gt; command, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>command</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>命令内容（帧 payload——业务方定义格式）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（换届/窗口打满/显式取消——调用方感知为 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>命令的日志 index（多数派已提交——不等 apply）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（携带当前已知 leader——调用方重路由）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateLeaderLocalAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateLeaderLocalAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateLeaderLocalAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateLeaderLocalAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  ReplicateLeaderLocalAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复制一条命令（LeaderLocal 完成档）：返回 index = leader 本地已持久化（fsync 组提交——
+不等多数派复制、不等 commit/apply）。非 Leader 立即抛 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>。</p>
+<p>★ 弱档语义：返回后其他副本可能还没有此条目；leader 宕机时未复制到任何成员的
+尾部写丢失、已复制部分经最高日志者当选保留——返回的 index 不保证最终在多数派日志中
+（可能随换届回退）。commitIndex 照旧由多数派推进——强一致需求用
+<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ReplicateAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateCommittedAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ReplicateCommittedAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a> 或 ReadIndex。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReplicateLeaderLocalAsync(ReadOnlyMemory&lt;byte&gt; command, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>command</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>命令内容（帧 payload——业务方定义格式）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（换届/显式取消——调用方感知为 OperationCanceledException）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>命令在 leader 本地持久化后的日志 index（不等多数派复制/commit/apply）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（携带当前已知 leader——调用方重路由）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_ResignAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ResignAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_ResignAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.ResignAsync(System.Threading.CancellationToken)">
+  ResignAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>主动让位（运维动作——节点下线/维护前先让位，避免等选举窗的超时窗口）：
+leader 立即降为 follower（任期不变、清本任投票——仍可给其他候选者投票），
+集群经选举窗自然选出新 leader。<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_LeadershipToken">LeadershipToken</a> 随降级取消。
+非 leader 调用抛 <a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a>（无位可让——明确失败而非幂等静默）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask ResignAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（让位前等待——降级落盘阶段取消）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时本节点已降级为 follower（任期不变、清本任投票——LeadershipToken 已取消）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无位可让）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a></dt>
+    <dd><p><code class="paramref">ct</code> 已取消。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_RunUnderAppendGateAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.RunUnderAppendGateAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_RunUnderAppendGateAsync__1_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask___0___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.RunUnderAppendGateAsync``1(System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask{``0}},System.Threading.CancellationToken)">
+  RunUnderAppendGateAsync&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>宿主维护操作串行化面（T6 结构修复——自压缩入 followerAppendGate）：压缩/截头等
+日志变更维护操作与 AppendEntries/快照安装的日志操作互斥（同一 <span class="xref">TC.Tier.Core.Net.Raft.RaftStateMachine._followerAppendGate</span>——
+锁序恒 followerAppendGate → store 内部门）。压缩窗内入站 AE 排队等待：窗长须远小于选举窗
+（磁盘 DIO+WT 压缩档亚毫秒——超窗= follower 心跳处理停滞自发换届，宿主压缩节奏守卫兜底）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;T&gt; RunUnderAppendGateAsync&lt;T&gt;(Func&lt;CancellationToken, ValueTask&lt;T&gt;&gt; work, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>work</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;T&gt;&gt;</dt>
+    <dd><p>临界区内执行的异步工作（接收取消令牌）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;T&gt;</dt>
+    <dd><p>work 返回的结果。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>T</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_StartAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_StartAsync_TC_Tier_Core_Net_Raft_ClusterConfig_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.StartAsync(TC.Tier.Core.Net.Raft.ClusterConfig)">
+  StartAsync(ClusterConfig)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动状态机循环（初始配置装配 + 请求 handler 挂载；循环启动即进入 Follower 并掷选举超时）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StartAsync(ClusterConfig initialConfig)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>initialConfig</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>初始活动配置（装配：恢复的配置或用户配置）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时循环线程已启动并进入 Follower（Standalone 单成员配置直接就位 Leader）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>重复启动或传输未实现内部挂载口。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_StopAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.StopAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_StopAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.StopAsync(System.Threading.CancellationToken)">
+  StopAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>停止状态机循环（取消循环——循环退出后完成；循环已异常终止时直接返回）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StopAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（停止过程等待的取消——循环线程退出有界兜底）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时循环线程已退出、复制 lane 链已全退（幂等——重复调用立即完成）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_TransferLeadershipAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.TransferLeadershipAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_TransferLeadershipAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.TransferLeadershipAsync(TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  TransferLeadershipAsync(NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>领导权定向转让（二期-D2——etcd MoveLeader 同族）：登记转让目标后等待目标追平日志，
+追平即发 TimeoutNow（目标跳过预票立即真选举——抬任期使本端 StepDown）。返回 = 让位完成；
+超时回退 = <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>（本端仍在位可继续服务——转让意图作废）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask TransferLeadershipAsync(NodeId target, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>转让目标（须为活动配置中的 voter）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>让位完成（目标真选举抬任期 → 本端已降级 follower）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 leader。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>目标不在活动配置或非 voter。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a></dt>
+    <dd><p>转让窗口超限（目标未追平/未发起选举）——超时回退。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftStateMachine_WaitForAppliedAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.WaitForAppliedAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_WaitForAppliedAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.WaitForAppliedAsync(System.Int64,System.Threading.CancellationToken)">
+  WaitForAppliedAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>等待本地应用水位推进到 ≥ index（二期-B §6.3）：返回时本地业务状态机已 apply 到
+≥ index——转发线性读（<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReadIndexForwardedAsync_System_Threading_CancellationToken_">ReadIndexForwardedAsync(CancellationToken)</a>）的本地读段。快照重建
+不发 AppliedTo——重建完成后由状态机显式完成 ≤ N₀ 的 waiter（<span class="xref">TC.Tier.Core.Net.Raft.RaftStateMachine.OnSnapshotRebuilt(System.Int64)</span>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask WaitForAppliedAsync(long index, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>目标 applied 位点。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（降级/停止 = 批量取消终态）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成 = 本地业务状态机已 apply 到 ≥ index（水位已达 = 同步完成；快照重建完成也显式完成 ≤ N₀ 的 waiter）；取消/降级/停止 = 任务取消终态。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_EntryCommitted" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.EntryCommitted">
+  EntryCommitted
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>commitIndex 推进（含应用完成——用户面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;long&gt;? EntryCommitted</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftStateMachine_LeaderChanged" data-uid="TC.Tier.Core.Net.Raft.RaftStateMachine.LeaderChanged">
+  LeaderChanged
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当选/降级事件（true = 本节点当选——用户面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;bool&gt;? LeaderChanged</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

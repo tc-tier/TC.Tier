@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class InProcessTransportHub | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class InProcessTransportHub | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="进程内传输枢纽（spec-12 &#167;7——InProcess 介质 = 同构基准/测试主场：与网络介质零差别验收的锚； 同进程恒可信——安全档不适用（恒明文语义），无握手/连接概念）。 ★ 装配：一个枢纽 = 一个集群域（同枢纽内节点互通）；节点经  注册   即可达（对既有节点双向 PeerConnected）； 即离线（PeerGone 广播）。 ★ 投递：发送方上下文直排派发（同步回调 + 异常隔离——背压 = handler 慢直接传导到发送方，   spec-12 &#167;7 背压模型的内存形态）。 ★ 注入矩阵内建（&#167;9.2——延迟/分区/丢包/乱序定向注入，TCP 介质等价语义；   随机源可注入固定种子保证测试确定性）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub" class="text-break">
+Class InProcessTransportHub  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.html">Transport</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.InProcess.html">InProcess</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>进程内传输枢纽（spec-12 §7——InProcess 介质 = 同构基准/测试主场：与网络介质零差别验收的锚；
+同进程恒可信——安全档不适用（恒明文语义），无握手/连接概念）。</p>
+<p>★ 装配：一个枢纽 = 一个集群域（同枢纽内节点互通）；节点经 <a class="xref" href="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.html#TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Register_TC_Tier_Core_Net_NodeId_">Register(NodeId)</a> 注册
+  即可达（对既有节点双向 PeerConnected）；<a class="xref" href="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.html#TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Unregister_TC_Tier_Core_Net_NodeId_">Unregister(NodeId)</a> 即离线（PeerGone 广播）。</p>
+<p>★ 投递：发送方上下文直排派发（同步回调 + 异常隔离——背压 = handler 慢直接传导到发送方，
+  spec-12 §7 背压模型的内存形态）。</p>
+<p>★ 注入矩阵内建（§9.2——延迟/分区/丢包/乱序定向注入，TCP 介质等价语义；
+  随机源可注入固定种子保证测试确定性）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class InProcessTransportHub : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">InProcessTransportHub</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub__ctor_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub__ctor_TC_Tier_Core_Net_Transport_TransportOptions_System_Random_TC_Tier_Core_Observability_ObservabilityHub_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.#ctor(TC.Tier.Core.Net.Transport.TransportOptions,System.Random,TC.Tier.Core.Observability.ObservabilityHub)">
+  InProcessTransportHub(TransportOptions?, Random?, ObservabilityHub?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public InProcessTransportHub(TransportOptions? options = null, Random? random = null, ObservabilityHub? hub = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>传输选项（内存介质取请求回调域+慢回调阈值——参数面与 TCP 同源；
+null = 缺省。测试主场可调小超时驱动超时路径）。</p>
+</dd>
+    <dt><code>random</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.random">Random</a></dt>
+    <dd><p>随机源（丢包判定——测试可注入固定种子保证确定性）。</p>
+</dd>
+    <dt><code>hub</code> <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a></dt>
+    <dd><p>可观测中心（可选——null = Disabled；spec-12 §9.1 唯一接入点）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Faults_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.Faults*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Faults" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.Faults">
+  Faults
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>故障注入器（枢纽级——节点对定向，全节点共享一副矩阵）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITransportFaultInjector Faults { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.ITransportFaultInjector.html">ITransportFaultInjector</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_NetView_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.NetView*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_NetView" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.NetView">
+  NetView
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Net 维度视图（null = Disabled——节点经枢纽共享）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ObservabilityHub.NetView? NetView { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a>.<a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.NetView.html">NetView</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_NodeCount_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.NodeCount*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_NodeCount" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.NodeCount">
+  NodeCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已注册节点数（测试诊断）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int NodeCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestDedupCapacity_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestDedupCapacity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestDedupCapacity" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestDedupCapacity">
+  RequestDedupCapacity
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>应答端 CorrId 去重窗口容量。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int RequestDedupCapacity { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestDedupMaxBytes_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestDedupMaxBytes*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestDedupMaxBytes" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestDedupMaxBytes">
+  RequestDedupMaxBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>应答端去重窗口字节软预算。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long RequestDedupMaxBytes { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestPendingCapacity_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestPendingCapacity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestPendingCapacity" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestPendingCapacity">
+  RequestPendingCapacity
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 pending 关联表容量。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int RequestPendingCapacity { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestTimeout_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_RequestTimeout" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.RequestTimeout">
+  RequestTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调缺省超时（本枢纽节点共用——SendRequestAsync 无 per-call 选项时）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan RequestTimeout { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_SlowDispatchThreshold_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.SlowDispatchThreshold*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_SlowDispatchThreshold" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.SlowDispatchThreshold">
+  SlowDispatchThreshold
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>分发慢回调阈值（null = 不检测——直排热路径零计时开销）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan? SlowDispatchThreshold { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_StreamWindowFrames_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.StreamWindowFrames*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_StreamWindowFrames" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.StreamWindowFrames">
+  StreamWindowFrames
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流式会话背压窗口帧数。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int StreamWindowFrames { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_DisposeAsync_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_DisposeAsync" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时全部节点已关闭并清空。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Register_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.Register*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Register_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.Register(TC.Tier.Core.Net.NodeId)">
+  Register(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注册节点端点（幂等——重复注册返回同一端点；新节点与既有节点互相触发 PeerConnected）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public InProcessNode Register(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>节点 ID（Empty 哨兵非法）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.html">InProcessNode</a></dt>
+    <dd><p>该节点的传输端点（重复注册返回同一端点实例）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p><code class="paramref">id</code> 为 Empty 哨兵。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Unregister_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.Unregister*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Unregister_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.Unregister(TC.Tier.Core.Net.NodeId)">
+  Unregister(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注销节点端点（既有节点触发 PeerGone；此后发往该节点 = 静默丢弃）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Unregister(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>要注销的节点 ID（未注册 = 无操作）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

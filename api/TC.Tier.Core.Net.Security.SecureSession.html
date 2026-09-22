@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SecureSession | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SecureSession | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="KeyPair 档会话密钥（握手产物——spec-12 &#167;3.4）。 ★ 前向保密形态（Noise IK 同构）：静态密钥只做签名（身份证明），密钥协商用   每连接临时 ECDH——静态私钥日后泄露不危及历史会话。 ★ 双向密钥（ Initiator/Responder 方向分离——同键双向自反攻击防御）+ 确认密钥   （Final 帧密钥确认 MAC）。粒度在帧保护层消费（——   AEAD=加密+认证；MAC-only=仅认证）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Security.SecureSession">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Security_SecureSession" data-uid="TC.Tier.Core.Net.Security.SecureSession" class="text-break">
+Class SecureSession  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Security.html">Security</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>KeyPair 档会话密钥（握手产物——spec-12 §3.4）。</p>
+<p>★ 前向保密形态（Noise IK 同构）：静态密钥只做<b>签名</b>（身份证明），密钥协商用
+  每连接<b>临时</b> ECDH——静态私钥日后泄露不危及历史会话。</p>
+<p>★ 双向密钥（ Initiator/Responder 方向分离——同键双向自反攻击防御）+ 确认密钥
+  （Final 帧密钥确认 MAC）。粒度在帧保护层消费（<a class="xref" href="TC.Tier.Core.Net.Security.FrameProtection.html">FrameProtection</a>——
+  AEAD=加密+认证；MAC-only=仅认证）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SecureSession : IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SecureSession</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_AckExtensionSize" data-uid="TC.Tier.Core.Net.Security.SecureSession.AckExtensionSize">
+  AckExtensionSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Ack 扩展段长度（静态公钥 + 临时公钥 + responderNonce + 签名）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int AckExtensionSize = 138</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_InitExtensionSize" data-uid="TC.Tier.Core.Net.Security.SecureSession.InitExtensionSize">
+  InitExtensionSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Init 扩展段长度（静态公钥 + 临时公钥 + 签名）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int InitExtensionSize = 130</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_KeySize" data-uid="TC.Tier.Core.Net.Security.SecureSession.KeySize">
+  KeySize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>会话密钥长度（HKDF 输出分段——双向各 32B + 确认 32B）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int KeySize = 32</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_ConfirmKey_" data-uid="TC.Tier.Core.Net.Security.SecureSession.ConfirmKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_ConfirmKey" data-uid="TC.Tier.Core.Net.Security.SecureSession.ConfirmKey">
+  ConfirmKey
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>密钥确认键（Final 帧 MAC——双方同键互验）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] ConfirmKey { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_Protection_" data-uid="TC.Tier.Core.Net.Security.SecureSession.Protection*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_Protection" data-uid="TC.Tier.Core.Net.Security.SecureSession.Protection">
+  Protection
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>帧保护粒度（握手双方配置一致——KeyPair 档协商产物）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FrameProtection Protection { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Security.FrameProtection.html">FrameProtection</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_RecvKey_" data-uid="TC.Tier.Core.Net.Security.SecureSession.RecvKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_RecvKey" data-uid="TC.Tier.Core.Net.Security.SecureSession.RecvKey">
+  RecvKey
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端发送密钥（= 本端接收密钥）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] RecvKey { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_SendKey_" data-uid="TC.Tier.Core.Net.Security.SecureSession.SendKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_SendKey" data-uid="TC.Tier.Core.Net.Security.SecureSession.SendKey">
+  SendKey
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端发送密钥（AEAD=加密键；MAC-only=HMAC 键——按方向取本端发送/对端接收）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] SendKey { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_ComputeConfirmTag_" data-uid="TC.Tier.Core.Net.Security.SecureSession.ComputeConfirmTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_ComputeConfirmTag_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.ComputeConfirmTag(System.ReadOnlySpan{System.Byte})">
+  ComputeConfirmTag(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Final 帧密钥确认标签（HMAC-SHA256(confirm, &quot;final&quot;||transcript)——双方互验同值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] ComputeConfirmTag(ReadOnlySpan&lt;byte&gt; transcriptHash)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transcriptHash</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>握手记录哈希（Init/Ack 全材料）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>32B 确认标签（写入 Final 帧供对端校验）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_ComputeUdpTag_" data-uid="TC.Tier.Core.Net.Security.SecureSession.ComputeUdpTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_ComputeUdpTag_System_Byte___System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.ComputeUdpTag(System.Byte[],System.ReadOnlySpan{System.Byte})">
+  ComputeUdpTag(byte[], ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>UDP 尾标签计算（HMAC(udpKey, frame)）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte[] ComputeUdpTag(byte[] udpKey, ReadOnlySpan&lt;byte&gt; frame)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>udpKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>UDP 认证键（<a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html#TC_Tier_Core_Net_Security_SecureSession_DeriveUdpKey">DeriveUdpKey()</a> 派生）。</p>
+</dd>
+    <dt><code>frame</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>完整报文（帧字节全入 MAC 域）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>32B HMAC-SHA256 尾标签。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_DecodeAckExtension_" data-uid="TC.Tier.Core.Net.Security.SecureSession.DecodeAckExtension*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_DecodeAckExtension_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.DecodeAckExtension(System.ReadOnlySpan{System.Byte})">
+  DecodeAckExtension(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码 Ack 扩展段（静态公钥自报 + 临时公钥 + responderNonce + 签名）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static (byte[] StaticKey, byte[] EphemeralKey, ulong Nonce, byte[] Signature) DecodeAckExtension(ReadOnlySpan&lt;byte&gt; ext)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ext</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.uint64,system.byte[]-.statickey">StaticKey</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.uint64,system.byte[]-.ephemeralkey">EphemeralKey</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.uint64,system.byte[]-.nonce">Nonce</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.uint64,system.byte[]-.signature">Signature</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_DecodeInitExtension_" data-uid="TC.Tier.Core.Net.Security.SecureSession.DecodeInitExtension*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_DecodeInitExtension_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.DecodeInitExtension(System.ReadOnlySpan{System.Byte})">
+  DecodeInitExtension(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码 Init 扩展段（静态公钥自报 + 临时公钥 + 签名）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static (byte[] StaticKey, byte[] EphemeralKey, byte[] Signature) DecodeInitExtension(ReadOnlySpan&lt;byte&gt; ext)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ext</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.byte[]-.statickey">StaticKey</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.byte[]-.ephemeralkey">EphemeralKey</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.byte[],system.byte[]-.signature">Signature</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_DeriveUdpKey_" data-uid="TC.Tier.Core.Net.Security.SecureSession.DeriveUdpKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_DeriveUdpKey" data-uid="TC.Tier.Core.Net.Security.SecureSession.DeriveUdpKey">
+  DeriveUdpKey()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>UDP 报文认证键（HKDF(confirm, &quot;udp&quot;)——TCP 会话派生，双方同源；
+报文形态 = 标准帧 + 32B 尾标签（帧字节全入 MAC 域））。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] DeriveUdpKey()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>32B UDP 认证键（双方同源——同一会话派生值一致）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_Dispose_" data-uid="TC.Tier.Core.Net.Security.SecureSession.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_Dispose" data-uid="TC.Tier.Core.Net.Security.SecureSession.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>密钥销毁（尽力——托管数组清零后弃置）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_EncodeInitExtension_" data-uid="TC.Tier.Core.Net.Security.SecureSession.EncodeInitExtension*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_EncodeInitExtension_TC_Tier_Core_Net_Security_NodeKeyPair_TC_Tier_Core_Net_Security_NodeKeyPair_System_UInt64_System_Span_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.EncodeInitExtension(TC.Tier.Core.Net.Security.NodeKeyPair,TC.Tier.Core.Net.Security.NodeKeyPair,System.UInt64,System.Span{System.Byte})">
+  EncodeInitExtension(NodeKeyPair, NodeKeyPair, ulong, Span&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码 Init 扩展段（发起方：静态+临时公钥 + 静态私钥对 Init 材料的签名）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void EncodeInitExtension(NodeKeyPair staticKey, NodeKeyPair ephemeral, ulong initiatorNonce, Span&lt;byte&gt; destination)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>staticKey</code> <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>本端静态密钥（签名）。</p>
+</dd>
+    <dt><code>ephemeral</code> <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>本端临时密钥（本次连接新建）。</p>
+</dd>
+    <dt><code>initiatorNonce</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></dt>
+    <dd><p>Init Nonce。</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标（≥ <a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html#TC_Tier_Core_Net_Security_SecureSession_InitExtensionSize">InitExtensionSize</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_FinishAsInitiator_" data-uid="TC.Tier.Core.Net.Security.SecureSession.FinishAsInitiator*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_FinishAsInitiator_TC_Tier_Core_Net_Security_NodeKeyPair_TC_Tier_Core_Net_Security_NodeKeyPair_System_UInt64_System_ReadOnlySpan_System_Byte__TC_Tier_Core_Net_Security_FrameProtection_" data-uid="TC.Tier.Core.Net.Security.SecureSession.FinishAsInitiator(TC.Tier.Core.Net.Security.NodeKeyPair,TC.Tier.Core.Net.Security.NodeKeyPair,System.UInt64,System.ReadOnlySpan{System.Byte},TC.Tier.Core.Net.Security.FrameProtection)">
+  FinishAsInitiator(NodeKeyPair, NodeKeyPair, ulong, ReadOnlySpan&lt;byte&gt;, FrameProtection)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>发起方视角握手驱动：持有本端静态+临时密钥，消费 Ack 扩展段（自报静态公钥）产出会话。</p>
+<pre><code>        &lt;p&gt;★ 验签用 Ack 自报的静态公钥；返回该公钥供调用方做钉扎比对/TOFU 学习（验签成立 ≠
+          信任锚成立——两道校验分离）。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static (SecureSession Session, byte[] ResponderStaticKey) FinishAsInitiator(NodeKeyPair staticKey, NodeKeyPair ephemeral, ulong initiatorNonce, ReadOnlySpan&lt;byte&gt; responderExtension, FrameProtection protection)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>staticKey</code> <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>本端静态密钥（签名身份）。</p>
+</dd>
+    <dt><code>ephemeral</code> <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>本端临时密钥（本次连接新建——ECDH 用后即弃）。</p>
+</dd>
+    <dt><code>initiatorNonce</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></dt>
+    <dd><p>Init 携带的 Nonce。</p>
+</dd>
+    <dt><code>responderExtension</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Ack 扩展段（[静态公钥][临时公钥][nonce][签名]）。</p>
+</dd>
+    <dt><code>protection</code> <a class="xref" href="TC.Tier.Core.Net.Security.FrameProtection.html">FrameProtection</a></dt>
+    <dd><p>帧保护粒度（本端配置——对端一致由调用方核对）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html">SecureSession</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.security.securesession,system.byte[]-.session">Session</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.security.securesession,system.byte[]-.responderstatickey">ResponderStaticKey</a>)</dt>
+    <dd><p>（会话, 应答方自报静态公钥——33B）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_StartAsResponder_" data-uid="TC.Tier.Core.Net.Security.SecureSession.StartAsResponder*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_StartAsResponder_TC_Tier_Core_Net_Security_NodeKeyPair_System_ReadOnlySpan_System_Byte__System_UInt64_TC_Tier_Core_Net_Security_FrameProtection_" data-uid="TC.Tier.Core.Net.Security.SecureSession.StartAsResponder(TC.Tier.Core.Net.Security.NodeKeyPair,System.ReadOnlySpan{System.Byte},System.UInt64,TC.Tier.Core.Net.Security.FrameProtection)">
+  StartAsResponder(NodeKeyPair, ReadOnlySpan&lt;byte&gt;, ulong, FrameProtection)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>应答方视角握手驱动：校验 Init 扩展段签名（自报静态公钥）→ 产 Ack 扩展段 → 会话工厂。</p>
+<pre><code>        &lt;p&gt;★ 两步形态（应答方先验 Init 再发 Ack——签名失败立即 Error 断连，不产 Ack）。
+          返回发起方自报静态公钥供钉扎比对/TOFU 学习。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static (byte[] InitiatorStaticKey, Func&lt;NodeKeyPair, ulong, byte[]&gt; AckExtension, Func&lt;NodeKeyPair, ulong, SecureSession&gt; Finish) StartAsResponder(NodeKeyPair staticKey, ReadOnlySpan&lt;byte&gt; initiatorExtension, ulong initiatorNonce, FrameProtection protection)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>staticKey</code> <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>本端静态密钥。</p>
+</dd>
+    <dt><code>initiatorExtension</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>Init 扩展段（[静态公钥][临时公钥][签名]）。</p>
+</dd>
+    <dt><code>initiatorNonce</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></dt>
+    <dd><p>Init 携带的 Nonce。</p>
+</dd>
+    <dt><code>protection</code> <a class="xref" href="TC.Tier.Core.Net.Security.FrameProtection.html">FrameProtection</a></dt>
+    <dd><p>帧保护粒度。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.func-tc.tier.core.net.security.nodekeypair,system.uint64,system.byte[]-,system.func-tc.tier.core.net.security.nodekeypair,system.uint64,tc.tier.core.net.security.securesession--.initiatorstatickey">InitiatorStaticKey</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.func-tc.tier.core.net.security.nodekeypair,system.uint64,system.byte[]-,system.func-tc.tier.core.net.security.nodekeypair,system.uint64,tc.tier.core.net.security.securesession--.ackextension">AckExtension</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a>, <a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html">SecureSession</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.byte[],system.func-tc.tier.core.net.security.nodekeypair,system.uint64,system.byte[]-,system.func-tc.tier.core.net.security.nodekeypair,system.uint64,tc.tier.core.net.security.securesession--.finish">Finish</a>)</dt>
+    <dd><p>（InitiatorStatic,（Ack 扩段编码, 会话完成））。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_VerifyConfirmTag_" data-uid="TC.Tier.Core.Net.Security.SecureSession.VerifyConfirmTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_VerifyConfirmTag_System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.VerifyConfirmTag(System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte})">
+  VerifyConfirmTag(ReadOnlySpan&lt;byte&gt;, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>校验对端 Final 标签（密钥确认失败 = Error + 断连——握手不完整）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool VerifyConfirmTag(ReadOnlySpan&lt;byte&gt; transcriptHash, ReadOnlySpan&lt;byte&gt; tag)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transcriptHash</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>握手记录哈希（Init/Ack 全材料）。</p>
+</dd>
+    <dt><code>tag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>对端 Final 帧携带的确认标签。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 标签匹配（双方密钥一致、握手材料完整）；false = 确认失败。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureSession_VerifyUdpTag_" data-uid="TC.Tier.Core.Net.Security.SecureSession.VerifyUdpTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureSession_VerifyUdpTag_System_Byte___System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureSession.VerifyUdpTag(System.Byte[],System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte})">
+  VerifyUdpTag(byte[], ReadOnlySpan&lt;byte&gt;, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>UDP 尾标签校验（常量时间比较）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool VerifyUdpTag(byte[] udpKey, ReadOnlySpan&lt;byte&gt; frame, ReadOnlySpan&lt;byte&gt; tag)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>udpKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>UDP 认证键（<a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html#TC_Tier_Core_Net_Security_SecureSession_DeriveUdpKey">DeriveUdpKey()</a> 派生）。</p>
+</dd>
+    <dt><code>frame</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>报文帧部分（不含尾标签）。</p>
+</dd>
+    <dt><code>tag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>报文尾部的 32B 标签。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 标签匹配（报文认证通过）；false = 标签不符（丢弃并计数）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

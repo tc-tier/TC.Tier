@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ITierQueue | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ITierQueue | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierQueue——本地持久队列（tc-tier-queue-spec）。 ★ P0 核心流：Enqueue（append-only）/ Dequeue（游标拉取）/ Ack（位点原子推进 + 截断）/   Flush / Truncate。队列级面委托内建组 &quot;$default&quot;——地址档基线语义（at-least-once，无 token）。 ★ P1 消费组：（独立位点/独立投递簿记/定格配置）+   （token 档——fencing/deliver-once）+ 治理三模式 +   。 ★ 交付语义（spec &#167;5/&#167;6.0）：at-least-once——崩溃后从持久位点重放；业务消费须幂等。 ★ 分配与持久化分离（同 TierWal 惯例）：Enqueue 返回 = 已入内存；落盘由 AckAsync   （契约：ack 数据先于位点持久）或显式  触发。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Queue.ITierQueue">
+
+
+
+  <h1 id="TC_Tier_Products_Queue_ITierQueue" data-uid="TC.Tier.Products.Queue.ITierQueue" class="text-break">
+Interface ITierQueue  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Queue.html">Queue</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierQueue——本地持久队列（tc-tier-queue-spec）。</p>
+<p>★ P0 核心流：Enqueue（append-only）/ Dequeue（游标拉取）/ Ack（位点原子推进 + 截断）/
+  Flush / Truncate。队列级面委托内建组 "$default"——地址档基线语义（at-least-once，无 token）。</p>
+<p>★ P1 消费组：<a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html#TC_Tier_Products_Queue_ITierQueue_CreateGroupAsync_TC_Tier_Products_Queue_GroupOptions_System_Threading_CancellationToken_">CreateGroupAsync(GroupOptions, CancellationToken)</a>（独立位点/独立投递簿记/定格配置）+
+  <a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html#TC_Tier_Products_Queue_ITierQueue_CreateConsumerAsync_System_String_">CreateConsumerAsync(string)</a>（token 档——fencing/deliver-once）+ 治理三模式 +
+  <a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html#TC_Tier_Products_Queue_ITierQueue_GetStatsAsync_System_Threading_CancellationToken_">GetStatsAsync(CancellationToken)</a>。</p>
+<p>★ 交付语义（spec §5/§6.0）：at-least-once——崩溃后从持久位点重放；业务消费须幂等。</p>
+<p>★ 分配与持久化分离（同 TierWal 惯例）：Enqueue 返回 = 已入内存；落盘由 AckAsync
+  （契约：ack 数据先于位点持久）或显式 <a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html#TC_Tier_Products_Queue_ITierQueue_FlushAsync_System_Threading_CancellationToken_">FlushAsync(CancellationToken)</a> 触发。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ITierQueue : ILifecycle&lt;TierQueueRecoveryHints&gt;, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady">ILifecycle&lt;TierQueueRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady_System_Int32_">ILifecycle&lt;TierQueueRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReadyAsync_System_Threading_CancellationToken_">ILifecycle&lt;TierQueueRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">ILifecycle&lt;TierQueueRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_IsReady">ILifecycle&lt;TierQueueRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_RecoveryState">ILifecycle&lt;TierQueueRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_RecoveryProgressChanged">ILifecycle&lt;TierQueueRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">IDisposable.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_DeadLetterQueue_" data-uid="TC.Tier.Products.Queue.ITierQueue.DeadLetterQueue*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_DeadLetterQueue" data-uid="TC.Tier.Products.Queue.ITierQueue.DeadLetterQueue">
+  DeadLetterQueue
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>死信子队列（独立实例 {name}.dlq——单组；Options.DeadLetter = null 时为 null）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ITierQueue? DeadLetterQueue { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html">ITierQueue</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_DurableTail_" data-uid="TC.Tier.Products.Queue.ITierQueue.DurableTail*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_DurableTail" data-uid="TC.Tier.Products.Queue.ITierQueue.DurableTail">
+  DurableTail
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已落盘水位（= Ring.FlushedUntilAddress）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress DurableTail { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_GroupCursor_" data-uid="TC.Tier.Products.Queue.ITierQueue.GroupCursor*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_GroupCursor" data-uid="TC.Tier.Products.Queue.ITierQueue.GroupCursor">
+  GroupCursor
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>&quot;$default&quot; 组连续已确认前缀的下一地址（持久真源——恢复重放起点）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress GroupCursor { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_HeadAddress_" data-uid="TC.Tier.Products.Queue.ITierQueue.HeadAddress*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_HeadAddress" data-uid="TC.Tier.Products.Queue.ITierQueue.HeadAddress">
+  HeadAddress
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前截断头地址。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress HeadAddress { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_TailAddress_" data-uid="TC.Tier.Products.Queue.ITierQueue.TailAddress*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_TailAddress" data-uid="TC.Tier.Products.Queue.ITierQueue.TailAddress">
+  TailAddress
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已分配尾地址（含未落盘）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress TailAddress { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_AckAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.AckAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_AckAsync_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.AckAsync(System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress},System.Threading.CancellationToken)">
+  AckAsync(IReadOnlyList&lt;LogicalAddress&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>确认一批消息（&quot;$default&quot; 组——幂等；乱序 ack 空洞进 Skip 表）。</p>
+<p>★ 契约（spec §5）：①payload 先于位点持久化；②返回 = 位点已持久；③随后自动截断。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask AckAsync(IReadOnlyList&lt;LogicalAddress&gt; acked, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>acked</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>要确认的消息地址列表。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_AckBufferedAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.AckBufferedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_AckBufferedAsync_System_Collections_Generic_IReadOnlyList_TC_Tier_Contracts_Storage_LogicalAddress__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.AckBufferedAsync(System.Collections.Generic.IReadOnlyList{TC.Tier.Contracts.Storage.LogicalAddress},System.Threading.CancellationToken)">
+  AckBufferedAsync(IReadOnlyList&lt;LogicalAddress&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>缓冲确认（可选吞吐路径）。返回不代表已持久；达到
+<a class="xref" href="TC.Tier.Products.Queue.TierQueueOptions.html#TC_Tier_Products_Queue_TierQueueOptions_BufferedAckBatchSize">BufferedAckBatchSize</a> 或调用
+<a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html#TC_Tier_Products_Queue_ITierQueue_FlushAcknowledgementsAsync_System_Threading_CancellationToken_">FlushAcknowledgementsAsync(CancellationToken)</a> 后才 durable。进程故障前的缓冲项会按 at-least-once 重投。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask AckBufferedAsync(IReadOnlyList&lt;LogicalAddress&gt; acked, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>acked</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_CancelDelayedAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.CancelDelayedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_CancelDelayedAsync_TC_Tier_Products_Queue_CancelDelayedFilter_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.CancelDelayedAsync(TC.Tier.Products.Queue.CancelDelayedFilter,System.Threading.CancellationToken)">
+  CancelDelayedAsync(CancelDelayedFilter, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取消延迟消息（索引删除 + 组 skip 标记——永不投递、截断解锚）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;int&gt; CancelDelayedAsync(CancelDelayedFilter filter, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filter</code> <a class="xref" href="TC.Tier.Products.Queue.CancelDelayedFilter.html">CancelDelayedFilter</a></dt>
+    <dd><p>按地址精确 / 按 dueTime 区间。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>取消条数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_CreateConsumerAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.CreateConsumerAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_CreateConsumerAsync_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueue.CreateConsumerAsync(System.String)">
+  CreateConsumerAsync(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取既有组的消费句柄（token 档——多消费者 = 多句柄同组）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ITierQueueConsumer CreateConsumerAsync(string groupName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>groupName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Queue.ITierQueueConsumer.html">ITierQueueConsumer</a></dt>
+    <dd><p>消费组句柄。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_CreateGroupAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.CreateGroupAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_CreateGroupAsync_TC_Tier_Products_Queue_GroupOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.CreateGroupAsync(TC.Tier.Products.Queue.GroupOptions,System.Threading.CancellationToken)">
+  CreateGroupAsync(GroupOptions, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>创建消费组（独立持久位点 + 独立投递簿记；组配置创建时定格）。已存在 → 抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;ITierQueueConsumer&gt; CreateGroupAsync(GroupOptions opt, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>opt</code> <a class="xref" href="TC.Tier.Products.Queue.GroupOptions.html">GroupOptions</a></dt>
+    <dd><p>组配置（名/起点/可见性/重投上限）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.ITierQueueConsumer.html">ITierQueueConsumer</a>&gt;</dt>
+    <dd><p>消费组句柄（token 档消费面）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_DeleteGroupAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.DeleteGroupAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_DeleteGroupAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.DeleteGroupAsync(System.String,System.Threading.CancellationToken)">
+  DeleteGroupAsync(string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>删除组（状态销毁 + 引擎目录回收 + 截断下界抬升）。&quot;$default&quot; 不可删。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask DeleteGroupAsync(string name, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_DequeueAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.DequeueAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_DequeueAsync_System_Int32_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.DequeueAsync(System.Int32,System.Threading.CancellationToken)">
+  DequeueAsync(int, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从 &quot;$default&quot; 组持久位点起顺序拉取 ≤ maxCount 条（登记 pending；不推进位点）。
+无可投消息 = 空列表。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;QueueDelivery&gt;&gt; DequeueAsync(int maxCount, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>maxCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>单批最大条数。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（冷区异步回源途中响应）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.QueueDelivery.html">QueueDelivery</a>&gt;&gt;</dt>
+    <dd><p>投递列表（地址序）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_EnqueueAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_EnqueueAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  EnqueueAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>入队单条消息，返回分配地址。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;EnqueueResult&gt; EnqueueAsync(ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>消息字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（溢出引擎异步写路径 / Block 治理等待响应）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.EnqueueResult.html">EnqueueResult</a>&gt;</dt>
+    <dd><p>分配的消息地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Queue.QueueFullException.html">QueueFullException</a></dt>
+    <dd><p>积压治理 Reject / Block 超时。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_EnqueueAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_EnqueueAsync_TC_Tier_Products_Queue_EnqueueOptions_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueAsync(TC.Tier.Products.Queue.EnqueueOptions,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  EnqueueAsync(EnqueueOptions, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>入队（全选项——P3：DueTime 延迟投递 / ProducerId+Seq 幂等生产档）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;EnqueueResult&gt; EnqueueAsync(EnqueueOptions opt, ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>opt</code> <a class="xref" href="TC.Tier.Products.Queue.EnqueueOptions.html">EnqueueOptions</a></dt>
+    <dd><p>入队选项。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>消息字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.EnqueueResult.html">EnqueueResult</a>&gt;</dt>
+    <dd><p>分配地址（幂等命中 = 首次地址）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>延迟未开启 Options.Delayed / 跨度超 MaxDelay / 幂等未开启。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_EnqueueBatchAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_EnqueueBatchAsync_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueBatchAsync(System.Collections.Generic.IReadOnlyList{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">
+  EnqueueBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>入队一批消息（逐条分配，地址连续推进）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;EnqueueResult&gt;&gt; EnqueueBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt; payloads, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payloads</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>消息字节列表。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.EnqueueResult.html">EnqueueResult</a>&gt;&gt;</dt>
+    <dd><p>各消息的分配地址（与入参一一对应）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_EnqueueBatchAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_EnqueueBatchAsync_TC_Tier_Products_Queue_EnqueueOptions_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.EnqueueBatchAsync(TC.Tier.Products.Queue.EnqueueOptions,System.Collections.Generic.IReadOnlyList{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">
+  EnqueueBatchAsync(EnqueueOptions, IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>按同一组选项入队一批消息（Seq 存在时按批内序号递增，保证幂等键不重复）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;EnqueueResult&gt;&gt; EnqueueBatchAsync(EnqueueOptions opt, IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt; payloads, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>opt</code> <a class="xref" href="TC.Tier.Products.Queue.EnqueueOptions.html">EnqueueOptions</a></dt>
+    <dd><p>批量入队选项。</p>
+</dd>
+    <dt><code>payloads</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>消息字节列表。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.EnqueueResult.html">EnqueueResult</a>&gt;&gt;</dt>
+    <dd><p>各消息的分配地址（与入参一一对应）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_FlushAcknowledgementsAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.FlushAcknowledgementsAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_FlushAcknowledgementsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.FlushAcknowledgementsAsync(System.Threading.CancellationToken)">
+  FlushAcknowledgementsAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>持久化 &quot;$default&quot; 组的全部缓冲确认。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask FlushAcknowledgementsAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_FlushAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.FlushAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_FlushAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.FlushAsync(System.Threading.CancellationToken)">
+  FlushAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>显式落盘到当前尾（组提交攒批后的同步点）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask FlushAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_GetGroupParticipant_" data-uid="TC.Tier.Products.Queue.ITierQueue.GetGroupParticipant*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_GetGroupParticipant_System_String_" data-uid="TC.Tier.Products.Queue.ITierQueue.GetGroupParticipant(System.String)">
+  GetGroupParticipant(string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 组状态域参与者（spec §6.3 档二——Session 域注册：
+SessionManager.Create(fs, name, (&quot;biz&quot;, 业务存储), (name, queue.GetGroupParticipant(g)))，
+AckInRoundAsync 的确认与业务效果同域 2PC 原子）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ITransactionParticipant GetGroupParticipant(string groupName)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>groupName</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></dt>
+    <dd><p>组状态 VersionedMetadata 参与者。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_GetStatsAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.GetStatsAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_GetStatsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.GetStatsAsync(System.Threading.CancellationToken)">
+  GetStatsAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>队列观测（各组滞后/在途/fence/积压水位——spec §8.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;QueueStats&gt; GetStatsAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.QueueStats.html">QueueStats</a>&gt;</dt>
+    <dd><p>队列统计快照。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_ListDelayedAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.ListDelayedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_ListDelayedAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.ListDelayedAsync(System.Threading.CancellationToken)">
+  ListDelayedAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>排队中延迟消息分页窥视（索引扫，不动 Ring）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;DelayedInfo&gt;&gt; ListDelayedAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.DelayedInfo.html">DelayedInfo</a>&gt;&gt;</dt>
+    <dd><p>延迟消息视图（dueTime 序）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_ListDelayedAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.ListDelayedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_ListDelayedAsync_TC_Tier_Products_Queue_DelayedQuery_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.ListDelayedAsync(TC.Tier.Products.Queue.DelayedQuery,System.Threading.CancellationToken)">
+  ListDelayedAsync(DelayedQuery, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>排队中延迟消息按 dueTime 区间和 Offset/Limit 分页窥视（索引扫，不动 Ring）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;DelayedInfo&gt;&gt; ListDelayedAsync(DelayedQuery query, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>query</code> <a class="xref" href="TC.Tier.Products.Queue.DelayedQuery.html">DelayedQuery</a></dt>
+    <dd><p>查询范围与分页参数。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.DelayedInfo.html">DelayedInfo</a>&gt;&gt;</dt>
+    <dd><p>延迟消息视图（dueTime 序）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_ListGroupsAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.ListGroupsAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_ListGroupsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.ListGroupsAsync(System.Threading.CancellationToken)">
+  ListGroupsAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已注册组名清单。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;string&gt;&gt; ListGroupsAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;&gt;</dt>
+    <dd><p>组名列表。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_ReplayAllAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.ReplayAllAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_ReplayAllAsync_TC_Tier_Products_Queue_ITierQueue_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.ReplayAllAsync(TC.Tier.Products.Queue.ITierQueue,System.Threading.CancellationToken)">
+  ReplayAllAsync(ITierQueue, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>回放全部死信到目标队列（批处理——读空为止），返回回放条数。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;int&gt; ReplayAllAsync(ITierQueue target, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html">ITierQueue</a></dt>
+    <dd><p>目标队列。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>回放条数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_ReplayAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.ReplayAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_ReplayAsync_TC_Tier_Contracts_Storage_LogicalAddress_TC_Tier_Products_Queue_ITierQueue_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.ReplayAsync(TC.Tier.Contracts.Storage.LogicalAddress,TC.Tier.Products.Queue.ITierQueue,System.Threading.CancellationToken)">
+  ReplayAsync(LogicalAddress, ITierQueue, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>回放单条死信：解 envelope → 原 payload 入目标队列 → DLQ 确认（spec §7.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;EnqueueResult&gt; ReplayAsync(LogicalAddress deadLetterAddress, ITierQueue target, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>deadLetterAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>死信地址（DLQ 投递面获得）。</p>
+</dd>
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Products.Queue.ITierQueue.html">ITierQueue</a></dt>
+    <dd><p>目标队列（通常是业务主队列）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Queue.EnqueueResult.html">EnqueueResult</a>&gt;</dt>
+    <dd><p>目标队列分配的地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_ResetGroupAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.ResetGroupAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_ResetGroupAsync_System_String_TC_Tier_Products_Queue_GroupStartAt_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.ResetGroupAsync(System.String,TC.Tier.Products.Queue.GroupStartAt,TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  ResetGroupAsync(string, GroupStartAt, LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复位组（fence 解除 + 位点按 startAt 重置 + 代次 +1）——EvictOldest 淘汰后的显式续命路。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ResetGroupAsync(string name, GroupStartAt startAt, LogicalAddress startAddress, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>组名。</p>
+</dd>
+    <dt><code>startAt</code> <a class="xref" href="TC.Tier.Products.Queue.GroupStartAt.html">GroupStartAt</a></dt>
+    <dd><p>复位起点形态。</p>
+</dd>
+    <dt><code>startAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>Address 形态起点。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_TruncateAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.TruncateAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_TruncateAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.TruncateAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  TruncateAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>截断前缀到 <code class="paramref">uptoExclusive</code>（开区间）——强制下界 = min(组 Cursor)：
+越界目标被夹取（不截未 ack 数据）。物理段回收失败不阻断逻辑截断。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;LogicalAddress&gt; TruncateAsync(LogicalAddress uptoExclusive, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>uptoExclusive</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>截断目标（夹取到下界）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>实际生效的截断头地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_ITierQueue_WaitForDurableAsync_" data-uid="TC.Tier.Products.Queue.ITierQueue.WaitForDurableAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_ITierQueue_WaitForDurableAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Queue.ITierQueue.WaitForDurableAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  WaitForDurableAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>等待/推进落盘水位覆盖指定地址（无效地址直接返回）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask WaitForDurableAsync(LogicalAddress address, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>address</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>需要覆盖的地址。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,916 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Struct NodeId | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Struct NodeId | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="节点身份——网络核心协议一等结构（spec-12 &#167;2：自定义结构，不借任何 BCL 类型当协议身份）。 ★ 组合 （16B 不透明字节串——布局唯一真源在彼处，本类型是身份   语义包装）：字节原序直拷、无端序解释，协议字节与运行时类型解耦。 ★ [BinaryLayout] 标注 = 线协议标准嵌套件（spec-12 &#167;10）——生成的 NodeIdCodec   委托 Opaque16Codec（小端直写承载字 = 字节原序直拷）；本类型内零 BinaryPrimitives、   零偏移字面量。 ★ 布局零语义：不塞集群号/代次/预留位——集群归属是握手字段，fencing/代次是 raft 任期   与证书的事；预留字段 = 想当然。 ★ 宽度 128-bit：集群身份第一性质 = 免协调不碰撞，128-bit 使其永不成议题   （身份每消息一次、从不每条目，字典基数 = 节点数）。 ★ Guid 只在边界：配置/数据库/第三方互操作的适配转换；线上与存储无 Guid 概念。 ★ 安全绑定文本 =  文本形式（mTLS 档 SAN   nid:&amp;lt;hex32&amp;gt; URI 条目；KeyPair 档 NodeId↔公钥钉扎绑定——spec-12 &#167;3.4）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.NodeId">
+
+
+
+  <h1 id="TC_Tier_Core_Net_NodeId" data-uid="TC.Tier.Core.Net.NodeId" class="text-break">
+Struct NodeId  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>节点身份——网络核心协议一等结构（spec-12 §2：自定义结构，不借任何 BCL 类型当协议身份）。</p>
+<p>★ 组合 <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a>（16B 不透明字节串——布局唯一真源在彼处，本类型是身份
+  语义包装）：字节原序直拷、无端序解释，协议字节与运行时类型解耦。</p>
+<p>★ [BinaryLayout] 标注 = 线协议标准嵌套件（spec-12 §10）——生成的 <code>NodeIdCodec</code>
+  委托 <code>Opaque16Codec</code>（小端直写承载字 = 字节原序直拷）；本类型内零 BinaryPrimitives、
+  零偏移字面量。</p>
+<p>★ 布局零语义：不塞集群号/代次/预留位——集群归属是握手字段，fencing/代次是 raft 任期
+  与证书的事；预留字段 = 想当然。</p>
+<p>★ 宽度 128-bit：集群身份第一性质 = 免协调不碰撞，128-bit 使其永不成议题
+  （身份每消息一次、从不每条目，字典基数 = 节点数）。</p>
+<p>★ Guid 只在边界：配置/数据库/第三方互操作的适配转换；线上与存储无 Guid 概念。</p>
+<p>★ 安全绑定文本 = <a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_ToString">ToString()</a> 文本形式（mTLS 档 SAN
+  <code>nid:&lt;hex32&gt;</code> URI 条目；KeyPair 档 NodeId↔公钥钉扎绑定——spec-12 §3.4）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[BinaryLayout(Features = BinaryLayoutFeatures.All)]
+public readonly struct NodeId : IEquatable&lt;NodeId&gt;, IComparable&lt;NodeId&gt;</code></pre>
+  </div>
+
+
+
+
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.icomparable-1">IComparable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NodeId__ctor_" data-uid="TC.Tier.Core.Net.NodeId.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId__ctor_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.NodeId.#ctor(System.ReadOnlySpan{System.Byte})">
+  NodeId(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从 16B 不透明字节构造（字节原序直拷——<a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_CopyTo_System_Span_System_Byte__">CopyTo(Span&lt;byte&gt;)</a> 逆变换）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId(ReadOnlySpan&lt;byte&gt; bytes)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>bytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>16 字节源——长度必须恰为 <a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_Size">Size</a>（多余由调用方切片）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p><code class="paramref">bytes</code> 长度 ≠ <a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_Size">Size</a>。</p>
+</dd>
+  </dl>
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_NodeId_Empty" data-uid="TC.Tier.Core.Net.NodeId.Empty">
+  Empty
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>未赋值哨兵（全零——非合法节点身份；与 <a href="https://learn.microsoft.com/dotnet/csharp/language-reference/keywords/default">default</a> 同一）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly NodeId Empty</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NodeId_Size_" data-uid="TC.Tier.Core.Net.NodeId.Size*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_Size" data-uid="TC.Tier.Core.Net.NodeId.Size">
+  Size
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>线编码字节数（= 布局 [StructLayout].Size 同源生成——布局变更此处跟随，零漂移）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int Size { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NodeId_CompareTo_" data-uid="TC.Tier.Core.Net.NodeId.CompareTo*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_CompareTo_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.CompareTo(TC.Tier.Core.Net.NodeId)">
+  CompareTo(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>字节字典序全序（§4.3 拨号归属&quot;较小 NodeId 方拨号&quot;的判定基础；NewSequential 的时间序性同源）。
+纯序关系，不赋予身份语义。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int CompareTo(NodeId other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>比较对象。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>负 = 本值较小；零 = 相等；正 = 本值较大。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_CopyTo_" data-uid="TC.Tier.Core.Net.NodeId.CopyTo*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_CopyTo_System_Span_System_Byte__" data-uid="TC.Tier.Core.Net.NodeId.CopyTo(System.Span{System.Byte})">
+  CopyTo(Span&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>原序写出 16B（字节原序直拷——与构造对称，无端序解释）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void CopyTo(Span&lt;byte&gt; destination)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲（长度 ≥ <a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_Size">Size</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p><code class="paramref">destination</code> 长度 &lt; <a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_Size">Size</a>。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_Equals_" data-uid="TC.Tier.Core.Net.NodeId.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_Equals_System_Object_" data-uid="TC.Tier.Core.Net.NodeId.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>值相等（装箱形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd><p>比较对象。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>同为 <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a> 且 16 字节完全一致。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_Equals_" data-uid="TC.Tier.Core.Net.NodeId.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_Equals_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.Equals(TC.Tier.Core.Net.NodeId)">
+  Equals(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>值相等（16B 全等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Equals(NodeId other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>比较对象。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>16 字节完全一致。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_GetHashCode_" data-uid="TC.Tier.Core.Net.NodeId.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_GetHashCode" data-uid="TC.Tier.Core.Net.NodeId.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>哈希（字典键语义）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>哈希值。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_NewRandom_" data-uid="TC.Tier.Core.Net.NodeId.NewRandom*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_NewRandom" data-uid="TC.Tier.Core.Net.NodeId.NewRandom">
+  NewRandom()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>缺省生成（128-bit 密码学随机——免协调不碰撞）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NodeId NewRandom()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新节点身份（全零概率 ~2^-128，视为不发生）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_NewSequential_" data-uid="TC.Tier.Core.Net.NodeId.NewSequential*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_NewSequential" data-uid="TC.Tier.Core.Net.NodeId.NewSequential">
+  NewSequential()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>时间有序生成（v7 式——同 16B 不透明布局）：前 6B = 48-bit 大端 Unix 毫秒时间戳
+（字节串字典序 = 时间序），后 10B 密码学随机（同毫秒内不碰撞）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NodeId NewSequential()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新节点身份。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_Parse_" data-uid="TC.Tier.Core.Net.NodeId.Parse*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_Parse_System_ReadOnlySpan_System_Char__" data-uid="TC.Tier.Core.Net.NodeId.Parse(System.ReadOnlySpan{System.Char})">
+  Parse(ReadOnlySpan&lt;char&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解析 hex32 文本形式（配置/诊断/SAN——大小写不敏感）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NodeId Parse(ReadOnlySpan&lt;char&gt; text)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>text</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>&gt;</dt>
+    <dd><p>恰 32 位十六进制字符（无连字符/前缀）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>对应节点身份。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.formatexception">FormatException</a></dt>
+    <dd><p>长度非 32 或含非十六进制字符。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_ToString_" data-uid="TC.Tier.Core.Net.NodeId.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_ToString" data-uid="TC.Tier.Core.Net.NodeId.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>文本形式（32 位小写十六进制，无连字符——日志/诊断/SAN 同源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>hex32 字符串。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_TryParse_" data-uid="TC.Tier.Core.Net.NodeId.TryParse*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_TryParse_System_ReadOnlySpan_System_Char__TC_Tier_Core_Net_NodeId__" data-uid="TC.Tier.Core.Net.NodeId.TryParse(System.ReadOnlySpan{System.Char},TC.Tier.Core.Net.NodeId@)">
+  TryParse(ReadOnlySpan&lt;char&gt;, out NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解析 hex32 文本形式（Try 形态——SAN/外部输入判定，失败不抛）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryParse(ReadOnlySpan&lt;char&gt; text, out NodeId nodeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>text</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.char">char</a>&gt;</dt>
+    <dd><p>文本（恰 32 位十六进制字符）。</p>
+</dd>
+    <dt><code>nodeId</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>解析产物。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>false = 长度/字符非法。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NodeId_op_Equality_" data-uid="TC.Tier.Core.Net.NodeId.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_op_Equality_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.op_Equality(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId)">
+  operator ==(NodeId, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>值相等。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(NodeId left, NodeId right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>左操作数。</p>
+</dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>右操作数。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>16 字节完全一致。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_op_GreaterThan_" data-uid="TC.Tier.Core.Net.NodeId.op_GreaterThan*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_op_GreaterThan_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.op_GreaterThan(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId)">
+  operator &gt;(NodeId, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>比较算子族（CA1036——IComparable 契约补全；字节字典序与 CompareTo 同源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator &gt;(NodeId left, NodeId right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_op_GreaterThanOrEqual_" data-uid="TC.Tier.Core.Net.NodeId.op_GreaterThanOrEqual*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_op_GreaterThanOrEqual_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.op_GreaterThanOrEqual(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId)">
+  operator &gt;=(NodeId, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>比较算子族（CA1036——IComparable 契约补全；字节字典序与 CompareTo 同源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator &gt;=(NodeId left, NodeId right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_op_Inequality_" data-uid="TC.Tier.Core.Net.NodeId.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_op_Inequality_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.op_Inequality(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId)">
+  operator !=(NodeId, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>值不等。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(NodeId left, NodeId right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>左操作数。</p>
+</dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>右操作数。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>存在字节差异。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_op_LessThan_" data-uid="TC.Tier.Core.Net.NodeId.op_LessThan*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_op_LessThan_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.op_LessThan(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId)">
+  operator &lt;(NodeId, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>比较算子族（CA1036——IComparable 契约补全；字节字典序与 CompareTo 同源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator &lt;(NodeId left, NodeId right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NodeId_op_LessThanOrEqual_" data-uid="TC.Tier.Core.Net.NodeId.op_LessThanOrEqual*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NodeId_op_LessThanOrEqual_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.NodeId.op_LessThanOrEqual(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId)">
+  operator &lt;=(NodeId, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>比较算子族（CA1036——IComparable 契约补全；字节字典序与 CompareTo 同源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator &lt;=(NodeId left, NodeId right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

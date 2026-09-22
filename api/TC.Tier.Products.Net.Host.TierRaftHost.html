@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierRaftHost | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierRaftHost | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierRaftHost——Multi-Raft 多组装配宿主（二期-C3 &#167;8，裁定②-4 双形态）： 一个  上 N 组，每组一套完整产品装配链 （TierWal → TierWalRaftStore → ApplyPipeline → RaftStateMachine + 可选 Swarm/SnapshotSwarm*， 经  组作用域视图挂载——引擎零组感知）。 ★ 传输所有权双形态（裁定②-4）：(a)  自建工厂——内部组装 ClusterTransport 并 owned（缺省便利形态）；(b) 外部传输构造器——装配层拥有（注入/多介质）。 两形态  属性均暴露（产品协议域 0x60+ 注册面，与组路由正交）。 ★ 成员对账（&#167;8.2）：周期取全体组配置成员并集 ↔ 物理对端表（IPeerRegistry）收敛—— 新成员 AddPeer、不再被任何组引用者 RemovePeer(closeLink)；组内成员集合始终以各组 ClusterConfig 为准（&#167;2.3 不变量⑤），物理表只是可达性超集。 ★ 生命周期（&#167;8.3）：Dispose = 对账循环停 → 各组（raft→apply→swarm→wal，分段有界） → 内部组宿主 → 传输（若 owned）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Net.Host.TierRaftHost">
+
+
+
+  <h1 id="TC_Tier_Products_Net_Host_TierRaftHost" data-uid="TC.Tier.Products.Net.Host.TierRaftHost" class="text-break">
+Class TierRaftHost  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Net.html">Net</a>.<a class="xref" href="TC.Tier.Products.Net.Host.html">Host</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierRaftHost——Multi-Raft 多组装配宿主（二期-C3 §8，裁定②-4 双形态）：
+一个 <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a> 上 N 组，每组一套完整产品装配链
+（TierWal → TierWalRaftStore → ApplyPipeline → RaftStateMachine + 可选 Swarm/SnapshotSwarm*，
+经 <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupChannel.html">RaftGroupChannel</a> 组作用域视图挂载——引擎零组感知）。</p>
+<p>★ 传输所有权双形态（裁定②-4）：(a) <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHost.html#TC_Tier_Products_Net_Host_TierRaftHost_Create_TC_Tier_Core_Net_NodeId_TC_Tier_Products_Net_Host_TierRaftHostOptions_">Create(NodeId, TierRaftHostOptions)</a> 自建工厂——内部组装
+ClusterTransport 并 owned（缺省便利形态）；(b) 外部传输构造器——装配层拥有（注入/多介质）。
+两形态 <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHost.html#TC_Tier_Products_Net_Host_TierRaftHost_Transport">Transport</a> 属性均暴露（产品协议域 0x60+ 注册面，与组路由正交）。</p>
+<p>★ 成员对账（§8.2）：周期取全体组配置成员并集 ↔ 物理对端表（IPeerRegistry）收敛——
+新成员 AddPeer、不再被任何组引用者 RemovePeer(closeLink)；组内成员集合始终以各组
+ClusterConfig 为准（§2.3 不变量⑤），物理表只是可达性超集。</p>
+<p>★ 生命周期（§8.3）：Dispose = 对账循环停 → 各组（raft→apply→swarm→wal，分段有界）
+→ 内部组宿主 → 传输（若 owned）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierRaftHost : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierRaftHost</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost__ctor_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.#ctor*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost__ctor_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Products_Net_Host_TierRaftHostOptions_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.#ctor(TC.Tier.Core.Net.Channels.IProtocolTransport,TC.Tier.Products.Net.Host.TierRaftHostOptions)">
+  TierRaftHost(IProtocolTransport, TierRaftHostOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>外部传输构造（装配层拥有——注入/多介质；Dispose 不释放传输）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierRaftHost(IProtocolTransport transport, TierRaftHostOptions? options = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd></dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHostOptions.html">TierRaftHostOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_Groups_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Groups*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_Groups" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Groups">
+  Groups
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已装配组集合（快照）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyCollection&lt;RaftGroupId&gt; Groups { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlycollection-1">IReadOnlyCollection</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_Self_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Self*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_Self" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Self">
+  Self
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Self { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_Topology_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Topology*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_Topology" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Topology">
+  Topology
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>拓扑感知面（二期-F1——位置标签/反亲和/故障域判定；null = 未供给）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TopologyMap? Topology { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TopologyMap.html">TopologyMap</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_Transport_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Transport*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_Transport" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Transport">
+  Transport
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>物理传输（装配层拥有/暴露——产品协议域 0x60+ 注册面，与组路由正交）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IProtocolTransport Transport { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_Create_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Create*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_Create_TC_Tier_Core_Net_NodeId_TC_Tier_Products_Net_Host_TierRaftHostOptions_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.Create(TC.Tier.Core.Net.NodeId,TC.Tier.Products.Net.Host.TierRaftHostOptions)">
+  Create(NodeId, TierRaftHostOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>自建工厂（裁定②-4 缺省便利形态）：内部组装 <a class="xref" href="TC.Tier.Core.Net.Transport.Tcp.ClusterTransport.html">ClusterTransport</a> 并 owned——
+Dispose 链尾收尾。需 <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHostOptions.html#TC_Tier_Products_Net_Host_TierRaftHostOptions_ListenEndPoint">ListenEndPoint</a> 监听（多组装配须可入站）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static TierRaftHost Create(NodeId self, TierRaftHostOptions options)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本端节点 ID（传输身份）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHostOptions.html">TierRaftHostOptions</a></dt>
+    <dd><p>宿主装配配置（<a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHostOptions.html#TC_Tier_Products_Net_Host_TierRaftHostOptions_ListenEndPoint">ListenEndPoint</a> 必填——缺失抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a>）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHost.html">TierRaftHost</a></dt>
+    <dd><p>传输已启动的多组宿主（组零装配——经 <a class="xref" href="TC.Tier.Products.Net.Host.TierRaftHost.html#TC_Tier_Products_Net_Host_TierRaftHost_CreateGroupAsync_TC_Tier_Core_Net_Raft_RaftGroupId_TC_Tier_Core_Net_Raft_ClusterConfig_TC_Tier_Core_Net_Raft_IStateMachine_TC_Tier_Products_Net_Node_TierRaftNodeOptions_TC_Tier_Core_IO_IFileSystem_System_Threading_CancellationToken_">CreateGroupAsync(RaftGroupId, ClusterConfig, IStateMachine, TierRaftNodeOptions?, IFileSystem?, CancellationToken)</a> 逐组建）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_CreateGroupAsync_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.CreateGroupAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_CreateGroupAsync_TC_Tier_Core_Net_Raft_RaftGroupId_TC_Tier_Core_Net_Raft_ClusterConfig_TC_Tier_Core_Net_Raft_IStateMachine_TC_Tier_Products_Net_Node_TierRaftNodeOptions_TC_Tier_Core_IO_IFileSystem_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.CreateGroupAsync(TC.Tier.Core.Net.Raft.RaftGroupId,TC.Tier.Core.Net.Raft.ClusterConfig,TC.Tier.Core.Net.Raft.IStateMachine,TC.Tier.Products.Net.Node.TierRaftNodeOptions,TC.Tier.Core.IO.IFileSystem,System.Threading.CancellationToken)">
+  CreateGroupAsync(RaftGroupId, ClusterConfig, IStateMachine, TierRaftNodeOptions?, IFileSystem?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>装配并启动一组（组 ID 已存在抛；宿主未启动 = 抛——先 StartAsync）。
+组存储命名空间：<code class="paramref">fs</code> 显式供给 ∥ options.GroupFileSystemFactory(id) 派生。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;ITierRaftGroup&gt; CreateGroupAsync(RaftGroupId id, ClusterConfig config, IStateMachine machine, TierRaftNodeOptions? nodeOptions = null, IFileSystem? fs = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID（已装配 = 抛）。</p>
+</dd>
+    <dt><code>config</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>组初始集群配置（组内成员集合的事实源）。</p>
+</dd>
+    <dt><code>machine</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html">IStateMachine</a></dt>
+    <dd><p>业务状态机（该组 apply 管道尾——日志即状态机）。</p>
+</dd>
+    <dt><code>nodeOptions</code> <a class="xref" href="TC.Tier.Products.Net.Node.TierRaftNodeOptions.html">TierRaftNodeOptions</a></dt>
+    <dd><p>节点装配配置（null = options.GroupDefaults）。</p>
+</dd>
+    <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>组存储命名空间根（null = options.GroupFileSystemFactory(id) 派生；两者皆无 = 抛）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（装配阶段生效）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Products.Net.Host.ITierRaftGroup.html">ITierRaftGroup</a>&gt;</dt>
+    <dd><p>已装配并启动的组句柄（TierRaftNode 就绪——复制/apply 运行中）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_DisposeAsync_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_DisposeAsync" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_GetGroup_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.GetGroup*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_GetGroup_TC_Tier_Core_Net_Raft_RaftGroupId_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.GetGroup(TC.Tier.Core.Net.Raft.RaftGroupId)">
+  GetGroup(RaftGroupId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取组（未装配 = KeyNotFound）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITierRaftGroup GetGroup(RaftGroupId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Host.ITierRaftGroup.html">ITierRaftGroup</a></dt>
+    <dd><p>组句柄（读面透传 TierRaftNode）；未装配抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keynotfoundexception">KeyNotFoundException</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_RemoveGroupAsync_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.RemoveGroupAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_RemoveGroupAsync_TC_Tier_Core_Net_Raft_RaftGroupId_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.RemoveGroupAsync(TC.Tier.Core.Net.Raft.RaftGroupId)">
+  RemoveGroupAsync(RaftGroupId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>移除组（注销路由 + 释放该组装配链；有界——不因单组滞留挂死 host）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask RemoveGroupAsync(RaftGroupId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>要移除的组 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>路由注销 + 组装配链释放（有界）后完成；组未装配 = 无操作立即完成。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_StartAsync_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_StartAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.StartAsync(System.Threading.CancellationToken)">
+  StartAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动：内部组宿主挂载三域（0x01/0x03/0x04 各一次）+ 对账循环起线。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StartAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（组宿主启动阶段生效）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>宿主就绪（组路由三域挂载 + 发现源/成员对账循环起线）后完成；重复启动抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Host_TierRaftHost_TryGetGroup_" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.TryGetGroup*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Host_TierRaftHost_TryGetGroup_TC_Tier_Core_Net_Raft_RaftGroupId_TC_Tier_Products_Net_Host_ITierRaftGroup__" data-uid="TC.Tier.Products.Net.Host.TierRaftHost.TryGetGroup(TC.Tier.Core.Net.Raft.RaftGroupId,TC.Tier.Products.Net.Host.ITierRaftGroup@)">
+  TryGetGroup(RaftGroupId, out ITierRaftGroup?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取组（Try 语义）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetGroup(RaftGroupId id, out ITierRaftGroup? group)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID。</p>
+</dd>
+    <dt><code>group</code> <a class="xref" href="TC.Tier.Products.Net.Host.ITierRaftGroup.html">ITierRaftGroup</a></dt>
+    <dd><p>输出：命中的组句柄；未命中 = null。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 已装配（<code class="paramref">group</code> 有效）；false = 未装配（group = null）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

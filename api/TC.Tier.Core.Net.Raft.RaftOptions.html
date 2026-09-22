@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RaftOptions | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RaftOptions | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="Raft 状态机参数（spec-01 &#167;8 参数化——契约① 数字推导；spec-02 &#167;6 心跳约束）。 ★ 选举超时 [150ms, 300ms] 是配置默认值（最终默认由 spec-09 压测稳定性裁决，非设计决策）；   心跳 ≤50ms（≪ T₀ 下界 150ms&#247;3——丢 1–2 个心跳不触发误选举）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.RaftOptions">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_RaftOptions" data-uid="TC.Tier.Core.Net.Raft.RaftOptions" class="text-break">
+Class RaftOptions  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Raft 状态机参数（spec-01 §8 参数化——契约① 数字推导；spec-02 §6 心跳约束）。</p>
+<p>★ 选举超时 [150ms, 300ms] 是配置默认值（最终默认由 spec-09 压测稳定性裁决，非设计决策）；
+  心跳 ≤50ms（≪ T₀ 下界 150ms÷3——丢 1–2 个心跳不触发误选举）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed record RaftOptions : IEquatable&lt;RaftOptions&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RaftOptions</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions__ctor_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions__ctor" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.#ctor">
+  RaftOptions()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_Clock_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Clock*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_Clock" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Clock">
+  Clock
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>时钟供给源（故障注入面 件一——时钟缝；缺省 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.system">System</a> 行为逐字节零变化）。</p>
+<pre><code>        &lt;p&gt;选举/心跳/复制计时走单调钟（&lt;code&gt;GetMsTimestamp&lt;/code&gt; 扩展——ms 域，与 TickCount64 同域）
+        ——换源不停走，墙钟跳变不误触发选举超时）；租约读窗按墙钟语义由注入测试显式快进/跳变驱动。&lt;/p&gt;
+        &lt;p&gt;★ 注入假钟时须让节拍注册表同钟：不传 registry 参数则状态机自动为本节点新建同钟注册表；
+        显式传入的 registry 须以同一 provider 构造（时钟域不一致 = deadline 判定错乱）。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeProvider Clock { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_Default_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Default*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_Default" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Default">
+  Default
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>默认配置（spec-01 §8 定案默认值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static RaftOptions Default { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_ElectionTimeoutMax_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ElectionTimeoutMax*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_ElectionTimeoutMax" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ElectionTimeoutMax">
+  ElectionTimeoutMax
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>选举超时上界（默认 300ms = 2T₀——每次触发后重掷）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan ElectionTimeoutMax { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_ElectionTimeoutMin_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ElectionTimeoutMin*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_ElectionTimeoutMin" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ElectionTimeoutMin">
+  ElectionTimeoutMin
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>选举超时下界 T₀（默认 150ms——契约① 窗口下界）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan ElectionTimeoutMin { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_EventQueueCapacity_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.EventQueueCapacity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_EventQueueCapacity" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.EventQueueCapacity">
+  EventQueueCapacity
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>入站事件队列容量（默认 4096——背压有界，spec-01 §6.2）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int EventQueueCapacity { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_HeartbeatInterval_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.HeartbeatInterval*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_HeartbeatInterval" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.HeartbeatInterval">
+  HeartbeatInterval
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Leader 心跳间隔（默认 50ms——spec-02 §6；必须 ≪ ElectionTimeoutMin）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan HeartbeatInterval { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_InFlightCapacity_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.InFlightCapacity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_InFlightCapacity" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.InFlightCapacity">
+  InFlightCapacity
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>In-flight 完成源窗口容量（池化完成源槽数——热路径零分配；打满自动回退 TCS 直通）。
+默认 4096。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int InFlightCapacity { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_LeaseClockDriftBound_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.LeaseClockDriftBound*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_LeaseClockDriftBound" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.LeaseClockDriftBound">
+  LeaseClockDriftBound
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>租约读时钟漂移上界（缺省 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan.zero">Zero</a> = 关）。</p>
+<pre><code>        &lt;p&gt;&gt; 0 时 &lt;xref href=&quot;TC.Tier.Core.Net.Raft.RaftStateMachine.ReadIndexAsync(System.Threading.CancellationToken)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 走租约快路径：leader 在
+        &quot;最近一次多数派确认（选举票/心跳应答）+ (选举窗下界 − 漂移界)&quot;窗口内的线性读零往返返回——
+        新 leader 最早也要整段选举窗后才会诞生，窗内本 leader 的 commitIndex 即线性读位点。
+        窗外自动回落心跳往返确认。时钟漂移纪律由运维承担（NTP）。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan LeaseClockDriftBound { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_Random_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Random*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_Random" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Random">
+  Random
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>随机源（选举超时重掷——测试注入固定种子保证确定性；null = Random.Shared）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Random? Random { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.random">Random</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_Replication_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Replication*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_Replication" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Replication">
+  Replication
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复制策略（条数/字节/时间三维度攒批；默认全零 = 立即推送）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ReplicationPolicy Replication { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationPolicy.html">ReplicationPolicy</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_ReplicationAck_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ReplicationAck*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_ReplicationAck" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ReplicationAck">
+  ReplicationAck
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>复制应答档（默认 <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationAck.html#TC_Tier_Core_Net_Raft_ReplicationAck_Majority">Majority</a>——现状不变）。</p>
+<pre><code>        &lt;p&gt;决定默认写入入口 &lt;xref href=&quot;TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateAsync(System.ReadOnlyMemory%7bSystem.Byte%7d%2cSystem.Threading.CancellationToken)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 的完成水位：
+        Majority = applied 水位（read-your-writes）；LeaderLocal = 本地持久化即返（Redis 类
+        异步一致部署形态——显式 per-call &lt;xref href=&quot;TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateLeaderLocalAsync(System.ReadOnlyMemory%7bSystem.Byte%7d%2cSystem.Threading.CancellationToken)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;
+        与 &lt;xref href=&quot;TC.Tier.Core.Net.Raft.RaftStateMachine.ReplicateCommittedAsync(System.ReadOnlyMemory%7bSystem.Byte%7d%2cSystem.Threading.CancellationToken)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt; 不受此配置影响）。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ReplicationAck ReplicationAck { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationAck.html">ReplicationAck</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_Equals_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_Equals_System_Object_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_Equals_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_Equals_TC_Tier_Core_Net_Raft_RaftOptions_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.Equals(TC.Tier.Core.Net.Raft.RaftOptions)">
+  Equals(RaftOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Equals(RaftOptions? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_GetHashCode_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_GetHashCode" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_ToString_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_ToString" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithClock_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithClock*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithClock_System_TimeProvider_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithClock(System.TimeProvider)">
+  WithClock(TimeProvider)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——时钟供给源（时钟缝注入：假钟快进/跳变/漂移的确定性测试；须与节拍注册表同钟）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithClock(TimeProvider clock)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clock</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd><p>时钟供给源（null 不合法——显式还原 System 用 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.system">System</a>）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithElectionTimeout_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithElectionTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithElectionTimeout_System_TimeSpan_System_TimeSpan_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithElectionTimeout(System.TimeSpan,System.TimeSpan)">
+  WithElectionTimeout(TimeSpan, TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——选举超时区间（测试加速用；须 min &lt; max）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithElectionTimeout(TimeSpan min, TimeSpan max)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>min</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>选举超时下界 T₀（须 &lt; <code class="paramref">max</code>）。</p>
+</dd>
+    <dt><code>max</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>选举超时上界（须 &gt; <code class="paramref">min</code>）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithHeartbeatInterval_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithHeartbeatInterval*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithHeartbeatInterval_System_TimeSpan_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithHeartbeatInterval(System.TimeSpan)">
+  WithHeartbeatInterval(TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——心跳间隔。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithHeartbeatInterval(TimeSpan interval)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>interval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>心跳间隔（必须 ≪ ElectionTimeoutMin——丢 1–2 个心跳不触发误选举）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithLeaseReads_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithLeaseReads*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithLeaseReads_System_TimeSpan_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithLeaseReads(System.TimeSpan)">
+  WithLeaseReads(TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——开启租约读（clockDriftBound 须 ∈ (0, ElectionTimeoutMin)——
+漂移界 ≥ 选举窗则租约窗非正，永不生效）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithLeaseReads(TimeSpan clockDriftBound)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clockDriftBound</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>集群时钟漂移上界（运维保证——NTP 纪律）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p><code class="paramref">clockDriftBound</code> 非正或 ≥ <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html#TC_Tier_Core_Net_Raft_RaftOptions_ElectionTimeoutMin">ElectionTimeoutMin</a>。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithRandom_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithRandom*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithRandom_System_Random_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithRandom(System.Random)">
+  WithRandom(Random)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——随机源（固定种子测试确定性）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithRandom(Random random)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>random</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.random">Random</a></dt>
+    <dd><p>随机源（选举超时重掷——null = Random.Shared）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithReplication_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithReplication*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithReplication_TC_Tier_Core_Net_Raft_ReplicationPolicy_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithReplication(TC.Tier.Core.Net.Raft.ReplicationPolicy)">
+  WithReplication(ReplicationPolicy)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——复制策略。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithReplication(ReplicationPolicy policy)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationPolicy.html">ReplicationPolicy</a></dt>
+    <dd><p>复制策略（条数/字节/时间三维度攒批；全零 = 立即推送）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_WithReplicationAck_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithReplicationAck*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_WithReplicationAck_TC_Tier_Core_Net_Raft_ReplicationAck_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.WithReplicationAck(TC.Tier.Core.Net.Raft.ReplicationAck)">
+  WithReplicationAck(ReplicationAck)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——复制应答档（缺省档切换：LeaderLocal = 默认入口本地持久化即返）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftOptions WithReplicationAck(ReplicationAck ack)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ack</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationAck.html">ReplicationAck</a></dt>
+    <dd><p>复制应答档（Majority = applied；LeaderLocal = 本地持久化即返）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd><p>新的 RaftOptions 实例（副本语义）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_op_Equality_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_op_Equality_TC_Tier_Core_Net_Raft_RaftOptions_TC_Tier_Core_Net_Raft_RaftOptions_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.op_Equality(TC.Tier.Core.Net.Raft.RaftOptions,TC.Tier.Core.Net.Raft.RaftOptions)">
+  operator ==(RaftOptions?, RaftOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(RaftOptions? left, RaftOptions? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftOptions_op_Inequality_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftOptions_op_Inequality_TC_Tier_Core_Net_Raft_RaftOptions_TC_Tier_Core_Net_Raft_RaftOptions_" data-uid="TC.Tier.Core.Net.Raft.RaftOptions.op_Inequality(TC.Tier.Core.Net.Raft.RaftOptions,TC.Tier.Core.Net.Raft.RaftOptions)">
+  operator !=(RaftOptions?, RaftOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(RaftOptions? left, RaftOptions? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftOptions.html">RaftOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

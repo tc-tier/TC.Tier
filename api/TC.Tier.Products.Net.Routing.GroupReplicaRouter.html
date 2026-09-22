@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class GroupReplicaRouter | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class GroupReplicaRouter | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="GroupReplicaRouter——复制档通用组路由面（一个物理传输 &#215; 一个协议域一实例）： 传输绑定 + 组分发 + 提案转发 + 状态封套四件事的公共单点，产品零重复。 ★ 一个物理传输一个路由器（同进程多组共享—— 惰性挂载）， 入站请求按组 ID 分发到对应 ；出站 =  （把命令送达目标节点的提案面——目标非 leader 时回 NotLeaderHint，调用方重路由）。 ★ 线格式（请求回调形态——CorrId 由传输承载）：请求 [GroupId 8B][命令字节] → 应答 [Status 1B][体]：Ok=[HasAddr 1B][Addr 16B][Index 8B]；StaleEpoch/Rejected=[Len 4B][UTF8]； NotLeaderHint=[Leader 16B]。状态字节值即 ——域内线格式稳定锚。 ★ 组表 = 本地装配事实（ 由 Builder 装配完成时挂载）；入站未装配组 = 确定性  应答（组发现不归路由器——另一半在 gossip/静态配置）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter">
+
+
+
+  <h1 id="TC_Tier_Products_Net_Routing_GroupReplicaRouter" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter" class="text-break">
+Class GroupReplicaRouter  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Net.html">Net</a>.<a class="xref" href="TC.Tier.Products.Net.Routing.html">Routing</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>GroupReplicaRouter——复制档通用组路由面（一个物理传输 × 一个协议域一实例）：
+传输绑定 + 组分发 + 提案转发 + 状态封套四件事的公共单点，产品零重复。</p>
+<p>★ 一个物理传输一个路由器（同进程多组共享——<a class="xref" href="TC.Tier.Products.Net.Routing.GroupReplicaRouter.html#TC_Tier_Products_Net_Routing_GroupReplicaRouter_GetOrCreate_TC_Tier_Core_Net_Channels_IProtocolTransport_System_Byte_TC_Tier_Core_Logging_ILogger_">GetOrCreate(IProtocolTransport, byte, ILogger?)</a> 惰性挂载），
+入站请求按组 ID 分发到对应 <a class="xref" href="TC.Tier.Products.Net.Routing.IGroupProposalHandler.html">IGroupProposalHandler</a>；出站 = <a class="xref" href="TC.Tier.Products.Net.Routing.GroupReplicaRouter.html#TC_Tier_Products_Net_Routing_GroupReplicaRouter_ForwardAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_RaftGroupId_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ForwardAsync(NodeId, RaftGroupId, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>
+（把命令送达目标节点的提案面——目标非 leader 时回 NotLeaderHint，调用方重路由）。</p>
+<p>★ 线格式（请求回调形态——CorrId 由传输承载）：<code>请求 [GroupId 8B][命令字节]</code> →
+<code>应答 [Status 1B][体]</code>：Ok=[HasAddr 1B][Addr 16B][Index 8B]；StaleEpoch/Rejected=[Len 4B][UTF8]；
+NotLeaderHint=[Leader 16B]。状态字节值即 <a class="xref" href="TC.Tier.Products.Net.Routing.GroupApplyStatus.html">GroupApplyStatus</a>——域内线格式稳定锚。</p>
+<p>★ 组表 = 本地装配事实（<a class="xref" href="TC.Tier.Products.Net.Routing.GroupReplicaRouter.html#TC_Tier_Products_Net_Routing_GroupReplicaRouter_Register_TC_Tier_Core_Net_Raft_RaftGroupId_TC_Tier_Products_Net_Routing_IGroupProposalHandler_">Register(RaftGroupId, IGroupProposalHandler)</a> 由 Builder 装配完成时挂载）；入站未装配组 =
+确定性 <a class="xref" href="TC.Tier.Products.Net.Routing.GroupApplyStatus.html#TC_Tier_Products_Net_Routing_GroupApplyStatus_Rejected">Rejected</a> 应答（组发现不归路由器——另一半在 gossip/静态配置）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class GroupReplicaRouter : IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">GroupReplicaRouter</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_Dispose_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.Dispose*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_Dispose" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_ForwardAsync_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.ForwardAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_ForwardAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_RaftGroupId_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.ForwardAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.RaftGroupId,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  ForwardAsync(NodeId, RaftGroupId, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>转发命令到目标节点（提案面——目标本地提案后回终局结果）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;GroupApplyResult&gt; ForwardAsync(NodeId target, RaftGroupId groupId, ReadOnlyMemory&lt;byte&gt; command, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>groupId</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID。</p>
+</dd>
+    <dt><code>command</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>命令字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Net.Routing.GroupApplyResult.html">GroupApplyResult</a>&gt;</dt>
+    <dd><p>apply 结果（NotLeaderHint 不经本面返回——转抛 NotLeaderException，调用方重路由）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_GetOrCreate_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.GetOrCreate*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_GetOrCreate_TC_Tier_Core_Net_Channels_IProtocolTransport_System_Byte_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.GetOrCreate(TC.Tier.Core.Net.Channels.IProtocolTransport,System.Byte,TC.Tier.Core.Logging.ILogger)">
+  GetOrCreate(IProtocolTransport, byte, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取/建传输绑定的路由器（幂等——同传输同协议域返回同一实例；handler 首次挂载）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static GroupReplicaRouter GetOrCreate(IProtocolTransport transport, byte protocolId, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>物理传输（产品协议域注册面）。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>产品协议域号（域号分配表见 Products.Net/COORDINATION.md）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Net.Routing.GroupReplicaRouter.html">GroupReplicaRouter</a></dt>
+    <dd><p>路由器实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_Register_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.Register*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_Register_TC_Tier_Core_Net_Raft_RaftGroupId_TC_Tier_Products_Net_Routing_IGroupProposalHandler_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.Register(TC.Tier.Core.Net.Raft.RaftGroupId,TC.Tier.Products.Net.Routing.IGroupProposalHandler)">
+  Register(RaftGroupId, IGroupProposalHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注册组提案受理面（Builder 装配完成时——入站按组分发）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Register(RaftGroupId groupId, IGroupProposalHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>groupId</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Products.Net.Routing.IGroupProposalHandler.html">IGroupProposalHandler</a></dt>
+    <dd><p>提案受理面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_Unregister_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.Unregister*"></a>
+
+  <h3 id="TC_Tier_Products_Net_Routing_GroupReplicaRouter_Unregister_TC_Tier_Core_Net_Raft_RaftGroupId_" data-uid="TC.Tier.Products.Net.Routing.GroupReplicaRouter.Unregister(TC.Tier.Core.Net.Raft.RaftGroupId)">
+  Unregister(RaftGroupId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注销组（副本释放时）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Unregister(RaftGroupId groupId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>groupId</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>组 ID。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IValueFormatter&lt;TValue&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IValueFormatter&lt;TValue&gt; | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="值格式化契约（tierkv-design.md——TValue 无约束 + 注入格式化接口；formatter = 纯转 byte）。 ★ 结构层存储恒为字节（Ring 结构化记录 + 变长本体 + 自动溢出，append-only）——   formatter 是 TValue 与字节序列的唯一翻译层；byte/byte[]/ROM&amp;lt;byte&amp;gt;/unmanaged 内建零实现   （[KvStore] 生成器自动发射，D6/D7 裁定），其余 TValue 由用户实现或 builder 显式注入。 ★ 契约： 与  对同一 value 必须一致   （GetSize(v) == Format 写入字节数）； 是 Format 的严格逆（逐字节可逆）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Kv.IValueFormatter`1">
+
+
+
+  <h1 id="TC_Tier_Products_Kv_IValueFormatter_1" data-uid="TC.Tier.Products.Kv.IValueFormatter`1" class="text-break">
+Interface IValueFormatter&lt;TValue&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Kv.html">Kv</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>值格式化契约（tierkv-design.md——TValue 无约束 + 注入格式化接口；formatter = <b>纯转 byte</b>）。</p>
+<p>★ 结构层存储恒为字节（Ring 结构化记录 + 变长本体 + 自动溢出，append-only）——
+  formatter 是 TValue 与字节序列的唯一翻译层；byte/byte[]/ROM&lt;byte&gt;/unmanaged 内建零实现
+  （[KvStore] 生成器自动发射，D6/D7 裁定），其余 TValue 由用户实现或 builder 显式注入。</p>
+<p>★ 契约：<a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html#TC_Tier_Products_Kv_IValueFormatter_1_GetSize__0_">GetSize(TValue)</a> 与 <a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html#TC_Tier_Products_Kv_IValueFormatter_1_Format__0_System_Span_System_Byte__">Format(TValue, Span&lt;byte&gt;)</a> 对同一 value 必须一致
+  （GetSize(v) == Format 写入字节数）；<a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html#TC_Tier_Products_Kv_IValueFormatter_1_Parse_System_ReadOnlySpan_System_Byte__">Parse(ReadOnlySpan&lt;byte&gt;)</a> 是 Format 的严格逆（逐字节可逆）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IValueFormatter&lt;TValue&gt;</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TValue</code></dt>
+    <dd><p>值类型（无约束——格式化能力由本契约承载）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Kv_IValueFormatter_1_Format_" data-uid="TC.Tier.Products.Kv.IValueFormatter`1.Format*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IValueFormatter_1_Format__0_System_Span_System_Byte__" data-uid="TC.Tier.Products.Kv.IValueFormatter`1.Format(`0,System.Span{System.Byte})">
+  Format(TValue, Span&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>把 value 写入 destination（长度 = <a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html#TC_Tier_Products_Kv_IValueFormatter_1_GetSize__0_">GetSize(TValue)</a> 的返回值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void Format(TValue value, Span&lt;byte&gt; destination)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>待序列化的值。</p>
+</dd>
+    <dt><code>destination</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>写入目标缓冲区，长度不小于 <a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html#TC_Tier_Products_Kv_IValueFormatter_1_GetSize__0_">GetSize(TValue)</a> 返回值。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IValueFormatter_1_GetSize_" data-uid="TC.Tier.Products.Kv.IValueFormatter`1.GetSize*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IValueFormatter_1_GetSize__0_" data-uid="TC.Tier.Products.Kv.IValueFormatter`1.GetSize(`0)">
+  GetSize(TValue)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>value 序列化后的字节数（写入 Ring 前定长申请——变长值按实例返回）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int GetSize(TValue value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>待测量序列化字节数的值。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>value 序列化后的字节数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IValueFormatter_1_Parse_" data-uid="TC.Tier.Products.Kv.IValueFormatter`1.Parse*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IValueFormatter_1_Parse_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Products.Kv.IValueFormatter`1.Parse(System.ReadOnlySpan{System.Byte})">
+  Parse(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从 source 读回 value（严格逆操作）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">TValue Parse(ReadOnlySpan&lt;byte&gt; source)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>待反序列化的字节序列。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><span class="xref">TValue</span></dt>
+    <dd><p>从 source 反序列化得到的值。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

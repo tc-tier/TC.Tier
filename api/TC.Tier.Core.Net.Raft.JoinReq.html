@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class JoinReq | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class JoinReq | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="加入集群请求（Standby 引导——新节点向 leader 递；leader 按申请档入组： 缺省 learner（ 追平后晋级）∥  witness 档 （投票不存数据，永不晋级））。bootstrap 端点非 leader = 应答携带其已知 leader 提示（Accepted=false——调用方轮转重试）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.JoinReq">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_JoinReq" data-uid="TC.Tier.Core.Net.Raft.JoinReq" class="text-break">
+Class JoinReq  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>加入集群请求（Standby 引导——新节点向 leader 递；leader 按申请档入组：
+缺省 learner（<a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html#TC_Tier_Core_Net_Raft_JoinReq_AutoPromote">AutoPromote</a> 追平后晋级）∥ <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html#TC_Tier_Core_Net_Raft_JoinReq_AsWitness">AsWitness</a> witness 档
+（投票不存数据，永不晋级））。bootstrap 端点非 leader = 应答携带其已知 leader
+提示（Accepted=false——调用方轮转重试）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[WireMessageTag(9)]
+public sealed record JoinReq : RaftRpc, IEquatable&lt;RaftRpc&gt;, IEquatable&lt;JoinReq&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></div>
+      <div><span class="xref">JoinReq</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a>&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_WireFormatVersion">RaftRpc.WireFormatVersion</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesPerAppend">RaftRpc.MaxEntriesPerAppend</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesRegionBytes">RaftRpc.MaxEntriesRegionBytes</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxSnapshotBlocks">RaftRpc.MaxSnapshotBlocks</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxSnapshotHolders">RaftRpc.MaxSnapshotHolders</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_Term">RaftRpc.Term</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq__ctor_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq__ctor" data-uid="TC.Tier.Core.Net.Raft.JoinReq.#ctor">
+  JoinReq()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public JoinReq()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_AsWitness_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.AsWitness*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_AsWitness" data-uid="TC.Tier.Core.Net.Raft.JoinReq.AsWitness">
+  AsWitness
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>witness 档（三期-F2 装配面）：受理即以 witness 入组——投票计多数派、
+不存日志体（断言流推进）、永不晋级。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool AsWitness { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_AutoPromote_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.AutoPromote*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_AutoPromote" data-uid="TC.Tier.Core.Net.Raft.JoinReq.AutoPromote">
+  AutoPromote
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>追平后自动晋级 voter（false = 保持 learner——观察副本形态；
+<a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html#TC_Tier_Core_Net_Raft_JoinReq_AsWitness">AsWitness</a> = true 时忽略——witness 永不晋级）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required bool AutoPromote { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_CandidateId_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.CandidateId*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_CandidateId" data-uid="TC.Tier.Core.Net.Raft.JoinReq.CandidateId">
+  CandidateId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>申请加入的节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required NodeId CandidateId { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_EndPointBytes_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.EndPointBytes*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_EndPointBytes" data-uid="TC.Tier.Core.Net.Raft.JoinReq.EndPointBytes">
+  EndPointBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加入方监听地址（host:port 的 UTF-8——leader 据此注册拨号表回连复制；
+进程内/已互联传输形态 = 空）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[WireMember(MaxCount = 64)]
+public ReadOnlyMemory&lt;byte&gt; EndPointBytes { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_EqualityContract_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.EqualityContract*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_EqualityContract" data-uid="TC.Tier.Core.Net.Raft.JoinReq.EqualityContract">
+  EqualityContract
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Type EqualityContract { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_Equals_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_Equals_System_Object_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_Equals_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_Equals_TC_Tier_Core_Net_Raft_JoinReq_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.Equals(TC.Tier.Core.Net.Raft.JoinReq)">
+  Equals(JoinReq?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Equals(JoinReq? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_Equals_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_Equals_TC_Tier_Core_Net_Raft_RaftRpc_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.Equals(TC.Tier.Core.Net.Raft.RaftRpc)">
+  Equals(RaftRpc?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override sealed bool Equals(RaftRpc? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_GetHashCode_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_GetHashCode" data-uid="TC.Tier.Core.Net.Raft.JoinReq.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_PrintMembers_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.PrintMembers*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_PrintMembers_System_Text_StringBuilder_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.PrintMembers(System.Text.StringBuilder)">
+  PrintMembers(StringBuilder)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override bool PrintMembers(StringBuilder builder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_ToString_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_ToString" data-uid="TC.Tier.Core.Net.Raft.JoinReq.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_op_Equality_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_op_Equality_TC_Tier_Core_Net_Raft_JoinReq_TC_Tier_Core_Net_Raft_JoinReq_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.op_Equality(TC.Tier.Core.Net.Raft.JoinReq,TC.Tier.Core.Net.Raft.JoinReq)">
+  operator ==(JoinReq?, JoinReq?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(JoinReq? left, JoinReq? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_JoinReq_op_Inequality_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_JoinReq_op_Inequality_TC_Tier_Core_Net_Raft_JoinReq_TC_Tier_Core_Net_Raft_JoinReq_" data-uid="TC.Tier.Core.Net.Raft.JoinReq.op_Inequality(TC.Tier.Core.Net.Raft.JoinReq,TC.Tier.Core.Net.Raft.JoinReq)">
+  operator !=(JoinReq?, JoinReq?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(JoinReq? left, JoinReq? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.JoinReq.html">JoinReq</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

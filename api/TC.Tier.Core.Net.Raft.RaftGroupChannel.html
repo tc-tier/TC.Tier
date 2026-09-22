@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RaftGroupChannel | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RaftGroupChannel | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="组作用域传输视图（二期-C1 &#167;4.3——每组一枚，引擎经其挂载三域而零组感知）： 出站加前缀：请求回调（0x01/0x03）物理发送 [GroupId][inner]，返回剥前缀并校验本组   （不符 = 畸形应答——跨组串包防御）；流式（0x04）open payload = [GroupId][调用方载荷]。入站面：核心注册口写入宿主组绑定表（三域各自至多一个——重复抛）；公开注册口/数据报面   一律抛（Raft 家族零数据报——已验证；产品协议域注册在物理传输上）。Self/PeerConnected/PeerGone/Faults 委托共享传输；Start/DisposeAsync no-op（生命周期归   装配层/宿主——&#167;2.3 不变量④）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_RaftGroupChannel" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel" class="text-break">
+Class RaftGroupChannel  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>组作用域传输视图（二期-C1 §4.3——每组一枚，引擎经其挂载三域而<strong>零组感知</strong>）：</p>
+<ul><li>出站加前缀：请求回调（0x01/0x03）物理发送 <code>[GroupId][inner]</code>，返回剥前缀并校验本组
+  （不符 = 畸形应答——跨组串包防御）；流式（0x04）open payload = <code>[GroupId][调用方载荷]</code>。</li><li>入站面：核心注册口写入宿主组绑定表（三域各自至多一个——重复抛）；公开注册口/数据报面
+  一律抛（Raft 家族零数据报——已验证；产品协议域注册在物理传输上）。</li><li>Self/PeerConnected/PeerGone/Faults 委托共享传输；Start/DisposeAsync no-op（生命周期归
+  装配层/宿主——§2.3 不变量④）。</li></ul>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class RaftGroupChannel : IProtocolTransport, IProtocol, ITransport, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RaftGroupChannel</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html">IProtocol</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.ITransport.html">ITransport</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Net.Channels.RequestBatchClient.html#TC_Tier_Core_Net_Channels_RequestBatchClient_SendBatchAsync_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_NodeId_System_Byte_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Nullable_System_TimeSpan__System_Threading_CancellationToken_">RequestBatchClient.SendBatchAsync(IProtocolTransport, NodeId, byte, IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, TimeSpan?, CancellationToken)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Faults_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Faults*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Faults" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Faults">
+  Faults
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>故障注入（常设面——延迟/分区/丢包/乱序，任一介质等价复跑）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITransportFaultInjector Faults { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.ITransportFaultInjector.html">ITransportFaultInjector</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_GroupId_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.GroupId*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_GroupId" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.GroupId">
+  GroupId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public RaftGroupId GroupId { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Self_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Self*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Self" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Self">
+  Self
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Self { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Transport_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Transport*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Transport" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Transport">
+  Transport
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>宿主挂载的物理传输（装配面透传——产品域注册仍走物理传输）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IProtocolTransport Transport { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_DisposeAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_DisposeAsync" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_OpenStreamAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.OpenStreamAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.OpenStreamAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开流式会话（spec-12 §5.3——可靠有序 + 背压；GB 级 O(单帧) 不驻留）。</p>
+<p>★ 目标未连/对端不接受 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>；等待超时 = <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>；
+  会话不跨重连恢复（链路断 = Reset，上层重开）。</p>
+<p>★ openPayload（二期-C1）：随 StreamOpen 帧承载的发起方载荷（不透明字节，协议域自解释——
+  如组路由的 [GroupId 8B] 前缀）；接受侧经 <a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html#TC_Tier_Core_Net_Channels_IWireStream_OpenPayload">OpenPayload</a> 与 acceptor
+  回调取得。空 = 无载荷（既有形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;IWireStream&gt; OpenStreamAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; openPayload = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>openPayload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>开流载荷（不透明字节——协议域自解释）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html">IWireStream</a>&gt;</dt>
+    <dd><p>会话。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterCoreProtocol_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterCoreProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterCoreProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterCoreProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterCoreProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·内部口（数据报 handler——只放行内部核心区 0x00-0x4F）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>发送承载声明（内存介质恒承载——声明语义在进程内退化为直派）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterCoreRequestHandler_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterCoreRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterCoreRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterCoreRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterCoreRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·内部口（只放行内部核心区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterCoreStreamAcceptor_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterCoreStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterCoreStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterCoreStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterCoreStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册·内部口（只放行内部核心区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterProtocol_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·公开口（spec-12 §3.5 注册面分流）——只放行注册区 0x60-0xAF
+（<a class="xref" href="TC.Tier.Core.Net.Wire.ProtocolIds.html#TC_Tier_Core_Net_Wire_ProtocolIds_IsUserRegistrable_System_Byte_">IsUserRegistrable(byte)</a>）；同 ID 重复注册抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>发送承载声明（默认 TCP 帧流；内存介质恒承载——尽力语义不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterRequestHandler_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·公开口（spec-12 §5.2——只放行注册区 0x60-0xAF，同 §3.5 分流）；
+同 ID 重复注册抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterStreamAcceptor_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_RegisterStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.RegisterStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册·公开口（spec-12 §5.3——注册区 0x60-0xAF，同 §3.5 分流）。
+未注册 acceptor 的协议域 = 拒绝开流（发起端 <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html#TC_Tier_Core_Net_Channels_IProtocol_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a> 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_SendDatagramAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.SendDatagramAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_SendDatagramAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.SendDatagramAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  SendDatagramAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>数据报发送（尽力送达——spec-12 §5.1）：对端未连/注入丢弃 = 静默丢弃；
+仅参数错误（超帧上限/取消）抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask SendDatagramAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>载荷（≤帧协议上限——大块走流式通道）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_SendRequestAsync_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.SendRequestAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_SendRequestAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_Net_Channels_RequestOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.SendRequestAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},TC.Tier.Core.Net.Channels.RequestOptions,System.Threading.CancellationToken)">
+  SendRequestAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, RequestOptions?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调发送（spec-12 §5.2——单请求 → 关联应答 → 超时；CorrId 传输生成）。</p>
+<p>★ 目标未连 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>（调用方有应答期待，不静默浪费超时窗）；
+  注入丢弃 = 超时；取消传播；应答到达返回载荷（空应答合法）。</p>
+<p>★ 投递语义缺省 at-most-once（单发 + 超时）；重传/确认 = 显式选择
+  （RetryPolicy——at-least-once）。</p>
+<p>★ ValueTask 单次消费契约（await 恰一次）；参数校验（未连接/载荷超限/已释放）
+  在调用点同步抛（非 async 直通形态——调用方 try/catch 即达）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;byte[]&gt; SendRequestAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, RequestOptions? options = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>请求载荷。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Channels.RequestOptions.html">RequestOptions</a></dt>
+    <dd><p>per-call 选项（null = 传输缺省）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt;</dt>
+    <dd><p>应答载荷。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Start_" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Start*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_Start" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.Start">
+  Start()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动（幂等——监听/拨号循环/注册即活，介质实现差异在此吸收）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Start()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_PeerConnected" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.PeerConnected">
+  PeerConnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端可达（TCP = 握手完成；InProcess = 节点注册）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerConnected</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_RaftGroupChannel_PeerGone" data-uid="TC.Tier.Core.Net.Raft.RaftGroupChannel.PeerGone">
+  PeerGone
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端离线（TCP = Established 链路断开；InProcess = 节点注销）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerGone</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

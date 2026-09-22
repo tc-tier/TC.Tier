@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SecureRecordCodec | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SecureRecordCodec | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="安全记录层（spec-12 &#167;3.4——KeyPair 档握手后的全帧保护）。 ★ 记录形态（TCP 流）：[长度 4B][计数器 8B][载荷]——载荷按粒度 = 密文+16B AEAD 标签   （：AES-256-GCM，全帧加密+认证）∥ 明文帧+32B HMAC   （：仅完整性——防冒充/伪造/篡改不加密）。解包后   的字节 = 标准帧（16B 帧头 + payload），下游帧解析零改动。 ★ 计数器 nonce（NIST SP 800-38D 形态）：12B = 4B 零填充 ‖ 8B 发送计数器——每方向   独立计数；接收侧严格递增校验（重放/乱序拒绝——TCP 有序流上计数器回退 = 篡改/重放）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Security_SecureRecordCodec" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec" class="text-break">
+Class SecureRecordCodec  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Security.html">Security</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>安全记录层（spec-12 §3.4——KeyPair 档握手后的全帧保护）。</p>
+<p>★ 记录形态（TCP 流）：[长度 4B][计数器 8B][载荷]——载荷按粒度 = 密文+16B AEAD 标签
+  （<a class="xref" href="TC.Tier.Core.Net.Security.FrameProtection.html#TC_Tier_Core_Net_Security_FrameProtection_Aead">Aead</a>：AES-256-GCM，全帧加密+认证）∥ 明文帧+32B HMAC
+  （<a class="xref" href="TC.Tier.Core.Net.Security.FrameProtection.html#TC_Tier_Core_Net_Security_FrameProtection_MacOnly">MacOnly</a>：仅完整性——防冒充/伪造/篡改不加密）。解包后
+  的字节 = 标准帧（16B 帧头 + payload），下游帧解析零改动。</p>
+<p>★ 计数器 nonce（NIST SP 800-38D 形态）：12B = 4B 零填充 ‖ 8B 发送计数器——每方向
+  独立计数；接收侧严格递增校验（重放/乱序拒绝——TCP 有序流上计数器回退 = 篡改/重放）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SecureRecordCodec : IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SecureRecordCodec</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureRecordCodec__ctor_" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec__ctor_TC_Tier_Core_Net_Security_SecureSession_" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.#ctor(TC.Tier.Core.Net.Security.SecureSession)">
+  SecureRecordCodec(SecureSession)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（会话密钥按方向取——<a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html">SecureSession</a> 产物；
+★独立持有密钥副本——session 先释放不影响已建立的记录层，本类 Dispose 自清）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SecureRecordCodec(SecureSession session)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>session</code> <a class="xref" href="TC.Tier.Core.Net.Security.SecureSession.html">SecureSession</a></dt>
+    <dd><p>握手产物（方向键已按角色对正）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_AeadTagSize" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.AeadTagSize">
+  AeadTagSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>AEAD 标签长度（GCM-128/256 同为 16B）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int AeadTagSize = 16</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_MacTagSize" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.MacTagSize">
+  MacTagSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>HMAC-SHA256 标签长度（MAC-only 粒度）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int MacTagSize = 32</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_RecordHeaderSize" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.RecordHeaderSize">
+  RecordHeaderSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>记录头长度（长度 4B + 计数器 8B）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int RecordHeaderSize = 12</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureRecordCodec_MaxRecordBytes_" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.MaxRecordBytes*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_MaxRecordBytes" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.MaxRecordBytes">
+  MaxRecordBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单条记录载荷上限（明文帧 ≤ 16MB 帧协议上限 + 密文开销——畸形防御界；
+尺寸从生成物/帧协议常量派生，禁手写布局值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int MaxRecordBytes { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureRecordCodec_Dispose_" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_Dispose" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>销毁密码件（独立持有的密钥副本一并清零）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureRecordCodec_Open_" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.Open*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_Open_System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.Open(System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte})">
+  Open(ReadOnlySpan&lt;byte&gt;, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解开一条记录（记录载荷 → 明文整帧）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] Open(ReadOnlySpan&lt;byte&gt; header, ReadOnlySpan&lt;byte&gt; payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>header</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>记录头（[长度 4B][计数器 8B]——长度域由调用方切流后传入校验）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>记录载荷（长度域声明的字节）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>明文整帧。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.security.cryptography.cryptographicexception">CryptographicException</a></dt>
+    <dd><p>认证失败 / 计数器回退（重放防御）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Security_SecureRecordCodec_Seal_" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.Seal*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_SecureRecordCodec_Seal_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.SecureRecordCodec.Seal(System.ReadOnlySpan{System.Byte})">
+  Seal(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>包装一帧（整帧字节 → 记录字节）。线程安全（发送计数器+密码件全程互斥——
+AesGcm/HMACSHA256 单实例非线程安全：OpenSSL 路径缓存共享 EVP_CIPHER_CTX，
+并发 Encrypt 竞态 → &quot;cipher operation failed&quot;；锁须覆盖取号→加密全程，保计数器与
+nonce/密文原子配对）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] Seal(ReadOnlySpan&lt;byte&gt; frame)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>frame</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>明文整帧（16B 帧头 + payload——<a class="xref" href="TC.Tier.Core.Net.Wire.FrameCodec.html">FrameCodec</a> 产物）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>记录（[长度 4B][计数器 8B][载荷]）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

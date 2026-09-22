@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class Membership | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class Membership | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="成员变更协调器（spec-04 &#167;2 定案——single-server 变更：一次一个节点，API 层串行化）。 加节点：提案配置条目 [C_old ∪ {new}]（旧多数派提交）→ apply 切换活动配置   → 新节点经快照/增量追赶（追赶期无投票权——配置驱动成员关系，spec-04 &#167;3）。移除节点：提案配置条目 [C_new]（移除）→ apply 切换 → 被移除 leader 自杀降级   （状态机 HandleConfigChanged——spec-04 &#167;4）。串行化（spec-08 &#167;7）：并发 Add/Remove 排队执行——一次一个变更（joint consensus   不做——论文原话 single-server&quot;更简单&quot;，spec-04 &#167;5 定案）。 ★ 配置切换 = apply 产物（日志即状态机）：提案返回 = committed 且 applied——返回时 活动配置已切换（经 ApplyPipeline 配置条目分流 → 状态机 ConfigChanged）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.Membership">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_Membership" data-uid="TC.Tier.Core.Net.Raft.Membership" class="text-break">
+Class Membership  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>成员变更协调器（spec-04 §2 定案——single-server 变更：一次一个节点，API 层串行化）。</p>
+<ul><li><b>加节点</b>：提案配置条目 [C_old ∪ {new}]（旧多数派提交）→ apply 切换活动配置
+  → 新节点经快照/增量追赶（追赶期无投票权——配置驱动成员关系，spec-04 §3）。</li><li><b>移除节点</b>：提案配置条目 [C_new]（移除）→ apply 切换 → 被移除 leader 自杀降级
+  （状态机 HandleConfigChanged——spec-04 §4）。</li><li><b>串行化</b>（spec-08 §7）：并发 Add/Remove 排队执行——一次一个变更（joint consensus
+  不做——论文原话 single-server"更简单"，spec-04 §5 定案）。</li></ul>
+<p>★ 配置切换 = apply 产物（日志即状态机）：提案返回 = committed 且 applied——返回时
+活动配置已切换（经 ApplyPipeline 配置条目分流 → 状态机 ConfigChanged）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class Membership : IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">Membership</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership__ctor_" data-uid="TC.Tier.Core.Net.Raft.Membership.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership__ctor_TC_Tier_Core_Net_Raft_RaftStateMachine_" data-uid="TC.Tier.Core.Net.Raft.Membership.#ctor(TC.Tier.Core.Net.Raft.RaftStateMachine)">
+  Membership(RaftStateMachine)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Membership(RaftStateMachine machine)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>machine</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html">RaftStateMachine</a></dt>
+    <dd><p>raft 状态机（提案经 leader；配置观测）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_AddLearnerAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddLearnerAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_AddLearnerAsync_TC_Tier_Core_Net_NodeId_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddLearnerAsync(TC.Tier.Core.Net.NodeId,System.String,System.Threading.CancellationToken)">
+  AddLearnerAsync(NodeId, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加 learner（观察副本/引导形态）：提案 [当前配置 ∪ {member(learner)}]——收日志复制可读，
+不投票不计多数派。已存在 = 幂等返回（无论现角色）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AddLearnerAsync(NodeId member, string endPoint = &quot;&quot;, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新 learner 节点 ID。</p>
+</dd>
+    <dt><code>endPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时配置条目已 committed 且 applied——活动配置已含新 learner。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_AddLearnersAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddLearnersAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_AddLearnersAsync_System_Collections_Generic_IEnumerable_System_ValueTuple_TC_Tier_Core_Net_NodeId_System_String___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddLearnersAsync(System.Collections.Generic.IEnumerable{System.ValueTuple{TC.Tier.Core.Net.NodeId,System.String}},System.Threading.CancellationToken)">
+  AddLearnersAsync(IEnumerable&lt;(NodeId Id, string EndPoint)&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>批量加 learner（#507c——机群批量引导：一条配置条目携多节点，N 节点入队 = O(1) 轮协议）。</p>
+<p>★ 安全性：learner 不投票不计多数派——批量加入不改变投票成员集，quorum 交集论证平凡成立
+  （<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html#TC_Tier_Core_Net_Raft_ClusterConfig_AddLearners_System_Collections_Generic_IEnumerable_System_ValueTuple_TC_Tier_Core_Net_NodeId_System_String___">AddLearners(IEnumerable&lt;(NodeId Id, string EndPoint)&gt;)</a> 头注释）。单条上限 200（wire Count 1B）——更大批次
+  在本 API 内自动分多条批量条目顺序提交（每条都是合法配置快照，串行化门保证无并发交错）。</p>
+<p>★ 幂等：已存在的成员跳过；全部已存在 = 零提案直接返回。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AddLearnersAsync(IEnumerable&lt;(NodeId Id, string EndPoint)&gt; learners, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>learners</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;(<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.nodeid,system.string-.id">Id</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.nodeid,system.string-.endpoint">EndPoint</a>)&gt;</dt>
+    <dd><p>批量 learner（ID + 端点；端点空串 = 进程内传输）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（提交中取消——已提交条目不回退，重调续走）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时批量条目已 committed 且 applied——活动配置已含全部新 learner。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_AddMemberAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddMemberAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_AddMemberAsync_TC_Tier_Core_Net_NodeId_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddMemberAsync(TC.Tier.Core.Net.NodeId,System.String,System.Threading.CancellationToken)">
+  AddMemberAsync(NodeId, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加成员（spec-04 §2 第一步）：提案 [当前配置 ∪ {member}]——旧多数派提交后 apply 生效。
+已存在 = 幂等返回。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AddMemberAsync(NodeId member, string endPoint = &quot;&quot;, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新成员节点 ID。</p>
+</dd>
+    <dt><code>endPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时配置条目已 committed 且 applied——活动配置已含新成员（voter）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_AddWitnessAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddWitnessAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_AddWitnessAsync_TC_Tier_Core_Net_NodeId_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.AddWitnessAsync(TC.Tier.Core.Net.NodeId,System.String,System.Threading.CancellationToken)">
+  AddWitnessAsync(NodeId, string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加 witness（见证者——投票计入选主/提交多数派，不存日志体不自荐、永不晋级；
+三期-F2 装配面便捷操作）：提案 [当前配置 ∪ {member(witness)}]。已存在 = 幂等返回。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AddWitnessAsync(NodeId member, string endPoint = &quot;&quot;, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新 witness 节点 ID。</p>
+</dd>
+    <dt><code>endPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时配置条目已 committed 且 applied——活动配置已含新 witness。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_ChangeMembersAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.ChangeMembersAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_ChangeMembersAsync_System_Collections_Generic_IEnumerable_System_ValueTuple_TC_Tier_Core_Net_NodeId_System_String___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.ChangeMembersAsync(System.Collections.Generic.IEnumerable{System.ValueTuple{TC.Tier.Core.Net.NodeId,System.String}},System.Threading.CancellationToken)">
+  ChangeMembersAsync(IEnumerable&lt;(NodeId Id, string EndPoint)&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>多成员原子变更（二期-F3——DDR-F3 编排式变更链，etcd 生产同款）：一次调用把成员集
+变更到 <code class="paramref">target</code>——先增后删的单步变更链（链上每个中间配置都是已提交
+的合法配置，安全性由单步变更保证、原子性由编排保证，论文 §6 认可备选）。</p>
+<p>★ 幂等可续：每步前重读活动配置（已达成目标形态的成员跳过）——中途失败/换届/
+重启后重调本 API 即从当时配置续走，最终收敛目标集。目标 = 当前 = 零提案。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task ChangeMembersAsync(IEnumerable&lt;(NodeId Id, string EndPoint)&gt; target, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;(<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.nodeid,system.string-.id">Id</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.nodeid,system.string-.endpoint">EndPoint</a>)&gt;</dt>
+    <dd><p>目标成员集（voter+witness 全集形态——learner 角色变更走 AddLearner/Promote）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（链中断——已提交步骤不回退，重调续走）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>变更链全部完成（先增后删的每一步均已 committed 且 applied——活动配置收敛为 target）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案——重路由后重调）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>变更链将移除最后一名成员（集群将无多数派）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_Dispose_" data-uid="TC.Tier.Core.Net.Raft.Membership.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_Dispose" data-uid="TC.Tier.Core.Net.Raft.Membership.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>释放资源（串行化信号量）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_PromoteAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.PromoteAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_PromoteAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.PromoteAsync(TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  PromoteAsync(NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>晋级 voter（learner → voter——引导流追平后转正）：提案角色切换，返回 = 已提交生效。
+缺席或已是 voter = 幂等返回。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task PromoteAsync(NodeId member, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>要晋级的节点 ID。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时角色切换条目已 committed 且 applied——该成员已转为 voter。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_Membership_RemoveMemberAsync_" data-uid="TC.Tier.Core.Net.Raft.Membership.RemoveMemberAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_Membership_RemoveMemberAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.Membership.RemoveMemberAsync(TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  RemoveMemberAsync(NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>移除成员（spec-04 §2 第二步）：提案 [当前配置 \ {member}]。被移除者是 leader 时其自杀降级
+（spec-04 §4）；不存在的成员 = 幂等返回；移除最后一名成员被拒。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task RemoveMemberAsync(NodeId member, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>member</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>要移除的节点 ID。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时配置条目已 committed 且 applied——活动配置已移除该成员。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.NotLeaderException.html">NotLeaderException</a></dt>
+    <dd><p>本节点非 Leader（无权提案）。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>试图移除最后一名成员（集群将无多数派）。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

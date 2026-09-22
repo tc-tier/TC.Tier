@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class FederationLink | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class FederationLink | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="联邦链路目标侧拉取循环（二期-F6——DDR-F6）：周期向源拉取增量、目标组引擎幂等重放 （——本地多数派确认，无跨集群特权）、 重放确认后推进去重水位（持久化——断链/重启从水位续传，不丢不重）。 ★ 重放范围：Command 条目 only（Config/Noop 是集群本地语义——成员/空操作不跨域）； Config 类条目照常推进水位（源集群已提交事实，仅不重放内容）。 ★ 断链续传：传输失败/批次缺失即停推（水位不动），下一 poll 从持久化水位续拉。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Federation.FederationLink">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Federation_FederationLink" data-uid="TC.Tier.Core.Net.Federation.FederationLink" class="text-break">
+Class FederationLink  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Federation.html">Federation</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>联邦链路目标侧拉取循环（二期-F6——DDR-F6）：周期向源拉取增量、目标组引擎幂等重放
+（<a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html#TC_Tier_Core_Net_Raft_RaftStateMachine_ReplicateAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ReplicateAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>——本地多数派确认，无跨集群特权）、
+重放确认后推进去重水位（持久化——断链/重启从水位续传，不丢不重）。</p>
+<p>★ 重放范围：Command 条目 only（Config/Noop 是集群本地语义——成员/空操作不跨域）；
+Config 类条目照常推进水位（源集群已提交事实，仅不重放内容）。</p>
+<p>★ 断链续传：传输失败/批次缺失即停推（水位不动），下一 poll 从持久化水位续拉。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class FederationLink : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">FederationLink</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationLink__ctor_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink__ctor_System_UInt32_TC_Tier_Core_Net_Raft_RaftGroupId_TC_Tier_Core_Net_Raft_RaftStateMachine_TC_Tier_Core_Net_Federation_IFederationWatermarkStore_System_Func_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_System_Threading_Tasks_ValueTask_System_ReadOnlyMemory_System_Byte____System_Nullable_System_TimeSpan__System_Int32_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.#ctor(System.UInt32,TC.Tier.Core.Net.Raft.RaftGroupId,TC.Tier.Core.Net.Raft.RaftStateMachine,TC.Tier.Core.Net.Federation.IFederationWatermarkStore,System.Func{System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken,System.Threading.Tasks.ValueTask{System.ReadOnlyMemory{System.Byte}}},System.Nullable{System.TimeSpan},System.Int32)">
+  FederationLink(uint, RaftGroupId, RaftStateMachine, IFederationWatermarkStore, Func&lt;ReadOnlyMemory&lt;byte&gt;, CancellationToken, ValueTask&lt;ReadOnlyMemory&lt;byte&gt;&gt;&gt;, TimeSpan?, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FederationLink(uint sourceClusterTag, RaftGroupId group, RaftStateMachine target, IFederationWatermarkStore watermarks, Func&lt;ReadOnlyMemory&lt;byte&gt;, CancellationToken, ValueTask&lt;ReadOnlyMemory&lt;byte&gt;&gt;&gt; pull, TimeSpan? pollInterval = null, int maxEntriesPerPoll = 256)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>sourceClusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>源集群标签（pull 声明——源侧据此核对，错配即拒链）。</p>
+</dd>
+    <dt><code>group</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>联邦承载的目标组。</p>
+</dd>
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html">RaftStateMachine</a></dt>
+    <dd><p>目标组引擎（重放面——本集群多数派确认）。</p>
+</dd>
+    <dt><code>watermarks</code> <a class="xref" href="TC.Tier.Core.Net.Federation.IFederationWatermarkStore.html">IFederationWatermarkStore</a></dt>
+    <dd><p>去重水位持久化面（键 = (源标签, 组)——消费域是源集群）。</p>
+</dd>
+    <dt><code>pull</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;&gt;</dt>
+    <dd><p>拉取委托：请求帧 → 应答帧（跨进程 = 传输 0x06 域请求回调；单进程 = 委托直连）。</p>
+</dd>
+    <dt><code>pollInterval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>拉取周期（缺省 200ms）。</p>
+</dd>
+    <dt><code>maxEntriesPerPoll</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>单次拉取条数上限（缺省 256——背压由周期天然形成）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink_LastPollResult" data-uid="TC.Tier.Core.Net.Federation.FederationLink.LastPollResult">
+  LastPollResult
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>链路观测：最近一次 poll 的（源水位, 本地已消费水位）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public (long SourceIndex, long ConsumedIndex) LastPollResult</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt>(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.sourceindex">SourceIndex</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64-.consumedindex">ConsumedIndex</a>)</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink_OnPollError" data-uid="TC.Tier.Core.Net.Federation.FederationLink.OnPollError">
+  OnPollError
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>poll 异常观测口（断链/换届瞬态——链路自愈语义不变，供调用方计数/告警）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Action&lt;Exception&gt;? OnPollError</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.exception">Exception</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationLink_Watermark_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.Watermark*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink_Watermark" data-uid="TC.Tier.Core.Net.Federation.FederationLink.Watermark">
+  Watermark
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本地已消费的源日志高水位（去重依据——0 = 尚未消费）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Watermark { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationLink_DisposeAsync_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink_DisposeAsync" data-uid="TC.Tier.Core.Net.Federation.FederationLink.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>收口拉取循环。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>定时器已停、在途 poll 排空（组取消 + drain——门随拍尾 finally 归位）后完成。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationLink_PollOnceAsync_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.PollOnceAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink_PollOnceAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.PollOnceAsync(System.Threading.CancellationToken)">
+  PollOnceAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单次拉取-重放（循环体；亦可手动驱动——测试/维护形态）：拉批次 → Command 条目
+逐条重放（committed 即确认）→ 推进持久化水位。拒链（Granted=0）= 静默跳过
+（错配是配置错误——重试无益也不致命，观测面由调用方读 LastPollResult）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask PollOnceAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（本拍传输等待阶段生效——取消即中断本拍，水位不动）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>本拍完成即完成；拉取/重放异常不外抛（经 <a class="xref" href="TC.Tier.Core.Net.Federation.FederationLink.html#TC_Tier_Core_Net_Federation_FederationLink_OnPollError">OnPollError</a> 观测——水位不动，下一拍自持久化水位续拉）；
+入口排队前 ct 已取消则上抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.operationcanceledexception">OperationCanceledException</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationLink_Start_" data-uid="TC.Tier.Core.Net.Federation.FederationLink.Start*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationLink_Start" data-uid="TC.Tier.Core.Net.Federation.FederationLink.Start">
+  Start()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动拉取循环。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Start()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

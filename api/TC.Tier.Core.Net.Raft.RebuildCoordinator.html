@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class RebuildCoordinator | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class RebuildCoordinator | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="冷启动重建协调器（spec-05 &#167;5 定案——日志即状态机：重建 = 重放）。 ★ 存储经  端口（spec-12 &#167;8.1）——★ 双源读（spec-03 &#167;7 快照区 重放归位）：跨界区间 [from..N₀] 经快照读面（快照 = 可导出的日志前缀镜像），(N₀..to] 经 主数据读面——applied &amp;lt; N₀ 的重启/快照安装场景由本协调器一次补齐，业务状态不依赖 快照面之外的镜像语义。 ★ 配置条目在重放中按序 apply（spec-04 &#167;6 配置恢复——配置与成员关系全部由 apply 管道产物决定， 无独立配置持久化面）；判别 = 条目结构字段 Kind（——wire v3 信封之死）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.RebuildCoordinator">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_RebuildCoordinator" data-uid="TC.Tier.Core.Net.Raft.RebuildCoordinator" class="text-break">
+Class RebuildCoordinator  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>冷启动重建协调器（spec-05 §5 定案——日志即状态机：重建 = 重放）。</p>
+<p>★ 存储经 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 端口（spec-12 §8.1）——★ 双源读（spec-03 §7 快照区
+重放归位）：跨界区间 [from..N₀] 经快照读面（快照 = 可导出的日志前缀镜像），(N₀..to] 经
+主数据读面——applied &lt; N₀ 的重启/快照安装场景由本协调器一次补齐，业务状态不依赖
+快照面之外的镜像语义。</p>
+<p>★ 配置条目在重放中按序 apply（spec-04 §6 配置恢复——配置与成员关系全部由 apply 管道产物决定，
+无独立配置持久化面）；判别 = 条目结构字段 Kind（<a class="xref" href="TC.Tier.Core.Net.Raft.RaftEntryKind.html">RaftEntryKind</a>——wire v3 信封之死）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class RebuildCoordinator</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">RebuildCoordinator</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_RebuildCoordinator_ApplyCommittedRangeAsync_" data-uid="TC.Tier.Core.Net.Raft.RebuildCoordinator.ApplyCommittedRangeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RebuildCoordinator_ApplyCommittedRangeAsync_TC_Tier_Core_Net_Raft_IRaftStore_TC_Tier_Core_Net_Raft_IStateMachine_System_Int64_System_Int64_System_Action_TC_Tier_Core_Net_Raft_ClusterConfig__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RebuildCoordinator.ApplyCommittedRangeAsync(TC.Tier.Core.Net.Raft.IRaftStore,TC.Tier.Core.Net.Raft.IStateMachine,System.Int64,System.Int64,System.Action{TC.Tier.Core.Net.Raft.ClusterConfig},System.Threading.CancellationToken)">
+  ApplyCommittedRangeAsync(IRaftStore, IStateMachine, long, long, Action&lt;ClusterConfig&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>应用已提交区间 [from..to]（双源读：≤ N₀ 经快照读面、&gt; N₀ 经主数据读面——一次调用读完整跨界区间）。</p>
+<p>调用方保证 from &gt; applied、to ≤ commit（单调推进区间——严格与日志序一致）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ValueTask&lt;long&gt; ApplyCommittedRangeAsync(IRaftStore store, IStateMachine machine, long from, long to, Action&lt;ClusterConfig&gt; onConfigChanged, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>store</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+    <dd><p>存储端口（双源读：快照读面 + 主数据读面）。</p>
+</dd>
+    <dt><code>machine</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html">IStateMachine</a></dt>
+    <dd><p>业务状态机（按序 ApplyAsync）。</p>
+</dd>
+    <dt><code>from</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>区间起始 index（须 &gt; applied）。</p>
+</dd>
+    <dt><code>to</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>区间终止 index（须 ≤ commit）。</p>
+</dd>
+    <dt><code>onConfigChanged</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a>&gt;</dt>
+    <dd><p>配置条目 apply 回调（→ 状态机/管道——spec-04）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>实际应用到的最后 index（区间为空 = from-1）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_RebuildCoordinator_RebuildAsync_" data-uid="TC.Tier.Core.Net.Raft.RebuildCoordinator.RebuildAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_RebuildCoordinator_RebuildAsync_TC_Tier_Core_Net_Raft_IRaftStore_TC_Tier_Core_Net_Raft_IStateMachine_System_Action_TC_Tier_Core_Net_Raft_ClusterConfig__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.RebuildCoordinator.RebuildAsync(TC.Tier.Core.Net.Raft.IRaftStore,TC.Tier.Core.Net.Raft.IStateMachine,System.Action{TC.Tier.Core.Net.Raft.ClusterConfig},System.Threading.CancellationToken)">
+  RebuildAsync(IRaftStore, IStateMachine, Action&lt;ClusterConfig&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>重建业务状态（幂等——重复调用重新重放，业务 at-least-once 契约容忍）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ValueTask&lt;long&gt; RebuildAsync(IRaftStore store, IStateMachine machine, Action&lt;ClusterConfig&gt; onConfigChanged, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>store</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+    <dd><p>存储端口（日志读取 + appliedIndex 落盘）。</p>
+</dd>
+    <dt><code>machine</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html">IStateMachine</a></dt>
+    <dd><p>业务状态机（ApplyAsync 重放）。</p>
+</dd>
+    <dt><code>onConfigChanged</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a>&gt;</dt>
+    <dd><p>配置条目 apply 回调（→ 状态机/管道——spec-04）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>重建后的 appliedIndex（此后 ApplyPipeline 从此 +1 接管）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

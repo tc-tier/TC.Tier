@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class GroupMoveOrchestrator | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class GroupMoveOrchestrator | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="组搬迁编排器（二期-F5——DDR-F5）：把某成员从组内迁出至目标节点的四步编排—— 目标入组 → 等追平 → leader 迁移（若在源）→ 源出组。 ★ 数据面归 Fs（裁定③——镜像/迁移通道归 Fs 既有能力）；本面只做时序调度 + 配置变更——日志复制追平是缺省搬迁形态，镜像通道由装配方在入组前预热（接口不变）。 ★ 恢复语义（F3 变更链同款）：每步都是已提交的合法配置态；任一步失败保留 中间态，重调幂等续走（已入组跳过、已迁 leader 跳过、已出组跳过）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_GroupMoveOrchestrator" data-uid="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator" class="text-break">
+Class GroupMoveOrchestrator  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>组搬迁编排器（二期-F5——DDR-F5）：把某成员从组内迁出至目标节点的四步编排——
+目标入组 → 等追平 → leader 迁移（若在源）→ 源出组。</p>
+<p>★ 数据面归 Fs（裁定③——镜像/迁移通道归 Fs 既有能力）；本面只做时序调度 +
+配置变更——日志复制追平是缺省搬迁形态，镜像通道由装配方在入组前预热（接口不变）。</p>
+<p>★ 恢复语义（F3 变更链同款）：每步都是已提交的合法配置态；任一步失败保留
+中间态，重调幂等续走（已入组跳过、已迁 leader 跳过、已出组跳过）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class GroupMoveOrchestrator</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">GroupMoveOrchestrator</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_GroupMoveOrchestrator__ctor_" data-uid="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_GroupMoveOrchestrator__ctor_TC_Tier_Core_Net_Raft_RaftStateMachine_TC_Tier_Core_Net_Raft_Membership_" data-uid="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator.#ctor(TC.Tier.Core.Net.Raft.RaftStateMachine,TC.Tier.Core.Net.Raft.Membership)">
+  GroupMoveOrchestrator(RaftStateMachine, Membership)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public GroupMoveOrchestrator(RaftStateMachine raft, Membership membership)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>raft</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftStateMachine.html">RaftStateMachine</a></dt>
+    <dd><p>组引擎（须为 leader 视角——搬迁编排由 leader 驱动）。</p>
+</dd>
+    <dt><code>membership</code> <a class="xref" href="TC.Tier.Core.Net.Raft.Membership.html">Membership</a></dt>
+    <dd><p>同组成员变更协调器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_GroupMoveOrchestrator_MoveAsync_" data-uid="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator.MoveAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_GroupMoveOrchestrator_MoveAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_NodeId_System_String_System_Func_System_Threading_CancellationToken_System_Threading_Tasks_ValueTask__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.GroupMoveOrchestrator.MoveAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.NodeId,System.String,System.Func{System.Threading.CancellationToken,System.Threading.Tasks.ValueTask},System.Threading.CancellationToken)">
+  MoveAsync(NodeId, NodeId, string, Func&lt;CancellationToken, ValueTask&gt;?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单次组搬迁：加入 <code class="paramref">joining</code>、移出 <code class="paramref">leaving</code>
+（先加后删——多数派不缩水）。编排由 leader 视角驱动。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask MoveAsync(NodeId joining, NodeId leaving, string joiningEndPoint = &quot;&quot;, Func&lt;CancellationToken, ValueTask&gt;? mirrorReady = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>joining</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点（入组）。</p>
+</dd>
+    <dt><code>leaving</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>源节点（出组——可为 leader 自身，引擎自杀降级语义承接）。</p>
+</dd>
+    <dt><code>joiningEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>入组端点（空串 = 进程内传输）。</p>
+</dd>
+    <dt><code>mirrorReady</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</dt>
+    <dd><p>数据面前置挂钩（Fs 镜像预热完成回调——缺省 = 日志复制追平形态）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>编排全部完成（每步均已提交的合法配置态——任一步失败保留中间态，重调幂等续走）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a></dt>
+    <dd><p>等追平超时（30s 内 matchIndex 未达提交水位）。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

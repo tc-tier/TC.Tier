@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class S3ClientOptions | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class S3ClientOptions | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="S3 客户端配置——endpoint/region/凭证/重试/超时/能力位声明。 ★ 兼容云矩阵：同一实现换 endpoint/credentials 覆盖 S3/OSS(S3 兼容)/MinIO/R2/B2；   COS 不承诺（独立 V5 签名，另议——remote-storage-s3 设计 &#167;7.5）。 ★ 能力位声明（Supports*）：S3 2023+/MinIO 当前版条件 PUT/DELETE 均 ✓（默认开）；   老兼容端点（部分 OSS 版本/老 MinIO）由部署方按实际关闭——能力位诚实表达，fencing 层据此降级。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.IO.S3.S3ClientOptions">
+
+
+
+  <h1 id="TC_Tier_Core_IO_S3_S3ClientOptions" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions" class="text-break">
+Class S3ClientOptions  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.IO.html">IO</a>.<a class="xref" href="TC.Tier.Core.IO.S3.html">S3</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.IO.S3.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>S3 客户端配置——endpoint/region/凭证/重试/超时/能力位声明。</p>
+<p>★ 兼容云矩阵：同一实现换 endpoint/credentials 覆盖 S3/OSS(S3 兼容)/MinIO/R2/B2；
+  COS 不承诺（独立 V5 签名，另议——remote-storage-s3 设计 §7.5）。</p>
+<p>★ 能力位声明（Supports*）：S3 2023+/MinIO 当前版条件 PUT/DELETE 均 ✓（默认开）；
+  老兼容端点（部分 OSS 版本/老 MinIO）由部署方按实际关闭——能力位诚实表达，fencing 层据此降级。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class S3ClientOptions</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">S3ClientOptions</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions__ctor_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions__ctor" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.#ctor">
+  S3ClientOptions()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public S3ClientOptions()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_Bucket_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Bucket*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_Bucket" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Bucket">
+  Bucket
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>桶名（path-style 寻址：<code>{endpoint}/{bucket}/{key}</code>——MinIO/自建兼容端标准形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required string Bucket { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_Credentials_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Credentials*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_Credentials" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Credentials">
+  Credentials
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>凭证源。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required ICredentialProvider Credentials { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.IO.S3.ICredentialProvider.html">ICredentialProvider</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_Endpoint_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Endpoint*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_Endpoint" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Endpoint">
+  Endpoint
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>端点（scheme://host[:port]，如 <code>http://127.0.0.1:9000</code> / <code>https://s3.cn-north-1.amazonaws.com.cn</code>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required string Endpoint { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_MaxRetries_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.MaxRetries*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_MaxRetries" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.MaxRetries">
+  MaxRetries
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>重试次数上限（幂等操作：5xx/429/网络抖动——指数退避 + 抖动）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int MaxRetries { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_PooledConnectionIdleTimeout_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.PooledConnectionIdleTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_PooledConnectionIdleTimeout" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.PooledConnectionIdleTimeout">
+  PooledConnectionIdleTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>连接池空闲超时（空闲即关——客户端在服务端断开前主动回收）。默认 60s（显式钉死——
+须小于目标端点的服务端空闲断开阈值；OSS 实测 60-90s）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan? PooledConnectionIdleTimeout { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_PooledConnectionLifetime_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.PooledConnectionLifetime*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_PooledConnectionLifetime" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.PooledConnectionLifetime">
+  PooledConnectionLifetime
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>连接池寿命（连接建立起计的总年龄，与活跃无关——到期重建）。默认 10 分钟。
+★ 防死连接复用（Aliyun OSS 服务端 60-90s 断开空闲连接——老 SDK lifetime=0 永不回收导致
+周期性 SSL 抖动的根因）；配合 <a class="xref" href="TC.Tier.Core.IO.S3.S3ClientOptions.html#TC_Tier_Core_IO_S3_S3ClientOptions_PooledConnectionIdleTimeout">PooledConnectionIdleTimeout</a> 双防线。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan? PooledConnectionLifetime { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_Region_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Region*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_Region" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Region">
+  Region
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>区域（签名 scope 用；MinIO 默认 us-east-1）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Region { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_RetryBaseDelay_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.RetryBaseDelay*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_RetryBaseDelay" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.RetryBaseDelay">
+  RetryBaseDelay
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>重试基础延迟（指数退避基数，默认 200ms）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan RetryBaseDelay { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_SigningHost_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SigningHost*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_SigningHost" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SigningHost">
+  SigningHost
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>签名 Host 解耦（增补设计 §9）：连接 Host（endpoint 派生）与<b>签名 Host</b> 分离——
+经自有域名反代到云原生域名时（cos.mytzz.top → cos.region.myqcloud.com），
+签云域名（SigV4 所签 = 服务端所见，反代层负责 Host 改写与 SNI）。null = endpoint 派生（默认）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string? SigningHost { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_SupportsConditionalDelete_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SupportsConditionalDelete*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_SupportsConditionalDelete" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SupportsConditionalDelete">
+  SupportsConditionalDelete
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>服务端条件 DELETE（If-Match）可用（S3 2023+/MinIO 当前 ✓；缺 → Head+无条件删降级）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool SupportsConditionalDelete { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_SupportsConditionalPut_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SupportsConditionalPut*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_SupportsConditionalPut" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SupportsConditionalPut">
+  SupportsConditionalPut
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>服务端条件 PUT（If-Match/If-None-Match）可用（S3 2023+/MinIO 当前 ✓；缺 → fencing 降级）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool SupportsConditionalPut { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_SupportsStrongList_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SupportsStrongList*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_SupportsStrongList" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.SupportsStrongList">
+  SupportsStrongList
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>写后立即可见（S3 2020.12+/MinIO ✓；老 OSS 最终一致——读后短重试吸收）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool SupportsStrongList { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_Timeout_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Timeout*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_Timeout" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Timeout">
+  Timeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单请求超时（默认 100s——含大对象上传）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan Timeout { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_UseVirtualHostAddressing_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.UseVirtualHostAddressing*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_UseVirtualHostAddressing" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.UseVirtualHostAddressing">
+  UseVirtualHostAddressing
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>virtual-host 寻址（<code>{bucket}.{endpoint-host}/{key}</code>；默认 false = path-style
+<code>{endpoint}/{bucket}/{key}</code>）。★ COS 的 S3 兼容层要求 virtual-host（path-style
+会把整段路径当 key——桶级操作与 copy 全部失真）；S3/MinIO/R2 两者皆可（R2 实际仅支持 vhost）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool UseVirtualHostAddressing { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_IO_S3_S3ClientOptions_Validate_" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Validate*"></a>
+
+  <h3 id="TC_Tier_Core_IO_S3_S3ClientOptions_Validate" data-uid="TC.Tier.Core.IO.S3.S3ClientOptions.Validate">
+  Validate()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造校验（endpoint 形态/桶名非空）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Validate()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

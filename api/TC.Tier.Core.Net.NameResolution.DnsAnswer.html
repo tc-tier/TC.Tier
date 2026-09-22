@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class DnsAnswer | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class DnsAnswer | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="查询结果——记录集 + 聚合 MinTtl + 安全位结论（#498 诉求 6/7）。 ★ 聚合 MinTtl：CNAME 跟随链各跳 TTL 取最小（缓存有效期的权威口径）；记录集为空且 = = 负缓存形态。 ★ 确定性：同应答字节 → 同结果（记录保持应答节顺序，零顺序扰动）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer">
+
+
+
+  <h1 id="TC_Tier_Core_Net_NameResolution_DnsAnswer" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer" class="text-break">
+Class DnsAnswer  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.NameResolution.html">NameResolution</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>查询结果——记录集 + 聚合 MinTtl + 安全位结论（#498 诉求 6/7）。</p>
+<p>★ 聚合 MinTtl：CNAME 跟随链各跳 TTL 取最小（缓存有效期的权威口径）；记录集为空且
+<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html#TC_Tier_Core_Net_NameResolution_DnsSecurityStatus_ResponseCode">ResponseCode</a>=<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsResponseCode.html#TC_Tier_Core_Net_NameResolution_DnsResponseCode_NxDomain">NxDomain</a> = 负缓存形态。</p>
+<p>★ 确定性：同应答字节 → 同结果（记录保持应答节顺序，零顺序扰动）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed record DnsAnswer : IEquatable&lt;DnsAnswer&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">DnsAnswer</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer__ctor_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer__ctor_System_String_TC_Tier_Core_Net_NameResolution_DnsRecordType_System_Collections_Immutable_ImmutableArray_TC_Tier_Core_Net_NameResolution_DnsSrvRecord__System_Collections_Immutable_ImmutableArray_System_Net_IPAddress__System_Collections_Immutable_ImmutableArray_System_String__System_TimeSpan_TC_Tier_Core_Net_NameResolution_DnsSecurityStatus_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.#ctor(System.String,TC.Tier.Core.Net.NameResolution.DnsRecordType,System.Collections.Immutable.ImmutableArray{TC.Tier.Core.Net.NameResolution.DnsSrvRecord},System.Collections.Immutable.ImmutableArray{System.Net.IPAddress},System.Collections.Immutable.ImmutableArray{System.String},System.TimeSpan,TC.Tier.Core.Net.NameResolution.DnsSecurityStatus)">
+  DnsAnswer(string, DnsRecordType, ImmutableArray&lt;DnsSrvRecord&gt;, ImmutableArray&lt;IPAddress&gt;, ImmutableArray&lt;string&gt;, TimeSpan, DnsSecurityStatus)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>查询结果——记录集 + 聚合 MinTtl + 安全位结论（#498 诉求 6/7）。</p>
+<p>★ 聚合 MinTtl：CNAME 跟随链各跳 TTL 取最小（缓存有效期的权威口径）；记录集为空且
+<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html#TC_Tier_Core_Net_NameResolution_DnsSecurityStatus_ResponseCode">ResponseCode</a>=<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsResponseCode.html#TC_Tier_Core_Net_NameResolution_DnsResponseCode_NxDomain">NxDomain</a> = 负缓存形态。</p>
+<p>★ 确定性：同应答字节 → 同结果（记录保持应答节顺序，零顺序扰动）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DnsAnswer(string Name, DnsRecordType Type, ImmutableArray&lt;DnsSrvRecord&gt; SrvRecords, ImmutableArray&lt;IPAddress&gt; Addresses, ImmutableArray&lt;string&gt; Aliases, TimeSpan TimeToLive, DnsSecurityStatus Security)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>Name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>发起查询名（原始输入名——非链中末跳）。</p>
+</dd>
+    <dt><code>Type</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html">DnsRecordType</a></dt>
+    <dd><p>查询记录类型。</p>
+</dd>
+    <dt><code>SrvRecords</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSrvRecord.html">DnsSrvRecord</a>&gt;</dt>
+    <dd><p>SRV 记录集（<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html#TC_Tier_Core_Net_NameResolution_DnsRecordType_SRV">SRV</a> 查询非空）。</p>
+</dd>
+    <dt><code>Addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipaddress">IPAddress</a>&gt;</dt>
+    <dd><p>地址记录集（A/AAAA 查询非空；CNAME 跟随到终点后填充）。</p>
+</dd>
+    <dt><code>Aliases</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd><p>跟随链（按序——空 = 无 CNAME 跟随）。</p>
+</dd>
+    <dt><code>TimeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>聚合 MinTtl（链上各跳最小值）。</p>
+</dd>
+    <dt><code>Security</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html">DnsSecurityStatus</a></dt>
+    <dd><p>安全位结论。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Addresses_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Addresses*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Addresses" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Addresses">
+  Addresses
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>地址记录集（A/AAAA 查询非空；CNAME 跟随到终点后填充）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ImmutableArray&lt;IPAddress&gt; Addresses { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipaddress">IPAddress</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Aliases_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Aliases*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Aliases" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Aliases">
+  Aliases
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>跟随链（按序——空 = 无 CNAME 跟随）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ImmutableArray&lt;string&gt; Aliases { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Name_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Name*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Name" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Name">
+  Name
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>发起查询名（原始输入名——非链中末跳）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string Name { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Security_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Security*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Security" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Security">
+  Security
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>安全位结论。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DnsSecurityStatus Security { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html">DnsSecurityStatus</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_SrvRecords_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.SrvRecords*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_SrvRecords" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.SrvRecords">
+  SrvRecords
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>SRV 记录集（<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html#TC_Tier_Core_Net_NameResolution_DnsRecordType_SRV">SRV</a> 查询非空）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ImmutableArray&lt;DnsSrvRecord&gt; SrvRecords { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSrvRecord.html">DnsSrvRecord</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_TimeToLive_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.TimeToLive*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_TimeToLive" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.TimeToLive">
+  TimeToLive
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>聚合 MinTtl（链上各跳最小值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan TimeToLive { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Type_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Type*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Type" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Type">
+  Type
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>查询记录类型。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DnsRecordType Type { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html">DnsRecordType</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Deconstruct_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Deconstruct*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Deconstruct_System_String__TC_Tier_Core_Net_NameResolution_DnsRecordType__System_Collections_Immutable_ImmutableArray_TC_Tier_Core_Net_NameResolution_DnsSrvRecord___System_Collections_Immutable_ImmutableArray_System_Net_IPAddress___System_Collections_Immutable_ImmutableArray_System_String___System_TimeSpan__TC_Tier_Core_Net_NameResolution_DnsSecurityStatus__" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Deconstruct(System.String@,TC.Tier.Core.Net.NameResolution.DnsRecordType@,System.Collections.Immutable.ImmutableArray{TC.Tier.Core.Net.NameResolution.DnsSrvRecord}@,System.Collections.Immutable.ImmutableArray{System.Net.IPAddress}@,System.Collections.Immutable.ImmutableArray{System.String}@,System.TimeSpan@,TC.Tier.Core.Net.NameResolution.DnsSecurityStatus@)">
+  Deconstruct(out string, out DnsRecordType, out ImmutableArray&lt;DnsSrvRecord&gt;, out ImmutableArray&lt;IPAddress&gt;, out ImmutableArray&lt;string&gt;, out TimeSpan, out DnsSecurityStatus)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Deconstruct(out string Name, out DnsRecordType Type, out ImmutableArray&lt;DnsSrvRecord&gt; SrvRecords, out ImmutableArray&lt;IPAddress&gt; Addresses, out ImmutableArray&lt;string&gt; Aliases, out TimeSpan TimeToLive, out DnsSecurityStatus Security)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>Name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>Type</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html">DnsRecordType</a></dt>
+    <dd></dd>
+    <dt><code>SrvRecords</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSrvRecord.html">DnsSrvRecord</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>Addresses</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipaddress">IPAddress</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>Aliases</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.immutable.immutablearray-1">ImmutableArray</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>TimeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>Security</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html">DnsSecurityStatus</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Empty_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Empty*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Empty_System_String_TC_Tier_Core_Net_NameResolution_DnsRecordType_System_TimeSpan_TC_Tier_Core_Net_NameResolution_DnsSecurityStatus_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Empty(System.String,TC.Tier.Core.Net.NameResolution.DnsRecordType,System.TimeSpan,TC.Tier.Core.Net.NameResolution.DnsSecurityStatus)">
+  Empty(string, DnsRecordType, TimeSpan, DnsSecurityStatus)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>空应答工厂（负缓存/无数据形态——记录集全空，TTL = 负缓存值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static DnsAnswer Empty(string name, DnsRecordType type, TimeSpan ttl, DnsSecurityStatus security)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+    <dt><code>type</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html">DnsRecordType</a></dt>
+    <dd></dd>
+    <dt><code>ttl</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>security</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html">DnsSecurityStatus</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Equals_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Equals_System_Object_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Equals_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_Equals_TC_Tier_Core_Net_NameResolution_DnsAnswer_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.Equals(TC.Tier.Core.Net.NameResolution.DnsAnswer)">
+  Equals(DnsAnswer?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Equals(DnsAnswer? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_GetHashCode_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_GetHashCode" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_ToString_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_ToString" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_op_Equality_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_op_Equality_TC_Tier_Core_Net_NameResolution_DnsAnswer_TC_Tier_Core_Net_NameResolution_DnsAnswer_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.op_Equality(TC.Tier.Core.Net.NameResolution.DnsAnswer,TC.Tier.Core.Net.NameResolution.DnsAnswer)">
+  operator ==(DnsAnswer?, DnsAnswer?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(DnsAnswer? left, DnsAnswer? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsAnswer_op_Inequality_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsAnswer_op_Inequality_TC_Tier_Core_Net_NameResolution_DnsAnswer_TC_Tier_Core_Net_NameResolution_DnsAnswer_" data-uid="TC.Tier.Core.Net.NameResolution.DnsAnswer.op_Inequality(TC.Tier.Core.Net.NameResolution.DnsAnswer,TC.Tier.Core.Net.NameResolution.DnsAnswer)">
+  operator !=(DnsAnswer?, DnsAnswer?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(DnsAnswer? left, DnsAnswer? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

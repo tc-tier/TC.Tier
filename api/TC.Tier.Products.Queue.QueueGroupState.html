@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class QueueGroupState | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class QueueGroupState | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="组状态（tc-tier-queue-spec &#167;5.2 P2 面）定长 codec。 布局（小端，&quot;TQGRP03\0&quot;）： [Magic 8B][Cursor 16B][SkipCount 4B][RetryCount 4B] [Skip[i] 16B &#215; MaxInFlight][Retry[i] 20B（addr 16B + count 4B）&#215; MaxInFlight] [Epoch 8B][Flags 4B]。 Cursor = 连续已确认前缀的下一地址（Invalid = 从未确认）；Skip = 乱序 ack 空洞（升序）； Retry = 活跃重试计数（&amp;gt;0 者——死信判据 redeliveryCount &amp;gt; MaxRedeliveries）； Epoch = fencing 组代次；Flags bit0 = Fenced（EvictOldest 淘汰）。 LogicalAddress 序列化 16B（SegId+Ext+Offset）——地址是事实，不解析结构。 P0/P1 魔数无部署存量——v3 不做兼容（beta 格式迭代期）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Queue.QueueGroupState">
+
+
+
+  <h1 id="TC_Tier_Products_Queue_QueueGroupState" data-uid="TC.Tier.Products.Queue.QueueGroupState" class="text-break">
+Class QueueGroupState  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Queue.html">Queue</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>组状态（tc-tier-queue-spec §5.2 P2 面）定长 codec。</p>
+<p>布局（小端，"TQGRP03\0"）：
+<code>[Magic 8B][Cursor 16B][SkipCount 4B][RetryCount 4B]
+[Skip[i] 16B × MaxInFlight][Retry[i] 20B（addr 16B + count 4B）× MaxInFlight]
+[Epoch 8B][Flags 4B]</code>。
+Cursor = 连续已确认前缀的下一地址（Invalid = 从未确认）；Skip = 乱序 ack 空洞（升序）；
+Retry = 活跃重试计数（&gt;0 者——死信判据 redeliveryCount &gt; MaxRedeliveries）；
+Epoch = fencing 组代次；Flags bit0 = Fenced（EvictOldest 淘汰）。</p>
+<p>LogicalAddress 序列化 16B（SegId+Ext+Offset）——地址是事实，不解析结构。
+P0/P1 魔数无部署存量——v3 不做兼容（beta 格式迭代期）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class QueueGroupState</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">QueueGroupState</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_FlagsFenced" data-uid="TC.Tier.Products.Queue.QueueGroupState.FlagsFenced">
+  FlagsFenced
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Fenced 标志位（Flags bit0——EvictOldest 淘汰后置位）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int FlagsFenced = 1</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_HeaderSize" data-uid="TC.Tier.Products.Queue.QueueGroupState.HeaderSize">
+  HeaderSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>定长头（由源生成器从 <code>QueueGroupStateHeaderLayout</code> 生成）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int HeaderSize = 32</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_TailSize" data-uid="TC.Tier.Products.Queue.QueueGroupState.TailSize">
+  TailSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>尾部长（由源生成器从 <code>QueueGroupStateTailLayout</code> 生成）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int TailSize = 12</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Queue_QueueGroupState_Magic_" data-uid="TC.Tier.Products.Queue.QueueGroupState.Magic*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_Magic" data-uid="TC.Tier.Products.Queue.QueueGroupState.Magic">
+  Magic
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>布局魔数（版本化——P2 &quot;TQGRP03\0&quot;：+RetryCounts）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ReadOnlySpan&lt;byte&gt; Magic { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Queue_QueueGroupState_PayloadSize_" data-uid="TC.Tier.Products.Queue.QueueGroupState.PayloadSize*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_PayloadSize_System_Int32_" data-uid="TC.Tier.Products.Queue.QueueGroupState.PayloadSize(System.Int32)">
+  PayloadSize(int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>MaxInFlight 对应的 payload 定长。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int PayloadSize(int maxInFlight)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>maxInFlight</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>组在途窗口上限（Skip + Retry 表容量）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>该 maxInFlight 对应的定长 payload 字节数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_QueueGroupState_TryRead_" data-uid="TC.Tier.Products.Queue.QueueGroupState.TryRead*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_TryRead_System_ReadOnlySpan_System_Byte__System_Int32_TC_Tier_Products_Queue_QueueGroupState_State__" data-uid="TC.Tier.Products.Queue.QueueGroupState.TryRead(System.ReadOnlySpan{System.Byte},System.Int32,TC.Tier.Products.Queue.QueueGroupState.State@)">
+  TryRead(ReadOnlySpan&lt;byte&gt;, int, out State)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码（魔数/计数校验失败 = 从未持久化或损坏 → false，调用方取空状态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryRead(ReadOnlySpan&lt;byte&gt; src, int maxInFlight, out QueueGroupState.State state)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>src</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>组状态字节。</p>
+</dd>
+    <dt><code>maxInFlight</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>组在途窗口上限（Skip + Retry 表容量）。</p>
+</dd>
+    <dt><code>state</code> <a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.html">QueueGroupState</a>.<a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.State.html">State</a></dt>
+    <dd><p>输出：解码后的组状态（失败 = default）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 解码成功；false = 魔数/几何/计数非法。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Queue_QueueGroupState_Write_" data-uid="TC.Tier.Products.Queue.QueueGroupState.Write*"></a>
+
+  <h3 id="TC_Tier_Products_Queue_QueueGroupState_Write_System_Span_System_Byte__TC_Tier_Products_Queue_QueueGroupState_State__System_Int32_" data-uid="TC.Tier.Products.Queue.QueueGroupState.Write(System.Span{System.Byte},TC.Tier.Products.Queue.QueueGroupState.State@,System.Int32)">
+  Write(Span&lt;byte&gt;, in State, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码到 span（PayloadSize(maxInFlight) 定长——尾部零填充）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void Write(Span&lt;byte&gt; dst, in QueueGroupState.State state, int maxInFlight)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>dst</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲（长度 ≥ <a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.html#TC_Tier_Products_Queue_QueueGroupState_PayloadSize_System_Int32_">PayloadSize(int)</a>(maxInFlight)）。</p>
+</dd>
+    <dt><code>state</code> <a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.html">QueueGroupState</a>.<a class="xref" href="TC.Tier.Products.Queue.QueueGroupState.State.html">State</a></dt>
+    <dd><p>待编码的组状态。</p>
+</dd>
+    <dt><code>maxInFlight</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>组在途窗口上限（Skip + Retry 表容量）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>dst 过小 / Skip 或 Retry 表超 maxInFlight。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

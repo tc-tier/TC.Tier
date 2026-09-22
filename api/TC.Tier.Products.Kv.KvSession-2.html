@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class KvSession&lt;TKey, TValue&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class KvSession&lt;TKey, TValue&gt; | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="KvSession——TierKv 会话（tierkv-design.md &#167;3.1/&#167;3.2，W2 会话全集）：写集可见性 + 原子批（F2 多 key 全或无）+ pending 簿记（CompletePendingAsync 刷盘收口）+ EPVS 版本保护（Serializable）。 ★ 单线程对象（FASTER 同契约）：一个会话实例只归一个逻辑线程使用，内部零锁； 并发正确性由「每会话一实例」表达。 ★ 档位语义（）：None=读恒走索引；ReadMyWrites（缺省 D3）= 写立即应用+写集读己之写；Serializable=RMW 全集+同步临界区 EPVS pin。 ★ EPVS pin 粒度 = 同步临界区（async-first 判例）：Serializable 的同步写在版本保护下执行—— 版本过渡不可能跨越进行中的临界区；操作之间过渡可完成。设计稿 &#167;3.1「ctor Enter/Dispose Leave」的 生命周期 pin 与 LightEpoch 线程亲和（每线程 Resume/Suspend 必须同线程配对）+ 异步续体线程跳转 不可兼得——落定 per-op 保护形态（FASTER ClientSession 同为 per-op 保护）；版本化快照读 W5 深化。 ★ pending 模型：写恒登记高水位地址（FireAndForget/WaitForPending 不即时刷）；  把 [FlushedUntil, 高水位] 一次刷盘收口（组提交形态—— Committed 档即时刷为逐写 FlushUntil，组提交策略 W6 接管）。 ★ 原子批（F2）：Begin 后写走暂存（stage 可见性隔离——本会话读可见、他人与索引不可见）； CommitAsync = Ring 追加 → 2PC Prepare（落盘悬空）→ ConfirmCommitted（提交点）→ 索引换绑 （可见性）——崩溃任一窗口全或无（悬空 Prepare 恢复即弃 + 派生重放教义）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Kv.KvSession`2">
+
+
+
+  <h1 id="TC_Tier_Products_Kv_KvSession_2" data-uid="TC.Tier.Products.Kv.KvSession`2" class="text-break">
+Class KvSession&lt;TKey, TValue&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Kv.html">Kv</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>KvSession——TierKv 会话（tierkv-design.md §3.1/§3.2，W2 会话全集）：写集可见性 + 原子批（F2
+多 key 全或无）+ pending 簿记（CompletePendingAsync 刷盘收口）+ EPVS 版本保护（Serializable）。</p>
+<p>★ 单线程对象（FASTER 同契约）：一个会话实例只归一个逻辑线程使用，内部零锁；
+并发正确性由「每会话一实例」表达。</p>
+<p>★ 档位语义（<a class="xref" href="TC.Tier.Products.Kv.KvSessionConditions.html">KvSessionConditions</a>）：None=读恒走索引；ReadMyWrites（缺省 D3）=
+写立即应用+写集读己之写；Serializable=RMW 全集+同步临界区 EPVS pin。</p>
+<p>★ EPVS pin 粒度 = 同步临界区（async-first 判例）：Serializable 的同步写在版本保护下执行——
+版本过渡不可能跨越进行中的临界区；操作之间过渡可完成。设计稿 §3.1「ctor Enter/Dispose Leave」的
+生命周期 pin 与 LightEpoch 线程亲和（每线程 Resume/Suspend 必须同线程配对）+ 异步续体线程跳转
+不可兼得——落定 per-op 保护形态（FASTER ClientSession 同为 per-op 保护）；版本化快照读 W5 深化。</p>
+<p>★ pending 模型：写恒登记高水位地址（FireAndForget/WaitForPending 不即时刷）；
+<a class="xref" href="TC.Tier.Products.Kv.KvSession-2.html#TC_Tier_Products_Kv_KvSession_2_CompletePendingAsync_System_Threading_CancellationToken_">CompletePendingAsync(CancellationToken)</a> 把 [FlushedUntil, 高水位] 一次刷盘收口（组提交形态——
+Committed 档即时刷为逐写 FlushUntil，组提交策略 W6 接管）。</p>
+<p>★ 原子批（F2）：Begin 后写走暂存（stage 可见性隔离——本会话读可见、他人与索引不可见）；
+CommitAsync = Ring 追加 → 2PC Prepare（落盘悬空）→ ConfirmCommitted（提交点）→ 索引换绑
+（可见性）——崩溃任一窗口全或无（悬空 Prepare 恢复即弃 + 派生重放教义）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class KvSession&lt;TKey, TValue&gt; : IDisposable where TKey : unmanaged, IEquatable&lt;TKey&gt;</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd></dd>
+    <dt><code>TValue</code></dt>
+    <dd></dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">KvSession&lt;TKey, TValue&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_Conditions_" data-uid="TC.Tier.Products.Kv.KvSession`2.Conditions*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_Conditions" data-uid="TC.Tier.Products.Kv.KvSession`2.Conditions">
+  Conditions
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>会话档位。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public KvSessionConditions Conditions { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Kv.KvSessionConditions.html">KvSessionConditions</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_IsBatchActive_" data-uid="TC.Tier.Products.Kv.KvSession`2.IsBatchActive*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_IsBatchActive" data-uid="TC.Tier.Products.Kv.KvSession`2.IsBatchActive">
+  IsBatchActive
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>原子批是否进行中。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsBatchActive { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_SessionVersion_" data-uid="TC.Tier.Products.Kv.KvSession`2.SessionVersion*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_SessionVersion" data-uid="TC.Tier.Products.Kv.KvSession`2.SessionVersion">
+  SessionVersion
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>会话版本（D1 session-version——创建时自版本分配器取单调值；会话写经分配器全局推进，
+本会话消费版本为其单调子序列；先创建的会话版本恒小）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long SessionVersion { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_AbortBatch_" data-uid="TC.Tier.Products.Kv.KvSession`2.AbortBatch*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_AbortBatch" data-uid="TC.Tier.Products.Kv.KvSession`2.AbortBatch">
+  AbortBatch()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>回滚原子批（全丢弃——暂存零应用，写集零污染）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void AbortBatch()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>无进行中的原子批。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_BeginAtomicBatch_" data-uid="TC.Tier.Products.Kv.KvSession`2.BeginAtomicBatch*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_BeginAtomicBatch" data-uid="TC.Tier.Products.Kv.KvSession`2.BeginAtomicBatch">
+  BeginAtomicBatch()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>开启原子批：此后写走暂存（本会话读可见——stage 隔离；他人与索引不可见），直到
+<a class="xref" href="TC.Tier.Products.Kv.KvSession-2.html#TC_Tier_Products_Kv_KvSession_2_CommitBatchAsync_System_Threading_CancellationToken_">CommitBatchAsync(CancellationToken)</a>（全应用）或 <a class="xref" href="TC.Tier.Products.Kv.KvSession-2.html#TC_Tier_Products_Kv_KvSession_2_AbortBatch">AbortBatch()</a>（全丢弃）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void BeginAtomicBatch()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>原子批已在进行中（禁止嵌套）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_CommitBatchAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.CommitBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_CommitBatchAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.CommitBatchAsync(System.Threading.CancellationToken)">
+  CommitBatchAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>提交原子批（全应用——提交点语义）：Ring 追加全部暂存 → 2PC Prepare（整体落盘悬空）→
+ConfirmCommitted（提交点）→ 索引换绑（可见性）。崩溃任一窗口全或无（悬空 Prepare 恢复即弃）。
+批内写视为已持久化（Prepare 落盘）——不经 pending。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask CommitBatchAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>任务在批内全部写整体提交（Prepare 落盘 + Confirm + 索引换绑）完成后完成。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>无进行中的原子批。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_CompareAndSwapAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.CompareAndSwapAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_CompareAndSwapAsync__0_System_Byte___System_ReadOnlyMemory_System_Byte__TC_Tier_Products_Kv_KvCommitPolicy_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.CompareAndSwapAsync(`0,System.Byte[],System.ReadOnlyMemory{System.Byte},TC.Tier.Products.Kv.KvCommitPolicy,System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  CompareAndSwapAsync(TKey, byte[]?, ReadOnlyMemory&lt;byte&gt;, KvCommitPolicy, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>值版便捷 CAS（kv 引擎值版 CompareAndSwapAsync；expectedValue=null = 预期不存在）。
+成功后写集登记（ReadMyWrites/Serializable 自见新值，过期语义与盘上帧一致）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;KvCasResult&gt; CompareAndSwapAsync(TKey key, byte[]? expectedValue, ReadOnlyMemory&lt;byte&gt; value, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, TimeSpan? timeToLive = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>expectedValue</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>预期的当前值字节（null = 预期不存在）。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>新值字节。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+    <dt><code>timeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>TTL（获取即租约——null = 无过期；引擎临界区内比较通过后起算）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Kv.KvCasResult.html">KvCasResult</a>&gt;</dt>
+    <dd><p>CAS 回执（换绑结果 + 当前/新绑定地址——fencing token = NewAddress）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>原子批进行中（CAS 即时语义与批暂存冲突——批内不支持）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_CompareAndSwapAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.CompareAndSwapAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_CompareAndSwapAsync__0_TC_Tier_Contracts_Storage_LogicalAddress_System_ReadOnlyMemory_System_Byte__TC_Tier_Products_Kv_KvCommitPolicy_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.CompareAndSwapAsync(`0,TC.Tier.Contracts.Storage.LogicalAddress,System.ReadOnlyMemory{System.Byte},TC.Tier.Products.Kv.KvCommitPolicy,System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  CompareAndSwapAsync(TKey, LogicalAddress, ReadOnlyMemory&lt;byte&gt;, KvCommitPolicy, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>地址版 CAS（乐观锁——kv 引擎地址版 CompareAndSwapAsync）。
+成功后写集登记（ReadMyWrites/Serializable 自见新值，过期语义与盘上帧一致）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;KvCasResult&gt; CompareAndSwapAsync(TKey key, LogicalAddress expectedAddress, ReadOnlyMemory&lt;byte&gt; value, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, TimeSpan? timeToLive = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>expectedAddress</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>预期的当前绑定地址（Invalid = 预期不存在）。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>新值字节。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+    <dt><code>timeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>TTL（获取即租约——null = 无过期；引擎临界区内比较通过后起算）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Kv.KvCasResult.html">KvCasResult</a>&gt;</dt>
+    <dd><p>CAS 回执（换绑结果 + 当前/新绑定地址——fencing token = NewAddress）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>原子批进行中（CAS 即时语义与批暂存冲突——批内不支持）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_CompletePendingAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.CompletePendingAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_CompletePendingAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.CompletePendingAsync(System.Threading.CancellationToken)">
+  CompletePendingAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>收口本会话全部 pending 写（FireAndForget/WaitForPending 登记的高水位）——
+Ring 刷盘至高水位，其后本会话写均持久化。批提交写不在此列（Prepare 已落盘）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask CompletePendingAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>刷盘任务（无 pending 时为已完成）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_DeleteAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.DeleteAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_DeleteAsync__0_TC_Tier_Products_Kv_KvCommitPolicy_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.DeleteAsync(`0,TC.Tier.Products.Kv.KvCommitPolicy,System.Threading.CancellationToken)">
+  DeleteAsync(TKey, KvCommitPolicy, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>删除 key（墓碑）。批内 = 暂存墓碑；批外 = 立即应用。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;bool&gt; DeleteAsync(TKey key, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>key 存在并删除为 true；key 不存在为 false。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_DeleteAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.DeleteAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_DeleteAsync__3__0___0_TC_Tier_Products_Kv_IKvFunctions__0___0__1___1___2____2_TC_Tier_Products_Kv_KvCommitPolicy_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.DeleteAsync``3(`0,``0,TC.Tier.Products.Kv.IKvFunctions{`0,``0,`1,``1,``2},``2,TC.Tier.Products.Kv.KvCommitPolicy,System.Threading.CancellationToken)">
+  DeleteAsync&lt;TInput, TOutput, TContext&gt;(TKey, TInput, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt;, TContext, KvCommitPolicy, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Functions 驱动删除（写集墓碑 + DeleteCompletionCallback NotFound/Ok）。批内不支持。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;KvStatus&gt; DeleteAsync&lt;TInput, TOutput, TContext&gt;(TKey key, TInput input, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; functions, TContext context, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>操作输入。</p>
+</dd>
+    <dt><code>functions</code> <a class="xref" href="TC.Tier.Products.Kv.IKvFunctions-5.html">IKvFunctions</a>&lt;TKey, TInput, TValue, TOutput, TContext&gt;</dt>
+    <dd><p>KV Functions 完整模型（DeleteCompletionCallback 回调）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a>&gt;</dt>
+    <dd><p>操作状态（Ok=删除；NotFound=key 不存在）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TInput</code></dt>
+    <dd></dd>
+    <dt><code>TOutput</code></dt>
+    <dd></dd>
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>functions 为 null。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>原子批进行中（批内 Delete 暂不支持）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_Dispose_" data-uid="TC.Tier.Products.Kv.KvSession`2.Dispose*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_Dispose" data-uid="TC.Tier.Products.Kv.KvSession`2.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>结束会话：丢弃未提交原子批（安全——零应用）+ 回收写集。EPVS 保护为 per-op
+同步临界区形态——释放无 epoch 义务（无线程亲和契约）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_Put_" data-uid="TC.Tier.Products.Kv.KvSession`2.Put*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_Put__0_System_ReadOnlySpan_System_Byte__TC_Tier_Products_Kv_KvCommitPolicy_" data-uid="TC.Tier.Products.Kv.KvSession`2.Put(`0,System.ReadOnlySpan{System.Byte},TC.Tier.Products.Kv.KvCommitPolicy)">
+  Put(TKey, ReadOnlySpan&lt;byte&gt;, KvCommitPolicy)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>同步写入（快路径；批内禁用——批内写经 PutAsync 暂存）。Serializable：同步临界区在
+EPVS 版本保护下执行（Enter/Leave 同线程同步段——async-first 兼容）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public LogicalAddress Put(TKey key, ReadOnlySpan&lt;byte&gt; value, KvCommitPolicy policy = KvCommitPolicy.FireAndForget)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>值字节。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>写入记录的逻辑地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>原子批进行中（批内写经 PutAsync 暂存）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_PutAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.PutAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_PutAsync__0_System_ReadOnlyMemory_System_Byte__TC_Tier_Products_Kv_KvCommitPolicy_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.PutAsync(`0,System.ReadOnlyMemory{System.Byte},TC.Tier.Products.Kv.KvCommitPolicy,System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  PutAsync(TKey, ReadOnlyMemory&lt;byte&gt;, KvCommitPolicy, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>写入 key→值字节。批内 = 暂存（CommitBatchAsync 才应用）；批外 = 立即应用 + 按
+<code class="paramref">policy</code> 决定持久化时机（Committed 即时刷；FireAndForget/WaitForPending
+登记高水位由 <a class="xref" href="TC.Tier.Products.Kv.KvSession-2.html#TC_Tier_Products_Kv_KvSession_2_CompletePendingAsync_System_Threading_CancellationToken_">CompletePendingAsync(CancellationToken)</a> 收口）。<code class="paramref">timeToLive</code> =
+TTL（过期惰性读删，W8）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;LogicalAddress&gt; PutAsync(TKey key, ReadOnlyMemory&lt;byte&gt; value, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, TimeSpan? timeToLive = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>值字节。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；FireAndForget/WaitForPending 登记高水位）。</p>
+</dd>
+    <dt><code>timeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>TTL（过期惰性读删；null=无过期）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>写入记录的逻辑地址（批内暂存返回 Invalid）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_PutFormattedAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.PutFormattedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_PutFormattedAsync__0__1_TC_Tier_Products_Kv_KvCommitPolicy_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.PutFormattedAsync(`0,`1,TC.Tier.Products.Kv.KvCommitPolicy,System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  PutFormattedAsync(TKey, TValue, KvCommitPolicy, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>写入 key→格式化值（formatter 翻译；批内暂存语义同字节面）。
+★ 批外单分配：formatter 直填帧缓冲后落环——原链路 formatter 缓冲 → PutAsync 内 Frame
+再拷 → 写集 ToArray 三次分配收敛为「framed + 写集 payload 副本」两次（写集独立副本
+是读己之写防缓冲复用的必要语义，保留）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;LogicalAddress&gt; PutFormattedAsync(TKey key, TValue value, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, TimeSpan? timeToLive = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>待格式化写入的值。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；FireAndForget/WaitForPending 登记高水位）。</p>
+</dd>
+    <dt><code>timeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>TTL（过期惰性读删；null=无过期）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a>&gt;</dt>
+    <dd><p>写入记录的逻辑地址（批内暂存返回 Invalid）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_ReadAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.ReadAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_ReadAsync__3__0___0_TC_Tier_Products_Kv_IKvFunctions__0___0__1___1___2____2_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.ReadAsync``3(`0,``0,TC.Tier.Products.Kv.IKvFunctions{`0,``0,`1,``1,``2},``2,System.Threading.CancellationToken)">
+  ReadAsync&lt;TInput, TOutput, TContext&gt;(TKey, TInput, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt;, TContext, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Functions 驱动读：写集/批暂存命中（RMW/Serializable 档）→ 本会话值直接翻译（墓碑=NotFound）；
+未命中 → 索引读（kv 引擎 ConcurrentReader 路径）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;(KvStatus Status, TOutput Output)&gt; ReadAsync&lt;TInput, TOutput, TContext&gt;(TKey key, TInput input, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; functions, TContext context, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>读操作输入。</p>
+</dd>
+    <dt><code>functions</code> <a class="xref" href="TC.Tier.Products.Kv.IKvFunctions-5.html">IKvFunctions</a>&lt;TKey, TInput, TValue, TOutput, TContext&gt;</dt>
+    <dd><p>KV Functions 完整模型（读侧钩子翻译 value→output）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.products.kv.kvstatus,--1-.status">Status</a>, TOutput <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.products.kv.kvstatus,--1-.output">Output</a>)&gt;</dt>
+    <dd><p>操作状态与翻译产物（NotFound/Ok）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TInput</code></dt>
+    <dd></dd>
+    <dt><code>TOutput</code></dt>
+    <dd></dd>
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>functions 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_RmwAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.RmwAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_RmwAsync__3__0___0_TC_Tier_Products_Kv_IKvFunctions__0___0__1___1___2____2_TC_Tier_Products_Kv_KvCommitPolicy_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.RmwAsync``3(`0,``0,TC.Tier.Products.Kv.IKvFunctions{`0,``0,`1,``1,``2},``2,TC.Tier.Products.Kv.KvCommitPolicy,System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  RmwAsync&lt;TInput, TOutput, TContext&gt;(TKey, TInput, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt;, TContext, KvCommitPolicy, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Functions 驱动 RMW（三流折叠经 kv 引擎；Ok 后写集刷新——本会话自见折叠结果；
+policy 决定持久化时机）。批内不支持（批+RMW 组合语义 W6 收口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;KvStatus&gt; RmwAsync&lt;TInput, TOutput, TContext&gt;(TKey key, TInput input, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; functions, TContext context, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, TimeSpan? timeToLive = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>RMW 操作输入（增量/参数）。</p>
+</dd>
+    <dt><code>functions</code> <a class="xref" href="TC.Tier.Products.Kv.IKvFunctions-5.html">IKvFunctions</a>&lt;TKey, TInput, TValue, TOutput, TContext&gt;</dt>
+    <dd><p>KV Functions 完整模型（三流折叠）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+    <dt><code>timeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>TTL（过期惰性读删；null=无过期）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a>&gt;</dt>
+    <dd><p>操作状态（Ok/Error）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TInput</code></dt>
+    <dd></dd>
+    <dt><code>TOutput</code></dt>
+    <dd></dd>
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>functions 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_TryGetBytesAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.TryGetBytesAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_TryGetBytesAsync__0_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.TryGetBytesAsync(`0,System.Threading.CancellationToken)">
+  TryGetBytesAsync(TKey, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>点查 key → 值字节副本（未命中 false；命中时 value 为独立副本）。档位语义见类型注释。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;(bool Found, byte[]? Value)&gt; TryGetBytesAsync(TKey key, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.boolean,system.byte[]-.found">Found</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.boolean,system.byte[]-.value">Value</a>)&gt;</dt>
+    <dd><p>命中时 Found=true 且 Value 为独立字节副本；未命中 Found=false、Value=null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_TryGetFormattedAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.TryGetFormattedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_TryGetFormattedAsync__0_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.TryGetFormattedAsync(`0,System.Threading.CancellationToken)">
+  TryGetFormattedAsync(TKey, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>点查 key → 格式化值（经 formatter 逆翻译；未命中 false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;(bool Found, TValue Value)&gt; TryGetFormattedAsync(TKey key, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.boolean,-1-.found">Found</a>, TValue <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.boolean,-1-.value">Value</a>)&gt;</dt>
+    <dd><p>命中时 Found=true 且 Value 为经 formatter 逆翻译的值；未命中 Found=false。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_KvSession_2_UpsertAsync_" data-uid="TC.Tier.Products.Kv.KvSession`2.UpsertAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_KvSession_2_UpsertAsync__3__0__1___0_TC_Tier_Products_Kv_IKvFunctions__0___0__1___1___2____2_TC_Tier_Products_Kv_KvCommitPolicy_System_Nullable_System_TimeSpan__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.KvSession`2.UpsertAsync``3(`0,`1,``0,TC.Tier.Products.Kv.IKvFunctions{`0,``0,`1,``1,``2},``2,TC.Tier.Products.Kv.KvCommitPolicy,System.Nullable{System.TimeSpan},System.Threading.CancellationToken)">
+  UpsertAsync&lt;TInput, TOutput, TContext&gt;(TKey, TValue, TInput, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt;, TContext, KvCommitPolicy, TimeSpan?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Functions 驱动 Upsert（会话上下文走
+<a class="xref" href="TC.Tier.Products.Kv.IKvFunctions-5.html#TC_Tier_Products_Kv_IKvFunctions_5_ConcurrentWriter__0___2__">ConcurrentWriter(ref TKey, ref TValue)</a> 校验钩子——
+false 拒绝以 Error 收口零写入）。批内不支持。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;KvStatus&gt; UpsertAsync&lt;TInput, TOutput, TContext&gt;(TKey key, TValue value, TInput input, IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; functions, TContext context, KvCommitPolicy policy = KvCommitPolicy.FireAndForget, TimeSpan? timeToLive = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>待写入的值。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>操作输入。</p>
+</dd>
+    <dt><code>functions</code> <a class="xref" href="TC.Tier.Products.Kv.IKvFunctions-5.html">IKvFunctions</a>&lt;TKey, TInput, TValue, TOutput, TContext&gt;</dt>
+    <dd><p>KV Functions 完整模型（ConcurrentWriter 校验钩子）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Products.Kv.KvCommitPolicy.html">KvCommitPolicy</a></dt>
+    <dd><p>完成语义（Committed 即时刷；其余登记高水位）。</p>
+</dd>
+    <dt><code>timeToLive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>TTL（过期惰性读删；null=无过期）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a>&gt;</dt>
+    <dd><p>操作状态（Ok=接受；Error=ConcurrentWriter 拒绝）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TInput</code></dt>
+    <dd></dd>
+    <dt><code>TOutput</code></dt>
+    <dd></dd>
+    <dt><code>TContext</code></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>functions 为 null。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>原子批进行中（批内 Upsert 暂不支持）。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

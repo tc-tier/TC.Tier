@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class InProcessNode | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class InProcessNode | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="进程内节点传输端点（spec-12 &#167;7 InProcess 介质—— 完整面实现， 与 （TCP）消费面零差别）：协议域注册/数据报收发/对端观测。 ★ 派发：发送方上下文直排（handler 同步回调 + 异常隔离——回调异常不外泄到发送方，   尽力送达语义与 TCP 读循环同构）。 ★ 生命周期：注册即活（ 为形态面幂等占位）；Dispose = 从枢纽注销。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode" class="text-break">
+Class InProcessNode  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.html">Transport</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.InProcess.html">InProcess</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>进程内节点传输端点（spec-12 §7 InProcess 介质——<a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a> 完整面实现，
+与 <a class="xref" href="TC.Tier.Core.Net.Transport.Tcp.ClusterTransport.html">ClusterTransport</a>（TCP）消费面零差别）：协议域注册/数据报收发/对端观测。</p>
+<p>★ 派发：发送方上下文直排（handler 同步回调 + 异常隔离——回调异常不外泄到发送方，
+  尽力送达语义与 TCP 读循环同构）。</p>
+<p>★ 生命周期：注册即活（<a class="xref" href="TC.Tier.Core.Net.Channels.ITransport.html#TC_Tier_Core_Net_Channels_ITransport_Start">Start()</a> 为形态面幂等占位）；Dispose = 从枢纽注销。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class InProcessNode : IProtocolTransport, IProtocol, ITransport, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">InProcessNode</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html">IProtocol</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.ITransport.html">ITransport</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Net.Channels.RequestBatchClient.html#TC_Tier_Core_Net_Channels_RequestBatchClient_SendBatchAsync_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_NodeId_System_Byte_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Nullable_System_TimeSpan__System_Threading_CancellationToken_">RequestBatchClient.SendBatchAsync(IProtocolTransport, NodeId, byte, IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, TimeSpan?, CancellationToken)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_Faults_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.Faults*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_Faults" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.Faults">
+  Faults
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>故障注入（枢纽级矩阵——节点对定向）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITransportFaultInjector Faults { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.ITransportFaultInjector.html">ITransportFaultInjector</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_Self_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.Self*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_Self" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.Self">
+  Self
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Self { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_DisposeAsync_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_DisposeAsync" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>端点释放（从枢纽注销——既有节点触发 PeerGone）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时本节点已从枢纽注销。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_OpenStreamAsync_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.OpenStreamAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.OpenStreamAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开流式会话（hub 直路由；对端未注册/不接受 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;IWireStream&gt; OpenStreamAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; openPayload = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>openPayload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>开流载荷（随会话建立透传给对端 acceptor；组路由场景 = host 剥前缀后的内层载荷——二期-C1）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（未用——内存直路由零等待；形态面签名同构）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html">IWireStream</a>&gt;</dt>
+    <dd><p>会话。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_RegisterProtocol_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.RegisterProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_RegisterProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.RegisterProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·公开口（§3.5 分流——注册区 0x60-0xAF；与 TCP 同一
+<span class="xref">TC.Tier.Core.Net.Channels.DatagramDispatcher</span> 单源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>承载声明（内存介质恒承载——UDP 回落语义在进程内退化为直派，尽力语义不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_RegisterRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.RegisterRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_RegisterRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.RegisterRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·公开口（注册区 0x60-0xAF——与 TCP 同一 <span class="xref">TC.Tier.Core.Net.Channels.RequestBroker</span> 单源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_RegisterStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.RegisterStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_RegisterStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.RegisterStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册·公开口（注册区 0x60-0xAF——与 TCP 同一分流规则）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_SendDatagramAsync_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.SendDatagramAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_SendDatagramAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.SendDatagramAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  SendDatagramAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>数据报发送（尽力送达——目标未注册/注入丢弃 = 静默丢弃；载荷上限 = 帧协议常量同构
+（大块走流式通道——契约与介质无关））。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask SendDatagramAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>载荷。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（注入延迟等待可取消）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时数据报已交付枢纽（尽力送达——目标未注册/注入丢弃 = 静默丢弃，不抛）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_SendRequestAsync_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.SendRequestAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_SendRequestAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_Net_Channels_RequestOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.SendRequestAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},TC.Tier.Core.Net.Channels.RequestOptions,System.Threading.CancellationToken)">
+  SendRequestAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, RequestOptions?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调发送（§5.2 at-most-once 缺省）：目标未注册 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>；
+注入丢弃/无应答 = 超时抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>；取消传播。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;byte[]&gt; SendRequestAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, RequestOptions? options = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>请求载荷。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Channels.RequestOptions.html">RequestOptions</a></dt>
+    <dd><p>per-call 选项（null = 缺省超时——同 TCP 缺省量级）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt;</dt>
+    <dd><p>应答载荷。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_Start_" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.Start*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_Start" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.Start">
+  Start()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动（幂等占位——注册即活，形态面同构；无监听/拨号概念）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Start()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_PeerConnected" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.PeerConnected">
+  PeerConnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端接入（同枢纽节点注册——经 <a class="xref" href="TC.Tier.Core.Net.Transport.InProcess.InProcessTransportHub.html#TC_Tier_Core_Net_Transport_InProcess_InProcessTransportHub_Register_TC_Tier_Core_Net_NodeId_">Register(NodeId)</a> 触发）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerConnected</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_InProcess_InProcessNode_PeerGone" data-uid="TC.Tier.Core.Net.Transport.InProcess.InProcessNode.PeerGone">
+  PeerGone
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端离线（同枢纽节点注销）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerGone</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

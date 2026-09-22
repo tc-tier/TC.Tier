@@ -1,0 +1,1060 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ITierTimeSeries | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ITierTimeSeries | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierTimeSeries——时序序列（tc-tier-timeseries-spec：Ring&#215;BTree 组合特化；#443 稠密多序列扩展）。 ★ 组合配方（spec &#167;1 四件积木）：RingOfTimeKey/RingOfDenseTimeKey（数据真相源）+   BTree 时间索引（乱序吸收/范围序/最新点查的正确性必需）+ VersionedMetadata（水位真相源——   retention 边界持久）+ Session 域（可选 2PC）。 ★ 双 API（#443 设计稿 &#167;6）：两参形态 = 默认序列（seriesId 0——单序列模式零迁移；dense   模式落默认序列）；三参形态 = 命名序列（dense 实例惰性注册；单序列实例仅 0 合法）。 ★ 写入（spec &#167;4.1/⑧）：Append 返回 = 内存可见（查询即时可见——BTree 同步插入）；   落盘由显式 FlushAsync / retention trim 前置 flush / 水位提交触发（分配-持久分离）。 ★ 乱序（定案③）：BTree 有序插入天然吸收——无后台排序；同刻多样本不覆盖（写入序交付）。 ★ retention（spec &#167;5/④）：TTL/字节直接回收（无 fence）；截断先行、水位随后，   崩溃窗口由恢复对账以数据事实收口。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries">
+
+
+
+  <h1 id="TC_Tier_Products_TimeSeries_ITierTimeSeries" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries" class="text-break">
+Interface ITierTimeSeries  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.TimeSeries.html">TimeSeries</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierTimeSeries——时序序列（tc-tier-timeseries-spec：Ring×BTree 组合特化；#443 稠密多序列扩展）。</p>
+<p>★ 组合配方（spec §1 四件积木）：RingOfTimeKey/RingOfDenseTimeKey（数据真相源）+
+  BTree 时间索引（乱序吸收/范围序/最新点查的正确性必需）+ VersionedMetadata（水位真相源——
+  retention 边界持久）+ Session 域（可选 2PC）。</p>
+<p>★ 双 API（#443 设计稿 §6）：两参形态 = 默认序列（seriesId 0——单序列模式零迁移；dense
+  模式落默认序列）；三参形态 = 命名序列（dense 实例惰性注册；单序列实例仅 0 合法）。</p>
+<p>★ 写入（spec §4.1/⑧）：Append 返回 = 内存可见（查询即时可见——BTree 同步插入）；
+  落盘由显式 FlushAsync / retention trim 前置 flush / 水位提交触发（分配-持久分离）。</p>
+<p>★ 乱序（定案③）：BTree 有序插入天然吸收——无后台排序；同刻多样本不覆盖（写入序交付）。</p>
+<p>★ retention（spec §5/④）：TTL/字节直接回收（无 fence）；截断先行、水位随后，
+  崩溃窗口由恢复对账以数据事实收口。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ITierTimeSeries : ILifecycle&lt;TimeSeriesRecoveryHints&gt;, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady_System_Int32_">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReadyAsync_System_Threading_CancellationToken_">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_IsReady">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_RecoveryState">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_RecoveryProgressChanged">ILifecycle&lt;TimeSeriesRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">IDisposable.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_DefaultSeriesId" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.DefaultSeriesId">
+  DefaultSeriesId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>默认序列标识（两参 API 落点——零迁移；dense 实例中与命名序列同位平等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint DefaultSeriesId = 0</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_DurableTail_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.DurableTail*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_DurableTail" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.DurableTail">
+  DurableTail
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已落盘水位（= Ring.FlushedUntilAddress）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress DurableTail { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_SeriesCount_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.SeriesCount*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_SeriesCount" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.SeriesCount">
+  SeriesCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已注册序列数（dense = 注册表计数；单序列恒 1）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">int SeriesCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TailAddress_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TailAddress*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TailAddress" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TailAddress">
+  TailAddress
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已分配尾地址（含未落盘）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">LogicalAddress TailAddress { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TrimmedUntilTimestamp_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TrimmedUntilTimestamp*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TrimmedUntilTimestamp" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TrimmedUntilTimestamp">
+  TrimmedUntilTimestamp
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>持久回收边界（早于此的样本已回收；重启后由恢复载入/校正）。dense = 默认序列边界。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long TrimmedUntilTimestamp { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendAsync_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendAsync(System.Int64,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  AppendAsync(long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>追加单条样本到默认序列，返回分配地址。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;SampleAppendResult&gt; AppendAsync(long timestamp, ReadOnlyMemory&lt;byte&gt; value, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timestamp</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>样本时刻（UTC Ticks）。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>样本值字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（溢出引擎异步写路径响应）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.SampleAppendResult.html">SampleAppendResult</a>&gt;</dt>
+    <dd><p>分配的样本地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>ts 早于回收边界（TrimmedUntil）或超出 MaxOutOfOrderPast——fail-fast 不静默丢。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendAsync_System_UInt32_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendAsync(System.UInt32,System.Int64,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  AppendAsync(uint, long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>追加单条样本到命名序列（dense 实例惰性注册；单序列实例仅 0 合法）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;SampleAppendResult&gt; AppendAsync(uint seriesId, long timestamp, ReadOnlyMemory&lt;byte&gt; value, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>timestamp</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>样本时刻（UTC Ticks）。</p>
+</dd>
+    <dt><code>value</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>样本值字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.SampleAppendResult.html">SampleAppendResult</a>&gt;</dt>
+    <dd><p>分配的样本地址。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>守卫违规（同两参）/超出 SeriesCapacity（fail-fast）/单序列实例写非零序列。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendBatchAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendBatchAsync_System_Collections_Generic_IReadOnlyList_System_ValueTuple_System_Int64_System_ReadOnlyMemory_System_Byte____System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendBatchAsync(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Int64,System.ReadOnlyMemory{System.Byte}}},System.Threading.CancellationToken)">
+  AppendBatchAsync(IReadOnlyList&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value)&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>追加一批样本到默认序列（Ring 批量窗口写——地址连续推进；逐条守卫）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;SampleAppendResult&gt;&gt; AppendBatchAsync(IReadOnlyList&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value)&gt; samples, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>samples</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte--.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte--.value">Value</a>)&gt;</dt>
+    <dd><p>样本列表（时刻 + 值）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.SampleAppendResult.html">SampleAppendResult</a>&gt;&gt;</dt>
+    <dd><p>各样本的分配地址（与入参一一对应）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>任一样本违反乱序守卫（批内前面已写入的样本不回滚——调用方按地址取舍）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendBatchAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_AppendBatchAsync_System_UInt32_System_Collections_Generic_IReadOnlyList_System_ValueTuple_System_Int64_System_ReadOnlyMemory_System_Byte____System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.AppendBatchAsync(System.UInt32,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Int64,System.ReadOnlyMemory{System.Byte}}},System.Threading.CancellationToken)">
+  AppendBatchAsync(uint, IReadOnlyList&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value)&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>追加一批样本到命名序列（同序列批量窗口写）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;IReadOnlyList&lt;SampleAppendResult&gt;&gt; AppendBatchAsync(uint seriesId, IReadOnlyList&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value)&gt; samples, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>samples</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte--.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte--.value">Value</a>)&gt;</dt>
+    <dd><p>样本列表（时刻 + 值）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.SampleAppendResult.html">SampleAppendResult</a>&gt;&gt;</dt>
+    <dd><p>各样本的分配地址（与入参一一对应）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>同上；单序列实例仅 0 合法。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_FloorAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.FloorAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_FloorAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.FloorAsync(System.Int64,System.Threading.CancellationToken)">
+  FloorAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>默认序列 ≤ ts 的最近样本（Prometheus @ 采样语义）；无 ≤ ts 样本 = null。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value, LogicalAddress Address)?&gt; FloorAsync(long ts, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ts</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>查询时刻（UTC Ticks，含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.value">Value</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)?&gt;</dt>
+    <dd><p>(时刻, 值, 地址)；无命中 = null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_FloorAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.FloorAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_FloorAsync_System_UInt32_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.FloorAsync(System.UInt32,System.Int64,System.Threading.CancellationToken)">
+  FloorAsync(uint, long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>命名序列 ≤ ts 的最近样本；无命中 = null。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value, LogicalAddress Address)?&gt; FloorAsync(uint seriesId, long ts, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>ts</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>查询时刻（UTC Ticks，含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.value">Value</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)?&gt;</dt>
+    <dd><p>(时刻, 值, 地址)；无命中 = null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_FlushAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.FlushAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_FlushAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.FlushAsync(System.Threading.CancellationToken)">
+  FlushAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>显式落盘到当前尾（组提交攒批后的同步点——索引锚点帧随后台策略物化）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask FlushAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_GetStatsAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.GetStatsAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_GetStatsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.GetStatsAsync(System.Threading.CancellationToken)">
+  GetStatsAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>全实例观测快照（dense = 注册表聚合——设计稿 §5.6）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;TimeSeriesStats&gt; GetStatsAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesStats.html">TimeSeriesStats</a>&gt;</dt>
+    <dd><p>统计快照。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_GetStatsAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.GetStatsAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_GetStatsAsync_System_UInt32_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.GetStatsAsync(System.UInt32,System.Threading.CancellationToken)">
+  GetStatsAsync(uint, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>命名序列观测快照（dense = 序列侧账 + 域内首末键；TrimmedUntil = 该序列回收边界）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;TimeSeriesStats&gt; GetStatsAsync(uint seriesId, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesStats.html">TimeSeriesStats</a>&gt;</dt>
+    <dd><p>统计快照。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_GetWatermarkParticipant_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.GetWatermarkParticipant*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_GetWatermarkParticipant" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.GetWatermarkParticipant">
+  GetWatermarkParticipant()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 水位参与者（spec §10——Session 2PC：业务写 + trim 水位同域原子；rollup 管道的事务化形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ITransactionParticipant GetWatermarkParticipant()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></dt>
+    <dd><p>水位 VersionedMetadata 参与者。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_LatestAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.LatestAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_LatestAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.LatestAsync(System.Threading.CancellationToken)">
+  LatestAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>默认序列最新样本（索引 Backward 语义 O(log n)——定案⑥）；空序列 = null。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value, LogicalAddress Address)?&gt; LatestAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.value">Value</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)?&gt;</dt>
+    <dd><p>(时刻, 值, 地址)；空序列 = null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_LatestAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.LatestAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_LatestAsync_System_UInt32_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.LatestAsync(System.UInt32,System.Threading.CancellationToken)">
+  LatestAsync(uint, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>命名序列最新样本；空序列 = null。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value, LogicalAddress Address)?&gt; LatestAsync(uint seriesId, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.value">Value</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)?&gt;</dt>
+    <dd><p>(时刻, 值, 地址)；空序列 = null。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_RangeAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.RangeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_RangeAsync_System_Int64_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.RangeAsync(System.Int64,System.Int64,System.Threading.CancellationToken)">
+  RangeAsync(long, long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>默认序列范围流：[fromInclusive, toExclusive) 按时间序逐条交付（索引序；冷热透明）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value, LogicalAddress Address)&gt; RangeAsync(long fromInclusive, long toExclusive, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fromInclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起点（含）。</p>
+</dd>
+    <dt><code>toExclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>终点（不含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（冷区异步回源途中响应）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.value">Value</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</dt>
+    <dd><p>(时刻, 值, 地址) 流——严格 (ts, addr) 字典序。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_RangeAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.RangeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_RangeAsync_System_UInt32_System_Int64_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.RangeAsync(System.UInt32,System.Int64,System.Int64,System.Threading.CancellationToken)">
+  RangeAsync(uint, long, long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>命名序列范围流（dense = 单树键前缀域 seek/迭代——出域即停）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;(long Timestamp, ReadOnlyMemory&lt;byte&gt; Value, LogicalAddress Address)&gt; RangeAsync(uint seriesId, long fromInclusive, long toExclusive, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>fromInclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起点（含）。</p>
+</dd>
+    <dt><code>toExclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>终点（不含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.timestamp">Timestamp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.value">Value</a>, <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.readonlymemory-system.byte-,tc.tier.contracts.storage.logicaladdress-.address">Address</a>)&gt;</dt>
+    <dd><p>(时刻, 值, 地址) 流。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TruncateAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TruncateAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TruncateAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TruncateAsync(System.Int64,System.Threading.CancellationToken)">
+  TruncateAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>默认序列 retention 推进：回收 ts &lt; beforeTimestampExclusive 的样本（索引清理 → 数据截断 → 水位持久）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;long&gt; TruncateAsync(long beforeTimestampExclusive, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>beforeTimestampExclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>回收边界（不含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>回收的样本数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TruncateAsync_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TruncateAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_ITierTimeSeries_TruncateAsync_System_UInt32_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.ITierTimeSeries.TruncateAsync(System.UInt32,System.Int64,System.Threading.CancellationToken)">
+  TruncateAsync(uint, long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>命名序列 retention 推进（dense = 本序列键域前缀截断；Ring 截断下限由全体序列钉住地址的 min 收口——慢序列钉住）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;long&gt; TruncateAsync(uint seriesId, long beforeTimestampExclusive, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识。</p>
+</dd>
+    <dt><code>beforeTimestampExclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>回收边界（不含）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>回收的样本数。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

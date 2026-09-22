@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierTimeSeriesBuilder | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierTimeSeriesBuilder | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierTimeSeries 构建者（tc-tier-timeseries-spec &#167;3——四段式装配惯例同 TierQueueBuilder： Options 配置链 → Builder → StartAsync 一步到位）。 ★ 组合设计思想（注入优先、回落默认）：零件规格全在 ；   可替换件全走 With\* 注入——Ring 工厂、Ring meta 策略工厂、水位 meta 工厂、索引工厂、   索引比较器、共享 epoch（多结构同域惯例）、引擎选项变换器、logger；不注入 = 内部默认实现。 ★ 启动状态机同 TierQueueBuilder：只能成功启动一次（重复抛）；失败可重试（销毁重建，   对齐 RecoveryBase &quot;Failed 销毁重建&quot; 哲学）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder">
+
+
+
+  <h1 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder" class="text-break">
+Class TierTimeSeriesBuilder  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.TimeSeries.html">TimeSeries</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierTimeSeries 构建者（tc-tier-timeseries-spec §3——四段式装配惯例同 TierQueueBuilder：
+Options 配置链 → Builder → StartAsync 一步到位）。</p>
+<p>★ 组合设计思想（注入优先、回落默认）：零件规格全在 <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesOptions.html">TimeSeriesOptions</a>；
+  可替换件全走 With\* 注入——Ring 工厂、Ring meta 策略工厂、水位 meta 工厂、索引工厂、
+  索引比较器、共享 epoch（多结构同域惯例）、引擎选项变换器、logger；不注入 = 内部默认实现。</p>
+<p>★ 启动状态机同 TierQueueBuilder：只能成功启动一次（重复抛）；失败可重试（销毁重建，
+  对齐 RecoveryBase "Failed 销毁重建" 哲学）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierTimeSeriesBuilder : IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierTimeSeriesBuilder</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder__ctor_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.#ctor*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Products_TimeSeries_TimeSeriesOptions_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Products.TimeSeries.TimeSeriesOptions)">
+  TierTimeSeriesBuilder(IFileSystem, TimeSeriesOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（= 配置，零 IO）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder(IFileSystem fs, TimeSeriesOptions options)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>文件系统抽象（介质面）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesOptions.html">TimeSeriesOptions</a></dt>
+    <dd><p>TimeSeries 选项（序列名/几何/retention/索引开关）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p>fs 或 options 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_Dispose_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.Dispose*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_Dispose" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_DisposeAsync_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_DisposeAsync" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_StartAsync_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_StartAsync_TC_Tier_Products_TimeSeries_TimeSeriesRecoveryHints_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.StartAsync(TC.Tier.Products.TimeSeries.TimeSeriesRecoveryHints,System.Threading.CancellationToken)">
+  StartAsync(TimeSeriesRecoveryHints, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>一步到位：构建 + 恢复（Ring/meta join + 水位载入 + 索引启动 + 对账）+ WaitForReady。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TierTimeSeries&gt; StartAsync(TimeSeriesRecoveryHints hints = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>hints</code> <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesRecoveryHints.html">TimeSeriesRecoveryHints</a></dt>
+    <dd><p>恢复 hints（无注入项——预留）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌——透传 WaitForReadyAsync。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeries.html">TierTimeSeries</a>&gt;</dt>
+    <dd><p>已恢复就绪的 TierTimeSeries 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>已成功启动过。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithDenseSeries_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithDenseSeries*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithDenseSeries" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithDenseSeries">
+  WithDenseSeries()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启用稠密多序列模式（#443 设计稿——等价 <code>Options.DenseSeries = true</code> 链式糖）。
+dense：DenseTimeKey（20B）+ TTS2 envelope + 单树键域化 + 水位 keyed 块化；序列容量护栏 =
+<a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesOptions.html#TC_Tier_Products_TimeSeries_TimeSeriesOptions_SeriesCapacity">SeriesCapacity</a>（缺省 2²⁰）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithDenseSeries()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithEpoch_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithEpoch*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithEpoch_TC_Tier_Core_Epochs_LightEpoch_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithEpoch(TC.Tier.Core.Epochs.LightEpoch)">
+  WithEpoch(LightEpoch)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入共享 epoch（组合域多结构共用同一读保护域的惯例——Ring 与索引同域时注入）。
+不注入 = 各结构自管。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithEpoch(LightEpoch epoch)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>epoch</code> <a class="xref" href="TC.Tier.Core.Epochs.LightEpoch.html">LightEpoch</a></dt>
+    <dd><p>共享 epoch 实例。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithIndexComparer_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithIndexComparer*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithIndexComparer_TC_Tier_Core_Primitives_IKeyComparer_TC_Tier_Products_TimeSeries_TimeKey__" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithIndexComparer(TC.Tier.Core.Primitives.IKeyComparer{TC.Tier.Products.TimeSeries.TimeKey})">
+  WithIndexComparer(IKeyComparer&lt;TimeKey&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入索引键比较器（默认 = <a class="xref" href="TC.Tier.Products.TimeSeries.TimeKeyComparer.html">TimeKeyComparer</a> 字段字典序）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithIndexComparer(IKeyComparer&lt;TimeKey&gt; comparer)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>comparer</code> <a class="xref" href="TC.Tier.Core.Primitives.IKeyComparer-1.html">IKeyComparer</a>&lt;<a class="xref" href="TC.Tier.Products.TimeSeries.TimeKey.html">TimeKey</a>&gt;</dt>
+    <dd><p>键比较器。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithIndexFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithIndexFactory*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithIndexFactory_TC_Tier_Products_TimeSeries_TimeSeriesIndexFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithIndexFactory(TC.Tier.Products.TimeSeries.TimeSeriesIndexFactory)">
+  WithIndexFactory(TimeSeriesIndexFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入时间 BTree 工厂。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithIndexFactory(TimeSeriesIndexFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesIndexFactory.html">TimeSeriesIndexFactory</a></dt>
+    <dd><p>时间索引工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithLogger_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithLogger*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithLogger_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithLogger(TC.Tier.Core.Logging.ILogger)">
+  WithLogger(ILogger)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入日志器。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithLogger(ILogger logger)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志器实例。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithMetaPolicyFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithMetaPolicyFactory*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithMetaPolicyFactory_TC_Tier_Contracts_Meta_MetaPolicyFactory_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaHeader_TC_Tier_Runtime_Structures_Ring_Contracts_RingMetaPayload__" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithMetaPolicyFactory(TC.Tier.Contracts.Meta.MetaPolicyFactory{TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader,TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload})">
+  WithMetaPolicyFactory(MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入 Ring meta 策略工厂（默认回落 Managed 模式——水位持久化，P0 已证实必需：
+Disabled 下重启丢水位回退引擎假尾）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithMetaPolicyFactory(MetaPolicyFactory&lt;RingMetaHeader, RingMetaPayload&gt; factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Contracts.Meta.MetaPolicyFactory-2.html">MetaPolicyFactory</a>&lt;<a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaHeader.html">RingMetaHeader</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.Contracts.RingMetaPayload.html">RingMetaPayload</a>&gt;</dt>
+    <dd><p>meta 策略工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithRingFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithRingFactory*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithRingFactory_TC_Tier_Products_TimeSeries_TimeSeriesRingFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithRingFactory(TC.Tier.Products.TimeSeries.TimeSeriesRingFactory)">
+  WithRingFactory(TimeSeriesRingFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入数据 Ring 装配工厂（自定义整件替换——恢复算法/扫描游标/快照/meta 策略全参自控）。
+不注入 = 默认装配（透传 WithMetaPolicyFactory/WithEpoch/WithLogger 到生成封闭类全参 ctor）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithRingFactory(TimeSeriesRingFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesRingFactory.html">TimeSeriesRingFactory</a></dt>
+    <dd><p>Ring 工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithStorageOptionsFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithStorageOptionsFactory*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithStorageOptionsFactory_TC_Tier_Products_TimeSeries_TimeSeriesStorageOptionsFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithStorageOptionsFactory(TC.Tier.Products.TimeSeries.TimeSeriesStorageOptionsFactory)">
+  WithStorageOptionsFactory(TimeSeriesStorageOptionsFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入各组件的 StorageEngineOptions 变换器。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithStorageOptionsFactory(TimeSeriesStorageOptionsFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesStorageOptionsFactory.html">TimeSeriesStorageOptionsFactory</a></dt>
+    <dd><p>引擎选项变换器。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithWatermarkMetaFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithWatermarkMetaFactory*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithWatermarkMetaFactory_TC_Tier_Products_TimeSeries_TimeSeriesWatermarkMetaFactory_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithWatermarkMetaFactory(TC.Tier.Products.TimeSeries.TimeSeriesWatermarkMetaFactory)">
+  WithWatermarkMetaFactory(TimeSeriesWatermarkMetaFactory)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入水位 meta 装配工厂（自定义持久化策略/meta 传输/恢复替换）。
+不注入 = 默认装配（new VersionedMetadata）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithWatermarkMetaFactory(TimeSeriesWatermarkMetaFactory factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="TC.Tier.Products.TimeSeries.TimeSeriesWatermarkMetaFactory.html">TimeSeriesWatermarkMetaFactory</a></dt>
+    <dd><p>水位 meta 工厂。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithWorkerScheduler_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithWorkerScheduler*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TierTimeSeriesBuilder_WithWorkerScheduler_TC_Tier_Core_Execution_IsolatedTaskScheduler_" data-uid="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.WithWorkerScheduler(TC.Tier.Core.Execution.IsolatedTaskScheduler)">
+  WithWorkerScheduler(IsolatedTaskScheduler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注入引擎 worker 调度器共享实例（#505——ring/索引/水位 meta 全部引擎共用一组线程；
+多实例/嵌入式/测试拓扑线程数恒定；所有权 Referenced 归注入方——Series 释放不回收）。
+不注入 = 各引擎按 StorageOptionsFactory 配置自建。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierTimeSeriesBuilder WithWorkerScheduler(IsolatedTaskScheduler scheduler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>scheduler</code> <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html">IsolatedTaskScheduler</a></dt>
+    <dd><p>共享调度器实例（如 <a class="xref" href="TC.Tier.Core.Execution.IsolatedTaskScheduler.html#TC_Tier_Core_Execution_IsolatedTaskScheduler_Shared">Shared</a>）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.TimeSeries.TierTimeSeriesBuilder.html">TierTimeSeriesBuilder</a></dt>
+    <dd><p>TierTimeSeriesBuilder（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

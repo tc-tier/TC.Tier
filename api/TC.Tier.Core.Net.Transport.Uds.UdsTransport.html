@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class UdsTransport | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class UdsTransport | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="UDS 同机控制面介质（二期-E7，DDR-E7——docs/design/e7-uds-medium-ddr.md）： Unix domain socket 点对点请求回调传输——定位 = 同机管理/控制面 （管理查询/G2 段分配/锁服务/健康探针等请求回调域）。 ★ 线信封（自描述，无跨介质互通承诺）： 请求帧  [CorrId 8B][From 16B][Domain 1B][len 4B][payload] 应答帧  [CorrId 8B][len 4B][payload] ★ 承载面：请求回调 only——数据报/流式/核心数据报注册 → NotSupported   （raft 复制走 TCP/QUIC——介质定位文档化，DDR-E7 &#167;0）。 ★ 寻址与连接形态：ctor 供给对端路径表（NodeId → socket 路径）；**每请求短连接**   （new → connect → 写请求 → 读一帧应答 → dispose——并发在途靠每请求独立连接成立，   不靠连接复用；#416 方案 B 裁定：承认现状，长连接复用 + CorrId 常驻读循环分发为   独立立项）。/ 为 ITransport 契约成员，   当前形态不触发（无对端生命周期跟踪）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport" class="text-break">
+Class UdsTransport  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.html">Transport</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.Uds.html">Uds</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>UDS 同机控制面介质（二期-E7，DDR-E7——docs/design/e7-uds-medium-ddr.md）：
+Unix domain socket 点对点请求回调传输——定位 = 同机管理/控制面
+（管理查询/G2 段分配/锁服务/健康探针等请求回调域）。</p>
+<p>★ 线信封（自描述，无跨介质互通承诺）：</p>
+<pre><code class="lang-csharp">请求帧  [CorrId 8B][From 16B][Domain 1B][len 4B][payload]
+应答帧  [CorrId 8B][len 4B][payload]</code></pre>
+<p>★ 承载面：请求回调 only——数据报/流式/核心数据报注册 → NotSupported
+  （raft 复制走 TCP/QUIC——介质定位文档化，DDR-E7 §0）。</p>
+<p>★ 寻址与连接形态：ctor 供给对端路径表（NodeId → socket 路径）；**每请求短连接**
+  （new → connect → 写请求 → 读一帧应答 → dispose——并发在途靠每请求独立连接成立，
+  不靠连接复用；#416 方案 B 裁定：承认现状，长连接复用 + CorrId 常驻读循环分发为
+  独立立项）。<a class="xref" href="TC.Tier.Core.Net.Transport.Uds.UdsTransport.html#TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerConnected">PeerConnected</a>/<a class="xref" href="TC.Tier.Core.Net.Transport.Uds.UdsTransport.html#TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerGone">PeerGone</a> 为 ITransport 契约成员，
+  当前形态不触发（无对端生命周期跟踪）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class UdsTransport : IProtocolTransport, IProtocol, ITransport, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">UdsTransport</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html">IProtocol</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.ITransport.html">ITransport</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+  <dl class="typelist extensionMethods">
+    <dt>Extension Methods</dt>
+    <dd>
+  <div>
+      <a class="xref" href="TC.Tier.Core.Net.Channels.RequestBatchClient.html#TC_Tier_Core_Net_Channels_RequestBatchClient_SendBatchAsync_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_NodeId_System_Byte_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Nullable_System_TimeSpan__System_Threading_CancellationToken_">RequestBatchClient.SendBatchAsync(IProtocolTransport, NodeId, byte, IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, TimeSpan?, CancellationToken)</a>
+  </div>
+  </dd></dl>
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport__ctor_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport__ctor_TC_Tier_Core_Net_NodeId_System_String_System_Collections_Generic_IReadOnlyDictionary_TC_Tier_Core_Net_NodeId_System_String__TC_Tier_Core_Logging_ILogger_System_Nullable_System_IO_UnixFileMode__" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.#ctor(TC.Tier.Core.Net.NodeId,System.String,System.Collections.Generic.IReadOnlyDictionary{TC.Tier.Core.Net.NodeId,System.String},TC.Tier.Core.Logging.ILogger,System.Nullable{System.IO.UnixFileMode})">
+  UdsTransport(NodeId, string?, IReadOnlyDictionary&lt;NodeId, string&gt;?, ILogger?, UnixFileMode?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（ownPath 非空 = 监听形态——接受对端入站请求；null = 纯客户端形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public UdsTransport(NodeId self, string? ownPath, IReadOnlyDictionary&lt;NodeId, string&gt;? peerPaths = null, ILogger? logger = null, UnixFileMode? socketFileMode = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本端节点 ID。</p>
+</dd>
+    <dt><code>ownPath</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>本端 socket 文件路径（Dispose unlink）。</p>
+</dd>
+    <dt><code>peerPaths</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd><p>对端路径表（NodeId → socket 路径——拨号目标）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+    <dt><code>socketFileMode</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.unixfilemode">UnixFileMode</a>?</dt>
+    <dd><p>socket inode 权限位（#508——bind 后收紧，IPC 身份授权铁证面；
+典型 0600=仅属主可连，替代「本机即信任域」免鉴权）。null = 不置（umask 决定，零行为变化）。
+仅 Unix（Linux/macOS）生效——Windows 无 POSIX inode 语义，非 null 值在 Start 抛
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a>（安全权限请求绝不静默忽略）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_Faults_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.Faults*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_Faults" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.Faults">
+  Faults
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>故障注入（常设面——延迟/分区/丢包/乱序，任一介质等价复跑）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITransportFaultInjector Faults { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.ITransportFaultInjector.html">ITransportFaultInjector</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerPaths_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.PeerPaths*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerPaths" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.PeerPaths">
+  PeerPaths
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端路径表（诊断/测试）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyDictionary&lt;NodeId, string&gt; PeerPaths { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_Self_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.Self*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_Self" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.Self">
+  Self
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端节点 ID。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId Self { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_DisposeAsync_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_DisposeAsync" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>DisposeAsync（幂等）：unlink socket 文件 + 关闭监听/连接 + 取消循环 + 有界 drain
+（accept 专用线程等退、入站环排空——重复调用幂等直返）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时 socket 文件已 unlink、监听已关闭、循环已收口。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_OpenStreamAsync_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.OpenStreamAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.OpenStreamAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开流式会话（spec-12 §5.3——可靠有序 + 背压；GB 级 O(单帧) 不驻留）。</p>
+<p>★ 目标未连/对端不接受 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>；等待超时 = <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeoutexception">TimeoutException</a>；
+  会话不跨重连恢复（链路断 = Reset，上层重开）。</p>
+<p>★ openPayload（二期-C1）：随 StreamOpen 帧承载的发起方载荷（不透明字节，协议域自解释——
+  如组路由的 [GroupId 8B] 前缀）；接受侧经 <a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html#TC_Tier_Core_Net_Channels_IWireStream_OpenPayload">OpenPayload</a> 与 acceptor
+  回调取得。空 = 无载荷（既有形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;IWireStream&gt; OpenStreamAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; openPayload = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>openPayload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>开流载荷（不透明字节——协议域自解释）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html">IWireStream</a>&gt;</dt>
+    <dd><p>会话。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterCoreProtocol_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterCoreProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterCoreProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterCoreProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterCoreProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·内部口（数据报 handler——只放行内部核心区 0x00-0x4F）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>发送承载声明（内存介质恒承载——声明语义在进程内退化为直派）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterCoreRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterCoreRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterCoreRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterCoreRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterCoreRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·内部口（只放行内部核心区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterCoreStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterCoreStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterCoreStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterCoreStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterCoreStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册·内部口（只放行内部核心区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterCoreStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（内部核心区）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterProtocol_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域注册·公开口（spec-12 §3.5 注册面分流）——只放行注册区 0x60-0xAF
+（<a class="xref" href="TC.Tier.Core.Net.Wire.ProtocolIds.html#TC_Tier_Core_Net_Wire_ProtocolIds_IsUserRegistrable_System_Byte_">IsUserRegistrable(byte)</a>）；同 ID 重复注册抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>入站数据报处理器。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>发送承载声明（默认 TCP 帧流；内存介质恒承载——尽力语义不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 handler 注册·公开口（spec-12 §5.2——只放行注册区 0x60-0xAF，同 §3.5 分流）；
+同 ID 重复注册抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区 0x60-0xAF）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>入站请求处理器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_RegisterStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.RegisterStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流接受面注册·公开口（spec-12 §5.3——注册区 0x60-0xAF，同 §3.5 分流）。
+未注册 acceptor 的协议域 = 拒绝开流（发起端 <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html#TC_Tier_Core_Net_Channels_IProtocol_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a> 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>入站会话接受面。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_SendDatagramAsync_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.SendDatagramAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_SendDatagramAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.SendDatagramAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  SendDatagramAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>数据报发送（尽力送达——spec-12 §5.1）：对端未连/注入丢弃 = 静默丢弃；
+仅参数错误（超帧上限/取消）抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask SendDatagramAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>载荷（≤帧协议上限——大块走流式通道）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_SendRequestAsync_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.SendRequestAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_SendRequestAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_Net_Channels_RequestOptions_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.SendRequestAsync(TC.Tier.Core.Net.NodeId,System.Byte,System.ReadOnlyMemory{System.Byte},TC.Tier.Core.Net.Channels.RequestOptions,System.Threading.CancellationToken)">
+  SendRequestAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, RequestOptions?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调发送（点对点——target 须在 PeerPaths 中声明路径；否则 NetIOException）。
+线帧：[CorrId 8B][From 16B][Domain 1B][len 4B][payload]；应答 [CorrId 8B][len 4B][payload]。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;byte[]&gt; SendRequestAsync(NodeId target, byte protocolId, ReadOnlyMemory&lt;byte&gt; payload, RequestOptions? options = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点（须在 <a class="xref" href="TC.Tier.Core.Net.Transport.Uds.UdsTransport.html#TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerPaths">PeerPaths</a> 中声明路径——未声明抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>）。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（请求帧携带；对端未注册域 = 静默丢弃——本端超时）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>请求载荷。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Channels.RequestOptions.html">RequestOptions</a></dt>
+    <dd><p>per-call 选项（本实现未读——超时/重试不生效，仅签名同构；默认 null）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（覆盖连接/写/读全程）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]&gt;</dt>
+    <dd><p>完成时返回应答载荷（应答帧剥离 [CorrId 8B][len 4B] 头）；对端关闭 = 抛 <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a>；取消传播。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_Start_" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.Start*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_Start" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.Start">
+  Start()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动：ownPath 非空 = 绑定/监听/accept 循环（socket 文件残留先清理）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Start()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="events">Events
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerConnected" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.PeerConnected">
+  PeerConnected
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端可达（TCP = 握手完成；InProcess = 节点注册）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerConnected</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerConnected_remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>★ #416 方案 B：当前每请求短连接形态不触发（无对端生命周期跟踪）——
+ITransport 契约成员保留，长连接复用立项时接线。</p>
+</div>
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerGone" data-uid="TC.Tier.Core.Net.Transport.Uds.UdsTransport.PeerGone">
+  PeerGone
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端离线（TCP = Established 链路断开；InProcess = 节点注销）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public event Action&lt;NodeId&gt;? PeerGone</code></pre>
+  </div>
+
+
+
+
+
+
+  <h4 class="section">Event Type</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+  <h4 class="section" id="TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerGone_remarks">Remarks</h4>
+  <div class="markdown level1 remarks"><p>★ 同 <a class="xref" href="TC.Tier.Core.Net.Transport.Uds.UdsTransport.html#TC_Tier_Core_Net_Transport_Uds_UdsTransport_PeerConnected">PeerConnected</a>——当前形态不触发。</p>
+</div>
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

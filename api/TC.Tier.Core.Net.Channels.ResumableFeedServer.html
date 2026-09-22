@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ResumableFeedServer | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ResumableFeedServer | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="可恢复流服务端（二期-E2）：有界保留窗 + 单调 offset 分配——  产出块 offset， 按 offset 供块； 保留窗外缺口 = HasChunk=false + HasMore=true（客户端稍后重试），越过尾部 = 完成。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Channels_ResumableFeedServer" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer" class="text-break">
+Class ResumableFeedServer  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Channels.html">Channels</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>可恢复流服务端（二期-E2）：有界保留窗 + 单调 offset 分配——
+<a class="xref" href="TC.Tier.Core.Net.Channels.ResumableFeedServer.html#TC_Tier_Core_Net_Channels_ResumableFeedServer_Append_System_ReadOnlyMemory_System_Byte__">Append(ReadOnlyMemory&lt;byte&gt;)</a> 产出块 offset，<a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html#TC_Tier_Core_Net_Channels_IRequestHandler_OnRequest_TC_Tier_Core_Net_NodeId_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_Net_Channels_IReplyContext_">OnRequest(NodeId, ReadOnlyMemory&lt;byte&gt;, IReplyContext)</a> 按 offset 供块；
+保留窗外缺口 = HasChunk=false + HasMore=true（客户端稍后重试），越过尾部 = 完成。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class ResumableFeedServer : IRequestHandler, IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">ResumableFeedServer</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Channels_ResumableFeedServer__ctor_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_ResumableFeedServer__ctor_TC_Tier_Core_Net_Channels_IProtocolTransport_System_Byte_TC_Tier_Core_Net_Opaque16_System_Int32_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.#ctor(TC.Tier.Core.Net.Channels.IProtocolTransport,System.Byte,TC.Tier.Core.Net.Opaque16,System.Int32,TC.Tier.Core.Logging.ILogger)">
+  ResumableFeedServer(IProtocolTransport, byte, Opaque16, int, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造并按域挂载（RegisterRequestHandler——域号由使用方在注册区 0x60-0xAF 自管）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ResumableFeedServer(IProtocolTransport transport, byte domain, Opaque16 feedId, int retention = 1024, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>承载传输。</p>
+</dd>
+    <dt><code>domain</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（注册区）。</p>
+</dd>
+    <dt><code>feedId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>流标识（客户端请求须匹配）。</p>
+</dd>
+    <dt><code>retention</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>保留窗块数（断线续传的容错深度——窗外缺口由上层重置）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Channels_ResumableFeedServer_RetainedCount_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.RetainedCount*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_ResumableFeedServer_RetainedCount" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.RetainedCount">
+  RetainedCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>在途/保留块数（诊断）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int RetainedCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Channels_ResumableFeedServer_Append_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.Append*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_ResumableFeedServer_Append_System_ReadOnlyMemory_System_Byte__" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.Append(System.ReadOnlyMemory{System.Byte})">
+  Append(ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>追加一块（返回分配的 offset——单调递增）。</p>
+<pre><code>        &lt;p&gt;★ #418：块数据在锁内&lt;b&gt;复制&lt;/b&gt;后留存——调用方传入池化/滚动缓冲切片（ring/pipe
+        复用是常见形态）时，缓冲复用不再静默污染保留窗内已存块（曾为引用留存，污染窗口 =
+        保留窗生命周期，全程无错误信号）。上限 &lt;xref href=&quot;TC.Tier.Core.Net.Channels.ResumableFeedMessage.MaxChunkBytes&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;
+        （1 MiB）内复制代价可接受，契约安全零心智负担。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Append(ReadOnlyMemory&lt;byte&gt; chunk)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>chunk</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>块数据（内部复制——调用方缓冲可立即复用）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>分配给该块的 offset（0 起单调递增；供客户端按 offset 拉取）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Channels_ResumableFeedServer_Dispose_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_ResumableFeedServer_Dispose" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Channels_ResumableFeedServer_OnRequest_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.OnRequest*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_ResumableFeedServer_OnRequest_TC_Tier_Core_Net_NodeId_System_ReadOnlyMemory_System_Byte__TC_Tier_Core_Net_Channels_IReplyContext_" data-uid="TC.Tier.Core.Net.Channels.ResumableFeedServer.OnRequest(TC.Tier.Core.Net.NodeId,System.ReadOnlyMemory{System.Byte},TC.Tier.Core.Net.Channels.IReplyContext)">
+  OnRequest(NodeId, ReadOnlyMemory&lt;byte&gt;, IReplyContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>按 offset 供块（HasChunk=false + HasMore=true = 保留窗内缺口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void OnRequest(NodeId from, ReadOnlyMemory&lt;byte&gt; payload, IReplyContext reply)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>from</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>请求来源节点（本实现未用）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>FeedChunkReq 编码帧（畸形/非本消息族 = 静默丢弃——对端超时自愈）。</p>
+</dd>
+    <dt><code>reply</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IReplyContext.html">IReplyContext</a></dt>
+    <dd><p>应答上下文（同步编码 FeedChunkResp 回程）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

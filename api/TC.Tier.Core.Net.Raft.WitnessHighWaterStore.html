@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class WitnessHighWaterStore | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class WitnessHighWaterStore | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="Witness 高水位存储（二期-F2——DDR-F2）：witness 节点的  形态。 ★ 只持久化「日志存在性证明」——高水位对 (LastIndex, LastTerm) + (Term, VotedFor) 选举契约；日志体/状态机/快照全部缺席（witness 永不成为 leader，故永不提供日志体， 永不导出/安装快照——无体日志不会被读取）。 ★ 本实现为内存版（测试/嵌入式/内存形态）；生产持久化（高水位断电丢失 = 退回 旧高水位，投票保守方向安全但可能阻塞当选——建议装配方 fsync 持久化）归装配方按 本接口封装。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore" class="text-break">
+Class WitnessHighWaterStore  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Witness 高水位存储（二期-F2——DDR-F2）：witness 节点的 <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a> 形态。</p>
+<p>★ 只持久化「日志存在性证明」——高水位对 (LastIndex, LastTerm) + (Term, VotedFor)
+选举契约；日志体/状态机/快照全部缺席（witness 永不成为 leader，故永不提供日志体，
+永不导出/安装快照——无体日志不会被读取）。</p>
+<p>★ 本实现为内存版（测试/嵌入式/内存形态）；生产持久化（高水位断电丢失 = 退回
+旧高水位，投票保守方向安全但可能阻塞当选——建议装配方 fsync 持久化）归装配方按
+本接口封装。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class WitnessHighWaterStore : IRaftStore</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">WitnessHighWaterStore</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore__ctor_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore__ctor" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.#ctor">
+  WitnessHighWaterStore()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public WitnessHighWaterStore()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AllocatedIndex_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AllocatedIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AllocatedIndex" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AllocatedIndex">
+  AllocatedIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>= 高水位。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long AllocatedIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AppliedIndex_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AppliedIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AppliedIndex" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AppliedIndex">
+  AppliedIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>恒 0——witness 无状态机。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long AppliedIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_LastLogIndex_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.LastLogIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_LastLogIndex" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.LastLogIndex">
+  LastLogIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>高水位 index。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long LastLogIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_LastLogTerm_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.LastLogTerm*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_LastLogTerm" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.LastLogTerm">
+  LastLogTerm
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>高水位 term。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long LastLogTerm { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_PersistedIndex_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.PersistedIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_PersistedIndex" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.PersistedIndex">
+  PersistedIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>= 高水位（断言推进即视为持久化完成——内存版无 fsync 窗口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long PersistedIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_SnapshotIndex_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.SnapshotIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_SnapshotIndex" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.SnapshotIndex">
+  SnapshotIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>恒 0——无快照。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long SnapshotIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_Term_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.Term*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_Term" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.Term">
+  Term
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前任期（启动恢复）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Term { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_VotedFor_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.VotedFor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_VotedFor" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.VotedFor">
+  VotedFor
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本任期投票对象（Empty = 未投；启动恢复）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NodeId VotedFor { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AppendAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AppendAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AppendAsync_System_Int64_System_Collections_Generic_IReadOnlyList_System_ValueTuple_System_Int64_System_Byte_System_ReadOnlyMemory_System_Byte____System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AppendAsync(System.Int64,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Int64,System.Byte,System.ReadOnlyMemory{System.Byte}}},System.Threading.CancellationToken)">
+  AppendAsync(long, IReadOnlyList&lt;(long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体——witness 的条目到达走引擎 witness 分支（内容不落盘）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; AppendAsync(long prevIndex, IReadOnlyList&lt;(long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt; entries, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>prevIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>前置 index（断言匹配点——无日志体，不适用）。</p>
+</dd>
+    <dt><code>entries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte,system.readonlymemory-system.byte--.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte,system.readonlymemory-system.byte--.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte,system.readonlymemory-system.byte--.content">Content</a>)&gt;</dt>
+    <dd><p>条目（(Term, Kind, Content) 三元组——内容不落盘）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>无返回——恒抛（条目到达走 <a class="xref" href="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.html#TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AssertHighWatermarkAsync_System_Int64_System_Int64_System_Threading_CancellationToken_">AssertHighWatermarkAsync(long, long, CancellationToken)</a> 断言流）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>恒抛——witness 无日志体。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AssertHighWatermarkAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AssertHighWatermarkAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AssertHighWatermarkAsync_System_Int64_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.AssertHighWatermarkAsync(System.Int64,System.Int64,System.Threading.CancellationToken)">
+  AssertHighWatermarkAsync(long, long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>witness 断言推进（二期-F2 核心）：内容丢弃、只推高水位（index 严格更高且 term ≥
+记录任期才推进——单调不回退）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;bool&gt; AssertHighWatermarkAsync(long index, long term, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Leader 日志前沿 index。</p>
+</dd>
+    <dt><code>term</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>Leader 任期（高水位记录的任期口径）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>true = 高水位已推进；false = 未推进（落后/同位/任期旧——单调不回退）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_CountEntries_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.CountEntries*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_CountEntries_System_Int64_System_Int32_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.CountEntries(System.Int64,System.Int32)">
+  CountEntries(long, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>witness 永非 leader。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int CountEntries(long startIndex, int maxCount)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起始 index（不适用——witness 永非 leader）。</p>
+</dd>
+    <dt><code>maxCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>至多计数条数（不适用）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>无返回——恒抛（无日志体）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>恒抛——witness 无日志体。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ImportSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ImportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ImportSnapshotAsync_System_Int64_System_Collections_Generic_IAsyncEnumerable_System_ValueTuple_System_Int64_System_Int64_System_Byte_System_ReadOnlyMemory_System_Byte____System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ImportSnapshotAsync(System.Int64,System.Collections.Generic.IAsyncEnumerable{System.ValueTuple{System.Int64,System.Int64,System.Byte,System.ReadOnlyMemory{System.Byte}}},System.Threading.CancellationToken)">
+  ImportSnapshotAsync(long, IAsyncEnumerable&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无状态机——witness 拒绝快照安装。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask ImportSnapshotAsync(long snapshotIndex, IAsyncEnumerable&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt; entries, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>snapshotIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>快照覆盖点（不适用——witness 无状态机）。</p>
+</dd>
+    <dt><code>entries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.content">Content</a>)&gt;</dt>
+    <dd><p>快照条目流（不消费）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>无返回——恒抛。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>恒抛——witness 无状态机，不安装快照。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_InitializeAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.InitializeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_InitializeAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.InitializeAsync(System.Threading.CancellationToken)">
+  InitializeAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无恢复面（内存版——持久化版本在此恢复高水位）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask InitializeAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>初始化完成即结束（内存版同步完成）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_PrevLogMatchesAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.PrevLogMatchesAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_PrevLogMatchesAsync_System_Int64_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.PrevLogMatchesAsync(System.Int64,System.Int64,System.Threading.CancellationToken)">
+  PrevLogMatchesAsync(long, long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体——诚实失败优于静默（断言流走 <a class="xref" href="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.html#TC_Tier_Core_Net_Raft_WitnessHighWaterStore_AssertHighWatermarkAsync_System_Int64_System_Int64_System_Threading_CancellationToken_">AssertHighWatermarkAsync(long, long, CancellationToken)</a>，
+不经本方法）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;bool&gt; PrevLogMatchesAsync(long prevLogIndex, long prevLogTerm, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>prevLogIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>前置 index（无日志体——不适用）。</p>
+</dd>
+    <dt><code>prevLogTerm</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>前置 term（无日志体——不适用）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a>&gt;</dt>
+    <dd><p>无返回——恒抛（PrevLog 校验在引擎 witness 分支被跳过，不经本方法）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>恒抛——witness 无日志体。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ReadEntriesAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ReadEntriesAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ReadEntriesAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ReadEntriesAsync(System.Int64,System.Threading.CancellationToken)">
+  ReadEntriesAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体——witness 永非 leader（不读日志补复制）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt; ReadEntriesAsync(long startIndex, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.content">Content</a>)&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ReadLogTermAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ReadLogTermAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ReadLogTermAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ReadLogTermAsync(System.Int64,System.Threading.CancellationToken)">
+  ReadLogTermAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>index ≤ 高水位的记录任期 = 高水位 term；越界抛。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReadLogTermAsync(long index, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>条目 index（0 ≤ index ≤ 高水位——越界抛）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>该 index 的记录任期（index == 高水位 = 高水位 term；index &lt; 高水位 = 0——只存高水位对，无逐条 term）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>index 越界（&lt; 0 或 &gt; 高水位）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ReadSnapshotEntriesAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ReadSnapshotEntriesAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_ReadSnapshotEntriesAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.ReadSnapshotEntriesAsync(System.Int64,System.Threading.CancellationToken)">
+  ReadSnapshotEntriesAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体——witness 不导出快照。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt; ReadSnapshotEntriesAsync(long snapshotIndex, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>snapshotIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.content">Content</a>)&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_RefreshTailAfterImportAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.RefreshTailAfterImportAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_RefreshTailAfterImportAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.RefreshTailAfterImportAsync(System.Threading.CancellationToken)">
+  RefreshTailAfterImportAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体——no-op。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask RefreshTailAfterImportAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>恒同步完成（no-op）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_Scan_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.Scan*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_Scan_System_Int64_System_Int32_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.Scan(System.Int64,System.Int32)">
+  Scan(long, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IEnumerable&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt; Scan(long startIndex, int maxCount)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>maxCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.content">Content</a>)&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_TruncatePrefixToAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.TruncatePrefixToAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_TruncatePrefixToAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.TruncatePrefixToAsync(System.Int64,System.Threading.CancellationToken)">
+  TruncatePrefixToAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>no-op（无日志体可截）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask TruncatePrefixToAsync(long indexInclusive, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>indexInclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>删除至该 index（含）——忽略（无日志体可截）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>恒同步完成（no-op）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_TruncateSuffixFromAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.TruncateSuffixFromAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_TruncateSuffixFromAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.TruncateSuffixFromAsync(System.Int64,System.Threading.CancellationToken)">
+  TruncateSuffixFromAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>no-op（高水位单调——无截尾语义）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask TruncateSuffixFromAsync(long indexInclusive, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>indexInclusive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起始删除 index（忽略——高水位不回退）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>恒同步完成（no-op）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_TryGetEntry_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.TryGetEntry*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_TryGetEntry_System_Int64_System_Int64__System_Byte__System_ReadOnlyMemory_System_Byte___" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.TryGetEntry(System.Int64,System.Int64@,System.Byte@,System.ReadOnlyMemory{System.Byte}@)">
+  TryGetEntry(long, out long, out byte, out ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无日志体。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetEntry(long index, out long term, out byte kind, out ReadOnlyMemory&lt;byte&gt; content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>条目 index（无日志体——不适用）。</p>
+</dd>
+    <dt><code>term</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>条目 term（不写出）。</p>
+</dd>
+    <dt><code>kind</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>条目种类（不写出）。</p>
+</dd>
+    <dt><code>content</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>条目内容（不写出）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>无返回——恒抛。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>恒抛——witness 无日志体。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_UpdateAppliedIndexAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.UpdateAppliedIndexAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_UpdateAppliedIndexAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.UpdateAppliedIndexAsync(System.Int64,System.Threading.CancellationToken)">
+  UpdateAppliedIndexAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>无状态机——no-op。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask UpdateAppliedIndexAsync(long index, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>已应用 index（witness 无状态机——忽略）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>恒同步完成（no-op）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_WaitForPersistedAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.WaitForPersistedAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_WaitForPersistedAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.WaitForPersistedAsync(System.Int64,System.Threading.CancellationToken)">
+  WaitForPersistedAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>即时完成（内存版无持久化窗口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask WaitForPersistedAsync(long index, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>目标 index（断言推进即视为持久化完成——同步通过）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>即时完成（内存版无 fsync 窗口）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_WriteEntriesToAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.WriteEntriesToAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_WriteEntriesToAsync_System_Int64_System_Int32_System_Buffers_IBufferWriter_System_Byte__System_Int64___System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.WriteEntriesToAsync(System.Int64,System.Int32,System.Buffers.IBufferWriter{System.Byte},System.Int64[],System.Threading.CancellationToken)">
+  WriteEntriesToAsync(long, int, IBufferWriter&lt;byte&gt;, long[], CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>witness 永非 leader。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;int&gt; WriteEntriesToAsync(long startIndex, int count, IBufferWriter&lt;byte&gt; writer, long[] terms, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起始 index（不适用——witness 永非 leader）。</p>
+</dd>
+    <dt><code>count</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>至多写入条数（不适用）。</p>
+</dd>
+    <dt><code>writer</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.buffers.ibufferwriter-1">IBufferWriter</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>帧缓冲视图（不适用）。</p>
+</dd>
+    <dt><code>terms</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>[]</dt>
+    <dd><p>term 回填数组（不适用）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>无返回——恒抛（无日志体）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.notsupportedexception">NotSupportedException</a></dt>
+    <dd><p>恒抛——witness 无日志体。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_WriteTermAndVoteAsync_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.WriteTermAndVoteAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_WitnessHighWaterStore_WriteTermAndVoteAsync_System_Int64_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.WitnessHighWaterStore.WriteTermAndVoteAsync(System.Int64,TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  WriteTermAndVoteAsync(long, NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>选举契约（原子抬任期/投票——应答前落盘；内存版锁内直改）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask WriteTermAndVoteAsync(long term, NodeId votedFor, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>term</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>任期（单调不降——低于当前任期抛）。</p>
+</dd>
+    <dt><code>votedFor</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本任期投票对象（Empty = 清除）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>写入生效即完成（内存版无 fsync 窗口；生产持久化版本应答前落盘）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>term 低于当前任期。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

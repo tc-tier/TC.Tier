@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class HandshakeCodec | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class HandshakeCodec | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="握手帧载荷编解码与协商规则（spec-12 &#167;3.3 三步握手）。 ★ 载荷布局 [BinaryLayout] 声明（/，   32B/31B 定长——NodeId@0 为 &#167;2 一等结构嵌套件 16B 原序直拷；ClusterTag 4B 集群归属在   握手期交换（身份不变、归属可变——错集群 fail-fast，&#167;3.3））；读写由生成的   HandshakeInitCodec/HandshakeAckCodec 产出，本层只持协商语义   （版本区间/保留位/安全档校验、交集规则）。 ★ 三步时序/超时/防降级判定归连接层（spec-12 &#167;3.3/&#167;3.4）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Wire_HandshakeCodec" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec" class="text-break">
+Class HandshakeCodec  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Wire.html">Wire</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>握手帧载荷编解码与协商规则（spec-12 §3.3 三步握手）。</p>
+<p>★ 载荷布局 [BinaryLayout] 声明（<a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeInit.html">HandshakeInit</a>/<a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeAck.html">HandshakeAck</a>，
+  32B/31B 定长——NodeId@0 为 §2 一等结构嵌套件 16B 原序直拷；ClusterTag 4B 集群归属在
+  握手期交换（身份不变、归属可变——错集群 fail-fast，§3.3））；读写由生成的
+  <code>HandshakeInitCodec</code>/<code>HandshakeAckCodec</code> 产出，本层只持协商语义
+  （版本区间/保留位/安全档校验、交集规则）。</p>
+<p>★ 三步时序/超时/防降级判定归连接层（spec-12 §3.3/§3.4）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class HandshakeCodec</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">HandshakeCodec</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_AckPayloadSize_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.AckPayloadSize*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_AckPayloadSize" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.AckPayloadSize">
+  AckPayloadSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>HandshakeAck 载荷定长（= 载荷布局 [StructLayout].Size——同源生成）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int AckPayloadSize { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_InitPayloadSize_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.InitPayloadSize*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_InitPayloadSize" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.InitPayloadSize">
+  InitPayloadSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>HandshakeInit 载荷定长（= 载荷布局 [StructLayout].Size——同源生成）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static int InitPayloadSize { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_ClusterTagMatches_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.ClusterTagMatches*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_ClusterTagMatches_System_UInt32_System_UInt32_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.ClusterTagMatches(System.UInt32,System.UInt32)">
+  ClusterTagMatches(uint, uint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>集群归属核对（发起方核对 Ack 回显；应答方核对 Init——错集群 = Error + 断连 + 计数，§3.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool ClusterTagMatches(uint local, uint remote)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>local</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>本端配置的集群标签。</p>
+</dd>
+    <dt><code>remote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>对端到达帧携带/回显的标签。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 同集群。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_IntersectFeatures_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.IntersectFeatures*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_IntersectFeatures_System_Byte_System_Byte_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.IntersectFeatures(System.Byte,System.Byte)">
+  IntersectFeatures(byte, byte)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>特性位交集（双方都开才生效——按位与天然清除单侧/保留位）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte IntersectFeatures(byte local, byte remote)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>local</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>本端特性位。</p>
+</dd>
+    <dt><code>remote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>对端特性位。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>双方特性位的按位与（任一侧未开的特性被清除）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_ReadAck_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.ReadAck*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_ReadAck_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.ReadAck(System.ReadOnlySpan{System.Byte})">
+  ReadAck(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码 HandshakeAck 载荷。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static HandshakeAck ReadAck(ReadOnlySpan&lt;byte&gt; payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>线载荷（定长 <a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeCodec.html#TC_Tier_Core_Net_Wire_HandshakeCodec_AckPayloadSize">AckPayloadSize</a> 字节）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeAck.html">HandshakeAck</a></dt>
+    <dd><p>解码出的 Ack 载荷（应答方 ID/选定版本/特性交集/标签回显/nonce 回带/安全形态）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.formatexception">FormatException</a></dt>
+    <dd><p>载荷定长不符 / 安全形态未定义。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_ReadInit_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.ReadInit*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_ReadInit_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.ReadInit(System.ReadOnlySpan{System.Byte})">
+  ReadInit(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码 HandshakeInit 载荷。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static HandshakeInit ReadInit(ReadOnlySpan&lt;byte&gt; payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>线载荷（定长 <a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeCodec.html#TC_Tier_Core_Net_Wire_HandshakeCodec_InitPayloadSize">InitPayloadSize</a> 字节）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeInit.html">HandshakeInit</a></dt>
+    <dd><p>解码出的 Init 载荷（发起方 ID/版本区间/特性位/集群标签/nonce/安全形态）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.formatexception">FormatException</a></dt>
+    <dd><p>载荷定长不符 / 版本区间倒挂（对端协议违规——传输层 Error + 断连）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_TryNegotiateVersion_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.TryNegotiateVersion*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_TryNegotiateVersion_System_Byte_System_Byte_System_Byte_System_Byte_System_Byte__" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.TryNegotiateVersion(System.Byte,System.Byte,System.Byte,System.Byte,System.Byte@)">
+  TryNegotiateVersion(byte, byte, byte, byte, out byte)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>头版本协商（取双方区间交集的最高版；无交集 = false——Error 帧拒绝 + 断连）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryNegotiateVersion(byte minLocal, byte maxLocal, byte minRemote, byte maxRemote, out byte selected)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>minLocal</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>本端支持版本下界。</p>
+</dd>
+    <dt><code>maxLocal</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>本端支持版本上界。</p>
+</dd>
+    <dt><code>minRemote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>对端支持版本下界。</p>
+</dd>
+    <dt><code>maxRemote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>对端支持版本上界。</p>
+</dd>
+    <dt><code>selected</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>选定的版本（双方区间的最高交集；false 时为 0）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 存在交集，<code class="paramref">selected</code> 为可选的最高版；false = 无交集（版本协商失败）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_WriteAck_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.WriteAck*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_WriteAck_System_Span_System_Byte__TC_Tier_Core_Net_NodeId_System_Byte_System_Byte_System_UInt32_System_UInt64_System_Byte_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.WriteAck(System.Span{System.Byte},TC.Tier.Core.Net.NodeId,System.Byte,System.Byte,System.UInt32,System.UInt64,System.Byte)">
+  WriteAck(Span&lt;byte&gt;, NodeId, byte, byte, uint, ulong, byte)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码 HandshakeAck 载荷（定长 <a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeCodec.html#TC_Tier_Core_Net_Wire_HandshakeCodec_AckPayloadSize">AckPayloadSize</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void WriteAck(Span&lt;byte&gt; payload, NodeId self, byte selectedVersion, byte intersectedFeatures, uint clusterTagEcho, ulong initiatorNonce, byte security)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲（≥ <a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeCodec.html#TC_Tier_Core_Net_Wire_HandshakeCodec_AckPayloadSize">AckPayloadSize</a> 字节）。</p>
+</dd>
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>应答方节点 ID。</p>
+</dd>
+    <dt><code>selectedVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>选定的头版本（双方版本区间的最高交集）。</p>
+</dd>
+    <dt><code>intersectedFeatures</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>双方特性位按位与的交集。</p>
+</dd>
+    <dt><code>clusterTagEcho</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>回显的发起方集群归属标签（发起方据此核对）。</p>
+</dd>
+    <dt><code>initiatorNonce</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></dt>
+    <dd><p>原样回带的发起方随机数。</p>
+</dd>
+    <dt><code>security</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>安全形态（<a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeSecurity.html">HandshakeSecurity</a> 常量）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>保留特性位置位 / 安全形态未定义 / 缓冲不足。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Wire_HandshakeCodec_WriteInit_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.WriteInit*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_HandshakeCodec_WriteInit_System_Span_System_Byte__TC_Tier_Core_Net_NodeId_System_Byte_System_Byte_System_Byte_System_UInt32_System_UInt64_System_Byte_" data-uid="TC.Tier.Core.Net.Wire.HandshakeCodec.WriteInit(System.Span{System.Byte},TC.Tier.Core.Net.NodeId,System.Byte,System.Byte,System.Byte,System.UInt32,System.UInt64,System.Byte)">
+  WriteInit(Span&lt;byte&gt;, NodeId, byte, byte, byte, uint, ulong, byte)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码 HandshakeInit 载荷（写入 <code class="paramref">payload</code>，定长 <a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeCodec.html#TC_Tier_Core_Net_Wire_HandshakeCodec_InitPayloadSize">InitPayloadSize</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static void WriteInit(Span&lt;byte&gt; payload, NodeId self, byte minVersion, byte maxVersion, byte features, uint clusterTag, ulong nonce, byte security)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.span-1">Span</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲（≥ <a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeCodec.html#TC_Tier_Core_Net_Wire_HandshakeCodec_InitPayloadSize">InitPayloadSize</a> 字节）。</p>
+</dd>
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>发起方节点 ID。</p>
+</dd>
+    <dt><code>minVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>本端支持头版本下界。</p>
+</dd>
+    <dt><code>maxVersion</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>本端支持头版本上界（不得小于 <code class="paramref">minVersion</code>）。</p>
+</dd>
+    <dt><code>features</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>本端特性位（<a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeFeatures.html">HandshakeFeatures</a>——保留位必须清零）。</p>
+</dd>
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>本端集群归属标签。</p>
+</dd>
+    <dt><code>nonce</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint64">ulong</a></dt>
+    <dd><p>8B 发起方随机数（Ack 原样回带——错配/重放甄别）。</p>
+</dd>
+    <dt><code>security</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>安全形态（<a class="xref" href="TC.Tier.Core.Net.Wire.HandshakeSecurity.html">HandshakeSecurity</a> 常量）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>版本区间倒挂 / 保留特性位置位 / 安全形态未定义 / 缓冲不足。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

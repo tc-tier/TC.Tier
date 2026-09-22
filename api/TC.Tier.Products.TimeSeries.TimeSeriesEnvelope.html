@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TimeSeriesEnvelope | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TimeSeriesEnvelope | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierTimeSeries 样本 envelope（tc-tier-timeseries-spec &#167;2 产品层协议——TQE1 同族版本化变长头）。 布局（&quot;TTS1&quot;+flags 共 5B 头 + 双槽 16B）： [Magic 4B &quot;TTS1&quot;][Flags 1B][Timestamp 8B][Seq 8B?] + 原 payload。 ★ flags：bit0=HAS_SEQ（客户端序槽有效——乱序同刻消歧/幂等的预留面）；   其余位预留（压缩标记/系统样本——定案⑦ Gorilla 系后续迭代，接口零变更）。 ★ Timestamp = UTC Ticks，envelope 槽自述完整 ts（record key 只做分类）；   恢复对账 resolver 经本头读回 ts（非时序 record magic 不符 → 不入索引）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope">
+
+
+
+  <h1 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope" class="text-break">
+Class TimeSeriesEnvelope  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.TimeSeries.html">TimeSeries</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierTimeSeries 样本 envelope（tc-tier-timeseries-spec §2 产品层协议——TQE1 同族版本化变长头）。</p>
+<p>布局（"TTS1"+flags 共 5B 头 + 双槽 16B）：
+<code>[Magic 4B "TTS1"][Flags 1B][Timestamp 8B][Seq 8B?] + 原 payload</code>。</p>
+<p>★ flags：bit0=HAS_SEQ（客户端序槽有效——乱序同刻消歧/幂等的预留面）；
+  其余位预留（压缩标记/系统样本——定案⑦ Gorilla 系后续迭代，接口零变更）。</p>
+<p>★ Timestamp = UTC Ticks，envelope 槽自述完整 ts（record key 只做分类）；
+  恢复对账 resolver 经本头读回 ts（非时序 record magic 不符 → 不入索引）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class TimeSeriesEnvelope</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TimeSeriesEnvelope</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_DenseHeaderSize" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.DenseHeaderSize">
+  DenseHeaderSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>dense 固定头长（Magic 4 + Flags 1 + SeriesId 4 + Timestamp 8 + Seq 8 = 25B）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int DenseHeaderSize = 25</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_FlagHasSeq" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.FlagHasSeq">
+  FlagHasSeq
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>flags：Seq 槽有效。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const byte FlagHasSeq = 1</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_HeaderSize" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.HeaderSize">
+  HeaderSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>固定头长（Magic 4 + Flags 1 + Timestamp 8 + Seq 8）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int HeaderSize = 21</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_DenseMagic_" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.DenseMagic*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_DenseMagic" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.DenseMagic">
+  DenseMagic
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>dense 布局魔数（版本化——&quot;TTS2&quot;；与单序列 TTS1 互不读对方文件）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ReadOnlySpan&lt;byte&gt; DenseMagic { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_Magic_" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.Magic*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_Magic" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.Magic">
+  Magic
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>布局魔数（版本化）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ReadOnlySpan&lt;byte&gt; Magic { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_TryUnwrap_" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.TryUnwrap*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_TryUnwrap_System_ReadOnlySpan_System_Byte__System_Byte__System_Int64__System_Int64__System_Byte____" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.TryUnwrap(System.ReadOnlySpan{System.Byte},System.Byte@,System.Int64@,System.Int64@,System.Byte[]@)">
+  TryUnwrap(ReadOnlySpan&lt;byte&gt;, out byte, out long, out long, out byte[])
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解包（magic 校验失败 = 非本产品格式 → false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryUnwrap(ReadOnlySpan&lt;byte&gt; src, out byte flags, out long timestamp, out long seq, out byte[] payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>src</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>envelope 化样本字节。</p>
+</dd>
+    <dt><code>flags</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>输出：flags（bit0=HAS_SEQ）。</p>
+</dd>
+    <dt><code>timestamp</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出：样本时刻（UTC Ticks）。</p>
+</dd>
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出：客户端序（HAS_SEQ 未置位 = 0）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>输出：原 payload（拷贝交付）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 解包成功；false = 非本产品格式（魔数/长度非法）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_TryUnwrapDense_" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.TryUnwrapDense*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_TryUnwrapDense_System_ReadOnlySpan_System_Byte__System_Byte__System_UInt32__System_Int64__System_Int64__System_Byte____" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.TryUnwrapDense(System.ReadOnlySpan{System.Byte},System.Byte@,System.UInt32@,System.Int64@,System.Int64@,System.Byte[]@)">
+  TryUnwrapDense(ReadOnlySpan&lt;byte&gt;, out byte, out uint, out long, out long, out byte[])
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>dense 解包（TTS2 magic 校验失败 = 非本产品格式 → false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryUnwrapDense(ReadOnlySpan&lt;byte&gt; src, out byte flags, out uint seriesId, out long timestamp, out long seq, out byte[] payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>src</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>envelope 化样本字节。</p>
+</dd>
+    <dt><code>flags</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>输出：flags（bit0=HAS_SEQ）。</p>
+</dd>
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>输出：序列标识。</p>
+</dd>
+    <dt><code>timestamp</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出：样本时刻（UTC Ticks）。</p>
+</dd>
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出：客户端序（HAS_SEQ 未置位 = 0）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>输出：原 payload（拷贝交付）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 解包成功；false = 非本产品格式（魔数/长度非法）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_Wrap_" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.Wrap*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_Wrap_System_Int64_System_Nullable_System_Int64__System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.Wrap(System.Int64,System.Nullable{System.Int64},System.ReadOnlySpan{System.Byte})">
+  Wrap(long, long?, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>包裹：原 payload → envelope 化样本字节。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte[] Wrap(long timestamp, long? seq, ReadOnlySpan&lt;byte&gt; payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timestamp</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>样本时刻（UTC Ticks）。</p>
+</dd>
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>客户端序（null = 不携带——FlagHasSeq 不置位）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>原值字节。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>固定头 + 原 payload 拼接后的完整 envelope 样本字节。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_WrapDense_" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.WrapDense*"></a>
+
+  <h3 id="TC_Tier_Products_TimeSeries_TimeSeriesEnvelope_WrapDense_System_UInt32_System_Int64_System_Nullable_System_Int64__System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Products.TimeSeries.TimeSeriesEnvelope.WrapDense(System.UInt32,System.Int64,System.Nullable{System.Int64},System.ReadOnlySpan{System.Byte})">
+  WrapDense(uint, long, long?, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>dense 包裹：原 payload → envelope 化样本字节。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte[] WrapDense(uint seriesId, long timestamp, long? seq, ReadOnlySpan&lt;byte&gt; payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seriesId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>序列标识（入头——恢复重放路由 + 写侧路由凭证）。</p>
+</dd>
+    <dt><code>timestamp</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>样本时刻（UTC Ticks）。</p>
+</dd>
+    <dt><code>seq</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>客户端序（null = 不携带——FlagHasSeq 不置位）。</p>
+</dd>
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>原值字节。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>固定头 + 原 payload 拼接后的完整 envelope 样本字节。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

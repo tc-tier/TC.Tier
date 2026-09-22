@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierKvBuilder&lt;TKey, TValue&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierKvBuilder&lt;TKey, TValue&gt; | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierKv 装配器（TierWalBuilder 同构：注入面开放 + StartAsync 一步到位）。 ★ 装配两层（D7 同构）：显式层 = 本 Builder（Ring/索引工厂 + formatter/comparer/resolver 注入， 显式胜出）；缺省层 = [KvStore] 生成的封闭形态（formatter 零代码 + 内嵌派生 Ring/索引实现 自动装配）——两条路共用  的 Options→Settings 翻译面。 ★ 用法： var kv = await new TierKvBuilder&amp;lt;long, long&amp;gt;(fs, options)     .WithRingFactory((fso, o) =&amp;gt; new RingOfLong(TierKvAssembly.RingSettings(fso, o), fso))     .WithIndexFactory((fso, o, ring) =&amp;gt; new HashOfLong(fso, TierKvAssembly.HashSettings(fso, o), ring))     .StartAsync();">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Kv.TierKvBuilder`2">
+
+
+
+  <h1 id="TC_Tier_Products_Kv_TierKvBuilder_2" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2" class="text-break">
+Class TierKvBuilder&lt;TKey, TValue&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Kv.html">Kv</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierKv 装配器（TierWalBuilder 同构：注入面开放 + StartAsync 一步到位）。</p>
+<p>★ 装配两层（D7 同构）：显式层 = 本 Builder（Ring/索引工厂 + formatter/comparer/resolver 注入，
+显式胜出）；缺省层 = <code>[KvStore]</code> 生成的封闭形态（formatter 零代码 + 内嵌派生 Ring/索引实现
+自动装配）——两条路共用 <a class="xref" href="TC.Tier.Products.Kv.TierKvAssembly.html">TierKvAssembly</a> 的 Options→Settings 翻译面。</p>
+<p>★ 用法：</p>
+<pre><code class="lang-csharp">var kv = await new TierKvBuilder&lt;long, long&gt;(fs, options)
+    .WithRingFactory((fso, o) =&gt; new RingOfLong(TierKvAssembly.RingSettings(fso, o), fso))
+    .WithIndexFactory((fso, o, ring) =&gt; new HashOfLong(fso, TierKvAssembly.HashSettings(fso, o), ring))
+    .StartAsync();</code></pre>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierKvBuilder&lt;TKey, TValue&gt; : IDisposable, IAsyncDisposable where TKey : unmanaged, IEquatable&lt;TKey&gt;</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd><p>键类型（unmanaged + IEquatable）。</p>
+</dd>
+    <dt><code>TValue</code></dt>
+    <dd><p>值类型（无约束——formatter 承载格式化）。</p>
+</dd>
+  </dl>
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TierKvBuilder&lt;TKey, TValue&gt;</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2__ctor_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.#ctor*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2__ctor_TC_Tier_Core_IO_IFileSystem_TC_Tier_Products_Kv_TierKvOptions_TC_Tier_Products_Kv_IValueFormatter__1__TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.#ctor(TC.Tier.Core.IO.IFileSystem,TC.Tier.Products.Kv.TierKvOptions,TC.Tier.Products.Kv.IValueFormatter{`1},TC.Tier.Core.Logging.ILogger)">
+  TierKvBuilder(IFileSystem, TierKvOptions, IValueFormatter&lt;TValue&gt;?, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（fs + options；formatter 缺省 <a class="xref" href="TC.Tier.Products.Kv.ValueFormatters.html#TC_Tier_Products_Kv_ValueFormatters_Auto__1">Auto&lt;T&gt;()</a> 自动解析——
+byte/byte[]/ROM&lt;byte&gt;/unmanaged 值零声明；显式注入胜出）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierKvBuilder(IFileSystem fs, TierKvOptions options, IValueFormatter&lt;TValue&gt;? formatter = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>fs</code> <a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a></dt>
+    <dd><p>文件系统抽象（介质面）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Products.Kv.TierKvOptions.html">TierKvOptions</a></dt>
+    <dd><p>TierKv 选项。</p>
+</dd>
+    <dt><code>formatter</code> <a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html">IValueFormatter</a>&lt;TValue&gt;</dt>
+    <dd><p>值格式化器（缺省 Auto 自动解析；显式注入胜出）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（缺省 null）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_Dispose_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.Dispose*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_Dispose" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>释放（未 Start 的装配态无资源；已 Start 实例的生命周期归 TierKv 自身）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_DisposeAsync_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_DisposeAsync" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>异步释放。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成的 ValueTask。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_StartAsync_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_StartAsync_TC_Tier_Products_Kv_KvRecoveryHints_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.StartAsync(TC.Tier.Products.Kv.KvRecoveryHints,System.Threading.CancellationToken)">
+  StartAsync(KvRecoveryHints, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动（构造 + Initialize + WaitForReady 一步到位——TierWalBuilder.StartAsync 同构）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;TierKv&lt;TKey, TValue&gt;&gt; StartAsync(KvRecoveryHints hints = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>hints</code> <a class="xref" href="TC.Tier.Products.Kv.KvRecoveryHints.html">KvRecoveryHints</a></dt>
+    <dd><p>恢复提示（重放窗口）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Products.Kv.TierKv-2.html">TierKv</a>&lt;TKey, TValue&gt;&gt;</dt>
+    <dd><p>已就绪的 TierKv 实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>Ring 工厂或索引工厂未注入。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_WithIndexFactory_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithIndexFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_WithIndexFactory_System_Func_TC_Tier_Core_IO_IFileSystem_TC_Tier_Products_Kv_TierKvOptions_TC_Tier_Runtime_Structures_Ring_RingBase__0__TC_Tier_Contracts_Structures_IIndex__0___" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithIndexFactory(System.Func{TC.Tier.Core.IO.IFileSystem,TC.Tier.Products.Kv.TierKvOptions,TC.Tier.Runtime.Structures.Ring.RingBase{`0},TC.Tier.Contracts.Structures.IIndex{`0}})">
+  WithIndexFactory(Func&lt;IFileSystem, TierKvOptions, RingBase&lt;TKey&gt;, IIndex&lt;TKey&gt;&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——主索引工厂（探测族/比较族任一实例——<a class="xref" href="TC.Tier.Products.Kv.TierKv-2.html">TierKv&lt;TKey, TValue&gt;</a> ctor 按族闸门；
+resolver 缺省应挂 Ring 本体，探测族 tag 判等闭环回读数据面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierKvBuilder&lt;TKey, TValue&gt; WithIndexFactory(Func&lt;IFileSystem, TierKvOptions, RingBase&lt;TKey&gt;, IIndex&lt;TKey&gt;&gt; factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-4">Func</a>&lt;<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a>, <a class="xref" href="TC.Tier.Products.Kv.TierKvOptions.html">TierKvOptions</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;, <a class="xref" href="TC.Tier.Contracts.Structures.IIndex-1.html">IIndex</a>&lt;TKey&gt;&gt;</dt>
+    <dd><p>索引工厂委托（fs + options + ring → IIndex&lt;TKey&gt;）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Kv.TierKvBuilder-2.html">TierKvBuilder</a>&lt;TKey, TValue&gt;</dt>
+    <dd><p>本构建器（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_WithKeyComparer_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithKeyComparer*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_WithKeyComparer_TC_Tier_Core_Primitives_IKeyComparer__0__" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithKeyComparer(TC.Tier.Core.Primitives.IKeyComparer{`0})">
+  WithKeyComparer(IKeyComparer&lt;TKey&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——键比较器（判等/哈希——缺省 KeyComparer&lt;TKey&gt; 全字段）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierKvBuilder&lt;TKey, TValue&gt; WithKeyComparer(IKeyComparer&lt;TKey&gt; comparer)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>comparer</code> <a class="xref" href="TC.Tier.Core.Primitives.IKeyComparer-1.html">IKeyComparer</a>&lt;TKey&gt;</dt>
+    <dd><p>键比较器（判等/哈希）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Kv.TierKvBuilder-2.html">TierKvBuilder</a>&lt;TKey, TValue&gt;</dt>
+    <dd><p>本构建器（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_WithKeyResolver_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithKeyResolver*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_WithKeyResolver_TC_Tier_Contracts_Structures_IKeyResolver__0__" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithKeyResolver(TC.Tier.Contracts.Structures.IKeyResolver{`0})">
+  WithKeyResolver(IKeyResolver&lt;TKey&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——键解析器（tag 判等闭环回读数据面——缺省挂 Ring 本体，探测族硬依赖）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierKvBuilder&lt;TKey, TValue&gt; WithKeyResolver(IKeyResolver&lt;TKey&gt; resolver)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>resolver</code> <a class="xref" href="TC.Tier.Contracts.Structures.IKeyResolver-1.html">IKeyResolver</a>&lt;TKey&gt;</dt>
+    <dd><p>键解析器（tag 判等闭环回读数据面）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Kv.TierKvBuilder-2.html">TierKvBuilder</a>&lt;TKey, TValue&gt;</dt>
+    <dd><p>本构建器（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_WithLogger_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithLogger*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_WithLogger_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithLogger(TC.Tier.Core.Logging.ILogger)">
+  WithLogger(ILogger)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——日志。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierKvBuilder&lt;TKey, TValue&gt; WithLogger(ILogger logger)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Kv.TierKvBuilder-2.html">TierKvBuilder</a>&lt;TKey, TValue&gt;</dt>
+    <dd><p>本构建器（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_TierKvBuilder_2_WithRingFactory_" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithRingFactory*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_TierKvBuilder_2_WithRingFactory_System_Func_TC_Tier_Core_IO_IFileSystem_TC_Tier_Products_Kv_TierKvOptions_TC_Tier_Runtime_Structures_Ring_RingBase__0___" data-uid="TC.Tier.Products.Kv.TierKvBuilder`2.WithRingFactory(System.Func{TC.Tier.Core.IO.IFileSystem,TC.Tier.Products.Kv.TierKvOptions,TC.Tier.Runtime.Structures.Ring.RingBase{`0}})">
+  WithRingFactory(Func&lt;IFileSystem, TierKvOptions, RingBase&lt;TKey&gt;&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>With 链——Ring 数据引擎工厂（Settings 构建经 <a class="xref" href="TC.Tier.Products.Kv.TierKvAssembly.html#TC_Tier_Products_Kv_TierKvAssembly_RingSettings_TC_Tier_Core_IO_IFileSystem_TC_Tier_Products_Kv_TierKvOptions_">RingSettings(IFileSystem, TierKvOptions)</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TierKvBuilder&lt;TKey, TValue&gt; WithRingFactory(Func&lt;IFileSystem, TierKvOptions, RingBase&lt;TKey&gt;&gt; factory)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>factory</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="TC.Tier.Core.IO.IFileSystem.html">IFileSystem</a>, <a class="xref" href="TC.Tier.Products.Kv.TierKvOptions.html">TierKvOptions</a>, <a class="xref" href="TC.Tier.Runtime.Structures.Ring.RingBase-1.html">RingBase</a>&lt;TKey&gt;&gt;</dt>
+    <dd><p>Ring 工厂委托（fs + options → RingBase&lt;TKey&gt;）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Kv.TierKvBuilder-2.html">TierKvBuilder</a>&lt;TKey, TValue&gt;</dt>
+    <dd><p>本构建器（链式）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

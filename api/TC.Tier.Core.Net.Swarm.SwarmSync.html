@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SwarmSync | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SwarmSync | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="多源并行同步（spec-12 &#167;6.1——BitTorrent 同构：块清单 manifest + 并行度 K 多源拉取 + 块级换源重试 + 块校验和防错源）。 ★ 形态映射（&#167;6）：取块 = 请求回调（at-most-once 缺省——块级换源重试是投递语义的 换源变体）；持有者 = 显式列表（gossip 捎带集成随 T5 快照安装消费时定义）。 ★ 挂载（&#167;3.5）：StartAsync 经  内部口注册 （0x03）请求 handler；本地块源经  装配（holder 侧内容知识归使用方）。 ★ 边界（&#167;6.1）：raft 日志复制不多源（线性一致）——本机制仅内容寻址的基线数据； 装配点幂等 = 同一内容同一 Id 重下载结果一致（manifest 校验和保证）。 ★ 下载语义：逐块流式产出（O(并行度 &#215; 块) 驻留——消费者逐块落盘，GB 级不驻内存）； 单块全源耗尽 = 整体失败（——部分装配失败重来， 装配点幂等）；错块拦截（校验失败 = 换源 + 计数 + Net 视图 CrcFailure 钩子）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Swarm.SwarmSync">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Swarm_SwarmSync" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync" class="text-break">
+Class SwarmSync  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Swarm.html">Swarm</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>多源并行同步（spec-12 §6.1——BitTorrent 同构：块清单 manifest + 并行度 K 多源拉取 +
+块级换源重试 + 块校验和防错源）。</p>
+<p>★ 形态映射（§6）：取块 = 请求回调（at-most-once 缺省——块级换源重试是投递语义的
+换源变体）；持有者 = 显式列表（gossip 捎带集成随 T5 快照安装消费时定义）。</p>
+<p>★ 挂载（§3.5）：StartAsync 经 <span class="xref">TC.Tier.Core.Net.Channels.ICoreProtocolPort</span> 内部口注册
+<a class="xref" href="TC.Tier.Core.Net.Wire.ProtocolIds.html#TC_Tier_Core_Net_Wire_ProtocolIds_SwarmSync">SwarmSync</a>（0x03）请求 handler；本地块源经 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_">SetSource(ISwarmBlockSource?)</a>
+装配（holder 侧内容知识归使用方）。</p>
+<p>★ 边界（§6.1）：raft 日志复制不多源（线性一致）——本机制仅内容寻址的基线数据；
+装配点幂等 = 同一内容同一 Id 重下载结果一致（manifest 校验和保证）。</p>
+<p>★ 下载语义：逐块流式产出（O(并行度 × 块) 驻留——消费者逐块落盘，GB 级不驻内存）；
+单块全源耗尽 = 整体失败（<a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmDownloadException.html">SwarmDownloadException</a>——部分装配失败重来，
+装配点幂等）；错块拦截（校验失败 = 换源 + 计数 + Net 视图 CrcFailure 钩子）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SwarmSync : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SwarmSync</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync__ctor_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync__ctor_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_Swarm_SwarmOptions_TC_Tier_Core_Logging_ILogger_TC_Tier_Core_Observability_ObservabilityHub_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.#ctor(TC.Tier.Core.Net.Channels.IProtocolTransport,TC.Tier.Core.Net.Swarm.SwarmOptions,TC.Tier.Core.Logging.ILogger,TC.Tier.Core.Observability.ObservabilityHub)">
+  SwarmSync(IProtocolTransport, SwarmOptions?, ILogger?, ObservabilityHub?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（零 IO——挂载经 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_StartAsync">StartAsync()</a>；传输端点生命周期归装配层）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SwarmSync(IProtocolTransport transport, SwarmOptions? options = null, ILogger? logger = null, ObservabilityHub? hub = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>节点端点完整面（取块请求回调收发）。</p>
+</dd>
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmOptions.html">SwarmOptions</a></dt>
+    <dd><p>参数（null = 缺省）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+    <dt><code>hub</code> <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a></dt>
+    <dd><p>可观测中心（可选——null = Disabled；错块拦截计数归 Net 视图 CrcFailure）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_BadBlockCount_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.BadBlockCount*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_BadBlockCount" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.BadBlockCount">
+  BadBlockCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>错块拦截累计数（校验和失败被拒的块）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long BadBlockCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_ShouldAnnounce_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.ShouldAnnounce*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_ShouldAnnounce" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.ShouldAnnounce">
+  ShouldAnnounce
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>是否广播持有上报（ServeBlocks 与 AnnounceOnStart 同 true——纯消费者/退出广播面都不发）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool ShouldAnnounce { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_Transport_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.Transport*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_Transport" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.Transport">
+  Transport
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>节点端点完整面（反熵对账的探测发送面——装配面接线用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IProtocolTransport Transport { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_AnnounceContentAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.AnnounceContentAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_AnnounceContentAsync_System_Collections_Generic_IEnumerable_TC_Tier_Core_Net_NodeId__TC_Tier_Core_Net_Opaque16_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.AnnounceContentAsync(System.Collections.Generic.IEnumerable{TC.Tier.Core.Net.NodeId},TC.Tier.Core.Net.Opaque16,System.Threading.CancellationToken)">
+  AnnounceContentAsync(IEnumerable&lt;NodeId&gt;, Opaque16, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>内容域持有上报（#436 件四——Blob 域无 leader，目标 = 消费方配置的种子集；尽力送达）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AnnounceContentAsync(IEnumerable&lt;NodeId&gt; seeds, Opaque16 manifestId, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seeds</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_AnnounceSourceAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.AnnounceSourceAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_AnnounceSourceAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Opaque16_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.AnnounceSourceAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Opaque16,System.Threading.CancellationToken)">
+  AnnounceSourceAsync(NodeId, Opaque16, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>持有上报（尽力送达——单边声明；失败静默：丢失由下次上报/换届重报覆盖）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AnnounceSourceAsync(NodeId leader, Opaque16 manifestId, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>leader</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>上报目标（当前已知 leader）。</p>
+</dd>
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>持有的基线内容标识。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时上报已尽力送达（失败静默——丢失由下次上报/换届重报覆盖）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_AttachSource_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.AttachSource*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_AttachSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.AttachSource(TC.Tier.Core.Net.Swarm.ISwarmBlockSource)">
+  AttachSource(ISwarmBlockSource)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>注册附加块源（#436 件四——多内容源；入站取块按 manifestId 顺序探测 HasManifest 命中者）。
+raft 单槽 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_">SetSource(ISwarmBlockSource?)</a> 优先——既有行为不变。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void AttachSource(ISwarmBlockSource source)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmBlockSource.html">ISwarmBlockSource</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_DisposeAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_DisposeAsync" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时出站应答任务组已有界排空（幂等）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_DownloadAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.DownloadAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_DownloadAsync_TC_Tier_Core_Net_Swarm_SwarmManifest_System_Collections_Generic_IReadOnlyList_TC_Tier_Core_Net_NodeId__System_Action_System_Int64_TC_Tier_Core_Net_NodeId__System_Threading_CancellationToken_System_Nullable_System_Int32__" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.DownloadAsync(TC.Tier.Core.Net.Swarm.SwarmManifest,System.Collections.Generic.IReadOnlyList{TC.Tier.Core.Net.NodeId},System.Action{System.Int64,TC.Tier.Core.Net.NodeId},System.Threading.CancellationToken,System.Nullable{System.Int32})">
+  DownloadAsync(SwarmManifest, IReadOnlyList&lt;NodeId&gt;, Action&lt;long, NodeId&gt;?, CancellationToken, int?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>下载内容（并行度 K 多源拉取——逐块流式产出，消费者逐块落盘）。</p>
+<p>★ 换源：每块从轮转起点遍历持有者（源超时/无块/畸形/错块 = 换下一源）——
+  单块全源耗尽 = 整体失败（迭代收尾抛 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmDownloadException.html">SwarmDownloadException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;(long Index, byte[] Block)&gt; DownloadAsync(SwarmManifest manifest, IReadOnlyList&lt;NodeId&gt; holders, Action&lt;long, NodeId&gt;? onBlockCompleted = null, CancellationToken ct = default, int? parallelismOverride = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifest</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a></dt>
+    <dd><p>块清单（权威方构建）。</p>
+</dd>
+    <dt><code>holders</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>持有者列表（可含本端）。</p>
+</dd>
+    <dt><code>onBlockCompleted</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-2">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>块完成回调（块号 + 来源——可观测/测试计数；null = 无）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+    <dt><code>parallelismOverride</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>?</dt>
+    <dd><p>并行度覆写（null = Options.Parallelism；1 = 顺序交付——顺序落盘导入用）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte[]-.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte[]-.block">Block</a>)&gt;</dt>
+    <dd><p>块流（(块号, 块字节)——无序产出，消费者按块号定位落盘）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_DownloadBlocksAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.DownloadBlocksAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_DownloadBlocksAsync_TC_Tier_Core_Net_Swarm_SwarmManifest_System_Collections_Generic_IReadOnlyList_TC_Tier_Core_Net_NodeId__System_Collections_Generic_IEnumerable_System_Int64__System_Action_System_Int64_TC_Tier_Core_Net_NodeId__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.DownloadBlocksAsync(TC.Tier.Core.Net.Swarm.SwarmManifest,System.Collections.Generic.IReadOnlyList{TC.Tier.Core.Net.NodeId},System.Collections.Generic.IEnumerable{System.Int64},System.Action{System.Int64,TC.Tier.Core.Net.NodeId},System.Threading.CancellationToken)">
+  DownloadBlocksAsync(SwarmManifest, IReadOnlyList&lt;NodeId&gt;, IEnumerable&lt;long&gt;, Action&lt;long, NodeId&gt;?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>定向块拉取（反熵&quot;只传差异块&quot;——仅指定块号，换源/校验和全复用；单块全源耗尽
+= 整体失败 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmDownloadException.html">SwarmDownloadException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;(long Index, byte[] Block)&gt; DownloadBlocksAsync(SwarmManifest manifest, IReadOnlyList&lt;NodeId&gt; holders, IEnumerable&lt;long&gt; blockIndexes, Action&lt;long, NodeId&gt;? onBlockCompleted = null, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifest</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a></dt>
+    <dd><p>块清单。</p>
+</dd>
+    <dt><code>holders</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>持有者列表。</p>
+</dd>
+    <dt><code>blockIndexes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>目标块号（按序逐块取回）。</p>
+</dd>
+    <dt><code>onBlockCompleted</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-2">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>块完成回调。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte[]-.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.byte[]-.block">Block</a>)&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_GetHolders_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.GetHolders*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_GetHolders_TC_Tier_Core_Net_Opaque16_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.GetHolders(TC.Tier.Core.Net.Opaque16)">
+  GetHolders(Opaque16)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>持有者列表（空表兜底 [本端]——v1 行为，无上报时退化为单源，永不比现在差）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyList&lt;NodeId&gt; GetHolders(Opaque16 manifestId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>基线内容标识（代）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>持有该代内容的节点列表（无上报记录时返回仅含本端的单元素表）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_GetHolders_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.GetHolders*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_GetHolders_TC_Tier_Core_Net_Swarm_SwarmContentDomain_TC_Tier_Core_Net_Opaque16_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.GetHolders(TC.Tier.Core.Net.Swarm.SwarmContentDomain,TC.Tier.Core.Net.Opaque16)">
+  GetHolders(SwarmContentDomain, Opaque16)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>持有者列表（域化；空表兜底 [本端]——v1 行为，无上报时退化为单源，永不比现在差）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyList&lt;NodeId&gt; GetHolders(SwarmContentDomain domain, Opaque16 manifestId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>domain</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmContentDomain.html">SwarmContentDomain</a></dt>
+    <dd></dd>
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_GetManifestAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.GetManifestAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_GetManifestAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Opaque16_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.GetManifestAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Opaque16,System.Threading.CancellationToken)">
+  GetManifestAsync(NodeId, Opaque16, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>清单发现（#436 件三——向种子拉取内容清单；未持有/种子不可达 = null）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;SwarmManifest?&gt; GetManifestAsync(NodeId seed, Opaque16 manifestId, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>seed</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd></dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_OnLeaderLost_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.OnLeaderLost*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_OnLeaderLost" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.OnLeaderLost">
+  OnLeaderLost()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>换届清表（leader 卸任即丢表——本进程状态；新 leader 当选后由全体持有者重报覆盖）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void OnLeaderLost()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_RegisterSource_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.RegisterSource*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_RegisterSource_TC_Tier_Core_Net_Opaque16_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.RegisterSource(TC.Tier.Core.Net.Opaque16,TC.Tier.Core.Net.NodeId)">
+  RegisterSource(Opaque16, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>登记持有者（Announce 到达/本端发布——幂等；跨线程安全）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterSource(Opaque16 manifestId, NodeId holder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>基线内容标识（代）。</p>
+</dd>
+    <dt><code>holder</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>持有节点。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_RegisterSource_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.RegisterSource*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_RegisterSource_TC_Tier_Core_Net_Swarm_SwarmContentDomain_TC_Tier_Core_Net_Opaque16_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.RegisterSource(TC.Tier.Core.Net.Swarm.SwarmContentDomain,TC.Tier.Core.Net.Opaque16,TC.Tier.Core.Net.NodeId)">
+  RegisterSource(SwarmContentDomain, Opaque16, NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>登记持有者（域化——#436 件四；幂等，跨线程安全）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void RegisterSource(SwarmContentDomain domain, Opaque16 manifestId, NodeId holder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>domain</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmContentDomain.html">SwarmContentDomain</a></dt>
+    <dd></dd>
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd></dd>
+    <dt><code>holder</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_ResetHolders_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.ResetHolders*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_ResetHolders_TC_Tier_Core_Net_Opaque16_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.ResetHolders(TC.Tier.Core.Net.Opaque16)">
+  ResetHolders(Opaque16)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>换代清表（快照重导出 = 新 manifest——旧代 Announce 迟到不污染新代表）：
+清该代全部持有者并登记本端（导出方必持有刚发布的内容）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ResetHolders(Opaque16 manifestId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>新代内容标识。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_ResetHolders_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.ResetHolders*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_ResetHolders_TC_Tier_Core_Net_Swarm_SwarmContentDomain_TC_Tier_Core_Net_Opaque16_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.ResetHolders(TC.Tier.Core.Net.Swarm.SwarmContentDomain,TC.Tier.Core.Net.Opaque16)">
+  ResetHolders(SwarmContentDomain, Opaque16)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>换代清表（域化——清该域该代全部持有者并登记本端）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ResetHolders(SwarmContentDomain domain, Opaque16 manifestId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>domain</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmContentDomain.html">SwarmContentDomain</a></dt>
+    <dd></dd>
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.SetSource*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.SetSource(TC.Tier.Core.Net.Swarm.ISwarmBlockSource)">
+  SetSource(ISwarmBlockSource?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>装配本地块源（晚绑定/切换——holder 侧内容随使用方装配变动）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void SetSource(ISwarmBlockSource? source)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmBlockSource.html">ISwarmBlockSource</a></dt>
+    <dd><p>本地块源（null = 清空——本端不再持有任何内容）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmSync_StartAsync_" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmSync_StartAsync" data-uid="TC.Tier.Core.Net.Swarm.SwarmSync.StartAsync">
+  StartAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动：经内部口注册 SwarmSync 协议域（取块请求 handler）。只可一次。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StartAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时注册已提交（同步完成——<a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmOptions.html#TC_Tier_Core_Net_Swarm_SwarmOptions_ServeBlocks">ServeBlocks</a>=false 时不注册域）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>重复启动或传输未实现内部挂载口。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

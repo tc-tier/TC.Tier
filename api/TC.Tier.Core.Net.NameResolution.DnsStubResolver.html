@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class DnsStubResolver | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class DnsStubResolver | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="security-aware DNS stub resolver（#498——RFC 1035/2782/6891 客户端面全契约，零外部依赖叶子位）： 查询（SRV/A/AAAA）＋解析＋TTL 缓存＋EDNS0/安全位。 ★ 传输：UDP:53 首选；TC 置位 → TCP 重试；超时 +  次（指数退避）；多 server 轮询容错（每次尝试轮换下一个——ServFail/超时跟随）。 ★ 名展开（K8s CoreDNS 形态）：绝对名（尾点）直查；相对名按 ndots 阈值——点数 ≥ 阈值 先绝对后 search，否则先 search 后绝对（resolv.conf / Windows 网卡配置自举）。 ★ CNAME 跟随：深度上限 8，聚合 MinTtl（链上各跳取最小）；SRV 不跟随（RFC 2782：SRV 属主 不得为别名）。记录集保持应答节顺序——同应答字节 → 同结果。 ★ Non-goal（#498 永久排除）：DNSSEC 签名验证链与递归迭代解析（stub 以 AD 位消费递归层 验证结论——）；DNS server 面；mDNS/LLMNR/DNS-SD 组播族。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver">
+
+
+
+  <h1 id="TC_Tier_Core_Net_NameResolution_DnsStubResolver" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver" class="text-break">
+Class DnsStubResolver  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.NameResolution.html">NameResolution</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>security-aware DNS stub resolver（#498——RFC 1035/2782/6891 客户端面全契约，零外部依赖叶子位）：
+查询（SRV/A/AAAA）＋解析＋TTL 缓存＋EDNS0/安全位。</p>
+<p>★ 传输：UDP:53 首选；TC 置位 → TCP 重试；超时 + <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsStubResolverOptions.html#TC_Tier_Core_Net_NameResolution_DnsStubResolverOptions_Retries">Retries</a>
+次（指数退避）；多 server 轮询容错（每次尝试轮换下一个——ServFail/超时跟随）。</p>
+<p>★ 名展开（K8s CoreDNS 形态）：绝对名（尾点）直查；相对名按 ndots 阈值——点数 ≥ 阈值
+先绝对后 search，否则先 search 后绝对（resolv.conf / Windows 网卡配置自举）。</p>
+<p>★ CNAME 跟随：深度上限 8，聚合 MinTtl（链上各跳取最小）；SRV 不跟随（RFC 2782：SRV 属主
+不得为别名）。记录集保持应答节顺序——同应答字节 → 同结果。</p>
+<p>★ Non-goal（#498 永久排除）：DNSSEC 签名验证链与递归迭代解析（stub 以 AD 位消费递归层
+验证结论——<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsSecurityStatus.html">DnsSecurityStatus</a>）；DNS server 面；mDNS/LLMNR/DNS-SD 组播族。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class DnsStubResolver : IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">DnsStubResolver</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsStubResolver__ctor_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsStubResolver__ctor_TC_Tier_Core_Net_NameResolution_DnsStubResolverOptions_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.#ctor(TC.Tier.Core.Net.NameResolution.DnsStubResolverOptions,TC.Tier.Core.Logging.ILogger)">
+  DnsStubResolver(DnsStubResolverOptions?, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public DnsStubResolver(DnsStubResolverOptions? options = null, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsStubResolverOptions.html">DnsStubResolverOptions</a></dt>
+    <dd><p>选项（null = 全缺省——OS 自举 servers/search/ndots + CoreDNS 兼容缺省）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>可选日志器。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_Dispose_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_Dispose" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>释放（无持有资源——句柄级关闭语义；释放后查询抛 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.objectdisposedexception">ObjectDisposedException</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveAddressesAsync_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.ResolveAddressesAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveAddressesAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.ResolveAddressesAsync(System.String,System.Threading.CancellationToken)">
+  ResolveAddressesAsync(string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>A 地址查询（IPv6 用 <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsStubResolver.html#TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveAsync_System_String_TC_Tier_Core_Net_NameResolution_DnsRecordType_System_Threading_CancellationToken_">ResolveAsync(string, DnsRecordType, CancellationToken)</a> + <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html#TC_Tier_Core_Net_NameResolution_DnsRecordType_AAAA">AAAA</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;DnsAnswer&gt; ResolveAddressesAsync(string host, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>host</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>主机名。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a>&gt;</dt>
+    <dd><p>地址记录集 + 聚合 MinTtl + 安全位结论。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveAsync_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.ResolveAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveAsync_System_String_TC_Tier_Core_Net_NameResolution_DnsRecordType_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.ResolveAsync(System.String,TC.Tier.Core.Net.NameResolution.DnsRecordType,System.Threading.CancellationToken)">
+  ResolveAsync(string, DnsRecordType, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>标准查询入口（缓存 → 名展开 → 网络查询 → CNAME 跟随链）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;DnsAnswer&gt; ResolveAsync(string name, DnsRecordType type, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>name</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>查询名（尾点 = 绝对名；相对名走 search/ndots 展开）。</p>
+</dd>
+    <dt><code>type</code> <a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsRecordType.html">DnsRecordType</a></dt>
+    <dd><p>记录类型（A/AAAA/SRV 主形态；其余类型走原语但不保证 RDATA 解码）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a>&gt;</dt>
+    <dd><p>记录集 + 聚合 MinTtl + 安全位结论（NxDomain = 记录集空 + 负缓存 TTL，非异常）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.io.ioexception">IOException</a></dt>
+    <dd><p>全部尝试失败（超时/服务器失败——轮询耗尽）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveSrvAsync_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.ResolveSrvAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_NameResolution_DnsStubResolver_ResolveSrvAsync_System_String_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.NameResolution.DnsStubResolver.ResolveSrvAsync(System.String,System.Threading.CancellationToken)">
+  ResolveSrvAsync(string, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>SRV 查询（服务发现主形态——RFC 2782）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;DnsAnswer&gt; ResolveSrvAsync(string service, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>service</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>服务名（绝对名带尾点；相对名走 search/ndots 展开）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NameResolution.DnsAnswer.html">DnsAnswer</a>&gt;</dt>
+    <dd><p>SRV 记录集 + 聚合 MinTtl + 安全位结论。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

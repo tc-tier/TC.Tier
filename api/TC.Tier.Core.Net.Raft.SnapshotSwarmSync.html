@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SnapshotSwarmSync | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SnapshotSwarmSync | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="快照多源同步装配（spec-12 &#167;6.1 消费者——SwarmSync 首消费件）：把快照条目流块化 （）后走多源并行拉取；与单源流式路径 （）共享同一存储端口（IRaftStore 快照读/导入面）， 产物（目标快照区）逐字节一致——对拍契约见测试。 ★ 角色对称（spec-12 &#167;4 对称节点）：每节点既可作为 holder（ 发布块化内容供拉取）也可作为下载方（ 多源拉取重装导入）； holder 列表与 manifest 的交换是装配/握手面（InstallSnapshot RPC 携带——归 T6 引擎接线）， 本件只提供机制（发布 → 取 manifest；收到 manifest + holders → 安装）。 ★ 下载侧重装 O(快照字节) 缓冲（无序块按几何偏移落位后顺序解析导入——导入面仍逐条流式消费）； 传输线经  逐块流式（O(块) 驻留）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync" class="text-break">
+Class SnapshotSwarmSync  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>快照多源同步装配（spec-12 §6.1 消费者——SwarmSync 首消费件）：把快照条目流块化
+（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotBlockizer.html">SnapshotBlockizer</a>）后走多源并行拉取；与单源流式路径
+（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html">SnapshotStreamTransfer</a>）共享同一存储端口（IRaftStore 快照读/导入面），
+产物（目标快照区）逐字节一致——对拍契约见测试。</p>
+<p>★ 角色对称（spec-12 §4 对称节点）：每节点既可作为 holder（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.html#TC_Tier_Core_Net_Raft_SnapshotSwarmSync_PublishSnapshotAsync_System_Int64_System_Int32_System_Threading_CancellationToken_">PublishSnapshotAsync(long, int, CancellationToken)</a>
+发布块化内容供拉取）也可作为下载方（<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.html#TC_Tier_Core_Net_Raft_SnapshotSwarmSync_InstallSnapshotAsync_TC_Tier_Core_Net_Swarm_SwarmManifest_System_Collections_Generic_IReadOnlyList_TC_Tier_Core_Net_NodeId__System_Action_System_Int64_TC_Tier_Core_Net_NodeId__System_Threading_CancellationToken_">InstallSnapshotAsync(SwarmManifest, IReadOnlyList&lt;NodeId&gt;, Action&lt;long, NodeId&gt;?, CancellationToken)</a> 多源拉取重装导入）；
+holder 列表与 manifest 的交换是装配/握手面（InstallSnapshot RPC 携带——归 T6 引擎接线），
+本件只提供机制（发布 → 取 manifest；收到 manifest + holders → 安装）。</p>
+<p>★ 下载侧重装 O(快照字节) 缓冲（无序块按几何偏移落位后顺序解析导入——导入面仍逐条流式消费）；
+传输线经 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html">SwarmSync</a> 逐块流式（O(块) 驻留）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SnapshotSwarmSync</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SnapshotSwarmSync</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync__ctor_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync__ctor_TC_Tier_Core_Net_Swarm_SwarmSync_TC_Tier_Core_Net_Raft_IRaftStore_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.#ctor(TC.Tier.Core.Net.Swarm.SwarmSync,TC.Tier.Core.Net.Raft.IRaftStore,TC.Tier.Core.Logging.ILogger)">
+  SnapshotSwarmSync(SwarmSync, IRaftStore, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（零 IO——不自行挂载/启动，复用装配面已挂载的 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html">SwarmSync</a>）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SnapshotSwarmSync(SwarmSync swarm, IRaftStore store, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>swarm</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html">SwarmSync</a></dt>
+    <dd><p>多源同步组件（已 StartAsync——取块 handler 挂载 0x03）。</p>
+</dd>
+    <dt><code>store</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+    <dd><p>存储端口（快照条目源 / 导入目标）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_Swarm_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.Swarm*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_Swarm" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.Swarm">
+  Swarm
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>多源同步组件（持有表/上报面——装配面换届清表接线的对接点）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SwarmSync Swarm { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html">SwarmSync</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_AnnounceBaselineAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.AnnounceBaselineAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_AnnounceBaselineAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.AnnounceBaselineAsync(TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  AnnounceBaselineAsync(NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>基线上报（spec-12 §6.1 增量 S4——触发②启动恢复 / 触发③换届重报共用）：
+本端恢复/持有快照基线（SnapshotIndex &gt; 0）时，向已知 leader 单边声明
+（manifest Id = 覆盖点确定性映射——与发布侧同代；消息幂等，重复无害）。</p>
+<p>★ 无基线/未装配上报面 = 空操作；尽力送达——失败由下次上报覆盖。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task AnnounceBaselineAsync(NodeId leader, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>leader</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>上报目标（当前已知 leader——未知时由装配面等 LeaderChanged 后补发）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时上报已尽力送达（无基线/未装配上报面 = 空操作立即完成）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_InstallSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.InstallSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_InstallSnapshotAsync_TC_Tier_Core_Net_Swarm_SwarmManifest_System_Collections_Generic_IReadOnlyList_TC_Tier_Core_Net_NodeId__System_Action_System_Int64_TC_Tier_Core_Net_NodeId__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.InstallSnapshotAsync(TC.Tier.Core.Net.Swarm.SwarmManifest,System.Collections.Generic.IReadOnlyList{TC.Tier.Core.Net.NodeId},System.Action{System.Int64,TC.Tier.Core.Net.NodeId},System.Threading.CancellationToken)">
+  InstallSnapshotAsync(SwarmManifest, IReadOnlyList&lt;NodeId&gt;, Action&lt;long, NodeId&gt;?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>安装快照（下载方侧）：多源拉取块 → 按几何偏移重装帧化字节流 → 逐条解析 → 导入存储。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask InstallSnapshotAsync(SwarmManifest manifest, IReadOnlyList&lt;NodeId&gt; holders, Action&lt;long, NodeId&gt;? onBlockCompleted = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifest</code> <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a></dt>
+    <dd><p>块清单（权威方供给——holder 列表随握手面给出）。</p>
+</dd>
+    <dt><code>holders</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>持有者列表（可含本端）。</p>
+</dd>
+    <dt><code>onBlockCompleted</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-2">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>, <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd><p>块完成回调（块号 + 来源——块源归属观测；null = 无）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时全部块已拉取重装并逐条导入存储（单块全源耗尽抛 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmDownloadException.html">SwarmDownloadException</a>）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_PublishSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.PublishSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmSync_PublishSnapshotAsync_System_Int64_System_Int32_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmSync.PublishSnapshotAsync(System.Int64,System.Int32,System.Threading.CancellationToken)">
+  PublishSnapshotAsync(long, int, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>发布快照（holder/source 侧）：块化当前快照 → 挂到 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_">SetSource(ISwarmBlockSource?)</a> 供拉取。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;SwarmManifest&gt; PublishSnapshotAsync(long snapshotIndex, int blockSize, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>snapshotIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>快照覆盖点 N₀（读 [1..N₀] 条目）。</p>
+</dd>
+    <dt><code>blockSize</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>块大小（≤ 线协议防御界）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a>&gt;</dt>
+    <dd><p>块清单（装配面携给下载方——manifest Id = 覆盖点承载）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

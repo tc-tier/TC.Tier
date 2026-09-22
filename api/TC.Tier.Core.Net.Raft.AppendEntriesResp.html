@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class AppendEntriesResp | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class AppendEntriesResp | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="AppendEntries 应答（spec-02 &#167;3 持久化先于应答 + ★ 汇报 N₀ = 快照 index 扩展——spec-03 &#167;4： follower 应答回带本地 ，leader 发现 nextIndex ≤ N₀ 时改走快照安装）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_AppendEntriesResp" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp" class="text-break">
+Class AppendEntriesResp  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>AppendEntries 应答（spec-02 §3 持久化先于应答 + ★ 汇报 N₀ = 快照 index 扩展——spec-03 §4：
+follower 应答回带本地 <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html#TC_Tier_Core_Net_Raft_AppendEntriesResp_SnapshotIndex">SnapshotIndex</a>，leader 发现 nextIndex ≤ N₀ 时改走快照安装）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[WireMessageTag(6)]
+public sealed record AppendEntriesResp : RaftRpc, IEquatable&lt;RaftRpc&gt;, IEquatable&lt;AppendEntriesResp&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></div>
+      <div><span class="xref">AppendEntriesResp</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a>&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_WireFormatVersion">RaftRpc.WireFormatVersion</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesPerAppend">RaftRpc.MaxEntriesPerAppend</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxEntriesRegionBytes">RaftRpc.MaxEntriesRegionBytes</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxSnapshotBlocks">RaftRpc.MaxSnapshotBlocks</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_MaxSnapshotHolders">RaftRpc.MaxSnapshotHolders</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html#TC_Tier_Core_Net_Raft_RaftRpc_Term">RaftRpc.Term</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp__ctor_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp__ctor" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.#ctor">
+  AppendEntriesResp()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public AppendEntriesResp()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_ConflictIndex_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.ConflictIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_ConflictIndex" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.ConflictIndex">
+  ConflictIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>失败 hint——该 term 首条 index（leader 一次跳到 min(nextIndex-1, 该 term 首条)——spec-02 §4）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required long ConflictIndex { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_ConflictTerm_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.ConflictTerm*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_ConflictTerm" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.ConflictTerm">
+  ConflictTerm
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>失败 hint——冲突处 term（0 = 无 hint——日志比 leader 短）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required long ConflictTerm { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_EqualityContract_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.EqualityContract*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_EqualityContract" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.EqualityContract">
+  EqualityContract
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override Type EqualityContract { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.type">Type</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_MatchIndex_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.MatchIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_MatchIndex" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.MatchIndex">
+  MatchIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>成功时 follower 实际匹配到的日志尾 index（= prevLogIndex + 条数；心跳 = prevLogIndex）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required long MatchIndex { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_SnapshotIndex_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.SnapshotIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_SnapshotIndex" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.SnapshotIndex">
+  SnapshotIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>follower 本地快照覆盖点 N₀（leader 据此决策快照安装——spec-03 §4）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required long SnapshotIndex { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Success_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Success*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Success" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Success">
+  Success
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>是否成功（entries 已落盘 / 心跳 prevLog 匹配）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public required bool Success { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Equals_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Equals_System_Object_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Equals_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Equals_TC_Tier_Core_Net_Raft_AppendEntriesResp_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Equals(TC.Tier.Core.Net.Raft.AppendEntriesResp)">
+  Equals(AppendEntriesResp?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Equals(AppendEntriesResp? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Equals_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_Equals_TC_Tier_Core_Net_Raft_RaftRpc_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.Equals(TC.Tier.Core.Net.Raft.RaftRpc)">
+  Equals(RaftRpc?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override sealed bool Equals(RaftRpc? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftRpc.html">RaftRpc</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_GetHashCode_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_GetHashCode" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_PrintMembers_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.PrintMembers*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_PrintMembers_System_Text_StringBuilder_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.PrintMembers(System.Text.StringBuilder)">
+  PrintMembers(StringBuilder)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override bool PrintMembers(StringBuilder builder)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>builder</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.text.stringbuilder">StringBuilder</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_ToString_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_ToString" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_op_Equality_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_op_Equality_TC_Tier_Core_Net_Raft_AppendEntriesResp_TC_Tier_Core_Net_Raft_AppendEntriesResp_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.op_Equality(TC.Tier.Core.Net.Raft.AppendEntriesResp,TC.Tier.Core.Net.Raft.AppendEntriesResp)">
+  operator ==(AppendEntriesResp?, AppendEntriesResp?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(AppendEntriesResp? left, AppendEntriesResp? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_AppendEntriesResp_op_Inequality_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_AppendEntriesResp_op_Inequality_TC_Tier_Core_Net_Raft_AppendEntriesResp_TC_Tier_Core_Net_Raft_AppendEntriesResp_" data-uid="TC.Tier.Core.Net.Raft.AppendEntriesResp.op_Inequality(TC.Tier.Core.Net.Raft.AppendEntriesResp,TC.Tier.Core.Net.Raft.AppendEntriesResp)">
+  operator !=(AppendEntriesResp?, AppendEntriesResp?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(AppendEntriesResp? left, AppendEntriesResp? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace TC.Tier.Core.IO.Net | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace TC.Tier.Core.IO.Net | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.IO.Net">
+
+  <h1 id="TC_Tier_Core_IO_Net" data-uid="TC.Tier.Core.IO.Net" class="text-break">Namespace TC.Tier.Core.IO.Net</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.IO.Net.NetworkImageTransfer.html">NetworkImageTransfer</a></dt>
+      <dd><p>根空间镜像的 TCP 流式收发（raw-medium-and-conversion-design §9——网络发射端）。</p>
+<p>★ 协议 TIN1：握手（magic "TIN1" | 版本 u16 | mode u8）→ 载荷 → 回执帧
+  （magic "TIN2" | 帧数 u64 | 原始字节 u64 | 聚合 CRC u32 | 状态 u8）。</p>
+<p>★ 双向：同一 TCP 连接，发起端既可发送（Send）也可接收（ReceiveTo）——方向由调用者角色决定，
+  协议对称（对端另一角色运行互补方法）。</p>
+<p>★ 校验：TCA1 逐帧 CRC + 尾对账之上，接收端回执回传摘要——发送端可确认对端落盘一致。</p>
+<p>★ Raw 档（mode=Raw，#492）：连续卷整卷字节镜像——载荷为 [源长 u64] + 数据帧
+  （[len u32][payload][crc32 u32]，1 MiB 分块逐帧 CRC）+ 终结帧（len=0）；
+  回执 CRC 字段 = 聚合载荷 CRC（Structural 档 = 摘要字段 CRC——模式分轨语义）。
+  源侧 EnterMaintenance(WriteOperations) = 传输窗口只读冻结；接收端 EnterMaintenance(AllOperations)
+  + 容量预检（不足写前拒绝，目标零字节受损）+ 长度对账 + <b>OnMirrorCompleted</b> 重建内存元数据。</p>
+<p>★ v1 边界：单连接单传送（无续传/多路复用——续传为帧级断点的后续增强，台账 RM-06）；
+  Restore 要求 seekable 流的适配在此解决（网络流经 <a class="xref" href="TC.Tier.Core.IO.Net.NetworkImageTransfer.html">NetworkImageTransfer.RetargetableStream</a> 中转）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.IO.Net.NetworkTransferResult.html">NetworkTransferResult</a></dt>
+      <dd><p>传送结果（接收端回执 + 双端一致的摘要对账）。</p>
+</dd>
+    </dl>
+    <h3 id="enums">
+Enums
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Core.IO.Net.TransferMode.html">TransferMode</a></dt>
+      <dd><p>传送模式（握手帧 mode 字节——TIN1 协议）。</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

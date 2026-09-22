@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IWireStream | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IWireStream | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="流式会话（spec-12 &#167;5.3——可靠有序 + 背压；GB 级 O(单帧) 不驻留）：StreamOpen/Accept/ Data/End/Reset 帧族承载，会话号 1..254，不跨重连恢复（上层重开）。 ★ 背压 = 写 await 传导：接收侧会话缓冲有界，满 → 介质读循环 await →   对端 socket 写 await → 本端  await——整链传导。 ★ 生命周期：写端正常收尾 （End 帧——对端    自然结束）；异常中止 =    （Reset 帧——双方读写立即终止）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Channels.IWireStream">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Channels_IWireStream" data-uid="TC.Tier.Core.Net.Channels.IWireStream" class="text-break">
+Interface IWireStream  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Channels.html">Channels</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>流式会话（spec-12 §5.3——可靠有序 + 背压；GB 级 O(单帧) 不驻留）：StreamOpen/Accept/
+Data/End/Reset 帧族承载，会话号 1..254，不跨重连恢复（上层重开）。</p>
+<p>★ 背压 = 写 await 传导：接收侧会话缓冲有界，满 → 介质读循环 await →
+  对端 socket 写 await → 本端 <a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html#TC_Tier_Core_Net_Channels_IWireStream_WriteAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">WriteAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a> await——整链传导。</p>
+<p>★ 生命周期：写端正常收尾 <a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html#TC_Tier_Core_Net_Channels_IWireStream_CompleteAsync_System_Threading_CancellationToken_">CompleteAsync(CancellationToken)</a>（End 帧——对端
+  <a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html#TC_Tier_Core_Net_Channels_IWireStream_ReadAllAsync_System_Threading_CancellationToken_">ReadAllAsync(CancellationToken)</a> 自然结束）；异常中止 = <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">DisposeAsync()</a>
+  （Reset 帧——双方读写立即终止）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IWireStream : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Channels_IWireStream_OpenPayload_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.OpenPayload*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_IWireStream_OpenPayload" data-uid="TC.Tier.Core.Net.Channels.IWireStream.OpenPayload">
+  OpenPayload
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>开流载荷（二期-C1——发起端 <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocol.html#TC_Tier_Core_Net_Channels_IProtocol_OpenStreamAsync_TC_Tier_Core_Net_NodeId_System_Byte_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">OpenStreamAsync(NodeId, byte, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a> 随 StreamOpen
+承载的不透明字节；接受/发起两侧同义 = 线上全量。协议域自解释——如组路由前缀）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ReadOnlyMemory&lt;byte&gt; OpenPayload { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Channels_IWireStream_Peer_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.Peer*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_IWireStream_Peer" data-uid="TC.Tier.Core.Net.Channels.IWireStream.Peer">
+  Peer
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端节点。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">NodeId Peer { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Channels_IWireStream_ProtocolId_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.ProtocolId*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_IWireStream_ProtocolId" data-uid="TC.Tier.Core.Net.Channels.IWireStream.ProtocolId">
+  ProtocolId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域 ID（会话归属）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">byte ProtocolId { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Channels_IWireStream_CompleteAsync_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.CompleteAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_IWireStream_CompleteAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.CompleteAsync(System.Threading.CancellationToken)">
+  CompleteAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端写完（End 帧——正常收尾；对端 <a class="xref" href="TC.Tier.Core.Net.Channels.IWireStream.html#TC_Tier_Core_Net_Channels_IWireStream_ReadAllAsync_System_Threading_CancellationToken_">ReadAllAsync(CancellationToken)</a> 枚举自然结束）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask CompleteAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Channels_IWireStream_ReadAllAsync_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.ReadAllAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_IWireStream_ReadAllAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.ReadAllAsync(System.Threading.CancellationToken)">
+  ReadAllAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>读全部帧（可靠有序；对端 Complete 后枚举自然结束；Dispose/Reset 后终止）。
+逐帧产出——GB 级流读一帧处理一帧，O(单帧) 不驻留。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadAllAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>帧序列。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Channels_IWireStream_WriteAsync_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.WriteAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Channels_IWireStream_WriteAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Channels.IWireStream.WriteAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  WriteAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>写一帧（可靠有序；≤帧协议上限——GB 级流由使用方分块逐帧推进，O(单帧) 不驻留）。
+await = 背压传导（对端消费慢 → 本端等待）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask WriteAsync(ReadOnlyMemory&lt;byte&gt; buffer, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>buffer</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>帧数据。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

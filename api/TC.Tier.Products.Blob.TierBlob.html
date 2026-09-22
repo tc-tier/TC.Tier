@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TierBlob | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TierBlob | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierBlob——本地 Blob 空间（tierblob-spec：SnapshotBase 的产品封面，零新结构）。 ★ 组合配方（spec &#167;1 六大裁定）：StreamSnapshot 单形态数据引擎（{name}.blob.data——对象 =   一段连续地址区间的 CRC64 帧流，句柄 = 起始 LogicalAddress）+ 对象表（{name}.blob.meta——   版本链记录帧流，meta 真相源）。 ★ 帧几何不变式：每帧扇区对齐（数据区补零）——物理布局 = 逻辑布局，重启后恒等映射读回成立；   定长读免帧解析（数据区物理连续直达）。 ★ 线程模型：读并发无锁（表镜像点查 + 引擎读）；写单通道（产品写闸串行——结构层写尾单会话   契约，多生产者并行 = Runtime 迭代候选，spec &#167;4 诚实降级）。 ★ 恢复（spec &#167;5）：数据引擎 join（Backward 找帧尾 O(1)——无 meta，帧自描述）+ 表重放   （meta O(1) 水位 + 定步长）→ 对账（Active 逐个验帧 → 损坏标墓碑；孤儿帧不可见空间保留）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Blob.TierBlob">
+
+
+
+  <h1 id="TC_Tier_Products_Blob_TierBlob" data-uid="TC.Tier.Products.Blob.TierBlob" class="text-break">
+Class TierBlob  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Blob.html">Blob</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierBlob——本地 Blob 空间（tierblob-spec：SnapshotBase 的产品封面，零新结构）。</p>
+<p>★ 组合配方（spec §1 六大裁定）：StreamSnapshot 单形态数据引擎（<code>{name}.blob.data</code>——对象 =
+  一段连续地址区间的 CRC64 帧流，句柄 = 起始 LogicalAddress）+ 对象表（<code>{name}.blob.meta</code>——
+  版本链记录帧流，meta 真相源）。</p>
+<p>★ 帧几何不变式：每帧扇区对齐（数据区补零）——物理布局 = 逻辑布局，重启后恒等映射读回成立；
+  定长读免帧解析（数据区物理连续直达）。</p>
+<p>★ 线程模型：读并发无锁（表镜像点查 + 引擎读）；写单通道（产品写闸串行——结构层写尾单会话
+  契约，多生产者并行 = Runtime 迭代候选，spec §4 诚实降级）。</p>
+<p>★ 恢复（spec §5）：数据引擎 join（Backward 找帧尾 O(1)——无 meta，帧自描述）+ 表重放
+  （meta O(1) 水位 + 定步长）→ 对账（Active 逐个验帧 → 损坏标墓碑；孤儿帧不可见空间保留）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class TierBlob : LifecycleBase&lt;BlobRecoveryHints&gt;, ITierBlob, ILifecycle&lt;BlobRecoveryHints&gt;, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobRecoveryHints.html">BlobRecoveryHints</a>&gt;</div>
+      <div><span class="xref">TierBlob</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Products.Blob.ITierBlob.html">ITierBlob</a></div>
+      <div><a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html">ILifecycle</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobRecoveryHints.html">BlobRecoveryHints</a>&gt;</div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_GetAliveInstances_System_String_">LifecycleBase&lt;BlobRecoveryHints&gt;.GetAliveInstances(string)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady">LifecycleBase&lt;BlobRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReady_System_Int32_">LifecycleBase&lt;BlobRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_WaitForReadyAsync_System_Threading_CancellationToken_">LifecycleBase&lt;BlobRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_CancelRecovery">LifecycleBase&lt;BlobRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Initialize__0_">LifecycleBase&lt;BlobRecoveryHints&gt;.Initialize(BlobRecoveryHints)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Dispose">LifecycleBase&lt;BlobRecoveryHints&gt;.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">LifecycleBase&lt;BlobRecoveryHints&gt;.DisposeAsync()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_Id">LifecycleBase&lt;BlobRecoveryHints&gt;.Id</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_IsReady">LifecycleBase&lt;BlobRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryState">LifecycleBase&lt;BlobRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_RecoveryProgressChanged">LifecycleBase&lt;BlobRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_Bytes_" data-uid="TC.Tier.Products.Blob.TierBlob.Bytes*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_Bytes" data-uid="TC.Tier.Products.Blob.TierBlob.Bytes">
+  Bytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>引擎已用区间（物理折算，含帧开销与对齐补零）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long Bytes { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_CreateRecovery_" data-uid="TC.Tier.Products.Blob.TierBlob.CreateRecovery*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_CreateRecovery" data-uid="TC.Tier.Products.Blob.TierBlob.CreateRecovery">
+  CreateRecovery()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 默认 Recovery 单一创建点——恢复核心 = 引擎 join + 表重放 + 对账（spec §5）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override IRecovery&lt;BlobRecoveryHints&gt; CreateRecovery()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Lifecycle.IRecovery-1.html">IRecovery</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobRecoveryHints.html">BlobRecoveryHints</a>&gt;</dt>
+    <dd><p>恢复算法实例（由基类持有并在 Initialize 中执行）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_DeleteAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.DeleteAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_DeleteAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.DeleteAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  DeleteAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>删除 = 表墓碑（裁定⑥——空间保留，List/Get 即刻不可见）。幂等：已墓碑 no-op。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DeleteAsync(LogicalAddress objectId, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>对象句柄。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keynotfoundexception">KeyNotFoundException</a></dt>
+    <dd><p>句柄不存在。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_DisposeOverride_" data-uid="TC.Tier.Products.Blob.TierBlob.DisposeOverride*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_DisposeOverride_System_Boolean_" data-uid="TC.Tier.Products.Blob.TierBlob.DisposeOverride(System.Boolean)">
+  DisposeOverride(bool)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>子类同步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void DisposeOverride(bool disposing)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>disposing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true=用户调 Dispose（可触托管资源）；false=终结器（不可触托管）。
+本基类终结器不做资源清理（仅告警），disposing 恒为 true 供子类判断。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_DisposeOverrideAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.DisposeOverrideAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_DisposeOverrideAsync_System_Boolean_" data-uid="TC.Tier.Products.Blob.TierBlob.DisposeOverrideAsync(System.Boolean)">
+  DisposeOverrideAsync(bool)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>子类异步额外清理钩子（base 核心清理不可绕过）。默认空。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override ValueTask DisposeOverrideAsync(bool disposing)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>disposing</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true=用户经 <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html#TC_Tier_Core_Lifecycle_LifecycleBase_1_DisposeAsync">DisposeAsync()</a> 调用（可清理托管资源）；false=终结器路径（不可触托管）。
+本基类终结器不做资源清理（仅告警），当前恒以 true 调用，供子类判断。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>默认 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask.completedtask">CompletedTask</a>；子类实现时任务在额外清理完成后完成。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_FlushAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.FlushAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_FlushAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.FlushAsync(System.Threading.CancellationToken)">
+  FlushAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>落盘屏障：数据引擎 fsync（Complete 已保证对象表登记持久）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask FlushAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_GetAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.GetAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_GetAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Memory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.GetAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Memory{System.Byte},System.Threading.CancellationToken)">
+  GetAsync(LogicalAddress, Memory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>定长读（免帧解析快速路径——数据区物理连续，直接段感知读）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;int&gt; GetAsync(LogicalAddress objectId, Memory&lt;byte&gt; dst, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>对象句柄。</p>
+</dd>
+    <dt><code>dst</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.memory-1">Memory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>目标缓冲区（须 ≥ 对象长度）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a>&gt;</dt>
+    <dd><p>实际读取的字节数（= 对象长度）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keynotfoundexception">KeyNotFoundException</a></dt>
+    <dd><p>句柄不存在或已墓碑。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>dst 小于对象长度。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_GetInfoAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.GetInfoAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_GetInfoAsync_TC_Tier_Contracts_Storage_LogicalAddress_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.GetInfoAsync(TC.Tier.Contracts.Storage.LogicalAddress,System.Threading.CancellationToken)">
+  GetInfoAsync(LogicalAddress, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对象元信息（对象表点查，零数据 IO）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;BlobInfo&gt; GetInfoAsync(LogicalAddress objectId, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>对象句柄。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobInfo.html">BlobInfo</a>&gt;</dt>
+    <dd><p>对象元信息（含墓碑态——运维面可见）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keynotfoundexception">KeyNotFoundException</a></dt>
+    <dd><p>句柄不存在。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_GetParticipant_" data-uid="TC.Tier.Products.Blob.TierBlob.GetParticipant*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_GetParticipant" data-uid="TC.Tier.Products.Blob.TierBlob.GetParticipant">
+  GetParticipant()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 对象表参与者（spec 裁定⑤）：注册即得&quot;业务写 + 对象登记&quot;2PC 原子——
+会话域内（Prepare → Confirm/Abort）的对象登记随事务整体提交/回滚（登记帧尾截断 + 内存表回退）。
+会话期间的对象登记自动挂入事务（deferred commit）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ITransactionParticipant GetParticipant()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Contracts.Transactions.ITransactionParticipant.html">ITransactionParticipant</a></dt>
+    <dd><p>对象表事务参与者。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_GetStatsAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.GetStatsAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_GetStatsAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.GetStatsAsync(System.Threading.CancellationToken)">
+  GetStatsAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>观测快照（ObjectCount/TombstoneCount/Bytes——spec §6 统计面）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;BlobStats&gt; GetStatsAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobStats.html">BlobStats</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_ListAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.ListAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_ListAsync_TC_Tier_Products_Blob_BlobListFilter_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.ListAsync(TC.Tier.Products.Blob.BlobListFilter,System.Threading.CancellationToken)">
+  ListAsync(BlobListFilter, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对象枚举（对象表序 = 地址序）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IAsyncEnumerable&lt;BlobInfo&gt; ListAsync(BlobListFilter filter = default, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>filter</code> <a class="xref" href="TC.Tier.Products.Blob.BlobListFilter.html">BlobListFilter</a></dt>
+    <dd><p>过滤器（default = 全部 Active，全地址域）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobInfo.html">BlobInfo</a>&gt;</dt>
+    <dd><p>对象元信息流。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_OnInitializeBegin_" data-uid="TC.Tier.Products.Blob.TierBlob.OnInitializeBegin*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_OnInitializeBegin" data-uid="TC.Tier.Products.Blob.TierBlob.OnInitializeBegin">
+  OnInitializeBegin()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ Initialize 第一阶段钩子：并行启动数据引擎 + 表引擎（join 在恢复核心——
+数据尾由表推导后经 TruncateSuffix 纠偏）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">protected override void OnInitializeBegin()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_OpenRead_" data-uid="TC.Tier.Products.Blob.TierBlob.OpenRead*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_OpenRead_TC_Tier_Contracts_Storage_LogicalAddress_" data-uid="TC.Tier.Products.Blob.TierBlob.OpenRead(TC.Tier.Contracts.Storage.LogicalAddress)">
+  OpenRead(LogicalAddress)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开流式读会话（CRC64 逐帧校验——读至对象末尾自动验帧，校验失败抛 IOException）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public BlobReadSession OpenRead(LogicalAddress objectId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>objectId</code> <a class="xref" href="TC.Tier.Contracts.Storage.LogicalAddress.html">LogicalAddress</a></dt>
+    <dd><p>对象句柄。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Blob.BlobReadSession.html">BlobReadSession</a></dt>
+    <dd><p>读会话。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keynotfoundexception">KeyNotFoundException</a></dt>
+    <dd><p>句柄不存在或已墓碑。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_OpenWrite_" data-uid="TC.Tier.Products.Blob.TierBlob.OpenWrite*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_OpenWrite_System_Int64_" data-uid="TC.Tier.Products.Blob.TierBlob.OpenWrite(System.Int64)">
+  OpenWrite(long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>打开流式写会话（边写边算 CRC64，不驻内存整块）。
+★ 会话独占写通道（产品级单写者——结构层写尾单会话契约）；会话存活期间其它写操作排队。
+Dispose 未 Complete = Abort（尾截断回滚）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public BlobWriteSession OpenWrite(long expectedLength = -1)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>expectedLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>≥0 = 定长契约（须恰好写满 N 字节才可 Complete；容量守卫先行）；
+-1 = 不定长动态流（导出/管道常态，帧尾 TotalLength 收口）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Blob.BlobWriteSession.html">BlobWriteSession</a></dt>
+    <dd><p>写会话。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>定长预取判超 MaxBytes。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_PutAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.PutAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_PutAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.PutAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  PutAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>整对象单发写（内部走流式会话——CRC64 增量零驻留）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;BlobPutResult&gt; PutAsync(ReadOnlyMemory&lt;byte&gt; data, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>对象数据字节。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Blob.BlobPutResult.html">BlobPutResult</a>&gt;</dt>
+    <dd><p>对象句柄 + 长度。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>超出 MaxBytes 容量上限（fail-fast）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Products_Blob_TierBlob_ReclaimDeletedAsync_" data-uid="TC.Tier.Products.Blob.TierBlob.ReclaimDeletedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Blob_TierBlob_ReclaimDeletedAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Blob.TierBlob.ReclaimDeletedAsync(System.Threading.CancellationToken)">
+  ReclaimDeletedAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>物理回收手动档（裁定⑥）：回收墓碑对象空间——引擎内逐墓碑 extent 打洞 + 连续死亡前缀头截断
+（TruncatePrefix，Bytes 实际下降）。Active 对象区间零触碰。
+删除后不调本方法 = 空间保留（诚实定案）；重启后回收效果由表状态重推导（自愈）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;long&gt; ReclaimDeletedAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>估算回收字节数（打洞 extent + 死亡前缀帧长合计）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

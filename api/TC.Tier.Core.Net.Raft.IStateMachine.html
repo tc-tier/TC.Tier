@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IStateMachine | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IStateMachine | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="业务状态机接口（spec-05 &#167;1 定案）——日志即状态机：业务状态 = 已提交日志前缀的确定性函数；重建 = 重放。 ★ 业务方唯一必须实现 （按序应用已提交命令——index 单调递增、与日志序一致；   只被 ApplyPipeline 单 worker 调用——业务存储无并发写，结构层积木直接可用）。 ★ at-least-once 契约：apply 可能重复（断电重放 appliedIndex 之后区间）——实现须幂等/容忍重复   （raft 标准语义；at-most-once 会话去重归用户面 spec-08）。 ★ / = 可选优化路径（业务状态导出/导入，   冷启动免全量重放——存储与传输由使用方自理，协议层零绑定）；不使用不阻塞任何正确性。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.IStateMachine">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_IStateMachine" data-uid="TC.Tier.Core.Net.Raft.IStateMachine" class="text-break">
+Interface IStateMachine  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>业务状态机接口（spec-05 §1 定案）——日志即状态机：业务状态 = 已提交日志前缀的确定性函数；重建 = 重放。</p>
+<p>★ 业务方唯一必须实现 <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ApplyAsync_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">ApplyAsync(long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>（按序应用已提交命令——index 单调递增、与日志序一致；
+  只被 ApplyPipeline 单 worker 调用——业务存储无并发写，结构层积木直接可用）。</p>
+<p>★ at-least-once 契约：apply 可能重复（断电重放 appliedIndex 之后区间）——实现须幂等/容忍重复
+  （raft 标准语义；at-most-once 会话去重归用户面 spec-08）。</p>
+<p>★ <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ExportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferWriter_System_Threading_CancellationToken_">ExportStateAsync(IAsyncTransferWriter, CancellationToken)</a>/<a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ImportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferReader_System_Threading_CancellationToken_">ImportStateAsync(IAsyncTransferReader, CancellationToken)</a> = 可选优化路径（业务状态导出/导入，
+  冷启动免全量重放——存储与传输由使用方自理，协议层零绑定）；不使用不阻塞任何正确性。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IStateMachine</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_IStateMachine_ApplyAsync_" data-uid="TC.Tier.Core.Net.Raft.IStateMachine.ApplyAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_IStateMachine_ApplyAsync_System_Int64_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.IStateMachine.ApplyAsync(System.Int64,System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  ApplyAsync(long, ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>按序应用已提交命令（index 单调递增、与日志序一致；重复调用容忍——幂等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ApplyAsync(long index, ReadOnlyMemory&lt;byte&gt; command, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>命令的日志 index。</p>
+</dd>
+    <dt><code>command</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>命令内容（帧 payload——业务方定义格式）。</p>
+<pre><code>        &lt;p&gt;★ 生命周期契约（零拷贝）：command 仅在本次调用期间有效（apply 读可走存储
+        页缓冲零拷贝切片——后续读取推进后视图失效）——&lt;b&gt;禁止跨调用持有/存储&lt;/b&gt;，
+        需要留存内容的实现须在调用内拷贝。&lt;/p&gt;
+</code></pre>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_IStateMachine_ExportStateAsync_" data-uid="TC.Tier.Core.Net.Raft.IStateMachine.ExportStateAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_IStateMachine_ExportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferWriter_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.IStateMachine.ExportStateAsync(TC.Tier.Contracts.Structures.IAsyncTransferWriter,System.Threading.CancellationToken)">
+  ExportStateAsync(IAsyncTransferWriter, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>可选优化：业务状态导出（冷启动免全量重放——存储与传输由使用方自理）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ExportStateAsync(IAsyncTransferWriter writer, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>writer</code> <a class="xref" href="TC.Tier.Contracts.Structures.IAsyncTransferWriter.html">IAsyncTransferWriter</a></dt>
+    <dd><p>异步传输写入面（业务方自定义存储/序列化格式）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_IStateMachine_ImportStateAsync_" data-uid="TC.Tier.Core.Net.Raft.IStateMachine.ImportStateAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_IStateMachine_ImportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferReader_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.IStateMachine.ImportStateAsync(TC.Tier.Contracts.Structures.IAsyncTransferReader,System.Threading.CancellationToken)">
+  ImportStateAsync(IAsyncTransferReader, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>可选优化：业务状态导入（与 <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ExportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferWriter_System_Threading_CancellationToken_">ExportStateAsync(IAsyncTransferWriter, CancellationToken)</a> 配对）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ImportStateAsync(IAsyncTransferReader reader, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>reader</code> <a class="xref" href="TC.Tier.Contracts.Structures.IAsyncTransferReader.html">IAsyncTransferReader</a></dt>
+    <dd><p>异步传输读取面（与 <a class="xref" href="TC.Tier.Core.Net.Raft.IStateMachine.html#TC_Tier_Core_Net_Raft_IStateMachine_ExportStateAsync_TC_Tier_Contracts_Structures_IAsyncTransferWriter_System_Threading_CancellationToken_">ExportStateAsync(IAsyncTransferWriter, CancellationToken)</a> 导出格式对称消费）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

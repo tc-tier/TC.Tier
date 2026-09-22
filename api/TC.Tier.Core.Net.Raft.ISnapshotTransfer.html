@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ISnapshotTransfer | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ISnapshotTransfer | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="快照传输协调器（spec-03 &#167;7——协议层实现网络版传输面注入存储：导出/导入经注入面开会话； 目标绑定 = 装配层内部细节——每 follower 一次调用 = 一个新会话）。 ★ 装配（Builder/测试组合根）实现：设置当前目标（写/读会话路由）→ 调存储适配器 ExportSnapshotAsync/ImportSnapshotAsync。状态机只依赖本接口——传输形态零耦合。 ★ 握手协调面（spec-12 &#167;6.1）：导出返回 （swarm 形态 的 manifest+holders——由状态机装入 InstallSnapshot RPC 握手面随行）；null = 单源流式形态 （数据面自带一切，RPC 协调字段零值）。导入对称消费协调数据。两形态不可混装（集群装配 一致——swarm 导入方收到 null 协调数据 = 装配错误快速失败）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.ISnapshotTransfer">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_ISnapshotTransfer" data-uid="TC.Tier.Core.Net.Raft.ISnapshotTransfer" class="text-break">
+Interface ISnapshotTransfer  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>快照传输协调器（spec-03 §7——协议层实现网络版传输面注入存储：导出/导入经注入面开会话；
+目标绑定 = 装配层内部细节——每 follower 一次调用 = 一个新会话）。</p>
+<p>★ 装配（Builder/测试组合根）实现：设置当前目标（写/读会话路由）→ 调存储适配器
+ExportSnapshotAsync/ImportSnapshotAsync。状态机只依赖本接口——传输形态零耦合。</p>
+<p>★ 握手协调面（spec-12 §6.1）：导出返回 <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a>（swarm 形态
+的 manifest+holders——由状态机装入 InstallSnapshot RPC 握手面随行）；null = 单源流式形态
+（数据面自带一切，RPC 协调字段零值）。导入对称消费协调数据。两形态不可混装（集群装配
+一致——swarm 导入方收到 null 协调数据 = 装配错误快速失败）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ISnapshotTransfer</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ISnapshotTransfer_ExportSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.ISnapshotTransfer.ExportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ISnapshotTransfer_ExportSnapshotAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.ISnapshotTransfer.ExportSnapshotAsync(TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  ExportSnapshotAsync(NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>导出当前快照到目标（快照创建 = 实现侧策略——快照期间 Append 继续，增量随后推）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;SnapshotCoordination?&gt; ExportSnapshotAsync(NodeId target, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点（传输面路由）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a>&gt;</dt>
+    <dd><p>握手协调数据（swarm 形态；null = 单源流式——无协调数据）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ISnapshotTransfer_ImportSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.ISnapshotTransfer.ImportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ISnapshotTransfer_ImportSnapshotAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_SnapshotCoordination_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.ISnapshotTransfer.ImportSnapshotAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.SnapshotCoordination,System.Threading.CancellationToken)">
+  ImportSnapshotAsync(NodeId, SnapshotCoordination?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从对端导入快照（协调数据来自 InstallSnapshot RPC 握手面——swarm 形态据此多源拉取；
+null = 等待注入流式会话；事务式语义失败回滚旧快照完好）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ImportSnapshotAsync(NodeId source, SnapshotCoordination? coordination = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>来源节点（传输面路由）。</p>
+</dd>
+    <dt><code>coordination</code> <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a></dt>
+    <dd><p>握手协调数据（swarm 形态；null = 单源流式——缺省）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="KV Functions 完整模型（tierkv-design.md &#167;1——FASTER IFunctions 五参形态完整落地：用户裁定）。 ★ RMW 三流（&#167;3.3 统一为「读折叠 → Format → 追加 → 索引 CAS 换绑」）： Initial（key 无值造值）/ Copy（不可变记录折叠——旧记录保留，版本历史是我们的多出能力）/ InPlace（语义位——append-only 无可变区，实现为「本记录追加前最后折叠」：引擎先征询本钩子， false 回落 Copy 流——对齐 FASTER mutable→immutable 派生序）。 ★ 返回 false 契约：Initial/Copy 返回 false = 折叠失败 → RMW 以  收口（零写入）；InPlaceUpdater 返回 false = 本槽位放弃 → 回落 Copy 流（FASTER 同款派生）。 ★ 写侧钩子为语义位校验面（返回 false = 拒绝该写入——FASTER 原型为 void/bool 混合， 本契约统一 bool 值语义）；读侧钩子负责 value→output 翻译。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Kv.IKvFunctions`5">
+
+
+
+  <h1 id="TC_Tier_Products_Kv_IKvFunctions_5" data-uid="TC.Tier.Products.Kv.IKvFunctions`5" class="text-break">
+Interface IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt;  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Kv.html">Kv</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>KV Functions 完整模型（tierkv-design.md §1——FASTER IFunctions 五参形态完整落地：用户裁定）。</p>
+<p>★ RMW 三流（§3.3 统一为「读折叠 → Format → 追加 → 索引 CAS 换绑」）：
+Initial（key 无值造值）/ Copy（不可变记录折叠——旧记录保留，版本历史是我们的多出能力）/
+InPlace（语义位——append-only 无可变区，实现为「本记录追加前最后折叠」：引擎先征询本钩子，
+false 回落 Copy 流——对齐 FASTER mutable→immutable 派生序）。</p>
+<p>★ 返回 false 契约：Initial/Copy 返回 false = 折叠失败 → RMW 以 <a class="xref" href="TC.Tier.Products.Kv.KvStatus.html#TC_Tier_Products_Kv_KvStatus_Error">Error</a>
+收口（零写入）；InPlaceUpdater 返回 false = 本槽位放弃 → 回落 Copy 流（FASTER 同款派生）。</p>
+<p>★ 写侧钩子为语义位校验面（返回 false = 拒绝该写入——FASTER 原型为 void/bool 混合，
+本契约统一 bool 值语义）；读侧钩子负责 value→output 翻译。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface IKvFunctions&lt;TKey, TInput, TValue, TOutput, TContext&gt; where TKey : unmanaged, IEquatable&lt;TKey&gt;</code></pre>
+  </div>
+
+
+
+  <h4 class="section">Type Parameters</h4>
+  <dl class="parameters">
+    <dt><code>TKey</code></dt>
+    <dd><p>键类型（unmanaged + IEquatable）。</p>
+</dd>
+    <dt><code>TInput</code></dt>
+    <dd><p>操作输入（RMW 增量/读参数——用户定义）。</p>
+</dd>
+    <dt><code>TValue</code></dt>
+    <dd><p>值类型（经 <a class="xref" href="TC.Tier.Products.Kv.IValueFormatter-1.html">IValueFormatter&lt;TValue&gt;</a> 纯转 byte 存储）。</p>
+</dd>
+    <dt><code>TOutput</code></dt>
+    <dd><p>操作输出（读/RMW 的翻译产物——用户定义）。</p>
+</dd>
+    <dt><code>TContext</code></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_ConcurrentReader_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.ConcurrentReader*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_ConcurrentReader__0___1___2___3___4__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.ConcurrentReader(`0@,`1@,`2@,`3@,`4@)">
+  ConcurrentReader(ref TKey, ref TInput, ref TValue, ref TOutput, ref TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>并发读者（共享记录读——缺省 kv 读路径）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ConcurrentReader(ref TKey key, ref TInput input, ref TValue value, ref TOutput output, ref TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位）。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>读操作输入（参数）。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>命中的值（由引擎从记录读出）。</p>
+</dd>
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>读出翻译产物。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_ConcurrentWriter_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.ConcurrentWriter*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_ConcurrentWriter__0___2__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.ConcurrentWriter(`0@,`2@)">
+  ConcurrentWriter(ref TKey, ref TValue)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>并发写者（会话 Upsert 上下文——语义位与 Single 同形）。返回 false = 拒绝该写入。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool ConcurrentWriter(ref TKey key, ref TValue value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位）。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>待写入的值。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>接受写入为 true；拒绝为 false。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_CopyUpdater_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.CopyUpdater*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_CopyUpdater__0___1___2___2___3___4__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.CopyUpdater(`0@,`1@,`2@,`2@,`3@,`4@)">
+  CopyUpdater(ref TKey, ref TInput, ref TValue, ref TValue, ref TOutput, ref TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Copy 流：命中记录不可变折叠——oldValue+input 折叠出 newValue（旧记录保留——版本历史）。
+返回 false = 折叠失败（RMW 以 Error 收口，零写入）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool CopyUpdater(ref TKey key, ref TInput input, ref TValue oldValue, ref TValue newValue, ref TOutput output, ref TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位，禁改写）。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>RMW 操作输入（增量/参数）。</p>
+</dd>
+    <dt><code>oldValue</code> <span class="xref">TValue</span></dt>
+    <dd><p>命中记录的旧值。</p>
+</dd>
+    <dt><code>newValue</code> <span class="xref">TValue</span></dt>
+    <dd><p>折叠出的新值。</p>
+</dd>
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>折叠翻译产物（回传给完成回调）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>折叠成功为 true；失败为 false（RMW 以 Error 收口，零写入）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_DeleteCompletionCallback_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.DeleteCompletionCallback*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_DeleteCompletionCallback__0__TC_Tier_Products_Kv_KvStatus__4_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.DeleteCompletionCallback(`0@,TC.Tier.Products.Kv.KvStatus,`4)">
+  DeleteCompletionCallback(ref TKey, KvStatus, TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Delete 完成回调。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void DeleteCompletionCallback(ref TKey key, KvStatus status, TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>status</code> <a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a></dt>
+    <dd><p>操作状态（NotFound/Ok/Error）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_InPlaceUpdater_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.InPlaceUpdater*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_InPlaceUpdater__0___1___2___3___4__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.InPlaceUpdater(`0@,`1@,`2@,`3@,`4@)">
+  InPlaceUpdater(ref TKey, ref TInput, ref TValue, ref TOutput, ref TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>InPlace 等价流（语义位）：FASTER 原地更新槽位——append-only 恒追加，实现为
+「本记录追加前最后折叠」（引擎对命中记录先征询本钩子，折叠语义=原地改写 value）。
+返回 false = 回落 Copy 流（FASTER mutable→immutable 派生序）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool InPlaceUpdater(ref TKey key, ref TInput input, ref TValue value, ref TOutput output, ref TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位，禁改写）。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>RMW 操作输入（增量/参数）。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>命中记录的当前值；输出折叠后的新值。</p>
+</dd>
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>折叠翻译产物（回传给完成回调）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>折叠成功为 true；失败为 false（回落 Copy 流）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_InitialUpdater_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.InitialUpdater*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_InitialUpdater__0___1___2___3___4__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.InitialUpdater(`0@,`1@,`2@,`3@,`4@)">
+  InitialUpdater(ref TKey, ref TInput, ref TValue, ref TOutput, ref TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Initial 流：key 无值——由 input 造值（value 入参为 default，输出折叠结果）。
+返回 false = 折叠失败（RMW 以 Error 收口，零写入）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool InitialUpdater(ref TKey key, ref TInput input, ref TValue value, ref TOutput output, ref TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位，禁改写）。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>RMW 操作输入（增量/参数）。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>入参为 default（key 无值）；输出折叠出的新值。</p>
+</dd>
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>折叠翻译产物（回传给完成回调）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>折叠成功为 true；失败为 false（RMW 以 Error 收口，零写入）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_ReadCompletionCallback_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.ReadCompletionCallback*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_ReadCompletionCallback__0___1___3__TC_Tier_Products_Kv_KvStatus__4_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.ReadCompletionCallback(`0@,`1@,`3@,TC.Tier.Products.Kv.KvStatus,`4)">
+  ReadCompletionCallback(ref TKey, ref TInput, ref TOutput, KvStatus, TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Read 完成回调。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void ReadCompletionCallback(ref TKey key, ref TInput input, ref TOutput output, KvStatus status, TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>读操作输入。</p>
+</dd>
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>读出翻译产物。</p>
+</dd>
+    <dt><code>status</code> <a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a></dt>
+    <dd><p>操作状态（NotFound/Ok/Error）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_RmwCompletionCallback_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.RmwCompletionCallback*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_RmwCompletionCallback__3__TC_Tier_Products_Kv_KvStatus__4_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.RmwCompletionCallback(`3@,TC.Tier.Products.Kv.KvStatus,`4)">
+  RmwCompletionCallback(ref TOutput, KvStatus, TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>RMW 完成回调（output 折叠产物回传）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void RmwCompletionCallback(ref TOutput output, KvStatus status, TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>折叠翻译产物。</p>
+</dd>
+    <dt><code>status</code> <a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a></dt>
+    <dd><p>操作状态（NotFound/Ok/Error）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_SingleReader_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.SingleReader*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_SingleReader__0___1___2___3___4__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.SingleReader(`0@,`1@,`2@,`3@,`4@)">
+  SingleReader(ref TKey, ref TInput, ref TValue, ref TOutput, ref TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单读者（排他读上下文——Serializable 会话临界区）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void SingleReader(ref TKey key, ref TInput input, ref TValue value, ref TOutput output, ref TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位）。</p>
+</dd>
+    <dt><code>input</code> <span class="xref">TInput</span></dt>
+    <dd><p>读操作输入（参数）。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>命中的值（由引擎从记录读出）。</p>
+</dd>
+    <dt><code>output</code> <span class="xref">TOutput</span></dt>
+    <dd><p>读出翻译产物。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文（完成回调回传）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_SingleWriter_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.SingleWriter*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_SingleWriter__0___2__" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.SingleWriter(`0@,`2@)">
+  SingleWriter(ref TKey, ref TValue)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单写者（kv 直连 Upsert 上下文）。返回 false = 拒绝该写入（Upsert 以 NotFound 收口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool SingleWriter(ref TKey key, ref TValue value)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键（ref——引擎复用槽位）。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>待写入的值。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>接受写入为 true；拒绝为 false。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Kv_IKvFunctions_5_UpsertCompletionCallback_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.UpsertCompletionCallback*"></a>
+
+  <h3 id="TC_Tier_Products_Kv_IKvFunctions_5_UpsertCompletionCallback__0___2__TC_Tier_Products_Kv_KvStatus__4_" data-uid="TC.Tier.Products.Kv.IKvFunctions`5.UpsertCompletionCallback(`0@,`2@,TC.Tier.Products.Kv.KvStatus,`4)">
+  UpsertCompletionCallback(ref TKey, ref TValue, KvStatus, TContext)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>Upsert 完成回调。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">void UpsertCompletionCallback(ref TKey key, ref TValue value, KvStatus status, TContext context)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>key</code> <span class="xref">TKey</span></dt>
+    <dd><p>键。</p>
+</dd>
+    <dt><code>value</code> <span class="xref">TValue</span></dt>
+    <dd><p>写入的值。</p>
+</dd>
+    <dt><code>status</code> <a class="xref" href="TC.Tier.Products.Kv.KvStatus.html">KvStatus</a></dt>
+    <dd><p>操作状态（NotFound/Ok/Error）。</p>
+</dd>
+    <dt><code>context</code> <span class="xref">TContext</span></dt>
+    <dd><p>用户上下文。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class NodeKeyPair | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class NodeKeyPair | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="节点静态密钥对（spec-12 &#167;3.4 KeyPair 档——P-256 无证书非对称三件套：签名/ECDH/AEAD 派生源）。 ★ 算法由配置锁死（P-256 起步），**无算法协商**——密码协议实现责任归本层，刻意做最小：   同一 EC 私钥派生两个用途视图（ 签名 ∥  密钥协商），   签名走 P1363 定长格式（64B r||s——握手载荷定长化，无 DER 变长）。 ★ 公钥线格式 = 33B compressed（SEC1 点压缩）——握手 Init/Ack 追加段与信任锚存储同源；   NodeId↔公钥绑定经信任锚（钉扎/TOFU——spec-12 &#167;3.4 信任锚子形态）。 ★ 私钥字节仅本实例持有（ 仅供持久化迁移——调用方自负安全）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Security.NodeKeyPair">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Security_NodeKeyPair" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair" class="text-break">
+Class NodeKeyPair  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Security.html">Security</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>节点静态密钥对（spec-12 §3.4 KeyPair 档——P-256 无证书非对称三件套：签名/ECDH/AEAD 派生源）。</p>
+<p>★ 算法由配置锁死（P-256 起步），**无算法协商**——密码协议实现责任归本层，刻意做最小：
+  同一 EC 私钥派生两个用途视图（<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.security.cryptography.ecdsa">ECDsa</a> 签名 ∥ <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.security.cryptography.ecdiffiehellman">ECDiffieHellman</a> 密钥协商），
+  签名走 P1363 定长格式（64B r||s——握手载荷定长化，无 DER 变长）。</p>
+<p>★ 公钥线格式 = 33B compressed（SEC1 点压缩）——握手 Init/Ack 追加段与信任锚存储同源；
+  NodeId↔公钥绑定经信任锚（钉扎/TOFU——spec-12 §3.4 信任锚子形态）。</p>
+<p>★ 私钥字节仅本实例持有（<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_ExportPrivateKey">ExportPrivateKey()</a> 仅供持久化迁移——调用方自负安全）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class NodeKeyPair : IDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">NodeKeyPair</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable">IDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_PrivateKeySize" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.PrivateKeySize">
+  PrivateKeySize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>私钥字节长度（曲线阶 n &lt; 2^256）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int PrivateKeySize = 32</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_PublicKeySize" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.PublicKeySize">
+  PublicKeySize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>公钥线格式长度（SEC1 compressed——0x02/0x03 前缀 + 32B X）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int PublicKeySize = 33</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_SignatureSize" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.SignatureSize">
+  SignatureSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>P1363 定长签名长度（r||s 各 32B）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int SignatureSize = 64</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_PublicKey_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.PublicKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_PublicKey" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.PublicKey">
+  PublicKey
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>公钥线格式（33B compressed——有效至实例释放；信任锚/握手编码同源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ReadOnlySpan&lt;byte&gt; PublicKey { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_DeriveSharedSecret_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.DeriveSharedSecret*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_DeriveSharedSecret_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.DeriveSharedSecret(System.ReadOnlySpan{System.Byte})">
+  DeriveSharedSecret(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>ECDH 共享密钥（32B——会话密钥派生输入：HKDF(salt=双方 Nonce, ikm=共享密钥)）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] DeriveSharedSecret(ReadOnlySpan&lt;byte&gt; peerPublicKey)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>peerPublicKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>对端公钥（33B compressed）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>32B 原始共享密钥（共享点 X 坐标）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>公钥长度不为 <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_PublicKeySize">PublicKeySize</a>。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_Dispose_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Dispose*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_Dispose" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Dispose">
+  Dispose()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>销毁用途视图（ECParameters 私钥字节数组随 GC——托管内存无零化保证，持久化文件由调用方管）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Dispose()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_ExportPrivateKey_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.ExportPrivateKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_ExportPrivateKey" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.ExportPrivateKey">
+  ExportPrivateKey()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>导出私钥字节（持久化迁移专用——32B 大端 D；调用方自负存储安全）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] ExportPrivateKey()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>私钥字节副本（<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_PrivateKeySize">PrivateKeySize</a>B——独立数组，随调用方安全策略处置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_FromPrivateKey_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.FromPrivateKey*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_FromPrivateKey_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.FromPrivateKey(System.ReadOnlySpan{System.Byte})">
+  FromPrivateKey(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从私钥字节重建（持久化加载——32B 大端 D）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NodeKeyPair FromPrivateKey(ReadOnlySpan&lt;byte&gt; privateKey)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>privateKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>私钥字节（<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_PrivateKeySize">PrivateKeySize</a> 长）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>重建的密钥对（公钥点由私钥 D 推导）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>私钥长度不为 <a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_PrivateKeySize">PrivateKeySize</a>。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_Generate_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Generate*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_Generate" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Generate">
+  Generate()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>生成新密钥对（P-256）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NodeKeyPair Generate()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html">NodeKeyPair</a></dt>
+    <dd><p>新密钥对（公钥 33B compressed；私钥 32B 大端 D）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_Sign_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Sign*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_Sign_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Sign(System.ReadOnlySpan{System.Byte})">
+  Sign(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>签名（SHA-256 摘要 + P1363 定长 64B——私钥持有即身份证明，spec-12 §3.4）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] Sign(ReadOnlySpan&lt;byte&gt; data)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>被签数据（覆盖双方 Nonce 的握手材料）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>签名（<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_SignatureSize">SignatureSize</a> 定长 r||s）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Security_NodeKeyPair_Verify_" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Verify*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Security_NodeKeyPair_Verify_System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte__System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Security.NodeKeyPair.Verify(System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte},System.ReadOnlySpan{System.Byte})">
+  Verify(ReadOnlySpan&lt;byte&gt;, ReadOnlySpan&lt;byte&gt;, ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>验签（静态——任意公钥持有方校验；P1363 定长 64B）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool Verify(ReadOnlySpan&lt;byte&gt; peerPublicKey, ReadOnlySpan&lt;byte&gt; data, ReadOnlySpan&lt;byte&gt; signature)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>peerPublicKey</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>对端公钥（33B compressed）。</p>
+</dd>
+    <dt><code>data</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>被签数据。</p>
+</dd>
+    <dt><code>signature</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>签名（<a class="xref" href="TC.Tier.Core.Net.Security.NodeKeyPair.html#TC_Tier_Core_Net_Security_NodeKeyPair_SignatureSize">SignatureSize</a> 长）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 验签通过（数据完整且出自该公钥持有方）；false = 长度不符/数据或签名不符/公钥畸形。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

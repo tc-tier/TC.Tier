@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Struct FrameHeader | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Struct FrameHeader | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="帧头（spec-12 &#167;3.1——16B 定长、全部小端、介质无关：TCP 流帧与 UDP 数据报同一套头）。 ★ [BinaryLayout] 显式声明布局（spec-12 &#167;10 声明即代码）——全部字段（含   ）的位置/读写/偏移常量由生成的 FrameHeaderCodec 产出；   本层零偏移知识， 薄层只持帧语义（CRC 计算与校验、版本与上限判定）。 ★ 加字段 = 加一行  声明（TCSG001 锁 Size 与偏移和   一致）——手写偏移量在字段增删时整套漂移的形态不复存在。 偏移    宽度  字段 [0..4)  4B   PayloadLength   载荷长度（≤ 16MB） [4]     1B   Kind            帧种类（） [5]     1B   ChannelId       通道标识（） [6]     1B   ProtocolId      协议域 ID（） [7]     1B   Version         线协议头版本（=1；本 codec 只讲 v1） [8..12) 4B   HeaderCrc       CRC32C（覆盖本字段之前的全部头字节——防半帧/错位；                               值依赖已写出的头前缀，构造期 0 占位、由 FrameCodec 计算补写） [12..16) 4B  PayloadCrc      CRC32C（覆盖载荷） ★ 头版本 1 的字段永不再解释——演进走版本协商 + 新 FrameKind（spec-12 &#167;3.2）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Wire.FrameHeader">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Wire_FrameHeader" data-uid="TC.Tier.Core.Net.Wire.FrameHeader" class="text-break">
+Struct FrameHeader  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Wire.html">Wire</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>帧头（spec-12 §3.1——16B 定长、全部小端、介质无关：TCP 流帧与 UDP 数据报同一套头）。</p>
+<p>★ [BinaryLayout] 显式声明布局（spec-12 §10 声明即代码）——全部字段（含
+  <a class="xref" href="TC.Tier.Core.Net.Wire.FrameHeader.html#TC_Tier_Core_Net_Wire_FrameHeader_HeaderCrc">HeaderCrc</a>）的位置/读写/偏移常量由生成的 <code>FrameHeaderCodec</code> 产出；
+  本层零偏移知识，<a class="xref" href="TC.Tier.Core.Net.Wire.FrameCodec.html">FrameCodec</a> 薄层只持帧语义（CRC 计算与校验、版本与上限判定）。</p>
+<p>★ 加字段 = 加一行 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.runtime.interopservices.fieldoffsetattribute">FieldOffsetAttribute</a> 声明（TCSG001 锁 Size 与偏移和
+  一致）——手写偏移量在字段增删时整套漂移的形态不复存在。</p>
+<pre><code class="lang-csharp">偏移    宽度  字段
+[0..4)  4B   PayloadLength   载荷长度（≤ 16MB）
+[4]     1B   Kind            帧种类（）
+[5]     1B   ChannelId       通道标识（）
+[6]     1B   ProtocolId      协议域 ID（）
+[7]     1B   Version         线协议头版本（=1；本 codec 只讲 v1）
+[8..12) 4B   HeaderCrc       CRC32C（覆盖本字段之前的全部头字节——防半帧/错位；
+                              值依赖已写出的头前缀，构造期 0 占位、由 FrameCodec 计算补写）
+[12..16) 4B  PayloadCrc      CRC32C（覆盖载荷）</code></pre>
+<p>★ 头版本 1 的字段永不再解释——演进走版本协商 + 新 FrameKind（spec-12 §3.2）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">[BinaryLayout(Features = BinaryLayoutFeatures.All)]
+public readonly struct FrameHeader</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetype.equals">ValueType.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetype.gethashcode">ValueType.GetHashCode()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetype.tostring">ValueType.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Wire_FrameHeader__ctor_" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader__ctor_System_UInt32_System_Byte_System_Byte_System_Byte_System_Byte_System_UInt32_System_UInt32_" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.#ctor(System.UInt32,System.Byte,System.Byte,System.Byte,System.Byte,System.UInt32,System.UInt32)">
+  FrameHeader(uint, byte, byte, byte, byte, uint, uint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>全字段构造（按偏移序——BinaryLayout 生成 Read 的构造路径）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public FrameHeader(uint payloadLength, byte kind, byte channelId, byte protocolId, byte version, uint headerCrc, uint payloadCrc)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payloadLength</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>载荷字节数。</p>
+</dd>
+    <dt><code>kind</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>帧种类原始字节。</p>
+</dd>
+    <dt><code>channelId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>通道标识原始字节。</p>
+</dd>
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID 原始字节。</p>
+</dd>
+    <dt><code>version</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>头版本。</p>
+</dd>
+    <dt><code>headerCrc</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>头 CRC32C（编码期占位 0——由 FrameCodec 计算补写）。</p>
+</dd>
+    <dt><code>payloadCrc</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>载荷 CRC32C。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_ChannelId" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.ChannelId">
+  ChannelId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>通道标识原始字节。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly byte ChannelId</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_HeaderCrc" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.HeaderCrc">
+  HeaderCrc
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>头 CRC32C（覆盖本字段之前的全部头字节 [0..<a class="xref" href="TC.Tier.Core.Net.Wire.FrameHeaderCodec.html">FrameHeaderCodec</a>.Offset_HeaderCrc——
+防半帧/错位）。值依赖已写出的头前缀：编码构造期 0 占位，由 <a class="xref" href="TC.Tier.Core.Net.Wire.FrameCodec.html">FrameCodec</a> 计算后经
+生成的 <code>Write_HeaderCrc</code> 补写。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly uint HeaderCrc</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_Kind" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.Kind">
+  Kind
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>帧种类原始字节（未知种类传输层丢弃+计数——编解码层透传）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly byte Kind</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_PayloadCrc" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.PayloadCrc">
+  PayloadCrc
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>载荷 CRC32C（线上值——<a class="xref" href="TC.Tier.Core.Net.Wire.FrameCodec.html#TC_Tier_Core_Net_Wire_FrameCodec_VerifyPayload_TC_Tier_Core_Net_Wire_FrameHeader__System_ReadOnlySpan_System_Byte__">VerifyPayload(in FrameHeader, ReadOnlySpan&lt;byte&gt;)</a> 比对用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly uint PayloadCrc</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_PayloadLength" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.PayloadLength">
+  PayloadLength
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>载荷字节数（≤ <a class="xref" href="TC.Tier.Core.Net.Wire.FrameCodec.html#TC_Tier_Core_Net_Wire_FrameCodec_MaxPayloadLength">MaxPayloadLength</a>；0 合法——明文 Final 等）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly uint PayloadLength</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_ProtocolId" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.ProtocolId">
+  ProtocolId
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>协议域 ID 原始字节。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly byte ProtocolId</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Wire_FrameHeader_Version" data-uid="TC.Tier.Core.Net.Wire.FrameHeader.Version">
+  Version
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>头版本（解码侧 ≠1 即拒绝）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public readonly byte Version</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

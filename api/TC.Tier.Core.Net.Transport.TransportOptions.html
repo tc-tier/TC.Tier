@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class TransportOptions | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class TransportOptions | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="传输装配选项（spec-12 &#167;4.5——不可变 record，With 派生；运行参数零写死：缺省只服务零配置起步， 装配期全部可覆盖；协议常量除外（帧头 16B/PayloadLen 上限/CorrId 8B = 线格式定数））。 ★ 地址表 = 装配期静态注入（NodeId → IPEndPoint）；Core.Net 不做服务发现   （发现是 p2p 层职责）。动态成员 = 协议域配置变更后重建本传输。 ★ UDP 数据报端点： 非空 = 绑定   UDP 端点并经握手通告（特性位 bit1，Negotiate 帧承载）；null = UDP 关闭。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Transport.TransportOptions">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Transport_TransportOptions" data-uid="TC.Tier.Core.Net.Transport.TransportOptions" class="text-break">
+Class TransportOptions  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Transport.html">Transport</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>传输装配选项（spec-12 §4.5——不可变 record，With 派生；运行参数零写死：缺省只服务零配置起步，
+装配期全部可覆盖；协议常量除外（帧头 16B/PayloadLen 上限/CorrId 8B = 线格式定数））。</p>
+<p>★ 地址表 = 装配期静态注入（NodeId → IPEndPoint）；Core.Net 不做服务发现
+  （发现是 p2p 层职责）。动态成员 = 协议域配置变更后重建本传输。</p>
+<p>★ UDP 数据报端点：<a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html#TC_Tier_Core_Net_Transport_TransportOptions_UdpListenEndPoint">UdpListenEndPoint</a> 非空 = 绑定
+  UDP 端点并经握手通告（特性位 bit1，Negotiate 帧承载）；null = UDP 关闭。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed record TransportOptions : IEquatable&lt;TransportOptions&gt;</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">TransportOptions</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iequatable-1">IEquatable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a>&gt;</div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions__ctor_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions__ctor_System_Net_IPEndPoint_System_Collections_Generic_IReadOnlyDictionary_TC_Tier_Core_Net_NodeId_System_Net_IPEndPoint__System_TimeSpan_System_TimeSpan_System_TimeSpan_System_UInt32_System_Net_IPEndPoint_System_Int32_System_Boolean_System_Nullable_System_TimeSpan__System_Int32_System_Double_System_Nullable_System_TimeSpan__System_TimeSpan_System_Int32_System_Int32_System_Int32_System_Int32_System_Int64_System_Int32_System_TimeSpan_System_TimeSpan_System_Int32_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.#ctor(System.Net.IPEndPoint,System.Collections.Generic.IReadOnlyDictionary{TC.Tier.Core.Net.NodeId,System.Net.IPEndPoint},System.TimeSpan,System.TimeSpan,System.TimeSpan,System.UInt32,System.Net.IPEndPoint,System.Int32,System.Boolean,System.Nullable{System.TimeSpan},System.Int32,System.Double,System.Nullable{System.TimeSpan},System.TimeSpan,System.Int32,System.Int32,System.Int32,System.Int32,System.Int64,System.Int32,System.TimeSpan,System.TimeSpan,System.Int32)">
+  TransportOptions(IPEndPoint?, IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt;, TimeSpan, TimeSpan, TimeSpan, uint, IPEndPoint?, int, bool, TimeSpan?, int, double, TimeSpan?, TimeSpan, int, int, int, int, long, int, TimeSpan, TimeSpan, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>传输装配选项（spec-12 §4.5——不可变 record，With 派生；运行参数零写死：缺省只服务零配置起步，
+装配期全部可覆盖；协议常量除外（帧头 16B/PayloadLen 上限/CorrId 8B = 线格式定数））。</p>
+<p>★ 地址表 = 装配期静态注入（NodeId → IPEndPoint）；Core.Net 不做服务发现
+  （发现是 p2p 层职责）。动态成员 = 协议域配置变更后重建本传输。</p>
+<p>★ UDP 数据报端点：<a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html#TC_Tier_Core_Net_Transport_TransportOptions_UdpListenEndPoint">UdpListenEndPoint</a> 非空 = 绑定
+  UDP 端点并经握手通告（特性位 bit1，Negotiate 帧承载）；null = UDP 关闭。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions(IPEndPoint? ListenEndPoint, IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt; Peers, TimeSpan HandshakeTimeout, TimeSpan ReconnectInitialDelay, TimeSpan ReconnectMaxDelay, uint ClusterTag = 0, IPEndPoint? UdpListenEndPoint = null, int UdpMaxDatagramBytes = 1200, bool EnableKeepalive = false, TimeSpan? KeepaliveInterval = null, int KeepaliveMaxUnanswered = 3, double ReconnectBackoffFactor = 2, TimeSpan? SlowDispatchThreshold = null, TimeSpan RequestTimeout = default, int RequestPendingCapacity = 4096, int RequestDedupCapacity = 1024, int StreamWindowFrames = 16, int WriteQueueFrames = 64, long RequestDedupMaxBytes = 8388608, int MaxInboundLinks = 0, TimeSpan HandshakeFailCooldown = default, TimeSpan RequestQueueWait = default, int RequestPriorityReserve = 256)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ListenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>本端 TCP 监听端点（null = 不监听——纯拨号方；对称节点可随时开监听）。</p>
+</dd>
+    <dt><code>Peers</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd><p>对端地址表（装配期静态——成员制 TCP 拨号目标）。</p>
+</dd>
+    <dt><code>HandshakeTimeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>握手超时（三步任一环未完成即超时断连——缺省 3s）。</p>
+</dd>
+    <dt><code>ReconnectInitialDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>重连退避初值（缺省 100ms）。</p>
+</dd>
+    <dt><code>ReconnectMaxDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>重连退避封顶（缺省 2s——raft 消费方按 ElectionTimeoutMin/2 覆盖：
+选举节奏不被重连劫持；此处为传输层通用缺省）。</p>
+</dd>
+    <dt><code>ClusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>集群归属标签（握手期校验——错集群 fail-fast，§3.3）。</p>
+</dd>
+    <dt><code>UdpListenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>本端 UDP 数据报端点（null = 关闭；port 0 = 装配期取实际端口。
+地址须为具体可达地址——通配 Any 绑定在通告时以 TCP 连接本端地址替代）。</p>
+</dd>
+    <dt><code>UdpMaxDatagramBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>单报预算（缺省 1200；不做 IP 分片依赖，超预算回落 TCP 承载）。</p>
+</dd>
+    <dt><code>EnableKeepalive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>传输级保活（默认关闭——raft 心跳即业务级保活；
+特性位 bit0 协商双方都开才生效）。</p>
+</dd>
+    <dt><code>KeepaliveInterval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>保活周期（null = 10s 缺省；测试可调小）。</p>
+</dd>
+    <dt><code>KeepaliveMaxUnanswered</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>连续无入站保活次数达此值断连（缺省 3）。</p>
+</dd>
+    <dt><code>ReconnectBackoffFactor</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>重连退避倍率（缺省 ×2——连续失败按倍率增长，建立过即复位）。</p>
+</dd>
+    <dt><code>SlowDispatchThreshold</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>慢回调计数阈值（null = 10ms 缺省量级值——§5.1
+快进快出契约的可观测兜底，非机制）。</p>
+</dd>
+    <dt><code>RequestTimeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>请求回调缺省超时（缺省 3s——at-most-once 单发等待；per-call RequestOptions 覆盖）。</p>
+</dd>
+    <dt><code>RequestPendingCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>请求回调 pending 关联表容量（在途请求数上限，缺省 4096——满抛 fail-fast）。</p>
+</dd>
+    <dt><code>RequestDedupCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>应答端 CorrId 去重窗口容量（已服务请求记忆上限，缺省 1024——
+at-least-once 缓存响应重放不重复执行；窗口满淘汰最老）。</p>
+</dd>
+    <dt><code>StreamWindowFrames</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>流式会话入站缓冲帧数（背压窗口，缺省 16——满 = 读循环 await 传导对端写）。</p>
+</dd>
+    <dt><code>WriteQueueFrames</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>写队列帧容量（缺省 64——写者入队背压深度：流写背压停 writer 循环
+不锁写者，数据报/心跳/请求回调有界等待不饿死；帧序 = 单 writer FIFO）。</p>
+</dd>
+    <dt><code>RequestDedupMaxBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>应答端去重窗口字节软预算（缺省 8 MiB——大响应驻留上界 =
+预算 + 最大单条应答；超预算驱逐最老。单条超预算独占驻留——&quot;不缓存&quot;会破坏 at-least-once
+确认契约，故预算是驱逐目标非准入门槛）。</p>
+</dd>
+    <dt><code>MaxInboundLinks</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>最大入站链路数（二期-D4 连接治理——握手准入上限；0 = 不限）。</p>
+</dd>
+    <dt><code>HandshakeFailCooldown</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>握手失败冷却（二期-D4——同源 IP 握手失败后的准入冷却窗；Zero = 关闭）。</p>
+</dd>
+    <dt><code>RequestQueueWait</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>请求背压 Queue 策略的排队等待上限（缺省 500ms——超时回落 fail-fast）。</p>
+</dd>
+    <dt><code>RequestPriorityReserve</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>请求背压 Priority 域预留槽位（缺省 256——共享池满仍可入）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_DefaultClusterTag" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.DefaultClusterTag">
+  DefaultClusterTag
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>缺省集群标签（0——单集群部署零配置起步；多集群共存必须显式配置区分，§3.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const uint DefaultClusterTag = 0</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_DefaultRequestTimeout" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.DefaultRequestTimeout">
+  DefaultRequestTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调超时缺省（3s）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static readonly TimeSpan DefaultRequestTimeout</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_ClusterTag_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ClusterTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_ClusterTag" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ClusterTag">
+  ClusterTag
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>集群归属标签（握手期校验——错集群 fail-fast，§3.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public uint ClusterTag { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_EffectiveKeepaliveInterval_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EffectiveKeepaliveInterval*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_EffectiveKeepaliveInterval" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EffectiveKeepaliveInterval">
+  EffectiveKeepaliveInterval
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>生效保活周期（显式配置 ?? 缺省 10s）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan EffectiveKeepaliveInterval { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_EffectiveRequestTimeout_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EffectiveRequestTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_EffectiveRequestTimeout" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EffectiveRequestTimeout">
+  EffectiveRequestTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>生效请求超时（显式配置 ?? 缺省 3s——default(TimeSpan) 视为未配置）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan EffectiveRequestTimeout { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_EffectiveSlowDispatchThreshold_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EffectiveSlowDispatchThreshold*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_EffectiveSlowDispatchThreshold" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EffectiveSlowDispatchThreshold">
+  EffectiveSlowDispatchThreshold
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>生效慢回调阈值（显式配置 ?? 缺省 10ms）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan EffectiveSlowDispatchThreshold { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_EnableKeepalive_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EnableKeepalive*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_EnableKeepalive" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.EnableKeepalive">
+  EnableKeepalive
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>传输级保活（默认关闭——raft 心跳即业务级保活；
+特性位 bit0 协商双方都开才生效）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool EnableKeepalive { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_HandshakeFailCooldown_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.HandshakeFailCooldown*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_HandshakeFailCooldown" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.HandshakeFailCooldown">
+  HandshakeFailCooldown
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>握手失败冷却（二期-D4——同源 IP 握手失败后的准入冷却窗；Zero = 关闭）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan HandshakeFailCooldown { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_HandshakeTimeout_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.HandshakeTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_HandshakeTimeout" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.HandshakeTimeout">
+  HandshakeTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>握手超时（三步任一环未完成即超时断连——缺省 3s）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan HandshakeTimeout { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_KeepaliveInterval_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.KeepaliveInterval*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_KeepaliveInterval" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.KeepaliveInterval">
+  KeepaliveInterval
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>保活周期（null = 10s 缺省；测试可调小）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan? KeepaliveInterval { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_KeepaliveMaxUnanswered_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.KeepaliveMaxUnanswered*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_KeepaliveMaxUnanswered" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.KeepaliveMaxUnanswered">
+  KeepaliveMaxUnanswered
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>连续无入站保活次数达此值断连（缺省 3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int KeepaliveMaxUnanswered { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_ListenEndPoint_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ListenEndPoint*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_ListenEndPoint" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ListenEndPoint">
+  ListenEndPoint
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端 TCP 监听端点（null = 不监听——纯拨号方；对称节点可随时开监听）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IPEndPoint? ListenEndPoint { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_MaxInboundLinks_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.MaxInboundLinks*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_MaxInboundLinks" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.MaxInboundLinks">
+  MaxInboundLinks
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>最大入站链路数（二期-D4 连接治理——握手准入上限；0 = 不限）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int MaxInboundLinks { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_Peers_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Peers*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_Peers" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Peers">
+  Peers
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>对端地址表（装配期静态——成员制 TCP 拨号目标）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt; Peers { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_ReconnectBackoffFactor_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ReconnectBackoffFactor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_ReconnectBackoffFactor" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ReconnectBackoffFactor">
+  ReconnectBackoffFactor
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>重连退避倍率（缺省 ×2——连续失败按倍率增长，建立过即复位）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public double ReconnectBackoffFactor { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_ReconnectInitialDelay_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ReconnectInitialDelay*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_ReconnectInitialDelay" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ReconnectInitialDelay">
+  ReconnectInitialDelay
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>重连退避初值（缺省 100ms）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan ReconnectInitialDelay { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_ReconnectMaxDelay_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ReconnectMaxDelay*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_ReconnectMaxDelay" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ReconnectMaxDelay">
+  ReconnectMaxDelay
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>重连退避封顶（缺省 2s——raft 消费方按 ElectionTimeoutMin/2 覆盖：
+选举节奏不被重连劫持；此处为传输层通用缺省）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan ReconnectMaxDelay { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_RequestDedupCapacity_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestDedupCapacity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_RequestDedupCapacity" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestDedupCapacity">
+  RequestDedupCapacity
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>应答端 CorrId 去重窗口容量（已服务请求记忆上限，缺省 1024——
+at-least-once 缓存响应重放不重复执行；窗口满淘汰最老）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int RequestDedupCapacity { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_RequestDedupMaxBytes_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestDedupMaxBytes*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_RequestDedupMaxBytes" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestDedupMaxBytes">
+  RequestDedupMaxBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>应答端去重窗口字节软预算（缺省 8 MiB——大响应驻留上界 =
+预算 + 最大单条应答；超预算驱逐最老。单条超预算独占驻留——&quot;不缓存&quot;会破坏 at-least-once
+确认契约，故预算是驱逐目标非准入门槛）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public long RequestDedupMaxBytes { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_RequestPendingCapacity_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestPendingCapacity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_RequestPendingCapacity" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestPendingCapacity">
+  RequestPendingCapacity
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调 pending 关联表容量（在途请求数上限，缺省 4096——满抛 fail-fast）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int RequestPendingCapacity { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_RequestPriorityReserve_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestPriorityReserve*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_RequestPriorityReserve" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestPriorityReserve">
+  RequestPriorityReserve
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求背压 Priority 域预留槽位（缺省 256——共享池满仍可入）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int RequestPriorityReserve { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_RequestQueueWait_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestQueueWait*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_RequestQueueWait" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestQueueWait">
+  RequestQueueWait
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求背压 Queue 策略的排队等待上限（缺省 500ms——超时回落 fail-fast）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan RequestQueueWait { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_RequestTimeout_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_RequestTimeout" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.RequestTimeout">
+  RequestTimeout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>请求回调缺省超时（缺省 3s——at-most-once 单发等待；per-call RequestOptions 覆盖）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan RequestTimeout { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_SlowDispatchThreshold_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.SlowDispatchThreshold*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_SlowDispatchThreshold" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.SlowDispatchThreshold">
+  SlowDispatchThreshold
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>慢回调计数阈值（null = 10ms 缺省量级值——§5.1
+快进快出契约的可观测兜底，非机制）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TimeSpan? SlowDispatchThreshold { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_StreamWindowFrames_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.StreamWindowFrames*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_StreamWindowFrames" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.StreamWindowFrames">
+  StreamWindowFrames
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流式会话入站缓冲帧数（背压窗口，缺省 16——满 = 读循环 await 传导对端写）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int StreamWindowFrames { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_UdpListenEndPoint_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.UdpListenEndPoint*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_UdpListenEndPoint" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.UdpListenEndPoint">
+  UdpListenEndPoint
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本端 UDP 数据报端点（null = 关闭；port 0 = 装配期取实际端口。
+地址须为具体可达地址——通配 Any 绑定在通告时以 TCP 连接本端地址替代）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IPEndPoint? UdpListenEndPoint { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_UdpMaxDatagramBytes_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.UdpMaxDatagramBytes*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_UdpMaxDatagramBytes" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.UdpMaxDatagramBytes">
+  UdpMaxDatagramBytes
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单报预算（缺省 1200；不做 IP 分片依赖，超预算回落 TCP 承载）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int UdpMaxDatagramBytes { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WriteQueueFrames_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WriteQueueFrames*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WriteQueueFrames" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WriteQueueFrames">
+  WriteQueueFrames
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>写队列帧容量（缺省 64——写者入队背压深度：流写背压停 writer 循环
+不锁写者，数据报/心跳/请求回调有界等待不饿死；帧序 = 单 writer FIFO）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int WriteQueueFrames { get; init; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_Deconstruct_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Deconstruct*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_Deconstruct_System_Net_IPEndPoint__System_Collections_Generic_IReadOnlyDictionary_TC_Tier_Core_Net_NodeId_System_Net_IPEndPoint___System_TimeSpan__System_TimeSpan__System_TimeSpan__System_UInt32__System_Net_IPEndPoint__System_Int32__System_Boolean__System_Nullable_System_TimeSpan___System_Int32__System_Double__System_Nullable_System_TimeSpan___System_TimeSpan__System_Int32__System_Int32__System_Int32__System_Int32__System_Int64__System_Int32__System_TimeSpan__System_TimeSpan__System_Int32__" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Deconstruct(System.Net.IPEndPoint@,System.Collections.Generic.IReadOnlyDictionary{TC.Tier.Core.Net.NodeId,System.Net.IPEndPoint}@,System.TimeSpan@,System.TimeSpan@,System.TimeSpan@,System.UInt32@,System.Net.IPEndPoint@,System.Int32@,System.Boolean@,System.Nullable{System.TimeSpan}@,System.Int32@,System.Double@,System.Nullable{System.TimeSpan}@,System.TimeSpan@,System.Int32@,System.Int32@,System.Int32@,System.Int32@,System.Int64@,System.Int32@,System.TimeSpan@,System.TimeSpan@,System.Int32@)">
+  Deconstruct(out IPEndPoint?, out IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt;, out TimeSpan, out TimeSpan, out TimeSpan, out uint, out IPEndPoint?, out int, out bool, out TimeSpan?, out int, out double, out TimeSpan?, out TimeSpan, out int, out int, out int, out int, out long, out int, out TimeSpan, out TimeSpan, out int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Deconstruct(out IPEndPoint? ListenEndPoint, out IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt; Peers, out TimeSpan HandshakeTimeout, out TimeSpan ReconnectInitialDelay, out TimeSpan ReconnectMaxDelay, out uint ClusterTag, out IPEndPoint? UdpListenEndPoint, out int UdpMaxDatagramBytes, out bool EnableKeepalive, out TimeSpan? KeepaliveInterval, out int KeepaliveMaxUnanswered, out double ReconnectBackoffFactor, out TimeSpan? SlowDispatchThreshold, out TimeSpan RequestTimeout, out int RequestPendingCapacity, out int RequestDedupCapacity, out int StreamWindowFrames, out int WriteQueueFrames, out long RequestDedupMaxBytes, out int MaxInboundLinks, out TimeSpan HandshakeFailCooldown, out TimeSpan RequestQueueWait, out int RequestPriorityReserve)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ListenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd></dd>
+    <dt><code>Peers</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>HandshakeTimeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>ReconnectInitialDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>ReconnectMaxDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>ClusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd></dd>
+    <dt><code>UdpListenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd></dd>
+    <dt><code>UdpMaxDatagramBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>EnableKeepalive</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+    <dt><code>KeepaliveInterval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+    <dt><code>KeepaliveMaxUnanswered</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>ReconnectBackoffFactor</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd></dd>
+    <dt><code>SlowDispatchThreshold</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd></dd>
+    <dt><code>RequestTimeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>RequestPendingCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>RequestDedupCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>StreamWindowFrames</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>WriteQueueFrames</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>RequestDedupMaxBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+    <dt><code>MaxInboundLinks</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+    <dt><code>HandshakeFailCooldown</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>RequestQueueWait</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd></dd>
+    <dt><code>RequestPriorityReserve</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_Default_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Default*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_Default_System_Net_IPEndPoint_System_Collections_Generic_IReadOnlyDictionary_TC_Tier_Core_Net_NodeId_System_Net_IPEndPoint__" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Default(System.Net.IPEndPoint,System.Collections.Generic.IReadOnlyDictionary{TC.Tier.Core.Net.NodeId,System.Net.IPEndPoint})">
+  Default(IPEndPoint?, IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>缺省选项（握手 3s / 退避 100ms ×2 封顶 2s / UDP 关闭 / 保活关闭）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static TransportOptions Default(IPEndPoint? listenEndPoint, IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt; peers)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>listenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>本端 TCP 监听端点（null = 不监听）。</p>
+</dd>
+    <dt><code>peers</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd><p>对端地址表（装配期静态）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>缺省值派生的选项实例。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_Equals_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_Equals_System_Object_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Equals(System.Object)">
+  Equals(object?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override bool Equals(object? obj)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>obj</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_Equals_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Equals*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_Equals_TC_Tier_Core_Net_Transport_TransportOptions_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Equals(TC.Tier.Core.Net.Transport.TransportOptions)">
+  Equals(TransportOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Equals(TransportOptions? other)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>other</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_GetHashCode_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.GetHashCode*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_GetHashCode" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.GetHashCode">
+  GetHashCode()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override int GetHashCode()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_ToString_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ToString*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_ToString" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.ToString">
+  ToString()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public override string ToString()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_Validate_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Validate*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_Validate" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.Validate">
+  Validate()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>装配期校验（fail-fast）——record 的 <code>with</code> 派生不重跑构造校验，故校验收敛为显式面，
+由传输构造（选项唯一消费入口）调用：时序非正/倍率 &lt;1/预算非正/封顶低于初值均为矛盾配置。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void Validate()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>任一运行参数矛盾。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>地址表含 Empty 哨兵节点。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithClusterTag_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithClusterTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithClusterTag_System_UInt32_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithClusterTag(System.UInt32)">
+  WithClusterTag(uint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：集群归属标签（握手期校验——错集群 fail-fast）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithClusterTag(uint clusterTag)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>新集群归属标签。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了集群标签的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithConnectionGovernance_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithConnectionGovernance*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithConnectionGovernance_System_Int32_System_TimeSpan_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithConnectionGovernance(System.Int32,System.TimeSpan)">
+  WithConnectionGovernance(int, TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：连接治理（二期-D4）——最大入站链路数（0 = 不限）+ 握手失败冷却（同源 IP；Zero = 关闭）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithConnectionGovernance(int maxInboundLinks, TimeSpan handshakeFailCooldown)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>maxInboundLinks</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>最大入站链路数（握手准入上限；0 = 不限）。</p>
+</dd>
+    <dt><code>handshakeFailCooldown</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>同源 IP 握手失败后的准入冷却窗（Zero = 关闭）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了连接治理参数的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithHandshakeTimeout_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithHandshakeTimeout*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithHandshakeTimeout_System_TimeSpan_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithHandshakeTimeout(System.TimeSpan)">
+  WithHandshakeTimeout(TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：握手超时。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithHandshakeTimeout(TimeSpan timeout)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>新握手超时（须为正——<a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html#TC_Tier_Core_Net_Transport_TransportOptions_Validate">Validate()</a> 校验）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了握手超时的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithKeepalive_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithKeepalive*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithKeepalive_System_Boolean_System_Nullable_System_TimeSpan__System_Int32_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithKeepalive(System.Boolean,System.Nullable{System.TimeSpan},System.Int32)">
+  WithKeepalive(bool, TimeSpan?, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：传输级保活（周期 null = 10s 缺省）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithKeepalive(bool enable, TimeSpan? interval = null, int maxUnanswered = 3)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>enable</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>是否启用传输级保活（缺省关闭——特性位协商双方都开才生效）。</p>
+</dd>
+    <dt><code>interval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>保活周期（null = 10s 缺省；默认 null）。</p>
+</dd>
+    <dt><code>maxUnanswered</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>连续无入站保活断连阈值（须 ≥ 1；默认 3）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了三项保活参数的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithListen_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithListen*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithListen_System_Net_IPEndPoint_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithListen(System.Net.IPEndPoint)">
+  WithListen(IPEndPoint?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：本端 TCP 监听端点。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithListen(IPEndPoint? listenEndPoint)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>listenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>新监听端点（null = 不监听）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了监听端点的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithPeers_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithPeers*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithPeers_System_Collections_Generic_IReadOnlyDictionary_TC_Tier_Core_Net_NodeId_System_Net_IPEndPoint__" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithPeers(System.Collections.Generic.IReadOnlyDictionary{TC.Tier.Core.Net.NodeId,System.Net.IPEndPoint})">
+  WithPeers(IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：对端地址表（装配期静态注入替换）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithPeers(IReadOnlyDictionary&lt;NodeId, IPEndPoint&gt; peers)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>peers</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlydictionary-2">IReadOnlyDictionary</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a>&gt;</dt>
+    <dd><p>新对端地址表（整表替换，非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了地址表的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithReconnect_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithReconnect*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithReconnect_System_TimeSpan_System_Double_System_TimeSpan_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithReconnect(System.TimeSpan,System.Double,System.TimeSpan)">
+  WithReconnect(TimeSpan, double, TimeSpan)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：重连退避（初值/倍率/封顶）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithReconnect(TimeSpan initialDelay, double backoffFactor, TimeSpan maxDelay)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>initialDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>重连退避初值（须为正）。</p>
+</dd>
+    <dt><code>backoffFactor</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.double">double</a></dt>
+    <dd><p>退避倍率（须 ≥ 1）。</p>
+</dd>
+    <dt><code>maxDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>退避封顶（不得低于初值）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了三项退避参数的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithRequest_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithRequest*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithRequest_System_Nullable_System_TimeSpan__System_Int32_System_Int32_System_Nullable_System_Int64__" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithRequest(System.Nullable{System.TimeSpan},System.Int32,System.Int32,System.Nullable{System.Int64})">
+  WithRequest(TimeSpan?, int, int, long?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：请求回调（缺省超时/关联表容量/去重窗口容量与字节软预算）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithRequest(TimeSpan? timeout = null, int pendingCapacity = 4096, int dedupCapacity = 1024, long? dedupMaxBytes = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>timeout</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>缺省请求超时（null = 视为未配置，生效 3s 缺省；默认 null）。</p>
+</dd>
+    <dt><code>pendingCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>pending 关联表容量（在途请求数上限，须 ≥ 1；默认 4096）。</p>
+</dd>
+    <dt><code>dedupCapacity</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>应答端去重窗口容量（须 ≥ 1；默认 1024）。</p>
+</dd>
+    <dt><code>dedupMaxBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>?</dt>
+    <dd><p>去重窗口字节软预算（字节；null = 保持现值；默认 null）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了请求回调参数的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithRequestBackpressure_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithRequestBackpressure*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithRequestBackpressure_System_TimeSpan_System_Int32_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithRequestBackpressure(System.TimeSpan,System.Int32)">
+  WithRequestBackpressure(TimeSpan, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：请求背压旋钮（二期-D5）——Queue 策略排队等待上限 + Priority 域预留槽位。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithRequestBackpressure(TimeSpan requestQueueWait, int requestPriorityReserve)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>requestQueueWait</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>Queue 策略排队等待上限（Zero = 生效 500ms 缺省——超时回落 fail-fast）。</p>
+</dd>
+    <dt><code>requestPriorityReserve</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>Priority 域预留槽位数（共享池满仍可入）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了请求背压旋钮的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithSlowDispatchThreshold_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithSlowDispatchThreshold*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithSlowDispatchThreshold_System_Nullable_System_TimeSpan__" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithSlowDispatchThreshold(System.Nullable{System.TimeSpan})">
+  WithSlowDispatchThreshold(TimeSpan?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：慢回调计数阈值（null = 10ms 缺省）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithSlowDispatchThreshold(TimeSpan? threshold)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>threshold</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>新慢回调阈值（null = 缺省 10ms；显式值须为正）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了慢回调阈值的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_WithUdp_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithUdp*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_WithUdp_System_Net_IPEndPoint_System_Int32_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.WithUdp(System.Net.IPEndPoint,System.Int32)">
+  WithUdp(IPEndPoint?, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>派生：本端 UDP 数据报端点与单报预算（endpoint null = 关闭 UDP）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public TransportOptions WithUdp(IPEndPoint? udpListenEndPoint, int maxDatagramBytes = 1200)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>udpListenEndPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>新 UDP 监听端点（null = 关闭 UDP；port 0 = 装配期取实际端口）。</p>
+</dd>
+    <dt><code>maxDatagramBytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>单报预算（字节，须为正；默认 1200）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>替换了 UDP 端点与预算的新实例（其余位不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="operators">Operators
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_op_Equality_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.op_Equality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_op_Equality_TC_Tier_Core_Net_Transport_TransportOptions_TC_Tier_Core_Net_Transport_TransportOptions_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.op_Equality(TC.Tier.Core.Net.Transport.TransportOptions,TC.Tier.Core.Net.Transport.TransportOptions)">
+  operator ==(TransportOptions?, TransportOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator ==(TransportOptions? left, TransportOptions? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Transport_TransportOptions_op_Inequality_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.op_Inequality*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Transport_TransportOptions_op_Inequality_TC_Tier_Core_Net_Transport_TransportOptions_TC_Tier_Core_Net_Transport_TransportOptions_" data-uid="TC.Tier.Core.Net.Transport.TransportOptions.op_Inequality(TC.Tier.Core.Net.Transport.TransportOptions,TC.Tier.Core.Net.Transport.TransportOptions)">
+  operator !=(TransportOptions?, TransportOptions?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool operator !=(TransportOptions? left, TransportOptions? right)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>left</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd></dd>
+    <dt><code>right</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd></dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

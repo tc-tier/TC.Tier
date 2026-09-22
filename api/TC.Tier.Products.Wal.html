@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Namespace TC.Tier.Products.Wal | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Namespace TC.Tier.Products.Wal | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Wal">
+
+  <h1 id="TC_Tier_Products_Wal" data-uid="TC.Tier.Products.Wal" class="text-break">Namespace TC.Tier.Products.Wal</h1>
+  <div class="markdown level0 summary"></div>
+  <div class="markdown level0 conceptual"></div>
+  <div class="markdown level0 remarks"></div>
+
+    <h3 id="classes">
+Classes
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.TierWal.html">TierWal</a></dt>
+      <dd><p>TierWAL——协议中立 WAL 产品（raft/p2p 的存储中线）实现类。</p>
+<p>★ 心智模型（设计决策 2026-08-25）：<b>地址是事实</b>——entry 地址只在 Append 返回值记录，
+  绝不解析/推导逻辑地址结构（重启后段几何可能变，推导即错）；<b>不记录段</b>——段是底层的概念，
+  上层地址空间无限；index（long）= 顺序值，一条 entry 一个 index 一个地址（单调一一对应）。</p>
+<p>★ TierWAL 自己的三段式（每层在自己的槽位定义自己的格式）：</p>
+<p> - 头部 = opaque 容器（<span class="xref">TC.Tier.Products.Wal.WalOpaqueLayout</span>）：只记 [maxIndex→addr][minIndex→addr]
+  + raft 元数据预留区——搭 Meta 边车随显式提交原子落盘（CRC 完整性由底层 Meta 兜底）</p>
+<p> - 数据 = EntryLog 公共方法（Append/OpenCursor/Truncate*/SetOpaqueMeta）——TierWAL 不碰底层帧结构</p>
+<p> - 尾部/校验 = 底层 Meta 的原子持久化 + CRC32C（TierWAL 零机制知识）</p>
+<p>★ 生命周期 = <a class="xref" href="TC.Tier.Core.Lifecycle.LifecycleBase-1.html">LifecycleBase&lt;THints&gt;</a> 标准模板（恢复状态机/进度/取消/资源组）——
+  恢复核心 = <a class="xref" href="TC.Tier.Products.Wal.TierWal.html">TierWal.TierWalRecovery</a>（RecoveryBase 派生：层间 join EntryLog + opaque 解析
+  + 统一扫描重建锚点）。</p>
+<p>★ 定位（给定 index）：内存稀疏锚点二分（append 时每 <span class="xref">TC.Tier.Products.Wal.TierWal.AnchorInterval</span> 条记一个
+  [index→addr]，零 IO）→ 从锚点地址顺序扫帧（magic 有效帧）数到目标 → 有效停止。
+  恢复时从头顺序扫一遍重建锚点（= raft 恢复重放本身，不额外成本）。</p>
+<p>★ 双水位：<a class="xref" href="TC.Tier.Products.Wal.TierWal.html#TC_Tier_Products_Wal_TierWal_AllocatedIndex">AllocatedIndex</a>（内存计数，含攒批窗口）/ <a class="xref" href="TC.Tier.Products.Wal.TierWal.html#TC_Tier_Products_Wal_TierWal_PersistedIndex">PersistedIndex</a>
+  （最后显式提交水位——raft 语义的 last persisted index 可信下限）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.TierWalBuilder.html">TierWalBuilder</a></dt>
+      <dd><p>TierWAL 构建者（三段式装配惯例同 StorageEngineBuilder：Options 配置链 → Builder →
+StartAsync 一步到位——构建 + 恢复 + WaitForReady 一体）。</p>
+<p>★ 注入面开放（设计决策：委托注入开放——不注入回落默认，Meta 校验兜底不可绕过）。</p>
+<p>★ 启动状态机：只能成功启动一次（重复抛）；失败可重试（销毁重建 EntryLog 实例，对齐
+  RecoveryBase"Failed 销毁重建"哲学）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.TierWalOptions.html">TierWalOptions</a></dt>
+      <dd><p>TierWAL 配置（不可变 record + With 链——装配惯例同 StorageEngineOptions）。</p>
+</dd>
+    </dl>
+    <h3 id="structs">
+Structs
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.WalAppendLease.html">WalAppendLease</a></dt>
+      <dd><p>★ 批追加租约（ref struct——<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_BeginAppendBatch">BeginAppendBatch()</a> 产出，using 包裹）：
+逐条 <a class="xref" href="TC.Tier.Products.Wal.WalAppendLease.html#TC_Tier_Products_Wal_WalAppendLease_Append_System_ReadOnlySpan_System_Byte__">Append(ReadOnlySpan&lt;byte&gt;)</a>（返回该条 index，页满 = 底层让渡零阻塞）+ 地址→index
+簿记，Dispose 收尾释放。★ <b>绝不跨 await 持有</b>（持 WAL 写锁——ref struct 编译器强制不逃逸）。</p>
+<p>★ 分层：载荷帧格式知识归调用方（适配器）——lease 只收"一帧 payload"，内容零知识。</p>
+<p>★ index 簿记宿主权威：index = AllocatedIndex + 1（单写者串行下每条 Append 后
+AllocatedIndex = 该条 index）；租约零跨 await 可变状态——背压慢路的收尾在 static 助手
+（只传值）内完成，续体线程安全。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.WalAppendResult.html">WalAppendResult</a></dt>
+      <dd><p>组提交追加结果——raft 消费面：分配的 [起始 index, 条数]。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.WalEntry.html">WalEntry</a></dt>
+      <dd><p>重放产出的一条 entry——(index, 内容)。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.WalRecoveryHints.html">WalRecoveryHints</a></dt>
+      <dd><p>TierWAL 恢复 hints——外部主动注入的已知水位（地址级，同 <code>LogRecoveryHints</code> 语义）。</p>
+<p>★ 地址 = 事实：TierWAL 不解析/不推导逻辑地址结构，hints 直接透传底层 EntryLog
+  （恢复优先级统一：① hints ② meta ③ 扫盘——底层模板裁决）。</p>
+<p>★ 通常无需提供（default 让底层自恢复）；冷启动已知水位（如进程外归档）时注入。</p>
+</dd>
+    </dl>
+    <h3 id="interfaces">
+Interfaces
+</h3>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.ITierWal.html">ITierWal</a></dt>
+      <dd><p>TierWAL——协议中立 WAL 产品（raft/p2p 的存储中线）。</p>
+<p>★ 定位：存储侧把 raft 协议要求的<b>全部持久化语义做齐但内容零知识</b>——entry 内容不解析、
+  元数据内容不解析（Opaque 槽）；raft/p2p（TC.Tier.Products.Net）是纯消费方，直接接线即可。</p>
+<p>★ 能力映射（底层 EntryLog 已实现，TierWAL 只封装 + 自定 opaque 容器布局）：</p>
+<p> - 追加：组提交 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_AppendBatchAsync_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_">AppendBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)</a>（raft 攒批）/ 单条 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_AppendSingleAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">AppendSingleAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a></p>
+<p> - 显式提交 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_CommitAsync_System_Threading_CancellationToken_">CommitAsync(CancellationToken)</a>（raft 同步点：一次 fsync = 一批持久化）</p>
+<p> - 截断：<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_TruncatePrefixAsync_System_Int64_System_Threading_CancellationToken_">TruncatePrefixAsync(long, CancellationToken)</a>（头压缩，与写并行）/ <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_TruncateSuffixAsync_System_Int64_System_Threading_CancellationToken_">TruncateSuffixAsync(long, CancellationToken)</a>（冲突修正）</p>
+<p> - 重放 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ReadFromAsync_System_Int64_System_Threading_CancellationToken_">ReadFromAsync(long, CancellationToken)</a>（随机起点顺序读，index 定位 = 段表二分 + 段内扫帧计数）</p>
+<p> - 元数据 Opaque 槽 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_WriteMetaAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">WriteMetaAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>/<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ReadMeta">ReadMeta()</a>（term/vote/config 原子替换）</p>
+<p> - 快照导出/导入 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ExportSnapshotAsync_System_Threading_CancellationToken_">ExportSnapshotAsync(CancellationToken)</a>/<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ImportSnapshotAsync_System_Threading_CancellationToken_">ImportSnapshotAsync(CancellationToken)</a>（一致性点 N₀ 进帧 Header）</p>
+<p>★ index 承载（设计 §8.7）：raft 日志连续无空洞——index 由"起点 + 顺序计数"推导，
+  帧内零 index；段 anchor 表随 opaque 原子落盘（恢复 O(1) 读全表）。</p>
+<p>★ 双水位：<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_AllocatedIndex">AllocatedIndex</a>（内存计数，含攒批窗口）/ <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_PersistedIndex">PersistedIndex</a>
+  （最后显式提交水位——raft 语义的 last persisted index 可信下限，自动提交只提前落盘不推进）。</p>
+</dd>
+    </dl>
+    <dl class="jumplist">
+      <dt><a class="xref" href="TC.Tier.Products.Wal.IWalBatchLease.html">IWalBatchLease</a></dt>
+      <dd><p>★ 批读租约（<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ReadBatchLeaseSync_System_Int64_System_Int32_System_Threading_CancellationToken_">ReadBatchLeaseSync(long, int, CancellationToken)</a> 产出——复制读热路径零分配原语）：
+Entries = WAL 页缓冲切片的<b>惰性流式视图</b>（底层游标 MoveNext 驱动逐条产出——不预物化），
+<b>仅租约存活期且单次枚举有效</b>（游标前进不可重放）；Dispose 归还页（视图失效）。</p>
+</dd>
+    </dl>
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

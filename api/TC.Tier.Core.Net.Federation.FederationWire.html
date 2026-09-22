@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class FederationWire | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class FederationWire | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="联邦线信封（DDR-F6 定案）：跨集群独立 raft 域间的已提交条目流。 拉取请求 = [ClusterTag 4B][GroupId 8B][Watermark 8B][MaxEntries 4B]（24B）；批次应答 = [Granted 1B][ClusterTag 4B][Count 4B] + 条目&#215;N，   条目 = [Index 8B][Term 8B][Kind 1B][len 4B][payload]。 ★ Granted=0 = 拒链（对端 ClusterTag 不匹配——FederationWire.ClusterTagMatches 门）； Granted=1 = 批次有效（Count 可为 0——无增量）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Federation.FederationWire">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Federation_FederationWire" data-uid="TC.Tier.Core.Net.Federation.FederationWire" class="text-break">
+Class FederationWire  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Federation.html">Federation</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>联邦线信封（DDR-F6 定案）：跨集群独立 raft 域间的已提交条目流。</p>
+<ul><li>拉取请求 = <code>[ClusterTag 4B][GroupId 8B][Watermark 8B][MaxEntries 4B]</code>（24B）；</li><li>批次应答 = <code>[Granted 1B][ClusterTag 4B][Count 4B] + 条目×N</code>，
+  条目 = <code>[Index 8B][Term 8B][Kind 1B][len 4B][payload]</code>。</li></ul>
+<p>★ Granted=0 = 拒链（对端 ClusterTag 不匹配——FederationWire.ClusterTagMatches
+门）； Granted=1 = 批次有效（Count 可为 0——无增量）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class FederationWire</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">FederationWire</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_BatchHeaderSize" data-uid="TC.Tier.Core.Net.Federation.FederationWire.BatchHeaderSize">
+  BatchHeaderSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>批次应答定长头（Granted 1 + ClusterTag 4 + Count 4）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int BatchHeaderSize = 9</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_EntryHeaderSize" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EntryHeaderSize">
+  EntryHeaderSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单条目定长头（Index 8 + Term 8 + Kind 1 + len 4）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int EntryHeaderSize = 21</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_PullRequestSize" data-uid="TC.Tier.Core.Net.Federation.FederationWire.PullRequestSize">
+  PullRequestSize
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>拉取请求定长（ClusterTag 4 + GroupId 8 + Watermark 8 + Max 4）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int PullRequestSize = 24</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationWire_ClusterTagMatches_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.ClusterTagMatches*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_ClusterTagMatches_System_UInt32_System_UInt32_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.ClusterTagMatches(System.UInt32,System.UInt32)">
+  ClusterTagMatches(uint, uint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>集群归属核对（跨集群链路门——复用握手同款比较，spec-12 §3.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool ClusterTagMatches(uint local, uint remote)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>local</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>本端集群标签。</p>
+</dd>
+    <dt><code>remote</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>对端声明的集群标签。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 标签一致（放行）；false = 错配（拒链——Granted=0 回显本端标签供诊断）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationWire_EncodeBatch_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EncodeBatch*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_EncodeBatch_System_UInt32_System_Collections_Generic_IReadOnlyList_System_ValueTuple_System_Int64_System_Int64_System_Byte_System_ReadOnlyMemory_System_Byte____" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EncodeBatch(System.UInt32,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.Int64,System.Int64,System.Byte,System.ReadOnlyMemory{System.Byte}}})">
+  EncodeBatch(uint, IReadOnlyList&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码批次应答（条目为源已提交事实——逐条整段拷贝进单缓冲）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte[] EncodeBatch(uint clusterTag, IReadOnlyList&lt;(long Index, long Term, byte Kind, ReadOnlyMemory&lt;byte&gt; Content)&gt; entries)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>源集群标签（批次声明方）。</p>
+</dd>
+    <dt><code>entries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt; <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.readonlymemory-system.byte--.content">Content</a>)&gt;</dt>
+    <dd><p>已提交条目列表（可为空——无增量）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>批次应答帧（Granted=1：9B 头 + 逐条 <code>[Index 8B][Term 8B][Kind 1B][len 4B][payload]</code>——小端）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationWire_EncodePull_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EncodePull*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_EncodePull_System_UInt32_TC_Tier_Core_Net_Raft_RaftGroupId_System_Int64_System_Int32_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EncodePull(System.UInt32,TC.Tier.Core.Net.Raft.RaftGroupId,System.Int64,System.Int32)">
+  EncodePull(uint, RaftGroupId, long, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码拉取请求。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte[] EncodePull(uint clusterTag, RaftGroupId group, long watermark, int maxEntries)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>目标源集群标签（源侧据此核对，错配即拒链）。</p>
+</dd>
+    <dt><code>group</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>联邦承载的组 ID。</p>
+</dd>
+    <dt><code>watermark</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>本地已消费的源日志高水位（增量自水位 + 1 起拉；0 = 从头）。</p>
+</dd>
+    <dt><code>maxEntries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>单次拉取条数上限（≥ 1——源侧对 ≤ 0 视为畸形拒链）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>24B 拉取请求帧（<code>[ClusterTag 4B][GroupId 8B][Watermark 8B][MaxEntries 4B]</code>——小端）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationWire_EncodeReject_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EncodeReject*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_EncodeReject_System_UInt32_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.EncodeReject(System.UInt32)">
+  EncodeReject(uint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>编码拒绝应答（Granted=0 + 本端 ClusterTag——对端可诊断错配）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static byte[] EncodeReject(uint localClusterTag)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>localClusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>本端集群标签（回显供对端诊断错配）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>9B 拒绝应答帧（Granted=0、条目数 0）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationWire_TryDecodeBatch_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.TryDecodeBatch*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_TryDecodeBatch_System_ReadOnlySpan_System_Byte__System_Boolean__System_UInt32__System_Collections_Generic_List_System_ValueTuple_System_Int64_System_Int64_System_Byte_System_Byte______" data-uid="TC.Tier.Core.Net.Federation.FederationWire.TryDecodeBatch(System.ReadOnlySpan{System.Byte},System.Boolean@,System.UInt32@,System.Collections.Generic.List{System.ValueTuple{System.Int64,System.Int64,System.Byte,System.Byte[]}}@)">
+  TryDecodeBatch(ReadOnlySpan&lt;byte&gt;, out bool, out uint, out List&lt;(long Index, long Term, byte Kind, byte[] Content)&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码批次应答（截断/条目失配 = false——静默容错会吞数据）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryDecodeBatch(ReadOnlySpan&lt;byte&gt; wire, out bool granted, out uint clusterTag, out List&lt;(long Index, long Term, byte Kind, byte[] Content)&gt; entries)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>wire</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>入站应答帧。</p>
+</dd>
+    <dt><code>granted</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>输出：true = 批次有效；false = 拒链。</p>
+</dd>
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>输出：源集群标签。</p>
+</dd>
+    <dt><code>entries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.list-1">List</a>&lt;(<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.byte[]-.index">Index</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.byte[]-.term">Term</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.byte[]-.kind">Kind</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[] <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-system.int64,system.int64,system.byte,system.byte[]-.content">Content</a>)&gt;</dt>
+    <dd><p>输出：条目列表（拒链/空批次/解码失败 = 空表）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 帧结构完整（继续判定 granted——拒链/空批次亦 true）；false = 截断/条目长度失配（输出归零/default）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Federation_FederationWire_TryDecodePull_" data-uid="TC.Tier.Core.Net.Federation.FederationWire.TryDecodePull*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Federation_FederationWire_TryDecodePull_System_ReadOnlySpan_System_Byte__System_UInt32__TC_Tier_Core_Net_Raft_RaftGroupId__System_Int64__System_Int32__" data-uid="TC.Tier.Core.Net.Federation.FederationWire.TryDecodePull(System.ReadOnlySpan{System.Byte},System.UInt32@,TC.Tier.Core.Net.Raft.RaftGroupId@,System.Int64@,System.Int32@)">
+  TryDecodePull(ReadOnlySpan&lt;byte&gt;, out uint, out RaftGroupId, out long, out int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>解码拉取请求（缺长返回 false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static bool TryDecodePull(ReadOnlySpan&lt;byte&gt; wire, out uint clusterTag, out RaftGroupId group, out long watermark, out int maxEntries)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>wire</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>入站帧（≥ <a class="xref" href="TC.Tier.Core.Net.Federation.FederationWire.html#TC_Tier_Core_Net_Federation_FederationWire_PullRequestSize">PullRequestSize</a> 字节）。</p>
+</dd>
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>输出：对端声明的源集群标签。</p>
+</dd>
+    <dt><code>group</code> <a class="xref" href="TC.Tier.Core.Net.Raft.RaftGroupId.html">RaftGroupId</a></dt>
+    <dd><p>输出：目标组 ID。</p>
+</dd>
+    <dt><code>watermark</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出：对端已消费水位。</p>
+</dd>
+    <dt><code>maxEntries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>输出：对端单次条数上限。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 解码成功（各输出有效）；false = 帧长不足（输出全部归零/default）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

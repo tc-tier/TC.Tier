@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class HybridLogicClock | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class HybridLogicClock | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="混合逻辑时钟（二期-G1 NETGAP-024——HLC 原语，Kulkarni et al. &#167;3 构造）： ★ Tick（本地事件）：墙钟前进 → 物理跟钟、逻辑清零；墙钟停滞/回拨 → 逻辑 +1 （时间戳永不回退——墙钟回拨被逻辑域吸收）。 ★ Receive（收到远端时间戳）：物理 = max(本端墙钟, 本端物理, 远端物理)；三方等物理时 逻辑 = max(本端逻辑, 远端逻辑) + 1——因果吸收（远端领先即跟钟，跨分区重连后时序连续）。 ★ 墙钟源可注入（构造参数 wallNow——测试时钟回拨/跳跃场景）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Coordination_HybridLogicClock" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock" class="text-break">
+Class HybridLogicClock  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Coordination.html">Coordination</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>混合逻辑时钟（二期-G1 NETGAP-024——HLC 原语，Kulkarni et al. §3 构造）：</p>
+<p>★ Tick（本地事件）：墙钟前进 → 物理跟钟、逻辑清零；墙钟停滞/回拨 → 逻辑 +1
+（<b>时间戳永不回退</b>——墙钟回拨被逻辑域吸收）。</p>
+<p>★ Receive（收到远端时间戳）：物理 = max(本端墙钟, 本端物理, 远端物理)；三方等物理时
+逻辑 = max(本端逻辑, 远端逻辑) + 1——因果吸收（远端领先即跟钟，跨分区重连后时序连续）。</p>
+<p>★ 墙钟源可注入（构造参数 wallNow——测试时钟回拨/跳跃场景）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class HybridLogicClock</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">HybridLogicClock</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Coordination_HybridLogicClock__ctor_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_HybridLogicClock__ctor_System_Func_System_Int64__" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.#ctor(System.Func{System.Int64})">
+  HybridLogicClock(Func&lt;long&gt;?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（<code class="paramref">wallNow</code> 缺省 = Unix 毫秒墙钟；测试注入假钟）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HybridLogicClock(Func&lt;long&gt;? wallNow = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>wallNow</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-1">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Coordination_HybridLogicClock__ctor_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_HybridLogicClock__ctor_System_TimeProvider_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.#ctor(System.TimeProvider)">
+  HybridLogicClock(TimeProvider)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造——时钟缝统一供给源形态（故障注入面 件一）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HybridLogicClock(TimeProvider clock)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clock</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd><p>时钟供给源（取 <code>GetUtcNow</code> 的 Unix 毫秒；跳变/漂移经假钟注入；
+<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.system">System</a> 行为与缺省构造一致）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Coordination_HybridLogicClock_Current_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.Current*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_HybridLogicClock_Current" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.Current">
+  Current
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前时间戳（只观测，不推进）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HlcTimestamp Current { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Coordination.HlcTimestamp.html">HlcTimestamp</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Coordination_HybridLogicClock_Receive_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.Receive*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_HybridLogicClock_Receive_TC_Tier_Core_Net_Coordination_HlcTimestamp_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.Receive(TC.Tier.Core.Net.Coordination.HlcTimestamp)">
+  Receive(HlcTimestamp)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>收到远端时间戳（因果吸收）：物理 = max(墙钟, 本端物理, 远端物理)；逻辑按
+物理跳进来源区分——远端领先跟钟时逻辑 = remote.Logical + 1（Kulkarni 接收不变式
+h.j &gt; m：结果必须严格晚于被吸收的远端时间戳），墙钟领先两者（新物理严格大于远端
+物理）时逻辑归零安全。物理不变时逻辑 = max(本端逻辑, 远端逻辑) + 1。单调保证同 <a class="xref" href="TC.Tier.Core.Net.Coordination.HybridLogicClock.html#TC_Tier_Core_Net_Coordination_HybridLogicClock_Tick">Tick()</a>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HlcTimestamp Receive(HlcTimestamp remote)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>remote</code> <a class="xref" href="TC.Tier.Core.Net.Coordination.HlcTimestamp.html">HlcTimestamp</a></dt>
+    <dd><p>远端时间戳（随消息携带的因果上界）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Coordination.HlcTimestamp.html">HlcTimestamp</a></dt>
+    <dd><p>吸收远端因果后的新时间戳（单调且严格晚于 remote——永不早于本端先前任何返回值）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Coordination_HybridLogicClock_Tick_" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.Tick*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Coordination_HybridLogicClock_Tick" data-uid="TC.Tier.Core.Net.Coordination.HybridLogicClock.Tick">
+  Tick()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本地事件：推进并返回新时间戳（单调——永不早于先前任何返回值）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public HlcTimestamp Tick()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Coordination.HlcTimestamp.html">HlcTimestamp</a></dt>
+    <dd><p>推进后的新时间戳（墙钟前进 = 物理跟钟、逻辑清零；停滞/回拨 = 逻辑 +1——时间戳永不回退）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SwarmMerkle | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SwarmMerkle | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="Swarm manifest Merkle 树哈希（spec-12 &#167;6.1 增量——复制家族设计件 C 反熵对账的比对依据）： 块 CRC32C 为叶子，每  块聚一个子树根，子树根聚全局根。 ★ 纯函数（manifest Checksums 的派生计算——零状态）；全局根相等 = 整体一致零传输； 不等 = 沿子树粒度定位差异区间（叶子层区间批量比对，O(块数/扇出) 请求、4B/块比对流量）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Swarm_SwarmMerkle" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle" class="text-break">
+Class SwarmMerkle  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Swarm.html">Swarm</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>Swarm manifest Merkle 树哈希（spec-12 §6.1 增量——复制家族设计件 C 反熵对账的比对依据）：
+块 CRC32C 为叶子，每 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmMerkle.html#TC_Tier_Core_Net_Swarm_SwarmMerkle_SubtreeFanout">SubtreeFanout</a> 块聚一个子树根，子树根聚全局根。</p>
+<p>★ 纯函数（manifest Checksums 的派生计算——零状态）；全局根相等 = 整体一致零传输；
+不等 = 沿子树粒度定位差异区间（叶子层区间批量比对，O(块数/扇出) 请求、4B/块比对流量）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static class SwarmMerkle</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SwarmMerkle</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.memberwiseclone">object.MemberwiseClone()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmMerkle_SubtreeFanout" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.SubtreeFanout">
+  SubtreeFanout
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>子树扇出（每 64 块一个子树根——比对流量/定位粒度折中）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const int SubtreeFanout = 64</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmMerkle_ComputeGlobalRoot_" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.ComputeGlobalRoot*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmMerkle_ComputeGlobalRoot_System_ReadOnlySpan_System_UInt32__" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.ComputeGlobalRoot(System.ReadOnlySpan{System.UInt32})">
+  ComputeGlobalRoot(ReadOnlySpan&lt;uint&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>全局根（子树根串接的 CRC32C——相等即整体一致零传输）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static uint ComputeGlobalRoot(ReadOnlySpan&lt;uint&gt; checksums)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>checksums</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>&gt;</dt>
+    <dd><p>每块 CRC32C。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>全局根（空内容 = 0）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmMerkle_ComputeSubtreeRoots_" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.ComputeSubtreeRoots*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmMerkle_ComputeSubtreeRoots_System_ReadOnlySpan_System_UInt32__" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.ComputeSubtreeRoots(System.ReadOnlySpan{System.UInt32})">
+  ComputeSubtreeRoots(ReadOnlySpan&lt;uint&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>子树根序列（每 64 块一段——段内叶子 CRC 字节串接的 CRC32C；末段不足按实有）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static uint[] ComputeSubtreeRoots(ReadOnlySpan&lt;uint&gt; checksums)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>checksums</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>&gt;</dt>
+    <dd><p>每块 CRC32C（按块号序）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>[]</dt>
+    <dd><p>子树根序列（长度 = ⌈块数 / <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmMerkle.html#TC_Tier_Core_Net_Swarm_SwarmMerkle_SubtreeFanout">SubtreeFanout</a>⌉；空输入 = 空数组）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Swarm_SwarmMerkle_DiffBlocks_" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.DiffBlocks*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Swarm_SwarmMerkle_DiffBlocks_System_ReadOnlySpan_System_UInt32__System_ReadOnlySpan_System_UInt32__" data-uid="TC.Tier.Core.Net.Swarm.SwarmMerkle.DiffBlocks(System.ReadOnlySpan{System.UInt32},System.ReadOnlySpan{System.UInt32})">
+  DiffBlocks(ReadOnlySpan&lt;uint&gt;, ReadOnlySpan&lt;uint&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>差异块定位（叶子层逐块比对——本端 vs 对端，块号升序）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static IReadOnlyList&lt;long&gt;? DiffBlocks(ReadOnlySpan&lt;uint&gt; mine, ReadOnlySpan&lt;uint&gt; theirs)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>mine</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>&gt;</dt>
+    <dd><p>本端每块 CRC32C。</p>
+</dd>
+    <dt><code>theirs</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>&gt;</dt>
+    <dd><p>对端每块 CRC32C（长度不一致 = 内容不同代——返回 null 由调用方处置）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

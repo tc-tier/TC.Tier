@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ReplicationProcess | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ReplicationProcess | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="复制引擎（spec-02 Leader 侧全量）——nextIndex/matchIndex 管理、AppendEntries 构造与应答处理、 冲突回退（hint 加速）、commitIndex 推进（Figure 8 约束）、心跳循环。 ★ per-peer 续体链（spec-10 D1）：复制发送从共识循环线程抽出，每 peer 一条独立续体链 （线程池续体——不占专属线程，peer 间并行：发 A 时可处理 B 的 ack）；peer 状态 （nextIndex/matchIndex/在途）只被本链读写（raft 本要求每 peer 单在途 AppendEntries—— 串行是协议本性，单写者零锁）。信号驱动：新条目（）/ 应答投槽（）/ 心跳 tick（）→ lane 唤醒 → 消费应答槽 → 发送判定（滞后 / 心跳到期 / 在途超时重试）→ 回挂等待。 ★ 请求回调形态（spec-12 &#167;6）：发送 = 出站请求任务（per-call 超时对齐在途重试窗—— 应答由传输 CorrId 配对）；应答到达经  路由（状态机 term/ReadIndex 前处理）→  投槽/直跑——lane 单写者不变式与旧事件面同构。 ★ 快照判定：nextIndex ≤ 本地快照覆盖点 → 经  通知状态机 改走快照安装（spec-03 &#167;2 触发条件——增量复制无法接续）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_ReplicationProcess" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess" class="text-break">
+Class ReplicationProcess  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>复制引擎（spec-02 Leader 侧全量）——nextIndex/matchIndex 管理、AppendEntries 构造与应答处理、
+冲突回退（hint 加速）、commitIndex 推进（Figure 8 约束）、心跳循环。</p>
+<p>★ per-peer 续体链（spec-10 D1）：复制发送从共识循环线程抽出，每 peer 一条独立续体链
+（线程池续体——不占专属线程，peer 间并行：发 A 时可处理 B 的 ack）；peer 状态
+（nextIndex/matchIndex/在途）只被本链读写（raft 本要求每 peer 单在途 AppendEntries——
+串行是协议本性，单写者零锁）。信号驱动：新条目（<a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_NotifyAppended_System_Int32_System_Int64_">NotifyAppended(int, long)</a>）/
+应答投槽（<a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_CancellationToken_">HandleRespAsync(NodeId, AppendEntriesResp, CancellationToken)</a>）/ 心跳 tick（<a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleTick">HandleTick()</a>）→
+lane 唤醒 → 消费应答槽 → 发送判定（滞后 / 心跳到期 / 在途超时重试）→ 回挂等待。</p>
+<p>★ 请求回调形态（spec-12 §6）：发送 = 出站请求任务（per-call 超时对齐在途重试窗——
+应答由传输 CorrId 配对）；应答到达经 <span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess._onRespArrived</span> 路由（状态机 term/ReadIndex
+前处理）→ <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_CancellationToken_">HandleRespAsync(NodeId, AppendEntriesResp, CancellationToken)</a> 投槽/直跑——lane 单写者不变式与旧事件面同构。</p>
+<p>★ 快照判定：nextIndex ≤ 本地快照覆盖点 → 经 <span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess._onSnapshotNeeded</span> 通知状态机
+改走快照安装（spec-03 §2 触发条件——增量复制无法接续）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class ReplicationProcess : IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">ReplicationProcess</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess__ctor_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess__ctor_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_IRaftStore_TC_Tier_Core_Net_Channels_IProtocolTransport_System_Func_System_Int64__System_Action_System_Int64__System_Func_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_Tasks_ValueTask__System_Func_TC_Tier_Core_Net_NodeId_System_Threading_Tasks_ValueTask__System_Action_TC_Tier_Core_Net_NodeId__TC_Tier_Core_Net_Raft_ReplicationPolicy_System_TimeSpan_TC_Tier_Core_Logging_ILogger_System_Threading_CancellationToken_System_TimeProvider_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.#ctor(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.IRaftStore,TC.Tier.Core.Net.Channels.IProtocolTransport,System.Func{System.Int64},System.Action{System.Int64},System.Func{TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.AppendEntriesResp,System.Threading.Tasks.ValueTask},System.Func{TC.Tier.Core.Net.NodeId,System.Threading.Tasks.ValueTask},System.Action{TC.Tier.Core.Net.NodeId},TC.Tier.Core.Net.Raft.ReplicationPolicy,System.TimeSpan,TC.Tier.Core.Logging.ILogger,System.Threading.CancellationToken,System.TimeProvider)">
+  ReplicationProcess(NodeId, IRaftStore, IProtocolTransport, Func&lt;long&gt;, Action&lt;long&gt;, Func&lt;NodeId, AppendEntriesResp, ValueTask&gt;, Func&lt;NodeId, ValueTask&gt;, Action&lt;NodeId&gt;?, ReplicationPolicy?, TimeSpan, ILogger?, CancellationToken, TimeProvider?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ReplicationProcess(NodeId self, IRaftStore store, IProtocolTransport transport, Func&lt;long&gt; commitIndexProvider, Action&lt;long&gt; onCommitAdvanced, Func&lt;NodeId, AppendEntriesResp, ValueTask&gt; onRespArrived, Func&lt;NodeId, ValueTask&gt; onSnapshotNeeded, Action&lt;NodeId&gt;? onFollowerAck = null, ReplicationPolicy? policy = null, TimeSpan heartbeatInterval = default, ILogger? logger = null, CancellationToken lifecycleCt = default, TimeProvider? clock = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>self</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本节点 ID。</p>
+</dd>
+    <dt><code>store</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+    <dd><p>存储端口。</p>
+</dd>
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>节点端点完整面（请求回调发送 AppendEntries）。</p>
+</dd>
+    <dt><code>commitIndexProvider</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-1">Func</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>当前 commitIndex 读取（状态机持有）。</p>
+</dd>
+    <dt><code>onCommitAdvanced</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>commitIndex 推进回调（状态机 AdvanceCommit——投递 apply；多 lane 并发调用，状态机侧单调化）。</p>
+</dd>
+    <dt><code>onRespArrived</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-3">Func</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</dt>
+    <dd><p>应答到达路由（状态机：更高 term 降级/ReadIndex 计数 → 本类 <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationProcess.html#TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_CancellationToken_">HandleRespAsync(NodeId, AppendEntriesResp, CancellationToken)</a>——lane 投槽/直跑）。</p>
+</dd>
+    <dt><code>onSnapshotNeeded</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>&gt;</dt>
+    <dd><p>快照安装请求（nextIndex ≤ 本地快照覆盖点——增量无法接续；lane 链线程调用）。</p>
+</dd>
+    <dt><code>onFollowerAck</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.action-1">Action</a>&lt;<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a>&gt;</dt>
+    <dd></dd>
+    <dt><code>policy</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ReplicationPolicy.html">ReplicationPolicy</a></dt>
+    <dd><p>复制策略（条数/字节/时间三维度攒批；默认全零 = 立即推送）。</p>
+</dd>
+    <dt><code>heartbeatInterval</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a></dt>
+    <dd><p>心跳间隔（lane 空批心跳节流——RaftOptions.HeartbeatInterval）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志。</p>
+</dd>
+    <dt><code>lifecycleCt</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>生命周期取消（状态机停止——lane 链退出）。</p>
+</dd>
+    <dt><code>clock</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider">TimeProvider</a></dt>
+    <dd><p>时钟供给源（时钟缝 件一——缺省 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timeprovider.system">System</a> 行为不变）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_Config_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.Config*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_Config" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.Config">
+  Config
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前活动配置（leader 期成员集——选举/复制目标）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig Config { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_ApplyConfig_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.ApplyConfig*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_ApplyConfig_TC_Tier_Core_Net_Raft_ClusterConfig_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.ApplyConfig(TC.Tier.Core.Net.Raft.ClusterConfig)">
+  ApplyConfig(ClusterConfig)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>活动配置切换（apply 产物——spec-04）：重建复制表——新成员 nextIndex = 日志尾+1（快照/增量追赶）
+并起新链，移除成员停链；保留成员链与在途批不动（应答仍会到达——窗口 1 语义连续）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void ApplyConfig(ClusterConfig config)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>config</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新活动配置（apply 产物——含新/移除成员）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_BecomeFollower_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.BecomeFollower*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_BecomeFollower" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.BecomeFollower">
+  BecomeFollower()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>降级 Follower：停全部链（唤醒退出）+ 清复制表。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void BecomeFollower()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_BecomeLeader_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.BecomeLeader*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_BecomeLeader_TC_Tier_Core_Net_Raft_ClusterConfig_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.BecomeLeader(TC.Tier.Core.Net.Raft.ClusterConfig)">
+  BecomeLeader(ClusterConfig)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当选 Leader：初始化复制表（nextIndex = 日志尾+1、matchIndex = 0）+ 每 peer 起链
+（链首拍立即发空 AppendEntries——确立权威，spec-01 §5.3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void BecomeLeader(ClusterConfig config)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>config</code> <a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>当选时的活动配置（leader 期成员集）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_CompleteInstall_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.CompleteInstall*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_CompleteInstall_TC_Tier_Core_Net_NodeId_System_Int64_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.CompleteInstall(TC.Tier.Core.Net.NodeId,System.Int64)">
+  CompleteInstall(NodeId, long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>快照安装完成（spec-03 §4）：投伪应答（Success / MatchIndex = N₀）到 lane 槽——链内消费后
+nextIndex = N₀+1（快照已覆盖 [Head..N₀]——增量从 N₀+1 接续）+ 在途清 + 立即推增量。</p>
+<p>★ 槽投递形态（lane 单写者契约）：nextIndex/matchIndex/在途全部由链写——本方法只在
+  投递点写槽（快照安装期间无真实在途批应答，无覆盖风险）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void CompleteInstall(NodeId peer, long n0)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>peer</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>快照安装目标节点 ID。</p>
+</dd>
+    <dt><code>n0</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>快照覆盖点 N₀（投伪应答 MatchIndex = 此值——nextIndex 续接 N₀+1）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_DisposeAsync_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_DisposeAsync" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>任务组 drain（状态机 Dispose 路径——lane 链与出站请求全部退出后存储层才释放）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时窗口定时器已停、lane 任务组已 drain（幂等）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.HandleRespAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_HandleRespAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_AppendEntriesResp_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.HandleRespAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.AppendEntriesResp,System.Threading.CancellationToken)">
+  HandleRespAsync(NodeId, AppendEntriesResp, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>AppendEntries 应答投递（spec-02 §4/§5）：★ 可入侵直跑——lane 空闲时在应答
+到达线程直接续跑链逻辑（消费应答 + commit 判定 + 续发，省一次线程池续体调度）；
+lane 忙（在途发送/链循环驱动中）→ 写槽 + 唤醒信号。</p>
+<p>★ 同线程自投递免唤醒：应答在<b>驱动线程自己的发送栈内</b>同步回投（InProcess 直排）
+  时——驱动循环顶即将消费槽，Set 只会触发链循环空转唤醒（每条一跳线程池调度的系统性空转源）。
+  经 <span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess.PeerLane.DriverId</span> 比对免除。</p>
+<p>★ 入口 = <span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess._onRespArrived</span> 路由（状态机 term/ReadIndex 前处理后转投）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask HandleRespAsync(NodeId peer, AppendEntriesResp resp, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>peer</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>应答来源节点 ID。</p>
+</dd>
+    <dt><code>resp</code> <a class="xref" href="TC.Tier.Core.Net.Raft.AppendEntriesResp.html">AppendEntriesResp</a></dt>
+    <dd><p>AppendEntries 应答（成功/失败 hint）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（lane 驱动循环内取消感知）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时投递已受理（直跑续跑结束或槽投递完成——非 leader/无 lane 时立即完成忽略）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_HandleTick_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.HandleTick*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_HandleTick" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.HandleTick">
+  HandleTick()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>心跳 tick（spec-02 §6——周期循环；空批携带 leaderCommit 推进 follower 提交）。
+链形态：只广播唤醒信号——心跳发送/在途超时重试检查在链内（每 lane 独立节流）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void HandleTick()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_NotifyAppended_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.NotifyAppended*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_NotifyAppended_System_Int32_System_Int64_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.NotifyAppended(System.Int32,System.Int64)">
+  NotifyAppended(int, long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本地有新条目（append 线程批尾 flush 后调用）——三维度攒批判定：
+窗口 0（默认）即时唤醒滞后 lane；窗口 &gt; 0 攒批等 tick 触发（条数/字节即时触发）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void NotifyAppended(int count = 1, long bytes = 0)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>count</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>新增条目数（累计达 BatchSize 即时触发）。</p>
+</dd>
+    <dt><code>bytes</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>新增字节数（累计达 MaxBatchBytes 即时触发；0 = 不约束字节维度）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_StopAllLanesAndWaitAsync_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.StopAllLanesAndWaitAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_StopAllLanesAndWaitAsync" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.StopAllLanesAndWaitAsync">
+  StopAllLanesAndWaitAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>停全部 lane 并等待退出（leader 卸任路径——与 DisposeAsync 的差别：不释放任务组，可重新当选）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask StopAllLanesAndWaitAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时全部 lane 已停止（2s 总预算内等待退出——超时残留由进程收尾）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_TryAdvanceCommitAsync_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.TryAdvanceCommitAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_TryAdvanceCommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.TryAdvanceCommitAsync(System.Threading.CancellationToken)">
+  TryAdvanceCommitAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>多数派 matchIndex 最大值 N（含自己——自己 matchIndex = 本地 PersistedIndex）；
+N &gt; commitIndex 且 log[N].term == currentTerm → 推进（★ 只能经当前任期条目直接提交——
+旧任期条目随该次提交间接提交，防&quot;已提交条目被新 leader 覆盖&quot;，spec-02 §5）。</p>
+<p>多 lane 并发调用：matchIndex 快照读（lane 单写者——读到旧值只保守推迟推进，
+  下次应答再触发）；推进回调（<span class="xref">TC.Tier.Core.Net.Raft.ReplicationProcess._onCommitAdvanced</span>）由状态机侧单调化。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask TryAdvanceCommitAsync(CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（term 读取 await——取消感知）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时已按多数派 matchIndex 判定并推进 commit（不满足推进条件时立即完成无副作用）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_TryGetMatchIndex_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.TryGetMatchIndex*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_TryGetMatchIndex_TC_Tier_Core_Net_NodeId_System_Int64__" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.TryGetMatchIndex(TC.Tier.Core.Net.NodeId,System.Int64@)">
+  TryGetMatchIndex(NodeId, out long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>读 peer 当前 matchIndex（learner 追平晋级判定面；无链路 = false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetMatchIndex(NodeId peer, out long matchIndex)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>peer</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>查询的 peer 节点 ID。</p>
+</dd>
+    <dt><code>matchIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>输出：peer 的 matchIndex（无链路 = 0）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = peer 在复制表中（matchIndex 有效）；false = 无链路（matchIndex=0）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ReplicationProcess_WakeLanesIfCaughtUp_" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.WakeLanesIfCaughtUp*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ReplicationProcess_WakeLanesIfCaughtUp" data-uid="TC.Tier.Core.Net.Raft.ReplicationProcess.WakeLanesIfCaughtUp">
+  WakeLanesIfCaughtUp()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 健康 leader 心跳直唤 lane（判例 2026-09-04——饥饿不对称修复）：节点心跳
+deadline 到期（registry pacer 线程回调）时，若 leader 且<b>本地无持久化债</b>
+（PersistedIndex == AllocatedIndex——无未落盘条目）→ 直唤各 lane（跳过 raft 主循环
+一跳——循环被调度饥饿/事件积压延迟时心跳不再连带断供，健康 leader 挺过 ≤心跳窗的
+饥饿）。★ 病 leader 红线保持：有持久化债（allocated &gt; persisted——fsync 门挂住/
+真盘慢写）→ 不直唤——心跳静默 → follower 150-300ms 自发换届（病 leader 活性自愈
+契约不变，LeaderLocal 在途等待者换届取消路径照旧）。主循环 HandleTickAsync 保留
+为兜底（债消后的 flush 路径/批窗到期照常经循环驱动）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public void WakeLanesIfCaughtUp()</code></pre>
+  </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

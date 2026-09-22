@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class ClusterConfig | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class ClusterConfig | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="集群配置（spec-04 &#167;1 定案）——节点有序列表；版本 = 承载它的日志 index；meta 槽不存配置 （恢复 = 重放日志/快照帧流至配置条目——配置与状态机同构，日志即状态机）。 ★ 稳定序列化（——配置条目 payload 格式）：配置变更经日志复制 跨节点传播、重启经快照/重放恢复——格式必须稳定。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.ClusterConfig">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_ClusterConfig" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig" class="text-break">
+Class ClusterConfig  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>集群配置（spec-04 §1 定案）——节点有序列表；版本 = 承载它的日志 index；meta 槽不存配置
+（恢复 = 重放日志/快照帧流至配置条目——配置与状态机同构，日志即状态机）。</p>
+<p>★ 稳定序列化（<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html#TC_Tier_Core_Net_Raft_ClusterConfig_Serialize">Serialize()</a>——配置条目 payload 格式）：配置变更经日志复制
+跨节点传播、重启经快照/重放恢复——格式必须稳定。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class ClusterConfig</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">ClusterConfig</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig__ctor_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig__ctor_System_Collections_Generic_IEnumerable_TC_Tier_Core_Net_Raft_ClusterMember__" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.#ctor(System.Collections.Generic.IEnumerable{TC.Tier.Core.Net.Raft.ClusterMember})">
+  ClusterConfig(IEnumerable&lt;ClusterMember&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（副本语义——成员列表不可变）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig(IEnumerable&lt;ClusterMember&gt; members)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>members</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterMember.html">ClusterMember</a>&gt;</dt>
+    <dd><p>有序成员列表（顺序即确定性序列化顺序）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig__ctor_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig__ctor_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.#ctor(TC.Tier.Core.Net.NodeId)">
+  ClusterConfig(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（单成员快捷路径——Standalone 装配）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig(NodeId single)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>single</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="fields">Fields
+</h2>
+
+
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_FormatVersion" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.FormatVersion">
+  FormatVersion
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置条目 payload 格式版本（v2 = 成员尾增 Role 1B——件 B learner；v1 全 voter 可读）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public const ushort FormatVersion = 2</code></pre>
+  </div>
+
+
+
+
+  <h4 class="section">Field Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint16">ushort</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Count_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Count*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Count" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Count">
+  Count
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>集群大小 N（含 learner）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int Count { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_MajorityThreshold_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.MajorityThreshold*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_MajorityThreshold" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.MajorityThreshold">
+  MajorityThreshold
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>多数派阈值（⌊VoterCount/2⌋+1——Quorum 组件判定；learner 不占多数派）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int MajorityThreshold { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Members_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Members*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Members" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Members">
+  Members
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>成员只读视图。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public IReadOnlyList&lt;ClusterMember&gt; Members { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.ClusterMember.html">ClusterMember</a>&gt;</dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_VoterCount_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.VoterCount*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_VoterCount" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.VoterCount">
+  VoterCount
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>投票成员数（learner 不计——选举/提交的多数派口径）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public int VoterCount { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Add_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Add*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Add_TC_Tier_Core_Net_NodeId_System_String_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Add(TC.Tier.Core.Net.NodeId,System.String)">
+  Add(NodeId, string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加成员（single-server 变更第一步——C_old ∪ {new}）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig Add(NodeId id, string endPoint = &quot;&quot;)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新成员节点 ID。</p>
+</dd>
+    <dt><code>endPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新配置（已含新成员，角色为 voter）；若已存在则返回原配置。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_AddLearner_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.AddLearner*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_AddLearner_TC_Tier_Core_Net_NodeId_System_String_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.AddLearner(TC.Tier.Core.Net.NodeId,System.String)">
+  AddLearner(NodeId, string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加 learner（观察副本/引导形态——收日志复制可读，不投票不计多数派；已存在 = 原样返回）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig AddLearner(NodeId id, string endPoint = &quot;&quot;)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新成员节点 ID。</p>
+</dd>
+    <dt><code>endPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新配置（已含新成员，角色为 learner）；若已存在则返回原配置。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_AddLearners_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.AddLearners*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_AddLearners_System_Collections_Generic_IEnumerable_System_ValueTuple_TC_Tier_Core_Net_NodeId_System_String___" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.AddLearners(System.Collections.Generic.IEnumerable{System.ValueTuple{TC.Tier.Core.Net.NodeId,System.String}})">
+  AddLearners(IEnumerable&lt;(NodeId Id, string EndPoint)&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>批量加 learner（#507c——一条配置条目携多节点，机群批量引导 O(1) 轮协议）。</p>
+<p>★ 安全性：learner 不投票不计多数派——批量加入<b>不改变投票成员集</b>，新旧配置的多数派
+  完全重合，single-server 变更的 quorum 交集论证平凡成立（论文 §4.2 一次一节点的动机在投票成员
+  变更，learner 批量不在其约束域）。已存在的成员跳过（幂等）；全跳过 = 原样返回（零提案）。</p>
+<p>★ 上限 200：配置条目 wire 格式 Count 字段 1B（≤255）——留余量；更大的引导批次分多条
+  批量条目（万级拓扑的配置面扩容见 #507a/b 立项的格式 v3）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig AddLearners(IEnumerable&lt;(NodeId Id, string EndPoint)&gt; learners)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>learners</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;(<a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.nodeid,system.string-.id">Id</a>, <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.valuetuple-tc.tier.core.net.nodeid,system.string-.endpoint">EndPoint</a>)&gt;</dt>
+    <dd><p>批量 learner（ID + 端点；端点空串 = 进程内传输）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新配置（已含全部新 learner，角色 learner）；无新增则返回原配置。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>单条批量超过 200（wire 格式上限 255 留余量——分批引导）。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_AddWitness_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.AddWitness*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_AddWitness_TC_Tier_Core_Net_NodeId_System_String_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.AddWitness(TC.Tier.Core.Net.NodeId,System.String)">
+  AddWitness(NodeId, string)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>加 witness（见证者——投票计入选主/提交多数派，不存日志体不自荐；已存在 = 原样返回）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig AddWitness(NodeId id, string endPoint = &quot;&quot;)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>新 witness 节点 ID。</p>
+</dd>
+    <dt><code>endPoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>端点（进程内传输 = 空串；网络 = host:port——装配层消费）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新配置（已含新成员，角色为 witness）；若已存在则返回原配置。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Contains_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Contains*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Contains_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Contains(TC.Tier.Core.Net.NodeId)">
+  Contains(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>包含指定节点。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool Contains(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>查询节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 节点在配置中（voter 或 learner）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Deserialize_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Deserialize*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Deserialize_System_ReadOnlySpan_System_Byte__" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Deserialize(System.ReadOnlySpan{System.Byte})">
+  Deserialize(ReadOnlySpan&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>反序列化配置条目 payload（v2 本格；v1 兼容读——成员 role 全 Voter）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static ClusterConfig Deserialize(ReadOnlySpan&lt;byte&gt; payload)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>payload</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlyspan-1">ReadOnlySpan</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>配置条目 payload 字节（v2/v1 兼容）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>解析得到的集群配置。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.formatexception">FormatException</a></dt>
+    <dd><p>payload 过短/版本不支持/成员截断/端点截断。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_GetEndPoint_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.GetEndPoint*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_GetEndPoint_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.GetEndPoint(TC.Tier.Core.Net.NodeId)">
+  GetEndPoint(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>成员端点（NodeId↔EndPoint 映射查询）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public string GetEndPoint(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>查询节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>该成员的端点字符串（进程内传输 = 空串；网络传输 = host:port）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.keynotfoundexception">KeyNotFoundException</a></dt>
+    <dd><p>节点 <code class="paramref">id</code> 不在活动配置中。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_IsFullVoter_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.IsFullVoter*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_IsFullVoter_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.IsFullVoter(TC.Tier.Core.Net.NodeId)">
+  IsFullVoter(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>指定节点是否全量投票成员（可承接 leader 职责——witness 不自荐/不可转让）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsFullVoter(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>查询节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 全量 voter（可自荐当选/承接 leader 转让）；false = witness/learner 或不在配置中。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_IsVoter_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.IsVoter*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_IsVoter_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.IsVoter(TC.Tier.Core.Net.NodeId)">
+  IsVoter(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>指定节点是否投票成员（witness = true——二期-F2 计入选主/提交多数派；
+learner = false）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsVoter(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>查询节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = voter/witness（参与选举投票/计入多数派）；false = learner 或不在配置中。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_IsWitness_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.IsWitness*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_IsWitness_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.IsWitness(TC.Tier.Core.Net.NodeId)">
+  IsWitness(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>指定节点是否见证者（二期-F2——投票但不存全量数据、不自荐）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool IsWitness(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>查询节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = witness 角色（投票计入多数派但不存全量数据/不自荐）；false = 其他角色或不在配置中。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Promote_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Promote*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Promote_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Promote(TC.Tier.Core.Net.NodeId)">
+  Promote(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>晋级 voter（learner → voter——引导流追平后转正；缺席或已是 voter = 原样返回）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig Promote(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>要晋级的节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新配置（该成员角色切换为 voter）；缺席或已是 voter 则返回原配置。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Remove_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Remove*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Remove_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Remove(TC.Tier.Core.Net.NodeId)">
+  Remove(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>移除成员（single-server 变更第二步——C_new）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ClusterConfig Remove(NodeId id)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>id</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>要移除的节点 ID。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Raft.ClusterConfig.html">ClusterConfig</a></dt>
+    <dd><p>新配置（不再含该成员）；不存在的成员 = 原样返回。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_ClusterConfig_Serialize_" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Serialize*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_ClusterConfig_Serialize" data-uid="TC.Tier.Core.Net.Raft.ClusterConfig.Serialize">
+  Serialize()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>序列化为配置条目 payload（v2）：</p>
+<pre><code class="lang-csharp">[Version 2B LE][Count 1B][成员 × N：Id 16B + EpLen 1B + EndPoint UTF8 + Role 1B]</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public byte[] Serialize()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>[]</dt>
+    <dd><p>稳定序列化字节（配置条目 payload——跨节点传播/重启恢复用）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

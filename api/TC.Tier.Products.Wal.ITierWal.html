@@ -1,0 +1,1035 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Interface ITierWal | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Interface ITierWal | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="TierWAL——协议中立 WAL 产品（raft/p2p 的存储中线）。 ★ 定位：存储侧把 raft 协议要求的全部持久化语义做齐但内容零知识——entry 内容不解析、   元数据内容不解析（Opaque 槽）；raft/p2p（TC.Tier.Products.Net）是纯消费方，直接接线即可。 ★ 能力映射（底层 EntryLog 已实现，TierWAL 只封装 + 自定 opaque 容器布局）：  - 追加：组提交 （raft 攒批）/ 单条   - 显式提交 （raft 同步点：一次 fsync = 一批持久化）  - 截断：（头压缩，与写并行）/ （冲突修正）  - 重放 （随机起点顺序读，index 定位 = 段表二分 + 段内扫帧计数）  - 元数据 Opaque 槽 /（term/vote/config 原子替换）  - 快照导出/导入 /（一致性点 N₀ 进帧 Header） ★ index 承载（设计 &#167;8.7）：raft 日志连续无空洞——index 由&quot;起点 + 顺序计数&quot;推导，   帧内零 index；段 anchor 表随 opaque 原子落盘（恢复 O(1) 读全表）。 ★ 双水位：（内存计数，含攒批窗口）/    （最后显式提交水位——raft 语义的 last persisted index 可信下限，自动提交只提前落盘不推进）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Products.Wal.ITierWal">
+
+
+
+  <h1 id="TC_Tier_Products_Wal_ITierWal" data-uid="TC.Tier.Products.Wal.ITierWal" class="text-break">
+Interface ITierWal  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Products.html">Products</a>.<a class="xref" href="TC.Tier.Products.Wal.html">Wal</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Products.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>TierWAL——协议中立 WAL 产品（raft/p2p 的存储中线）。</p>
+<p>★ 定位：存储侧把 raft 协议要求的<b>全部持久化语义做齐但内容零知识</b>——entry 内容不解析、
+  元数据内容不解析（Opaque 槽）；raft/p2p（TC.Tier.Products.Net）是纯消费方，直接接线即可。</p>
+<p>★ 能力映射（底层 EntryLog 已实现，TierWAL 只封装 + 自定 opaque 容器布局）：</p>
+<p> - 追加：组提交 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_AppendBatchAsync_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_">AppendBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)</a>（raft 攒批）/ 单条 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_AppendSingleAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">AppendSingleAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a></p>
+<p> - 显式提交 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_CommitAsync_System_Threading_CancellationToken_">CommitAsync(CancellationToken)</a>（raft 同步点：一次 fsync = 一批持久化）</p>
+<p> - 截断：<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_TruncatePrefixAsync_System_Int64_System_Threading_CancellationToken_">TruncatePrefixAsync(long, CancellationToken)</a>（头压缩，与写并行）/ <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_TruncateSuffixAsync_System_Int64_System_Threading_CancellationToken_">TruncateSuffixAsync(long, CancellationToken)</a>（冲突修正）</p>
+<p> - 重放 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ReadFromAsync_System_Int64_System_Threading_CancellationToken_">ReadFromAsync(long, CancellationToken)</a>（随机起点顺序读，index 定位 = 段表二分 + 段内扫帧计数）</p>
+<p> - 元数据 Opaque 槽 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_WriteMetaAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_">WriteMetaAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)</a>/<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ReadMeta">ReadMeta()</a>（term/vote/config 原子替换）</p>
+<p> - 快照导出/导入 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ExportSnapshotAsync_System_Threading_CancellationToken_">ExportSnapshotAsync(CancellationToken)</a>/<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ImportSnapshotAsync_System_Threading_CancellationToken_">ImportSnapshotAsync(CancellationToken)</a>（一致性点 N₀ 进帧 Header）</p>
+<p>★ index 承载（设计 §8.7）：raft 日志连续无空洞——index 由"起点 + 顺序计数"推导，
+  帧内零 index；段 anchor 表随 opaque 原子落盘（恢复 O(1) 读全表）。</p>
+<p>★ 双水位：<a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_AllocatedIndex">AllocatedIndex</a>（内存计数，含攒批窗口）/ <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_PersistedIndex">PersistedIndex</a>
+  （最后显式提交水位——raft 语义的 last persisted index 可信下限，自动提交只提前落盘不推进）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public interface ITierWal : ILifecycle&lt;WalRecoveryHints&gt;, IDisposable, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady">ILifecycle&lt;WalRecoveryHints&gt;.WaitForReady()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReady_System_Int32_">ILifecycle&lt;WalRecoveryHints&gt;.WaitForReady(int)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_WaitForReadyAsync_System_Threading_CancellationToken_">ILifecycle&lt;WalRecoveryHints&gt;.WaitForReadyAsync(CancellationToken)</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_CancelRecovery">ILifecycle&lt;WalRecoveryHints&gt;.CancelRecovery()</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_IsReady">ILifecycle&lt;WalRecoveryHints&gt;.IsReady</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_RecoveryState">ILifecycle&lt;WalRecoveryHints&gt;.RecoveryState</a>
+    </div>
+    <div>
+      <a class="xref" href="TC.Tier.Contracts.Lifecycle.ILifecycle-1.html#TC_Tier_Contracts_Lifecycle_ILifecycle_1_RecoveryProgressChanged">ILifecycle&lt;WalRecoveryHints&gt;.RecoveryProgressChanged</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">IDisposable.Dispose()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable.disposeasync">IAsyncDisposable.DisposeAsync()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="properties">Properties
+</h2>
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_AllocatedIndex_" data-uid="TC.Tier.Products.Wal.ITierWal.AllocatedIndex*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_AllocatedIndex" data-uid="TC.Tier.Products.Wal.ITierWal.AllocatedIndex">
+  AllocatedIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>已分配尾 index（含未持久化缓冲——raft 攒批窗口）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long AllocatedIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_PersistedIndex_" data-uid="TC.Tier.Products.Wal.ITierWal.PersistedIndex*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_PersistedIndex" data-uid="TC.Tier.Products.Wal.ITierWal.PersistedIndex">
+  PersistedIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本地已持久化尾 index（Append + CommitAsync 后推进）。</p>
+<p>★ 命名澄清（raft 语义）：这是<b>本地 fsync 水位（last persisted index）</b>，不是集群 commitIndex
+  （多数派确认——单机给不了，由协议层根据复制进度计算）；协议层据此应答/推进 matchIndex。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long PersistedIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_SnapshotHeadIndex_" data-uid="TC.Tier.Products.Wal.ITierWal.SnapshotHeadIndex*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_SnapshotHeadIndex" data-uid="TC.Tier.Products.Wal.ITierWal.SnapshotHeadIndex">
+  SnapshotHeadIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前快照覆盖起点 index（镜像帧流第一条的 index；无快照 = 0）。</p>
+<p>★ 快照区 index 对齐的前提：快照帧流 = [SnapshotHeadIndex .. SnapshotIndex] 的原始条目帧
+  （帧内零 index——raft 日志 index 由起点+顺序计数推导，见设计 §8.7）；冷启动重建状态机
+  时从帧流第一条起按该起点计数，业务 apply 的 index 与日志序一致。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long SnapshotHeadIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_SnapshotIndex_" data-uid="TC.Tier.Products.Wal.ITierWal.SnapshotIndex*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_SnapshotIndex" data-uid="TC.Tier.Products.Wal.ITierWal.SnapshotIndex">
+  SnapshotIndex
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>当前快照覆盖到 index N₀（快照后/导入后；无快照 = 0）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">long SnapshotIndex { get; }</code></pre>
+  </div>
+
+
+
+
+
+  <h4 class="section">Property Value</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd></dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_AppendBatchAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.AppendBatchAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_AppendBatchAsync_System_Collections_Generic_IReadOnlyList_System_ReadOnlyMemory_System_Byte___System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.AppendBatchAsync(System.Collections.Generic.IReadOnlyList{System.ReadOnlyMemory{System.Byte}},System.Threading.CancellationToken)">
+  AppendBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>组提交追加：一批 entry 写入 WAL，返回分配的 [起始 index, 条数]。</p>
+<p>★ 持久化时机 = 组提交策略（Options 三维度）自动触发，或调用方显式 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_CommitAsync_System_Threading_CancellationToken_">CommitAsync(CancellationToken)</a>——
+  raft 语义：AppendEntries 攒批 → CommitAsync → 应答（一次 fsync = 一批持久化）。</p>
+<p>★ 内部 = <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_BeginAppendBatch">BeginAppendBatch()</a> 租约包装（单一真源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;WalAppendResult&gt; AppendBatchAsync(IReadOnlyList&lt;ReadOnlyMemory&lt;byte&gt;&gt; entries, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>entries</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ireadonlylist-1">IReadOnlyList</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>要追加的 entry 列表（每条 = 一帧 [len 4B][payload]）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Wal.WalAppendResult.html">WalAppendResult</a>&gt;</dt>
+    <dd><p>分配的 [起始 index, 条数]。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_AppendSingleAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.AppendSingleAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_AppendSingleAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.AppendSingleAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  AppendSingleAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>单条追加：一条 entry 写入 WAL，返回 [index, 1]（持久化时机同上；三维度全 0 配置 = 每写即提交的单条提交形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;WalAppendResult&gt; AppendSingleAsync(ReadOnlyMemory&lt;byte&gt; entry, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>entry</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>要追加的 entry（一帧 [len 4B][payload]）。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Products.Wal.WalAppendResult.html">WalAppendResult</a>&gt;</dt>
+    <dd><p>分配的 [index, 1]。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_BeginAppendBatch_" data-uid="TC.Tier.Products.Wal.ITierWal.BeginAppendBatch*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_BeginAppendBatch" data-uid="TC.Tier.Products.Wal.ITierWal.BeginAppendBatch">
+  BeginAppendBatch()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 开启批追加租约（ref struct，using 包裹——消费方控制形态）：逐条 <a class="xref" href="TC.Tier.Products.Wal.WalAppendLease.html#TC_Tier_Products_Wal_WalAppendLease_Append_System_ReadOnlySpan_System_Byte__">Append(ReadOnlySpan&lt;byte&gt;)</a>
+写入（返回该条 index）。适配器甜区：复用 scratch 逐条帧化直写（集合形态的 N+1 次分配/批 →
+~0）。★ 绝不跨 await 持有（持 WAL 写锁——ref struct 编译器强制）；单写者纪律：租约存活期
+禁止其他写者 Begin。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">WalAppendLease BeginAppendBatch()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Wal.WalAppendLease.html">WalAppendLease</a></dt>
+    <dd><p>批追加租约（StartIndex = AllocatedIndex + 1——写锁内取，无漂移）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_CommitAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.CommitAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_CommitAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.CommitAsync(System.Threading.CancellationToken)">
+  CommitAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>显式持久化：当前写游标前的全部 entry + opaque 容器原子落盘（映射 EntryLog.CommitAsync——
+flush 落盘 + 推进 PersistedIndex；调用方在需要同步点（应答客户端/推进 matchIndex）前调用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask CommitAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>提交完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ExportSnapshotAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.ExportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ExportSnapshotAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.ExportSnapshotAsync(System.Threading.CancellationToken)">
+  ExportSnapshotAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>导出快照经注入传输面（WriteHeader(N₀) + 条目帧流 + Footer CRC 校验——WalSnapshotFormat）。
+★ 会话经注入 <a class="xref" href="TC.Tier.Contracts.Structures.IAsyncTransferPersistence.html">IAsyncTransferPersistence</a> 打开（Builder.WithSnapshotPersistence）；
+未注入（无传输面）抛 InvalidOperationException（单机场景不需要导出——快照已本地化）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ExportSnapshotAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>异步完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ImportSnapshotAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.ImportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ImportSnapshotAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.ImportSnapshotAsync(System.Threading.CancellationToken)">
+  ImportSnapshotAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>经注入传输面导入快照（读 Header(N₀) + 帧流 + Footer 校验 → <b>替换</b>本地快照（清旧段 + 安装新段））。
+★ 导入后 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_SnapshotIndex">SnapshotIndex</a> = N₀——raft 应用快照内容后向 leader 汇报 N₀，leader 从 (N₀, 尾] 推增量。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask ImportSnapshotAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>异步完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_IsPersisted_" data-uid="TC.Tier.Products.Wal.ITierWal.IsPersisted*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_IsPersisted_System_Int64_" data-uid="TC.Tier.Products.Wal.ITierWal.IsPersisted(System.Int64)">
+  IsPersisted(long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>本地持久化水位查询（index ≤ PersistedIndex 即已持久化）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">bool IsPersisted(long index)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>要查询的索引。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>如果索引已持久化则返回 true，否则返回 false。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ReadBatchLeaseSync_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadBatchLeaseSync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ReadBatchLeaseSync_System_Int64_System_Int32_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadBatchLeaseSync(System.Int64,System.Int32,System.Threading.CancellationToken)">
+  ReadBatchLeaseSync(long, int, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 批读租借（复制读热路径零分配原语——2026-08-29 性能）：一次游标 lease 收集
+[startIndex, startIndex+maxCount) 的页切片列表——<b>零拷贝零分配</b>（页切片视图，
+无逐条 ToArray）。调用方在租约存活期内完成拷贝/消费，<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.idisposable.dispose">Dispose()</a>
+后视图失效（页归还池）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IWalBatchLease ReadBatchLeaseSync(long startIndex, int maxCount, CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起始索引。</p>
+</dd>
+    <dt><code>maxCount</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>最多收集条数。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（页 IO 取消——贯通租约枚举）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Products.Wal.IWalBatchLease.html">IWalBatchLease</a></dt>
+    <dd><p>租约（Entries = 页切片视图流）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ReadFromAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadFromAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ReadFromAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadFromAsync(System.Int64,System.Threading.CancellationToken)">
+  ReadFromAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从 index 顺序流式读 entry（定位 = 段表二分 + 段内扫帧计数，见设计 §8.7；冷节点快照后从 SnapshotIndex+1 调用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;WalEntry&gt; ReadFromAsync(long startIndex, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起始索引。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="TC.Tier.Products.Wal.WalEntry.html">WalEntry</a>&gt;</dt>
+    <dd><p>异步流式返回的 <a class="xref" href="TC.Tier.Products.Wal.WalEntry.html">WalEntry</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ReadFromSync_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadFromSync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ReadFromSync_System_Int64_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadFromSync(System.Int64)">
+  ReadFromSync(long)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>★ 同步重放（同 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ReadFromAsync_System_Int64_System_Threading_CancellationToken_">ReadFromAsync(long, CancellationToken)</a> 语义——随机起点顺序读；同步轨：
+页帧同步加载 + MoveNext 同步，零异步排队）。适用方 = 专用 worker 线程
+（apply 管道/状态机循环——热数据直读零 IO 等待；冷区同步回源阻塞由专用线程承担，
+换取消异步读链的偶发排队延迟——2026-08-27 性能诊断：apply 链异步读 2-6ms 偶发等待
+是串行复制的固定成本主体）。</p>
+<p>★ 零拷贝（2026-08-29 性能）：产出 <a class="xref" href="TC.Tier.Products.Wal.WalEntry.html#TC_Tier_Products_Wal_WalEntry_Data">Data</a> = WAL 页缓冲切片
+（页租借模式——换页不还池，游标持有至枚举结束）——<b>仅枚举存活期有效</b>
+（含循环体内 await）；跨枚举持有（如复制读收集后发送）须自行拷贝。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IEnumerable&lt;WalEntry&gt; ReadFromSync(long startIndex)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>startIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>起始索引。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.ienumerable-1">IEnumerable</a>&lt;<a class="xref" href="TC.Tier.Products.Wal.WalEntry.html">WalEntry</a>&gt;</dt>
+    <dd><p>顺序枚举的 <a class="xref" href="TC.Tier.Products.Wal.WalEntry.html">WalEntry</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ReadMeta_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadMeta*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ReadMeta" data-uid="TC.Tier.Products.Wal.ITierWal.ReadMeta">
+  ReadMeta()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>读当前元数据 blob；未写 = Empty。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ReadOnlyMemory&lt;byte&gt; ReadMeta()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>当前元数据 blob。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_ReadSnapshotEntriesAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadSnapshotEntriesAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_ReadSnapshotEntriesAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.ReadSnapshotEntriesAsync(System.Threading.CancellationToken)">
+  ReadSnapshotEntriesAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>流式读回最近一次镜像快照的条目帧流（raft 冷启动重建状态机分块消费——每条 = 一帧
+[len 4B][payload]，与 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_ExportSnapshotAsync_System_Threading_CancellationToken_">ExportSnapshotAsync(CancellationToken)</a> 导出格式同构）。
+无快照 = 空流。与 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_SnapshotIndex">SnapshotIndex</a> 配套：载入 N₀ 后重建镜像、再向 leader 汇报 N₀ 等增量。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">IAsyncEnumerable&lt;ReadOnlyMemory&lt;byte&gt;&gt; ReadSnapshotEntriesAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.collections.generic.iasyncenumerable-1">IAsyncEnumerable</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;&gt;</dt>
+    <dd><p>异步流式返回的条目帧流。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_SnapshotAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.SnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_SnapshotAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.SnapshotAsync(System.Threading.CancellationToken)">
+  SnapshotAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>raft 日志压缩（一体：主数据镜像生成 → 本地快照存储 → 增量压缩截断）。</p>
+<p>★ 快照内容 = 主数据 [Head..N₀] 的<b>原始条目帧流</b>（WAL 自己从主数据生成——非 raft 状态机镜像；
+  N₀ = 调用时 PersistedIndex——只含已持久化）；随后 <a class="xref" href="TC.Tier.Products.Wal.ITierWal.html#TC_Tier_Products_Wal_ITierWal_TruncatePrefixAsync_System_Int64_System_Threading_CancellationToken_">TruncatePrefixAsync(long, CancellationToken)</a>(N₀+1) 压缩已镜像段
+  （先快照后截断——被截区有快照覆盖）。</p>
+<p>★ 本地存储恒为内部快照结构（IncrementalSnapshot——raft 冷启动必须本地载入）；
+  传输（Export/Import）经注入的 <a class="xref" href="TC.Tier.Contracts.Structures.IAsyncTransferPersistence.html">IAsyncTransferPersistence</a>（默认回落 = 内部快照结构）。
+  调用时机 = leader 定期压缩（raft 惯例——低频）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask&lt;long&gt; SnapshotAsync(CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a>&gt;</dt>
+    <dd><p>快照覆盖点 N₀（= 调用时 PersistedIndex）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_TruncatePrefixAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.TruncatePrefixAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_TruncatePrefixAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.TruncatePrefixAsync(System.Int64,System.Threading.CancellationToken)">
+  TruncatePrefixAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>截头部 [0, newHeadIndex)：快照压缩后回收（TruncatePrefix→ReclaimHead 映射；与写完全并行）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask TruncatePrefixAsync(long newHeadIndex, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>newHeadIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>新的头索引。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>异步完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_TruncateSuffixAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.TruncateSuffixAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_TruncateSuffixAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.TruncateSuffixAsync(System.Int64,System.Threading.CancellationToken)">
+  TruncateSuffixAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>截尾部 [newTailIndex+1, ∞)：raft 冲突日志修正（TruncateSuffix→ReclaimTail 映射）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask TruncateSuffixAsync(long newTailIndex, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>newTailIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>新的尾索引。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>异步完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_WaitForPersistedAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.WaitForPersistedAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_WaitForPersistedAsync_System_Int64_System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.WaitForPersistedAsync(System.Int64,System.Threading.CancellationToken)">
+  WaitForPersistedAsync(long, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>阻塞等到 index 已持久化（映射 EntryLog.WaitForCommitAsync——raft 推进 commitIndex 的依据）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask WaitForPersistedAsync(long index, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>index</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>要等待的持久化索引。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>异步完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Products_Wal_ITierWal_WriteMetaAsync_" data-uid="TC.Tier.Products.Wal.ITierWal.WriteMetaAsync*"></a>
+
+  <h3 id="TC_Tier_Products_Wal_ITierWal_WriteMetaAsync_System_ReadOnlyMemory_System_Byte__System_Threading_CancellationToken_" data-uid="TC.Tier.Products.Wal.ITierWal.WriteMetaAsync(System.ReadOnlyMemory{System.Byte},System.Threading.CancellationToken)">
+  WriteMetaAsync(ReadOnlyMemory&lt;byte&gt;, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>原子写元数据 blob（term/vote/config——内容由协议层定义；经 opaque 容器搭 EntryLog 水位线落盘，CRC 校验兜底）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">ValueTask WriteMetaAsync(ReadOnlyMemory&lt;byte&gt; opaque, CancellationToken ct)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>opaque</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>要写入的元数据 blob。</p>
+</dd>
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>异步完成的 <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a>。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

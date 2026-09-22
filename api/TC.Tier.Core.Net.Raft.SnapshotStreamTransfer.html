@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SnapshotStreamTransfer | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SnapshotStreamTransfer | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="快照流式传输（spec-03 &#167;7 &#215; spec-12 &#167;6 单源基线——快照数据面走流式会话 0x04； ISnapshotTransfer 的机制面内建实现——存储经 IRaftStore 快照读/导入面，传输零格式知识）。 ★ 时序（spec-03 &#167;2）：leader 先导出（开流 → 逐条帧写 → End）→ 再发 InstallSnapshotReq 握手；★ follower 在 acceptor 回调即启动消费循环边收边导（流式背压契约：读端不读 = 写端挂起——IStreamAcceptor&quot;重活自起消费循环&quot;）， 等待导入完成 （&quot;快照已经注入传输面送达，本 RPC 只做同步点握手&quot;语义）。 ★ 挂载：StartAsync 经  内部口注册 0x04 acceptor。 每 peer 至多一个在途导入（引擎快照安装防重入保证）。 ★ 流式纪律：导出/导入均逐帧 O(单帧) 驻留（GB 级快照不驻内存）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer" class="text-break">
+Class SnapshotStreamTransfer  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>快照流式传输（spec-03 §7 × spec-12 §6 单源基线——快照数据面走流式会话 0x04；
+ISnapshotTransfer 的机制面内建实现——存储经 IRaftStore 快照读/导入面，传输零格式知识）。</p>
+<p>★ 时序（spec-03 §2）：leader 先导出（开流 → 逐条帧写 → End）→ 再发 InstallSnapshotReq
+握手；★ follower 在 acceptor 回调即启动消费循环<b>边收边导</b>（流式背压契约：读端不读 =
+写端挂起——IStreamAcceptor"重活自起消费循环"），<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html#TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_ImportSnapshotAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_SnapshotCoordination_System_Threading_CancellationToken_">ImportSnapshotAsync(NodeId, SnapshotCoordination?, CancellationToken)</a> 等待导入完成
+（"快照已经注入传输面送达，本 RPC 只做同步点握手"语义）。</p>
+<p>★ 挂载：StartAsync 经 <span class="xref">TC.Tier.Core.Net.Channels.ICoreProtocolPort</span> 内部口注册 0x04 acceptor。
+每 peer 至多一个在途导入（引擎快照安装防重入保证）。</p>
+<p>★ 流式纪律：导出/导入均逐帧 O(单帧) 驻留（GB 级快照不驻内存）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SnapshotStreamTransfer : ISnapshotTransfer, IAsyncDisposable</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SnapshotStreamTransfer</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Raft.ISnapshotTransfer.html">ISnapshotTransfer</a></div>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.iasyncdisposable">IAsyncDisposable</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer__ctor_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer__ctor_TC_Tier_Core_Net_Channels_IProtocolTransport_TC_Tier_Core_Net_Raft_IRaftStore_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.#ctor(TC.Tier.Core.Net.Channels.IProtocolTransport,TC.Tier.Core.Net.Raft.IRaftStore,TC.Tier.Core.Logging.ILogger)">
+  SnapshotStreamTransfer(IProtocolTransport, IRaftStore, ILogger?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（零 IO——挂载经 <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.html#TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_StartAsync">StartAsync()</a>；传输/存储生命周期归装配层）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SnapshotStreamTransfer(IProtocolTransport transport, IRaftStore store, ILogger? logger = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>transport</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IProtocolTransport.html">IProtocolTransport</a></dt>
+    <dd><p>节点端点完整面（流式会话开流/接受）。</p>
+</dd>
+    <dt><code>store</code> <a class="xref" href="TC.Tier.Core.Net.Raft.IRaftStore.html">IRaftStore</a></dt>
+    <dd><p>存储端口（快照条目源 / 导入目标）。</p>
+</dd>
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志（可选）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_DisposeAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.DisposeAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_DisposeAsync" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.DisposeAsync">
+  DisposeAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"></div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask DisposeAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时导入任务组已有界排空（幂等）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_ExportSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.ExportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_ExportSnapshotAsync_TC_Tier_Core_Net_NodeId_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.ExportSnapshotAsync(TC.Tier.Core.Net.NodeId,System.Threading.CancellationToken)">
+  ExportSnapshotAsync(NodeId, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>导出当前快照到目标（快照创建 = 实现侧策略——快照期间 Append 继续，增量随后推）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask&lt;SnapshotCoordination?&gt; ExportSnapshotAsync(NodeId target, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>target</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>目标节点（传输面路由）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask-1">ValueTask</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a>&gt;</dt>
+    <dd><p>握手协调数据（swarm 形态；null = 单源流式——无协调数据）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_ImportSnapshotAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.ImportSnapshotAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_ImportSnapshotAsync_TC_Tier_Core_Net_NodeId_TC_Tier_Core_Net_Raft_SnapshotCoordination_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.ImportSnapshotAsync(TC.Tier.Core.Net.NodeId,TC.Tier.Core.Net.Raft.SnapshotCoordination,System.Threading.CancellationToken)">
+  ImportSnapshotAsync(NodeId, SnapshotCoordination?, CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>从对端导入快照（协调数据来自 InstallSnapshot RPC 握手面——swarm 形态据此多源拉取；
+null = 等待注入流式会话；事务式语义失败回滚旧快照完好）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public ValueTask ImportSnapshotAsync(NodeId source, SnapshotCoordination? coordination = null, CancellationToken cancellationToken = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>来源节点（传输面路由）。</p>
+</dd>
+    <dt><code>coordination</code> <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotCoordination.html">SnapshotCoordination</a></dt>
+    <dd><p>握手协调数据（swarm 形态；null = 单源流式——缺省）。</p>
+</dd>
+    <dt><code>cancellationToken</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.valuetask">ValueTask</a></dt>
+    <dd><p>完成时快照流已接收并导入存储（无对应会话/导入失败抛——engine 应答失败重试）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_StartAsync_" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotStreamTransfer_StartAsync" data-uid="TC.Tier.Core.Net.Raft.SnapshotStreamTransfer.StartAsync">
+  StartAsync()
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动：经内部口注册 0x04 快照流会话 acceptor。只可一次。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task StartAsync()</code></pre>
+  </div>
+
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task">Task</a></dt>
+    <dd><p>完成时 acceptor 已注册（同步完成——重复启动抛）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.invalidoperationexception">InvalidOperationException</a></dt>
+    <dd><p>传输未实现内部挂载口。</p>
+</dd>
+  </dl>
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

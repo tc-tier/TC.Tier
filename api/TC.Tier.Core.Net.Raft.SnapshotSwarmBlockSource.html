@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class SnapshotSwarmBlockSource | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class SnapshotSwarmBlockSource | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="快照块源（spec-12 &#167;6.1 装配—— 的 holder 侧实现： 按内容标识 + 块号从物化内容做几何切片）。 ★ 内容知识归使用方（快照安装装配）——本件只认  的字节流，几何定位（块偏移 = 块号 &#215; 块大小，末块截短）由  承载。 ★ 单 manifest 源（与  单槽语义对齐——一次发布一个 快照；多快照并存的 holder 后续按需扩多 manifest 源）。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource" class="text-break">
+Class SnapshotSwarmBlockSource  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Raft.html">Raft</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>快照块源（spec-12 §6.1 装配——<a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmBlockSource.html">ISwarmBlockSource</a> 的 holder 侧实现：
+按内容标识 + 块号从物化内容做几何切片）。</p>
+<p>★ 内容知识归使用方（快照安装装配）——本件只认 <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmContent.html">SnapshotSwarmContent</a>
+的字节流，几何定位（块偏移 = 块号 × 块大小，末块截短）由 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmManifest.html">SwarmManifest</a> 承载。</p>
+<p>★ 单 manifest 源（与 <a class="xref" href="TC.Tier.Core.Net.Swarm.SwarmSync.html#TC_Tier_Core_Net_Swarm_SwarmSync_SetSource_TC_Tier_Core_Net_Swarm_ISwarmBlockSource_">SetSource(ISwarmBlockSource?)</a> 单槽语义对齐——一次发布一个
+快照；多快照并存的 holder 后续按需扩多 manifest 源）。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class SnapshotSwarmBlockSource : ISwarmBlockSource</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">SnapshotSwarmBlockSource</span></div>
+    </dd>
+  </dl>
+
+  <dl class="typelist implements">
+    <dt>Implements</dt>
+    <dd>
+      <div><a class="xref" href="TC.Tier.Core.Net.Swarm.ISwarmBlockSource.html">ISwarmBlockSource</a></div>
+    </dd>
+  </dl>
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="constructors">Constructors
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource__ctor_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.#ctor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource__ctor_TC_Tier_Core_Net_Raft_SnapshotSwarmContent_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.#ctor(TC.Tier.Core.Net.Raft.SnapshotSwarmContent)">
+  SnapshotSwarmBlockSource(SnapshotSwarmContent)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>构造（零 IO——只持块化内容引用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public SnapshotSwarmBlockSource(SnapshotSwarmContent content)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>content</code> <a class="xref" href="TC.Tier.Core.Net.Raft.SnapshotSwarmContent.html">SnapshotSwarmContent</a></dt>
+    <dd><p>块化快照内容。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_HasManifest_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.HasManifest*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_HasManifest_TC_Tier_Core_Net_Opaque16_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.HasManifest(TC.Tier.Core.Net.Opaque16)">
+  HasManifest(Opaque16)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>是否持有该内容（未持有 = 全部请求 HasBlock=false——快速路径）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool HasManifest(Opaque16 manifestId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>持有内容。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_TryGetBlock_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.TryGetBlock*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_TryGetBlock_TC_Tier_Core_Net_Opaque16_System_Int64_System_ReadOnlyMemory_System_Byte___" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.TryGetBlock(TC.Tier.Core.Net.Opaque16,System.Int64,System.ReadOnlyMemory{System.Byte}@)">
+  TryGetBlock(Opaque16, long, out ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>取块（持有内容但块号超界/缺失 = false——与未持有同语义，下载方换源）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetBlock(Opaque16 manifestId, long blockIndex, out ReadOnlyMemory&lt;byte&gt; block)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识。</p>
+</dd>
+    <dt><code>blockIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>块号。</p>
+</dd>
+    <dt><code>block</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>块字节（调用方只读；本实现返回底层缓冲须确保跨调用稳定——快照安装逐块读形态）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>持有该块。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_TryGetChecksums_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.TryGetChecksums*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_TryGetChecksums_TC_Tier_Core_Net_Opaque16_System_UInt32____" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.TryGetChecksums(TC.Tier.Core.Net.Opaque16,System.UInt32[]@)">
+  TryGetChecksums(Opaque16, out uint[])
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>每块校验和（实际内容逐块实算——反熵对账依据，spec-12 §6.1 件 C；
+物化内容不可变时实算值恒等于 manifest.Checksums）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryGetChecksums(Opaque16 manifestId, out uint[] checksums)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识（与本源不一致 = false）。</p>
+</dd>
+    <dt><code>checksums</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a>[]</dt>
+    <dd><p>每块 CRC32C（按块号序）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 校验和序列已产出；false = 内容标识不符。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_TryWriteBlock_" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.TryWriteBlock*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Raft_SnapshotSwarmBlockSource_TryWriteBlock_TC_Tier_Core_Net_Opaque16_System_Int64_System_ReadOnlyMemory_System_Byte__" data-uid="TC.Tier.Core.Net.Raft.SnapshotSwarmBlockSource.TryWriteBlock(TC.Tier.Core.Net.Opaque16,System.Int64,System.ReadOnlyMemory{System.Byte})">
+  TryWriteBlock(Opaque16, long, ReadOnlyMemory&lt;byte&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>写回块（反熵修复面——长度 + CRC32C 双校验落回物化内容；spec-12 §6.1 件 C）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public bool TryWriteBlock(Opaque16 manifestId, long blockIndex, ReadOnlyMemory&lt;byte&gt; block)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>manifestId</code> <a class="xref" href="TC.Tier.Core.Net.Opaque16.html">Opaque16</a></dt>
+    <dd><p>内容标识（与本源不一致 = false）。</p>
+</dd>
+    <dt><code>blockIndex</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int64">long</a></dt>
+    <dd><p>目标块号（超清单范围 = false）。</p>
+</dd>
+    <dt><code>block</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.readonlymemory-1">ReadOnlyMemory</a>&lt;<a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a>&gt;</dt>
+    <dd><p>待写块数据（长度与校验和须与 manifest 一致）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.boolean">bool</a></dt>
+    <dd><p>true = 校验通过并已落回；false = 内容标识不符/块号越界/长度或校验和不符。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

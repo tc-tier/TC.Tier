@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>Class NetClientBuilder | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="Class NetClientBuilder | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="地址制直连装配器（spec-12 &#167;11——客户端预设：缺省不监听，可开监听=对称节点；客户端/服务器 无固定模式——装配预设可覆写，&#167;4.2）。 ★ Connect 后对端身份握手才得知（&#167;4.1 地址制——有地址者拨号；目标未连 =    快速失败）； 携带。 ★ 注册面：协议域/请求回调/流接受面启动前注册（对端推流/回调到达即服务）。   身份/安全档形态同 。">
+      <link rel="icon" href="../favicon.ico">
+      <link rel="stylesheet" href="../public/docfx.min.css">
+      <link rel="stylesheet" href="../public/main.css">
+      <meta name="docfx:navrel" content="../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../">
+      
+      
+      
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="ManagedReference">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../index.html">
+            <img id="logo" class="svg" src="../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder">
+
+
+
+  <h1 id="TC_Tier_Core_Net_Hosting_NetClientBuilder" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder" class="text-break">
+Class NetClientBuilder  
+  </h1>
+
+  <div class="facts text-secondary">
+    <dl><dt>Namespace</dt><dd><a class="xref" href="TC.html">TC</a>.<a class="xref" href="TC.Tier.html">Tier</a>.<a class="xref" href="TC.Tier.Core.html">Core</a>.<a class="xref" href="TC.Tier.Core.Net.html">Net</a>.<a class="xref" href="TC.Tier.Core.Net.Hosting.html">Hosting</a></dd></dl>
+  <dl><dt>Assembly</dt><dd>TC.Tier.Core.Net.dll</dd></dl>
+  </div>
+
+  <div class="markdown summary"><p>地址制直连装配器（spec-12 §11——客户端预设：缺省不监听，可开监听=对称节点；客户端/服务器
+无固定模式——装配预设可覆写，§4.2）。</p>
+<p>★ Connect 后对端身份握手才得知（§4.1 地址制——有地址者拨号；目标未连 =
+  <a class="xref" href="TC.Tier.Core.Net.NetIOException.html">NetIOException</a> 快速失败）；<a class="xref" href="TC.Tier.Core.Net.Hosting.NodeEndpoint.html#TC_Tier_Core_Net_Hosting_NodeEndpoint_RemoteId">RemoteId</a> 携带。</p>
+<p>★ 注册面：协议域/请求回调/流接受面启动前注册（对端推流/回调到达即服务）。
+  身份/安全档形态同 <a class="xref" href="TC.Tier.Core.Net.Hosting.ClusterBuilder.html">ClusterBuilder</a>。</p>
+</div>
+  <div class="markdown conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public sealed class NetClientBuilder</code></pre>
+  </div>
+
+
+
+
+  <dl class="typelist inheritance">
+    <dt>Inheritance</dt>
+    <dd>
+      <div><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object">object</a></div>
+      <div><span class="xref">NetClientBuilder</span></div>
+    </dd>
+  </dl>
+
+
+
+  <dl class="typelist inheritedMembers">
+    <dt>Inherited Members</dt>
+    <dd>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gettype">object.GetType()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.tostring">object.ToString()</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object)">object.Equals(object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.equals#system-object-equals(system-object-system-object)">object.Equals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.referenceequals">object.ReferenceEquals(object, object)</a>
+    </div>
+    <div>
+      <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.object.gethashcode">object.GetHashCode()</a>
+    </div>
+  </dd></dl>
+
+
+
+
+
+
+  <h2 class="section" id="methods">Methods
+</h2>
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_ClusterTag_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.ClusterTag*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_ClusterTag_System_UInt32_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.ClusterTag(System.UInt32)">
+  ClusterTag(uint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：集群归属标签（握手期校验——拨入 tag≠0 集群必须匹配，§3.3 错集群 fail-fast）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder ClusterTag(uint clusterTag)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>clusterTag</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.uint32">uint</a></dt>
+    <dd><p>目标集群归属标签。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Connect*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_System_Net_IPEndPoint_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Connect(System.Net.IPEndPoint)">
+  Connect(IPEndPoint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：直连目标（地址制——有地址者拨号；对端身份握手后才得知）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder Connect(IPEndPoint endpoint)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>endpoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>对端 TCP 端点（非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">endpoint</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Connect*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_System_String_System_Int32_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Connect(System.String,System.Int32)">
+  Connect(string, int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：直连目标（host 支持 IP 或域名——§4.1 DnsEndPoint）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder Connect(string host, int port)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>host</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.string">string</a></dt>
+    <dd><p>对端主机（IP 字面量或可解析域名；解析失败即抛）。</p>
+</dd>
+    <dt><code>port</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>对端 TCP 端口。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p>host 为空或域名解析失败。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Create_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Create*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Create_TC_Tier_Core_Net_NodeId_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Create(TC.Tier.Core.Net.NodeId)">
+  Create(NodeId)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>创建（显式节点 ID——配置注入形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NetClientBuilder Create(NodeId nodeId)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>nodeId</code> <a class="xref" href="TC.Tier.Core.Net.NodeId.html">NodeId</a></dt>
+    <dd><p>本端节点 ID（不可为 <a class="xref" href="TC.Tier.Core.Net.NodeId.html#TC_Tier_Core_Net_NodeId_Empty">Empty</a> 哨兵）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p><code class="paramref">nodeId</code> 为 Empty 哨兵。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Create_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Create*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Create_TC_Tier_Core_Net_Ports_IIdentitySource_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Create(TC.Tier.Core.Net.Ports.IIdentitySource)">
+  Create(IIdentitySource)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>创建（身份供给端口——首次生成保存、此后加载；NodeId 跨重启稳定）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public static NetClientBuilder Create(IIdentitySource source)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>source</code> <a class="xref" href="TC.Tier.Core.Net.Ports.IIdentitySource.html">IIdentitySource</a></dt>
+    <dd><p>身份供给端口（非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">source</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Listen_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Listen*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Listen_System_Int32_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Listen(System.Int32)">
+  Listen(int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：开监听（可选——对称节点：服务端可直接推流，客户端/服务器无固定模式，§4.2）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder Listen(int port)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>port</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>TCP 监听端口（0 = 系统分配）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Listen_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Listen*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_Listen_System_Net_IPEndPoint_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.Listen(System.Net.IPEndPoint)">
+  Listen(IPEndPoint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：开监听（显式地址形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder Listen(IPEndPoint endpoint)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>endpoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>TCP 监听端点。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_RegisterProtocol_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.RegisterProtocol*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_RegisterProtocol_System_Byte_TC_Tier_Core_Net_Channels_IDatagramHandler_TC_Tier_Core_Net_Channels_DatagramBearer_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.RegisterProtocol(System.Byte,TC.Tier.Core.Net.Channels.IDatagramHandler,TC.Tier.Core.Net.Channels.DatagramBearer)">
+  RegisterProtocol(byte, IDatagramHandler, DatagramBearer)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：协议域数据报入站处理器（启动前注册——对端推送到达即服务）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder RegisterProtocol(byte protocolId, IDatagramHandler handler, DatagramBearer bearer = DatagramBearer.Tcp)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（同 ID 重复注册覆盖前者）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IDatagramHandler.html">IDatagramHandler</a></dt>
+    <dd><p>数据报入站处理器（非空）。</p>
+</dd>
+    <dt><code>bearer</code> <a class="xref" href="TC.Tier.Core.Net.Channels.DatagramBearer.html">DatagramBearer</a></dt>
+    <dd><p>该域数据报的承载介质（默认 TCP）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">handler</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_RegisterRequestHandler_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.RegisterRequestHandler*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_RegisterRequestHandler_System_Byte_TC_Tier_Core_Net_Channels_IRequestHandler_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.RegisterRequestHandler(System.Byte,TC.Tier.Core.Net.Channels.IRequestHandler)">
+  RegisterRequestHandler(byte, IRequestHandler)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：请求回调入站处理器（§5.2）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder RegisterRequestHandler(byte protocolId, IRequestHandler handler)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（同 ID 重复注册覆盖前者）。</p>
+</dd>
+    <dt><code>handler</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IRequestHandler.html">IRequestHandler</a></dt>
+    <dd><p>请求回调入站处理器（非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">handler</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_RegisterStreamAcceptor_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.RegisterStreamAcceptor*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_RegisterStreamAcceptor_System_Byte_TC_Tier_Core_Net_Channels_IStreamAcceptor_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.RegisterStreamAcceptor(System.Byte,TC.Tier.Core.Net.Channels.IStreamAcceptor)">
+  RegisterStreamAcceptor(byte, IStreamAcceptor)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：流式会话接受面（§5.3——对端开流即服务）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder RegisterStreamAcceptor(byte protocolId, IStreamAcceptor acceptor)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>protocolId</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.byte">byte</a></dt>
+    <dd><p>协议域 ID（同 ID 重复注册覆盖前者）。</p>
+</dd>
+    <dt><code>acceptor</code> <a class="xref" href="TC.Tier.Core.Net.Channels.IStreamAcceptor.html">IStreamAcceptor</a></dt>
+    <dd><p>流接受器（非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">acceptor</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_StartAsync_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.StartAsync*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_StartAsync_System_Threading_CancellationToken_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.StartAsync(System.Threading.CancellationToken)">
+  StartAsync(CancellationToken)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>启动（一次成型）：解析身份 → 构建传输 → 注册域（先注册后拨号——对端推送到达即服务）
+→ 地址制直连（<a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html#TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_System_Net_IPEndPoint_">Connect(IPEndPoint)</a> 配置时；握手即得对端身份 → RemoteId；
+直连失败传输一并清理——装配失败不残留半启动端点）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public Task&lt;NodeEndpoint&gt; StartAsync(CancellationToken ct = default)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>ct</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.cancellationtoken">CancellationToken</a></dt>
+    <dd><p>取消令牌（取消身份解析/直连拨号）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.threading.tasks.task-1">Task</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Hosting.NodeEndpoint.html">NodeEndpoint</a>&gt;</dt>
+    <dd><p>完成后的节点端点（未配置 <a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html#TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_System_Net_IPEndPoint_">Connect(IPEndPoint)</a> 时 RemoteId 为 null；配置了则握手即得对端身份）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithAutoReconnect_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithAutoReconnect*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithAutoReconnect_System_Nullable_System_TimeSpan__System_Nullable_System_TimeSpan__" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithAutoReconnect(System.Nullable{System.TimeSpan},System.Nullable{System.TimeSpan})">
+  WithAutoReconnect(TimeSpan?, TimeSpan?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>自动重连（二期-D7——地址制客户端断链自决重拨）：对端断链（PeerGone）后按退避
+（初值 ×2 封顶）重拨原端点直至恢复；缺省关闭（既有语义——调用方自决）。
+仅 <a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html#TC_Tier_Core_Net_Hosting_NetClientBuilder_Connect_System_Net_IPEndPoint_">Connect(IPEndPoint)</a> 地址制形态生效。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithAutoReconnect(TimeSpan? initialDelay = null, TimeSpan? maxDelay = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>initialDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>重拨退避初值（缺省 500ms；须 ≥ 零）。</p>
+</dd>
+    <dt><code>maxDelay</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.timespan">TimeSpan</a>?</dt>
+    <dd><p>重拨退避封顶（缺省 10s；须 ≥ 初值）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentoutofrangeexception">ArgumentOutOfRangeException</a></dt>
+    <dd><p>初值 &lt; 零，或封顶 &lt; 初值。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithIdentity_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithIdentity*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithIdentity_TC_Tier_Core_Net_Ports_NodeIdentity_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithIdentity(TC.Tier.Core.Net.Ports.NodeIdentity)">
+  WithIdentity(NodeIdentity)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：身份注入（§8.3 配置供给——优先于 Create 形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithIdentity(NodeIdentity identity)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>identity</code> <a class="xref" href="TC.Tier.Core.Net.Ports.NodeIdentity.html">NodeIdentity</a></dt>
+    <dd><p>节点身份（非空；其 <code>Id</code> 作为本端 NodeId）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">identity</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithKeyPair_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithKeyPair*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithKeyPair_TC_Tier_Core_Net_Security_SecurityOptions_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithKeyPair(TC.Tier.Core.Net.Security.SecurityOptions)">
+  WithKeyPair(SecurityOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>安全档：KeyPair（推荐缺省档——签名+ECDH+AEAD/MAC，信任锚钉扎/TOFU；错档 fail-fast，
+绝不静默降级为明文——§3.4 防降级）。装配同 <a class="xref" href="TC.Tier.Core.Net.Hosting.ClusterBuilder.html#TC_Tier_Core_Net_Hosting_ClusterBuilder_WithKeyPair_TC_Tier_Core_Net_Security_SecurityOptions_">WithKeyPair(SecurityOptions)</a>。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithKeyPair(SecurityOptions security)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>security</code> <a class="xref" href="TC.Tier.Core.Net.Security.SecurityOptions.html">SecurityOptions</a></dt>
+    <dd><p>KeyPair 档配置（非 KeyPair 档抛——错档 fail-fast）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">security</code> 为 null。</p>
+</dd>
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentexception">ArgumentException</a></dt>
+    <dd><p><code class="paramref">security</code> 非 KeyPair 档。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithLogger_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithLogger*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithLogger_TC_Tier_Core_Logging_ILogger_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithLogger(TC.Tier.Core.Logging.ILogger)">
+  WithLogger(ILogger)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：日志。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithLogger(ILogger logger)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>logger</code> <a class="xref" href="TC.Tier.Core.Logging.ILogger.html">ILogger</a></dt>
+    <dd><p>日志器（null = 不输出日志）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithMutualTls_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithMutualTls*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithMutualTls_System_Security_Cryptography_X509Certificates_X509Certificate2_System_Security_Cryptography_X509Certificates_X509Certificate2Collection_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithMutualTls(System.Security.Cryptography.X509Certificates.X509Certificate2,System.Security.Cryptography.X509Certificates.X509Certificate2Collection)">
+  WithMutualTls(X509Certificate2, X509Certificate2Collection?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>安全档：MutualTls（企业 CA/合规场景——TLS1.3 相互认证 + SAN <code>nid:</code> 绑定）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithMutualTls(X509Certificate2 certificate, X509Certificate2Collection? ca = null)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>certificate</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.security.cryptography.x509certificates.x509certificate2">X509Certificate2</a></dt>
+    <dd><p>本端私钥证书（SAN 含 nid:&lt;hex32&gt; 条目）。</p>
+</dd>
+    <dt><code>ca</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.security.cryptography.x509certificates.x509certificate2collection">X509Certificate2Collection</a></dt>
+    <dd><p>对端 CA（null = 系统信任库；自签形态传自签 CA）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithObservability_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithObservability*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithObservability_TC_Tier_Core_Observability_ObservabilityHub_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithObservability(TC.Tier.Core.Observability.ObservabilityHub)">
+  WithObservability(ObservabilityHub?)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：可观测枢纽（null = Disabled——§9.1 视图接入）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithObservability(ObservabilityHub? hub)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>hub</code> <a class="xref" href="TC.Tier.Core.Observability.ObservabilityHub.html">ObservabilityHub</a></dt>
+    <dd><p>可观测枢纽；null 表示禁用（Disabled）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithTransport_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithTransport*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithTransport_System_Func_TC_Tier_Core_Net_Transport_TransportOptions_TC_Tier_Core_Net_Transport_TransportOptions__" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithTransport(System.Func{TC.Tier.Core.Net.Transport.TransportOptions,TC.Tier.Core.Net.Transport.TransportOptions})">
+  WithTransport(Func&lt;TransportOptions, TransportOptions&gt;)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：传输选项管道（StartAsync 链尾依序执行、裁决一切——全部旋钮的通用改写口，可多次调用）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithTransport(Func&lt;TransportOptions, TransportOptions&gt; configure)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>configure</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.func-2">Func</a>&lt;<a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a>, <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a>&gt;</dt>
+    <dd><p>选项改写函数（非空；链尾依序执行，后执行者覆盖先执行者）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">configure</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithTransport_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithTransport*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithTransport_TC_Tier_Core_Net_Transport_TransportOptions_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithTransport(TC.Tier.Core.Net.Transport.TransportOptions)">
+  WithTransport(TransportOptions)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：传输选项整份注入（spec-12 §4.5 全旋钮可调口）。</p>
+<pre><code>        &lt;p&gt;优先级三段式（TierFs×options 合流同构）：显式方法 &gt; 注入 &gt; Default——
+        &lt;xref href=&quot;TC.Tier.Core.Net.Hosting.NetClientBuilder.Listen(System.Net.IPEndPoint)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;, &lt;xref href=&quot;TC.Tier.Core.Net.Hosting.NetClientBuilder.ClusterTag(System.UInt32)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;, &lt;xref href=&quot;TC.Tier.Core.Net.Hosting.NetClientBuilder.WithUdp(System.Int32)&quot; data-throw-if-not-resolved=&quot;false&quot;&gt;&lt;/xref&gt;
+        显式触达的位仍归方法裁决，其余旋钮以注入值为准。&lt;/p&gt;
+</code></pre>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithTransport(TransportOptions options)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>options</code> <a class="xref" href="TC.Tier.Core.Net.Transport.TransportOptions.html">TransportOptions</a></dt>
+    <dd><p>传输选项基线（非空）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+  <h4 class="section">Exceptions</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="https://learn.microsoft.com/dotnet/api/system.argumentnullexception">ArgumentNullException</a></dt>
+    <dd><p><code class="paramref">options</code> 为 null。</p>
+</dd>
+  </dl>
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithUdp_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithUdp*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithUdp_System_Int32_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithUdp(System.Int32)">
+  WithUdp(int)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：UDP 数据报端点（§4.5——数据报/请求回调的 UDP 承载；绑 Any，通告时以 TCP 连接本端地址替代）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithUdp(int port)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>port</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.int32">int</a></dt>
+    <dd><p>UDP 监听端口。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+  <a id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithUdp_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithUdp*"></a>
+
+  <h3 id="TC_Tier_Core_Net_Hosting_NetClientBuilder_WithUdp_System_Net_IPEndPoint_" data-uid="TC.Tier.Core.Net.Hosting.NetClientBuilder.WithUdp(System.Net.IPEndPoint)">
+  WithUdp(IPEndPoint)
+  
+  </h3>
+
+  <div class="markdown level1 summary"><p>配置：UDP 数据报端点（显式地址形态）。</p>
+</div>
+  <div class="markdown level1 conceptual"></div>
+
+  <div class="codewrapper">
+    <pre><code class="lang-csharp hljs">public NetClientBuilder WithUdp(IPEndPoint endpoint)</code></pre>
+  </div>
+
+  <h4 class="section">Parameters</h4>
+  <dl class="parameters">
+    <dt><code>endpoint</code> <a class="xref" href="https://learn.microsoft.com/dotnet/api/system.net.ipendpoint">IPEndPoint</a></dt>
+    <dd><p>UDP 监听端点（显式地址）。</p>
+</dd>
+  </dl>
+
+  <h4 class="section">Returns</h4>
+  <dl class="parameters">
+    <dt><a class="xref" href="TC.Tier.Core.Net.Hosting.NetClientBuilder.html">NetClientBuilder</a></dt>
+    <dd><p>同一装配器实例（供链式配置）。</p>
+</dd>
+  </dl>
+
+
+
+
+
+
+
+
+
+
+
+
+</article>
+
+        <div class="contribution d-print-none">
+        </div>
+
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
