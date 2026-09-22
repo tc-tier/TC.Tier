@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>TC.Tier 系统整体架构与搭建 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="TC.Tier 系统整体架构与搭建 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      <meta name="description" content="分层架构总览 + 两种搭建形态（嵌入式 / 服务中心）——从零怎么用、怎么搭的全局入口。">
+      <link rel="icon" href="favicon.ico">
+      <link rel="stylesheet" href="public/docfx.min.css">
+      <link rel="stylesheet" href="public/main.css">
+      <meta name="docfx:navrel" content="toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/docs-site/architecture.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="index.html">
+            <img id="logo" class="svg" src="logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+
+      <div class="content">
+        <div class="actionbar">
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="tctier-系统整体架构与搭建">TC.Tier 系统整体架构与搭建</h1>
+
+<p>本文回答三件事：<strong>整套系统怎么分层</strong>、<strong>两种搭建形态</strong>（嵌入式 / 用底层搭服务中心）、
+<strong>从零怎么用怎么搭</strong>。深入到各层机制与二进制格式见文末&quot;深入入口&quot;。</p>
+<h2 id="1-系统整体架构分层">1. 系统整体架构（分层）</h2>
+<pre><code>TC.Tier.Products        产品组合层（TierKv / TierQueue / TierWAL / TierTimeSeries / TierBlob——官方配方）
+TC.Tier.Products.Net    raft × TierWAL 官方节点（TierRaftNode / TierWalRaftStore / TierRaftHost）
+────────────────────────────────────────────────────────────
+TC.Tier.Core.Net        网络与共识层（raft 全家 · 三形态通道 · 多介质 · P2P · Swarm · Security）
+TC.Tier.Runtime         存储运行时（StorageEngine + 结构层：Ring/Log/Index/Meta/Snapshot + 2PC 事务）
+TC.Tier.Core            内核基础设施（IO 底座 · 生命周期 · 线程调度 · 原语 · 可观测）
+TC.Tier.Contracts       契约层（引擎 IO/生命周期/恢复/结构/事务——零依赖）
+────────────────────────────────────────────────────────────
+TC.Tier.CodeGen(+Analyzers)   源生成器横切（[WireMessage]/[BinaryLayout] 声明即代码，零运行时反射）
+</code></pre>
+<ul>
+<li><strong>依赖单向无环</strong>（编译期锁死）：<code>Contracts → Core → Runtime → Products</code>；网络支柱
+<code>Core → Core.Net → Products.Net</code>；Core.Net <strong>零产品知识</strong>（永不依赖 Products）。</li>
+<li><strong>&quot;底层存储&quot; = Contracts + Core + Runtime</strong>（引擎/结构/2PC——自定义存储模型的积木）；
+<strong>&quot;网络与共识&quot; = Core.Net</strong>（raft/传输/通道）；<strong>&quot;产品&quot; = Products(+Net)</strong>（官方配方）。</li>
+</ul>
+<h2 id="2-两种搭建形态">2. 两种搭建形态</h2>
+<p>TC.Tier 既可作为<strong>嵌入式存储底座</strong>打进你的进程，也可作为<strong>分布式服务中心</strong>的底层
+原语自己搭集群。选型看&quot;要不要跨进程一致性&quot;。</p>
+<h3 id="21-嵌入式应用进程内">2.1 嵌入式（应用进程内）</h3>
+<p>单进程直接使用，无网络、无集群——把 TC.Tier 当存储内核/产品库内嵌：</p>
+<pre><code class="lang-csharp">// 最小例子：存储引擎（换 URI 即换介质，代码不变）
+using var vol = TierFs.New(&quot;memory:&quot;);          // memory: / local:// / virtual:// ...
+await using var engine = await new StorageEngineOptions(&quot;demo&quot;).Builder(vol).StartAsync();
+var addr = await engine.AppendAsync(payload, CancellationToken.None);   // WAL 语义追加
+</code></pre>
+<p>嵌入式三种深度：</p>
+<table>
+<thead>
+<tr>
+<th>深度</th>
+<th>用什么</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>存储内核</strong></td>
+<td>存储引擎 + Ring/Log/Index/Meta/Snapshot 结构积木，自组存储模型</td>
+<td><a href="docs/runtime/storage-engine.html">存储引擎指南</a> · <a href="docs/runtime/structures.html">结构导览</a></td>
+</tr>
+<tr>
+<td><strong>单机产品</strong></td>
+<td>TierKv / TierQueue / TierWAL / TierTimeSeries / TierBlob（官方配方，含恢复/检查点/2PC）</td>
+<td><a href="docs/products/tierkv.html">产品使用指南</a> 等</td>
+</tr>
+<tr>
+<td><strong>内嵌复制组</strong></td>
+<td><code>TierQueueReplica</code> 同进程多副本（raft 组，进程内传输）——单进程内的一致性</td>
+<td><a href="docs/products/raft-consistency.html">raft 论文核心保证</a></td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-服务中心用底层搭分布式服务">2.2 服务中心（用底层搭分布式服务）</h3>
+<p>跨进程/跨机一致性——用 Core.Net + Products.Net 搭集群服务：</p>
+<table>
+<thead>
+<tr>
+<th>形态</th>
+<th>怎么搭</th>
+<th>入口</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>raft 节点集群</strong></td>
+<td><code>TierRaftNode</code> × N 节点，TCP 集群（listen + peers 表一行组装）</td>
+<td><a href="docs/products/raft-node.html">raft-node.md</a></td>
+</tr>
+<tr>
+<td><strong>多组服务中心</strong></td>
+<td><code>TierRaftHost</code> 一个传输上挂 N 个 raft 组（Multi-Raft）</td>
+<td><a href="docs/products/raft-node.html">raft-node.md</a></td>
+</tr>
+<tr>
+<td><strong>队列复制组</strong></td>
+<td><code>TierQueueReplica</code> × N 节点（raft × 队列——辖权/epoch 单写者）</td>
+<td><a href="docs/products/raft-consistency.html">raft 论文核心保证</a></td>
+</tr>
+<tr>
+<td><strong>自组 Core.Net 服务</strong></td>
+<td>用底层传输 + raft 引擎 + 三形态通道自建协议服务（请求回调/流式/数据报）</td>
+<td><a href="docs/core/net.html">net.md</a> · <a href="docs/core/raft-architecture.html">raft 共识架构</a></td>
+</tr>
+</tbody>
+</table>
+<p>服务中心形态的共识语义（复制完成档三选一 / 线性读 / 成员变更 / 快照追赶）与传输选型
+（TCP/QUIC/UDS/InProcess）见各层使用指南。</p>
+<h2 id="3-从零搭建路径决策速查">3. 从零搭建路径（决策速查）</h2>
+<pre><code>要跨进程一致性吗？
+├─ 否 → 嵌入式：选存储内核 / 单机产品 / 内嵌复制组（§2.1）→ 选介质（TierFs）→ 装配启动
+└─ 是 → 服务中心：
+        ├─ 队列服务 → TierQueueReplica 复制组（raft × 队列）
+        └─ 通用 KV/自定义 → TierRaftNode 集群（raft × TierWAL）或自组 Core.Net
+              └─ 节点数：3/5 奇数（多数派）→ 传输形态（TCP 集群 / 注入）→ 快照/反熵装配
+</code></pre>
+<h2 id="4-深入入口架构与格式手册">4. 深入入口（架构与格式手册）</h2>
+<p>从实现面判断&quot;稳定性 / 高性能 / 有序性 / 持久化 / 互操作性&quot;怎么保证：</p>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>回答什么</th>
+<th>层</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="docs/core/raft-architecture.html">raft 共识架构与稳定性</a></td>
+<td>论文五安全性质逐条实现映射 · 活性 · 有序性（提交全序/日志序/apply 序）· 高性能设计</td>
+<td>Core.Net</td>
+</tr>
+<tr>
+<td><a href="docs/core/transport-architecture.html">网络/传输层架构</a></td>
+<td>三形态收发（数据报/请求回调/流式）· 寻址与准入 · TCP/QUIC/UDS/InProcess 介质 · 身份安全三档</td>
+<td>Core.Net</td>
+</tr>
+<tr>
+<td><a href="docs/core/p2p-architecture.html">P2P/gossip 架构</a></td>
+<td>HyParView 双视图会员收敛 · φ 故障检测 · 广播去重/TTL/防环防风暴</td>
+<td>Core.Net</td>
+</tr>
+<tr>
+<td><a href="docs/runtime/persistence-architecture.html">持久化稳定性架构</a></td>
+<td>IO → 引擎 → WAL 三层崩溃一致性 · 三层水位体系 · 端到端持久化保证链 · 分工矩阵</td>
+<td>Runtime</td>
+</tr>
+<tr>
+<td><a href="docs/products/product-consistency.html">产品一致性架构</a></td>
+<td>TierKv / TierTimeSeries / TierBlob 真源/派生分层 · 2PC 提交点 · 崩溃窗口 · 恢复对账</td>
+<td>Products</td>
+</tr>
+<tr>
+<td><a href="docs/products/raft-consistency.html">raft 论文核心保证</a></td>
+<td>TierQueueReplica 一致性语义 · 辖权 fencing · exactly-once vs at-least-once 精确边界</td>
+<td>Products.Net</td>
+</tr>
+<tr>
+<td><a href="docs/runtime/binary-format-spec.html">二进制格式单元说明</a></td>
+<td>全系列二进制格式互操作手册——存储结构 + 产品封装 + 网络线格式，逐字节布局 + CRC/校验 + 版本演进</td>
+<td>Runtime（跨存储 × 线格式）</td>
+</tr>
+</tbody>
+</table>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/docs-site/architecture.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

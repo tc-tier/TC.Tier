@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>P2P/gossip 架构（HyParView 会员 &#215; 广播） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="P2P/gossip 架构（HyParView 会员 &#215; 广播） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/p2p-architecture.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="p2pgossip-架构hyparview-会员--广播">P2P/gossip 架构（HyParView 会员 × 广播）</h1>
+
+<p>本文回答：<strong>P2P 模式怎么保证会员收敛、失效自愈与广播有界</strong>——HyParView 双视图会员维护、
+JOIN 随机游走、φ 统计故障检测、失效替换与分区自愈、gossip 广播的去重/TTL/防环/防风暴。
+它是 <a href="transport-architecture.html">transport-architecture.md</a> 的一个上层机制面
+（spec-06 语义，spec-12 传输接线），与 raft 互斥并存（P2P 模式 = 最终一致性、无共识）。</p>
+<p>与 <a href="net.html">net.md</a> §8 的关系：net.md §8 是<strong>使用面</strong>（怎么挂载 P2P/广播、参数怎么调）；
+本文是<strong>实现面</strong>——据本文判断&quot;会员怎么收敛、失效怎么检出、广播怎么不风暴不重复&quot;。
+代码引用为仓库相对路径（<code>P2P/…</code> = <code>src/TC.Tier.Core.Net/P2P/…</code>）。</p>
+<blockquote>
+<p>规格源：spec-06（HyParView 设计规格——内部设计文档，语义已实施；本文为实施后公开描述）。</p>
+</blockquote>
+<hr>
+<h2 id="1-定位与总览">1. 定位与总览</h2>
+<pre><code>                    PeerController（HyParView 会员管理器，578 行）
+        ┌──────────────┬──────────────┬──────────────┬──────────────┐
+        │ 活跃视图       │ 被动视图      │ φ 故障检测     │ 周期维护       │
+        │ 对称邻居 ≤k(4)│ 备用池 ≤20   │ PhiAccrual    │ 心跳/φ/shuffle│
+        └──────┬───────┴──────┬───────┴──────────────┴──────────────┘
+               │ ActiveView   │
+               ▼              ▼
+        SwarmBroadcast（gossip 广播）   ── 数据报 0x02/0x05 → 传输层（UDP/TCP 回落）
+</code></pre>
+<ul>
+<li><strong>职责分离</strong>：<code>PeerController</code> 只管会员（视图/JOIN/心跳/φ/shuffle），不含广播；<code>SwarmBroadcast</code>
+构造时经委托接 <code>PeerController.ActiveView</code>——广播目标域 = 活跃视图。</li>
+<li><strong>定位</strong>（spec-06 §1）：<strong>超大集群模式</strong>——O(k) 连接不随 N 增长、无 leader 压力、最终一致性；
+与 raft（静态配置、强一致、O(N) 复制）互斥并存。P2P 模式下日志走 TierWAL 本地 append（无共识）。</li>
+</ul>
+<h2 id="2-hyparview-会员管理">2. HyParView 会员管理</h2>
+<h3 id="21-双视图模型">2.1 双视图模型</h3>
+<table>
+<thead>
+<tr>
+<th>视图</th>
+<th>语义</th>
+<th>边界</th>
+<th>存储</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>活跃视图</strong></td>
+<td>对称活跃邻居（gossip 扇出/转发目标域）</td>
+<td>有界 k（缺省 4）</td>
+<td><code>Dictionary&lt;NodeId, long&gt;</code>（邻居 → 建立时间）</td>
+</tr>
+<tr>
+<td><strong>被动视图</strong></td>
+<td>非对称备用池（断连补位来源）</td>
+<td>上限 20</td>
+<td><code>LinkedList&lt;NodeId&gt;</code>（头 = 最新；去重插头 + 超限裁尾）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>对称性不变量</strong>：本节点在 A 的活跃视图 ⟺ A 在本节点活跃视图（双向建立/移除，JOIN/NEIGHBOR
+双向、DISCONNECT/FAIL 双向、挤掉通知、单向边超龄判死——见下）。</li>
+<li><strong>不持久化</strong>：视图从配置 seed 重 JOIN 重建（分区全打散后的恢复路径——部署层提供种子，
+不做零配置发现）。</li>
+</ul>
+<h3 id="22-join-随机游走入组peercontrollercs138-166">2.2 JOIN 随机游走入组（<code>PeerController.cs:138-166</code>）</h3>
+<ol>
+<li><strong>种子入活跃视图</strong>：seed 直接成为对称邻居（论文 JOIN 第一步）；视图已满则挤掉最旧并通知。</li>
+<li><strong>发 JOIN 随机游走</strong>：TTL 缺省 6；每经一节点——<code>Ttl==0</code> 或本节点活跃视图有空位 = <strong>终点</strong>
+（建立活跃关系 + 回送 NEIGHBOR）；否则新节点进沿途节点被动视图，再随机挑活跃邻居 <code>Ttl-1</code>
+转发——转发目标随机，天然分散入网压力。</li>
+<li><strong>终点回送</strong>：等待 NEIGHBOR 应答（<code>JoinWaitTimeout</code> 5s 有界）。</li>
+</ol>
+<p><strong>收敛保证</strong>：</p>
+<ul>
+<li><strong>应答丢失不阻塞</strong>：超时后种子已在活跃视图（会员关系已建立），视图收敛交给 shuffle/周期维护；
+JOIN 一次性消息不重发，丢包介质下由使用方周期重 JOIN 驱动。</li>
+<li><strong>满视图有界</strong>：<code>AddActiveLocked</code> 满 k 则按建立时间挤最旧，净保持 k 有界。</li>
+<li><strong>挤掉保对称</strong>：被挤者收到 DISCONNECT 通知（<code>NotifyEvicted</code>）——否则它单边持有本节点且收不到
+心跳（无 φ 采样）→ 视图残留永不清理。<strong>锁外发送</strong>是刻意设计（InProcess 直排派发下同步递归
+会重入 AddActiveLocked 造成视图超界——挤掉+插入原子完成后通知移锁外，任意递归链每次 add
+均净 -1+1 = 有界）。</li>
+</ul>
+<h3 id="23-心跳探活与-φ-故障检测">2.3 心跳探活与 φ 故障检测</h3>
+<ul>
+<li><strong>心跳节拍</strong>：周期循环（<code>LoopAsync</code>）由 <code>DeadlineRegistry</code> 订阅驱动（<strong>刻意不用 Task.Delay</strong>——
+TimerQueue 高频窗口丢表项病理已实锤）；写脉冲容量 1 DropOldest。</li>
+<li><strong>φ 判定</strong>（<code>PhiAccrualDetector.cs</code>）：心跳到达间隔采样窗口（缺省 12 样本）拟合正态
+（均值/σ，n-1 方差），<code>φ = -log10(1-Φ((Δt-μ)/σ))</code>；缺省阈值 φ=8（误判率 ~10⁻⁸）；样本不足
+（&lt;3）时 φ=0 冷启动宽限。</li>
+<li><strong>防误判三件套</strong>：
+<ul>
+<li><strong>方差地板</strong> <code>σ = max(sqrt(variance), mean×0.3)</code>（Akka 同款）——定期间隔进程内投递 σ≈0 时
+单次调度抖动 z 即爆表（50ms 心跳 + 100ms 抖动会全员互判失败视图雪崩）；地板使 φ=8 要求
+dt ≳ 4× 心跳间隔——真断连检出、抖动不误判。</li>
+<li><strong>锚定标志</strong> <code>_anchored</code>——旧实现用 <code>_samples.Count&gt;0</code> 判定，首样本入队前计数仍 0 → 永假
+永不采样 φ 恒 0 楔死，已修。</li>
+<li><strong>单向边判死</strong> <code>IsZeroSampleExpired(心跳×8)</code>——对方不认为我是邻居则永不回发心跳，我方零
+样本恒 φ=0，无此判定则视图悬挂占坑；宽限 = 心跳间隔×8 覆盖调度抖动。</li>
+</ul>
+</li>
+</ul>
+<h3 id="24-失效替换与-fail-扩散">2.4 失效替换与 FAIL 扩散</h3>
+<ul>
+<li>判定失败 → 先移出被动池（<strong>防补位立刻拉回</strong>）→ 移出活跃视图 → <code>RefillFromPassiveLocked</code>
+补位：被动视图头（最年轻）优先升入活跃视图 + 发 NEIGHBOR 对称建立；补位先快照候选再发送
+（直排介质同步进入对端 handler 可能重入变异被动视图）。</li>
+<li><strong>FAIL 扩散</strong>：本地检出后向其余活跃邻居广播 <code>FailMsg</code>——故障信息全网快速传播，不等 φ 逐跳
+自行发现；对端同规则移出+补位。</li>
+<li><strong>主动离开</strong>：<code>LeaveAsync</code> 下电前向全部活跃成员发 DISCONNECT（尽力语义，逐成员隔离）。</li>
+<li><strong>对端离线兜底</strong>：<code>_transport.PeerGone</code> 事件（传输层发现连接断开）触发同样的移除+补位路径。</li>
+</ul>
+<h3 id="25-shuffle-搅动与分区自愈">2.5 shuffle 搅动与分区自愈</h3>
+<ul>
+<li><strong>shuffle</strong>（周期 60s）：从活跃视图随机挑目标，发送被动视图前 PRWL（缺省 6）个样本；接收方
+并入被动视图——被动池持续混合，成员搅动下新节点信息全网渗透。</li>
+<li><strong>分区自愈</strong>：失效 φ 检出 → 补位 + FAIL 扩散；被挤节点 DISCONNECT 主动移除；单向边超龄判死；
+全组打散 = 视图不持久化 + 配置种子重 JOIN 重建。</li>
+<li><strong>周期循环必活</strong>：<code>LoopAsync</code> 捕获全部异常只记日志继续——心跳/φ/shuffle 全在此循环，
+静默死亡 = 视图悬挂永不自愈。</li>
+</ul>
+<h2 id="3-gossip-广播swarmbroadcast">3. gossip 广播（<code>SwarmBroadcast</code>）</h2>
+<h3 id="31-语义与帧">3.1 语义与帧</h3>
+<ul>
+<li><strong>语义</strong>（spec-06 §6）：沿活跃视图扇出、逐跳转发，<strong>最终送达</strong>；不保证顺序、不保证送达
+（尽力数据报）。要可靠走 raft/请求回调。</li>
+<li><strong>帧</strong> <code>GossipFrameHeader</code> 37B：<code>[MsgId 16B][Origin 16B][Ttl 1B][PayloadLength 4B]</code> + payload。
+<ul>
+<li><code>MsgId</code> = 广播身份（16B 随机），去重键——<strong>同消息全网至多投递一次</strong>。</li>
+<li><code>Origin</code> = 最初广播者，中继逐跳不变（投递面语义——订阅方拿到的 NodeId 是最初广播者）。</li>
+</ul>
+</li>
+</ul>
+<h3 id="32-防重复--防环--防风暴三重约束叠加">3.2 防重复 / 防环 / 防风暴（三重约束叠加）</h3>
+<table>
+<thead>
+<tr>
+<th>约束</th>
+<th>机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>防重复</td>
+<td><code>SeenCache</code>（MsgId LRU，有界缺省 4096）——同 MsgId 至多投递一次；<strong>源头自登记</strong>（环回副本/自播路径归一）</td>
+</tr>
+<tr>
+<td>防循环</td>
+<td>TTL 有界（缺省 4，每中继减一，<code>Ttl&lt;=1</code> 不再转发）+ 转发排除来源者（<code>SampleTargets</code> 的 exclude）</td>
+</tr>
+<tr>
+<td>防风暴</td>
+<td>去重 + TTL 减尽即停 + fanout 上限（缺省 = 整个活跃视图 ≤k；扇出不随节点数放大——每跳至多 k 条）</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>重复窗口有界性</strong>：重复窗口 = 去重容量 × 传播时延。</li>
+<li><strong>畸形防护</strong>：载荷超限 60KB 源头 fail-fast 抛（不静默丢失）；入站畸形（负长度/截断）静默丢弃；
+handler 快进快出契约（慢回调计数兜底）。</li>
+</ul>
+<h3 id="33-扇出与抽样">3.3 扇出与抽样</h3>
+<ul>
+<li>发送 <code>Send</code>：<code>TaskSink.SubmitFast</code> 尽力发送（fire-and-forget 受控形态——Dispose 有界排空）。</li>
+<li>目标抽样 <code>SampleTargets</code>：活跃视图内去掉自身与来源者；候选数 ≤ Fanout 全取，超出则 partial
+Fisher-Yates 随机抽前 Fanout 位——<strong>转发目标随机</strong>，多路径冗余 + 重叠小世界漫游。</li>
+<li>Fanout 缩小 = 牺牲送达广度换发送量。</li>
+</ul>
+<h2 id="4-活性--收敛--有界性清单">4. 活性 / 收敛 / 有界性清单</h2>
+<table>
+<thead>
+<tr>
+<th>保证</th>
+<th>机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>无中心引导</td>
+<td>部署层种子 + JOIN 随机游走扩散，无发现服务器（不做零配置发现）</td>
+</tr>
+<tr>
+<td>活跃视图有界收敛</td>
+<td>满 k 挤最旧 + 锁外通知保对称（净 -1+1 有界）</td>
+</tr>
+<tr>
+<td>对称性不变量</td>
+<td>JOIN/NEIGHBOR 双向建立；DISCONNECT/FAIL 双向移除；挤掉通知；单向边超龄判死</td>
+</tr>
+<tr>
+<td>失效检出限时</td>
+<td>每 peer 独立 φ 采样 + 心跳驱动（φ=8 限时检出、抖动不误判）</td>
+</tr>
+<tr>
+<td>失效替换</td>
+<td>被动视图年轻者优先补位 + FAIL 扩散全网</td>
+</tr>
+<tr>
+<td>成员搅动收敛</td>
+<td>周期 shuffle 交换被动视图（PRWL=6 样本）</td>
+</tr>
+<tr>
+<td>分区自愈</td>
+<td>视图不持久化、配置种子重 JOIN；周期循环必活（异常隔离继续）</td>
+</tr>
+<tr>
+<td>广播无环/无风暴/无重复</td>
+<td>MsgId LRU 去重（源头自登记）+ TTL 逐跳 + 转发排源 + fanout 随机抽样</td>
+</tr>
+<tr>
+<td>广播有界</td>
+<td>载荷 60KB fail-fast、去重容量 4096 LRU、TTL/fanout 上限</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-与传输层的接线spec-12">5. 与传输层的接线（spec-12）</h2>
+<ul>
+<li><strong>协议域</strong>：<code>ProtocolIds.HyParView=0x02</code>、<code>ProtocolIds.Gossip=0x05</code>（内部核心区 0x00-0x4F）。</li>
+<li><strong>挂载口</strong>：<code>ICoreProtocolPort.RegisterCoreProtocol(protocolId, handler, DatagramBearer.Udp)</code>——
+机制零特权（与使用方同一分发路径）；装配要求传输实现内部口，否则构造抛。</li>
+<li><strong>分发</strong>：<code>DatagramDispatcher</code>——未注册协议静默丢弃 + 钩子；handler 异常隔离（不外泄不致命）。</li>
+<li><strong>承载</strong>：声明 UDP 的协议域在对端 UDP 端点已知、载荷 ≤1200B 时走 UDP；否则<strong>回落 TCP 帧流
+承载</strong>（尽力语义不变）。Gossip 帧含认证标签（KeyPair 档 32B 尾标签）。</li>
+<li><strong>消息线格式</strong>：六类消息（JOIN/NEIGHBOR/DISCONNECT/FAIL/SHUFFLE/HEARTBEAT），<code>[Tag 1B]</code> +
+字段声明序；发送方身份不上线（分发即身份）；解码防御逐字段生成（未知 tag/截断/Count 超上限
+= 丢弃，已知 tag 尾部扩展容忍前向兼容）。</li>
+</ul>
+<h2 id="6-与-raft-的关系并存语义">6. 与 raft 的关系（并存语义）</h2>
+<ul>
+<li><strong>互斥并存</strong>：P2P 模式（HyParView + gossip + TierWAL 本地 append）与 raft 模式（静态配置 +
+复制共识）是两套独立语义——P2P 是最终一致性/超大集群，raft 是强一致/有限成员。</li>
+<li><strong>SwarmSync</strong> 消费 HyParView 成员关系（多源快照的分发拓扑）；raft 不依赖 HyParView
+（静态配置成员）。同节点 raft/P2P 双跑的完整语义仍在归档 spec-06 §8 待决点。</li>
+</ul>
+<h2 id="7-相关文档">7. 相关文档</h2>
+<ul>
+<li>使用面（挂载/参数/观测）：<a href="net.html">net.md</a> §8</li>
+<li>网络层架构（三形态/寻址/安全——P2P 的传输接线）：<a href="transport-architecture.html">transport-architecture.md</a></li>
+<li>规格源：spec-06（内部设计文档，不随包发布——本页为实施后公开描述）。</li>
+<li>成员数定则（P2P 何时用）：<a href="net.html">net.md</a> §3.5</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/p2p-architecture.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>raft 共识架构与稳定性设计 | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="raft 共识架构与稳定性设计 | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/raft-architecture.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="raft-共识架构与稳定性设计">raft 共识架构与稳定性设计</h1>
+
+<p>本文回答三个问题：<strong>raft 实现的稳定性怎么保证</strong>（论文五条安全性质 + 活性的逐条实现映射）、
+<strong>高性能从哪来</strong>（直排/批/下环/零分配/泵线程）、<strong>有序性怎么处理</strong>（提交全序/日志序/apply 序/
+重复容忍/乱序防御）。</p>
+<p>与 <a href="net.html">net.md</a> 的关系：net.md §6 是<strong>使用面</strong>（复制完成档/读面/成员变更怎么调用）；
+本文是<strong>实现面</strong>——一个外部使用者据本文判断&quot;这套 raft 是否真的满足论文核心性质、边界在哪&quot;。
+代码引用为仓库相对路径（<code>Raft/…</code> = <code>src/TC.Tier.Core.Net/Raft/…</code>）。</p>
+<blockquote>
+<p>论文 = Raft（Diego Ongaro &amp; John Ousterhout，&quot;In Search of an Understandable Consensus Algorithm&quot;）。
+安全性质对应论文 §5.4：选举安全 / 领导权完整 / 日志匹配 / 状态机安全 / 领导权只追加。</p>
+</blockquote>
+<hr>
+<h2 id="1-架构总览">1. 架构总览</h2>
+<h3 id="11-组件与职责">1.1 组件与职责</h3>
+<pre><code>                     ┌──────────────────────────────────────────────────────┐
+                     │                 RaftStateMachine（共识引擎）           │
+                     │  ┌──────────────┐    ┌────────────────────────────┐  │
+  ┌─────────────┐    │  │ 共识循环       │    │ 复制引擎 ReplicationProcess │  │
+  │ 节拍注册表    │──▶│  │ LoopAsync     │◀──▶│  per-peer 复制 lane         │  │
+  │ Deadline     │Tick│  │ 泵线程：事件消费│    │ 泵线程：批发送/应答/commit  │  │
+  │ Registry     │    │  │ 心跳/选举定时  │    │ 推进（next/match/hint 回退）│  │
+  └─────────────┘    │  └──────┬───────┘    └────────────▲───────────────┘  │
+                     │         │ append                  │ 复制应答/快照     │
+                     │  ┌──────▼───────┐    ┌────────────┴───────────────┐  │
+                     │  │ 入站分发 Rpc  │    │ 出站 RPC（AppendEntries/   │  │
+                     │  │ 直排:AE/Join  │    │ Vote/ReadIndex 转发）       │  │
+                     │  │ 事件:Vote/等  │    │                            │  │
+                     │  └──────────────┘    └────────────┬───────────────┘  │
+                     └───────────────────────────────────┼──────────────────┘
+                                                         │ IProtocolTransport
+              ┌───────────────┐     ┌────────────────────▼───────────────┐
+              │ 业务状态机      │◀────│ ApplyPipeline（提交→应用管道）        │
+              │ IStateMachine  │apply│ 单 worker 泵线程：按日志序 apply     │
+              └───────────────┘     │ appliedIndex 节流落盘 / 配置条目分流   │
+              ┌───────────────┐     └────────────────────▲───────────────┘
+              │ 存储端口       │◀─────────────────────────┘
+              │ IRaftStore    │   append/prevLog 断言/截尾/双水位/快照点
+              │（可插拔：内存 / │
+              │  TierWal 适配）│
+              └───────────────┘
+</code></pre>
+<ul>
+<li><strong>共识引擎 <code>RaftStateMachine</code></strong>（<code>Raft/RaftStateMachine*.cs</code>，~8k 行/43 文件）：actor 单 worker
+事件循环——共识循环（<code>Raft/RaftStateMachine.Loop.cs</code>）+ 角色转换/选举（<code>.Election.cs</code>）+
+入站分发/RPC 处理（<code>.Rpc.cs</code>）+ 本地事件/快照（<code>.Events.cs</code>）。</li>
+<li><strong>复制引擎 <code>ReplicationProcess</code></strong>（<code>Raft/ReplicationProcess.cs</code>）：leader 侧全部——每 peer 一条
+复制 lane（<code>PeerLane</code>），nextIndex/matchIndex/在途窗口/批发送/冲突回退/commit 推进（Figure 8）。</li>
+<li><strong>提交→应用管道 <code>ApplyPipeline</code></strong>（<code>Raft/ApplyPipeline.cs</code>）：与共识循环解耦的独立单 worker，
+严格按日志序 apply、appliedIndex 节流落盘、配置条目分流。</li>
+<li><strong>存储端口 <code>IRaftStore</code></strong>：raft 对持久化的<strong>全部</strong>需求（term/votedFor/日志追加/prevLog 断言/
+截尾/双水位/快照点）——实现它即可接入任意存储（内存/文件/TierWal）。</li>
+<li><strong>业务状态机 <code>IStateMachine</code></strong>：<code>ApplyAsync</code> 单 worker 调用，at-least-once 幂等契约
+（业务状态 = 已提交日志前缀的确定性函数）。</li>
+<li><strong>节拍注册表 <code>DeadlineRegistry</code></strong>（<code>src/TC.Tier.Core/Execution/DeadlineRegistry.cs</code>）：
+tick 投递走专用线程 + WaitHandle 等待（零 TimerQueue——见 §4.5）。</li>
+<li><strong>传输 <code>IProtocolTransport</code></strong>：TCP/QUIC/InProcess 三介质等价。</li>
+</ul>
+<h3 id="12-线程与泵模型活性地板">1.2 线程与泵模型（活性地板）</h3>
+<p>每节点协议面专用线程（<strong>不进线程池</strong>——2026-09-03 活性判例：池续体偶发不执行 = 心跳停发 =
+全集群冻结）：</p>
+<table>
+<thead>
+<tr>
+<th>线程</th>
+<th>数量</th>
+<th>职责</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>共识循环泵线程</td>
+<td>1</td>
+<td><code>LoopAsync</code>——事件消费、心跳/选举定时、本地 append</td>
+</tr>
+<tr>
+<td>复制 lane 泵线程</td>
+<td>每 peer 1</td>
+<td><code>RunLaneAsync</code>——批发送/应答/commit 推进（peer 间并行）</td>
+</tr>
+<tr>
+<td>apply worker 泵线程</td>
+<td>1</td>
+<td><code>WorkerAsync</code>——按日志序 apply</td>
+</tr>
+<tr>
+<td>节拍线程</td>
+<td>1（可共享）</td>
+<td>DeadlineRegistry——tick 投递（封顶 ~100ms 扫描粒度）</td>
+</tr>
+<tr>
+<td>传输收发循环</td>
+<td>按介质</td>
+<td>TCP 每链收发 / InProcess hub</td>
+</tr>
+</tbody>
+</table>
+<p>泵域语义（<code>AsyncPump</code> 单线程泵）：域内 <code>await</code> 一律不写 <code>ConfigureAwait(false)</code>——续体经
+PumpContext 回流泵线程，共识/复制/apply 关键路径<strong>零线程池依赖</strong>。协议专用线程是活性地板，
+不受资源档位影响（见 <a href="../products/raft-node.html">raft-node.md</a> 资源档位一节）。</p>
+<h3 id="13-消息路径两类消息两条路径">1.3 消息路径（两类消息两条路径）</h3>
+<table>
+<thead>
+<tr>
+<th>消息</th>
+<th>路径</th>
+<th>理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>AppendEntries 请求</strong>（心跳/日志复制）</td>
+<td><strong>直排</strong>：请求回调线程 → <code>_followerAppendGate</code> 串行 → 应答（<code>Raft/RaftStateMachine.Rpc.cs:74-80,435</code>）</td>
+<td>活性续约路径——收到即重置选举定时器，不依赖事件队列/循环线程；队列满或循环被饿时心跳续约不受阻</td>
+</tr>
+<tr>
+<td><strong>Vote / InstallSnapshot / ReadIndex / TransferLeader 请求</strong></td>
+<td><strong>事件化</strong>：入队 <code>_events</code> → 共识循环串行处理 + <code>_clusterLock</code>（<code>Raft/RaftStateMachine.Rpc.cs:81-85</code>）</td>
+<td>低频、需跨状态机状态裁决——循环线程串行 + 锁，避免每请求一线程</td>
+</tr>
+<tr>
+<td><strong>AppendEntries 应答</strong>（follower → leader）</td>
+<td>复制 lane 请求任务回投 <code>HandleRespAsync</code> → 投槽/直跑（<code>Raft/ReplicationProcess.cs:435-453</code>）</td>
+<td>lane 单写者——应答由链消费，leader 侧无锁</td>
+</tr>
+<tr>
+<td><strong>本地事件</strong>（Replicate/ReadIndex/ConfigChanged/Tick）</td>
+<td>事件队列 → 共识循环</td>
+<td>单 worker 串行——本地 append 单写者</td>
+</tr>
+</tbody>
+</table>
+<p><strong>心跳直排是活性地板</strong>：follower 靠&quot;收到即处理&quot;续命。若走事件队列，队列满或循环被饿时心跳
+被阻塞会误触发选举（#504 挂死族根因之一，见 §2.6）。</p>
+<hr>
+<h2 id="2-稳定性论文核心性质如何实现">2. 稳定性：论文核心性质如何实现</h2>
+<h3 id="21-选举安全election-safety一个任期至多一个-leader">2.1 选举安全（Election Safety）——一个任期至多一个 Leader</h3>
+<ul>
+<li><strong>PreVote 先于真选举</strong>（<code>Raft/RaftStateMachine.Election.cs:174-199</code>）：预选举不抬集群 term，
+分区节点无法借预票把集群 term 抬上去（论文 §9.6）。预票按日志新鲜度授予，拿到多数派预票
+才落盘抬任期走真选举。</li>
+<li><strong>在位 leader 否决预票</strong>（<code>Raft/RaftStateMachine.Rpc.cs:328-340</code>）：本节点是 leader、或已知
+leader 且其心跳在最近一个选举窗内仍在续约 = 集群有主 → 拒预票——防扰主真选举（term 空转）。
+leader 真死后心跳停止续约，<code>ElectionTimeoutMax</code> 内否决自动解除。</li>
+<li><strong>抬任期落盘先于应答/广播</strong>（<code>Election.cs:34-98</code> <code>StepDownAsync</code>、<code>StartRealElectionAsync:207</code>）：
+契约①——<code>WriteTermAndVoteAsync</code> 先于 <code>SetRole</code>/应答。term 一旦写入即不可回退。</li>
+<li><strong>投票按日志新鲜度</strong> <code>IsUpToDate</code>（<code>Election.cs:349-353</code>）：term 优先，同 term 比 index——
+确保日志最新者当选（与领导权完整互推）。</li>
+<li><strong>每 term 至多一票</strong>：<code>votedFor</code> 落盘原子化（<code>Rpc.cs:373-398</code>）——split vote 后不自锁
+（PreVote 不沿用 votedFor 门禁，票唯一性由真实投票门禁保证）。</li>
+<li><strong>learner 不投票不自荐</strong>、<strong>witness 投票但不自荐</strong>（<code>Election.cs:154-155</code>）——多数派口径 =
+voter + witness，learner 不占席位。</li>
+</ul>
+<h3 id="22-领导权完整leader-completeness已提交条目必在新-leader-日志">2.2 领导权完整（Leader Completeness）——已提交条目必在新 Leader 日志</h3>
+<ul>
+<li><strong>上任即任期锚点 no-op</strong>（<code>Raft/RaftStateMachine.Election.cs:297-328</code> <code>BecomeLeaderAsync</code>）：commit 计数
+只认本任期条目（论文 §8.2）——不追加则 commitIndex 停在前任期水位，ReadIndex 以其应答 = 破约。</li>
+<li><strong>锚点门</strong>：锚点未提交前 ReadIndex 轮次/租约快路径挂起（<code>_readIndexHoldIndex</code>）——新 Leader
+不得以旧任期水位应答线性读。</li>
+<li><strong>commit 只经当前任期条目直接提交</strong>（<code>Raft/ReplicationProcess.cs:1145-1165</code> <code>TryAdvanceCommitAsync</code>）：
+Figure 8 约束——<code>log[n].term == currentTerm</code> 才推进；旧任期条目随该次提交<strong>间接</strong>提交
+（防&quot;已提交条目被新 leader 覆盖&quot;，与日志匹配互推）。</li>
+</ul>
+<h3 id="23-日志匹配log-matching同-index-同-term-则内容相同前序也相同">2.3 日志匹配（Log Matching）——同 index 同 term 则内容相同，前序也相同</h3>
+<ul>
+<li><strong>prevLog 断言 + 冲突截尾一体</strong>：<code>IRaftStore.AppendAsync(prevIndex, …)</code> 的 prevIndex 前置断言 +
+分叉尾随断言截断（<code>TierWalRaftStore.cs:175-245</code> 适配器）——纯追加或断言截尾，无第三种。</li>
+<li><strong>已提交区保护</strong>（<code>Raft/RaftStateMachine.Rpc.cs:510-522</code>）：乱序迟到的旧批（prevLogIndex &lt; 本地
+commitIndex，重写区间含已提交条目）<strong>拒绝</strong>并指向 commit+1——leader 单调回退收敛，日志尾不被
+截断。</li>
+<li><strong>冲突回退 hint 加速</strong>（<code>Raft/ReplicationProcess.cs:566-592</code>）：拒绝带 conflict term/index——
+一次跳到 <code>min(nextIndex-1, 该 term 首条)</code>（或前向 hint 的 <code>ConflictIndex ≥ next</code> 快照衔接），
+min 公式保证单调递减；拒绝一次回退一格是正确性基石。</li>
+<li><strong>快照边界衔接</strong>：<code>nextIndex ≤ SnapshotIndex</code> → 转快照安装（<code>ReplicationProcess.cs:675-682</code>）——
+增量复制无法接续的边界，快照覆盖点 N₀ 后从 N₀+1 续传。</li>
+</ul>
+<h3 id="24-状态机安全state-machine-safety同-index-在所有节点-apply-同一条">2.4 状态机安全（State Machine Safety）——同 index 在所有节点 apply 同一条</h3>
+<ul>
+<li><strong>commit 安全对 <code>(commitIndex, term)</code> 复合原子</strong>（<code>Raft/RaftStateMachine.cs:120-136</code>，
+<code>Atomic128&lt;CommitPair&gt;</code>）：推进瞬间 term 快照入对——期间换届则 CAS 失败重读放弃，
+<strong>不能提交旧 term 条目</strong>（§5.4.2 语义不依赖 leader-term 不变式）。</li>
+<li><strong>apply 单 worker 严格日志序</strong>（<code>Raft/ApplyPipeline.cs:201-283</code>）：<code>[lastApplied+1, commitIndex]</code>
+区间逐条 ApplyAsync——单消费者 FIFO 保序。apply 落后<strong>安全</strong>（只延迟读服务，不产生错误状态）。</li>
+<li><strong>at-least-once 重放 + 业务幂等</strong>：重启重放同一前缀；<code>IStateMachine</code> 契约要求确定性幂等
+（同 index 同命令 → 同状态）。apply 异常重入队有界重试，不杀 worker（<code>ApplyPipeline.cs:203-230</code>）。</li>
+<li><strong>快照推进竞态护栏</strong>（<code>ApplyPipeline.cs:234-238</code>）：快照把 SnapshotIndex 推过本地 applied 时
+双源读不原子——重读拿新 N₀ + 重入队有界自愈（防 applied 静默停滞）。</li>
+</ul>
+<h3 id="25-领导权只追加leader-append-onlyleader-不覆写删除自己日志">2.5 领导权只追加（Leader Append-Only）——Leader 不覆写/删除自己日志</h3>
+<ul>
+<li>并入 §2.2/§2.3：Leader 侧 <code>AppendEntriesAsync</code> 恒<strong>纯追加</strong>（<code>Raft/RaftStateMachine.Events.cs:70-74</code>）；
+截尾只发生在 follower 侧（响应 prevLog 断言失败）；Figure 8 约束阻止经旧任期条目提交。
+Leader 日志 = 追加单调序列（含快照导入后的续传）。</li>
+</ul>
+<h3 id="26-活性liveness及时选主及时推进">2.6 活性（Liveness）——及时选主、及时推进</h3>
+<ul>
+<li><strong>心跳 ≪ 选举窗</strong>：心跳缺省 50ms、选举窗 150-300ms（<code>Raft/RaftOptions.cs:14-20</code>）——丢 1-2 个
+心跳不触发误选举，leader 真死 1-2 窗内完成换届。</li>
+<li><strong>泵线程隔离池饥饿</strong>（§1.2）：共识/复制/apply 关键路径零池依赖。</li>
+<li><strong>tick 去 TimerQueue</strong>（<code>Raft/RaftStateMachine.cs:391-440</code> + DeadlineRegistry）：.NET 8
+TimerQueue 高频触发窗口丢表项（孤儿判例）→ 拉取模型专用线程，tick 是共识循环唯一活性源。</li>
+<li><strong>调度饥饿鲁棒</strong>（#504 挂死族根修，<code>Raft/RaftStateMachine.Loop.cs:130-146</code> + <code>Raft/RaftStateMachine.cs</code> 周期观测订阅）：
+选举超时按<strong>观测时间</strong>而非墙钟计数——泵线程被饿期间循环未运行，<code>CheckDeadline</code> 到期且
+<code>gap = now - _lastLoopProgressTicks ≥ ElectionTimeoutMin</code> 时判定观测能力缺失，<strong>重掷选举截止
+不触发选举</strong>（让被饿期间积压的 leader 心跳先被处理）；周期观测订阅保证观测粒度 &lt; 阈值
+（区分&quot;正常窗满&quot;与&quot;真被饿&quot;）。leader 真死时节点持续观测，窗口满即正常换届（活性保持）。</li>
+<li><strong>复制 lane 自愈</strong>：在途超时 = 重试窗口（<code>ReplicationProcess.cs:600-616</code>，应答丢失持续重试
+论文 §5.3）；心跳 tick 兜底唤醒；冲突回退立即重试。</li>
+<li><strong>观察点</strong>（<code>Raft/RaftStateMachine.Loop.cs:54-68</code>）：每个事件处理后 <code>CheckDeadline</code> +
+<code>FlushPendingAppendsAsync</code>——事件密集时心跳/选举/复制仍推进；空闲时节拍封顶 ~100ms 粒度触发。</li>
+</ul>
+<hr>
+<h2 id="3-有序性提交全序日志序apply-序">3. 有序性：提交全序、日志序、apply 序</h2>
+<h3 id="31-提交全序commit-单调">3.1 提交全序（commit 单调）</h3>
+<ul>
+<li>多数派 matchIndex 的第 <code>MajorityThreshold</code> 大值 = 可提交位（<code>ReplicationProcess.cs:1103-1118</code>，
+含自己 match = 本地 PersistedIndex；learner 不进数组；witness 计入）。</li>
+<li>推进单点 <code>AdvanceCommit</code>（<code>Raft/RaftStateMachine.Events.cs:290-304</code>）：复合 CAS 原子推进 +
+term 快照 + 投递 apply + 完成 committed 档等待者 + 事件——多 lane 并发上报安全，重复上报幂等跳过。</li>
+</ul>
+<h3 id="32-日志序leader-追加序--follower-应用序">3.2 日志序（Leader 追加序 = follower 应用序）</h3>
+<ul>
+<li><strong>Leader 排空攒批</strong>（<code>Raft/RaftStateMachine.Events.cs:27-62</code>）：一次排空队列连续 Replicate 事件 →
+一批一次 <code>AppendAsync</code> → 批内 index 连续 → 逐条注册完成源（applied/committed/LeaderLocal 档分流）。
+批内 index = <code>startIndex + i</code>——<strong>命令顺序即日志顺序即返回 index 顺序</strong>。</li>
+<li><strong>Follower gate 串行</strong>（<code>Raft/RaftStateMachine.Rpc.cs:467-504</code>）：<code>_followerAppendGate</code> 内
+term 重查 + prevLog 校验 + 追加 + 持久化 + 提交——检查序列不交错（请求回调线程并发到达，
+门串行）。提交跟随 = <code>AdvanceCommit(min(LeaderCommit, PersistedIndex))</code>（<code>Rpc.cs:624-627</code>）。</li>
+</ul>
+<h3 id="33-apply-序状态机安全的有序面">3.3 apply 序（状态机安全的有序面）</h3>
+<ul>
+<li><code>ApplyPipeline</code> 单 worker 严格按 <code>[lastApplied+1, commitIndex]</code> 区间应用（<code>ApplyPipeline.cs:239-283</code>）——
+业务状态机的 apply 顺序与全集群提交顺序<strong>完全一致</strong>（同 index 同命令，见 §2.4）。</li>
+<li>配置条目分流（<code>ApplyPipeline.cs:244-255</code>）：配置切换 = apply 产物——<code>_currentConfig</code> 更新 +
+<code>PostConfigChanged</code> 回调状态机（spec-04）。配置条目的 apply 序同样严格。</li>
+</ul>
+<h3 id="34-重复容忍与乱序防御">3.4 重复容忍与乱序防御</h3>
+<ul>
+<li><strong>at-least-once</strong>：崩溃重启重放同一前缀（apply 幂等）。这是<strong>唯一</strong>的重复来源——正常运行时
+单消费者 FIFO 恰好一次。</li>
+<li><strong>乱序防御</strong>：已提交区保护拒绝乱序迟到旧批（§2.3）；冲突回退单调收敛。</li>
+<li><strong>完成源幂等</strong>：注册前检查&quot;index ≤ 水位&quot;立即完成（<code>Raft/RaftStateMachine.cs:716-739</code>）——
+并发直排下重复完成不可能（slot 状态机 + 水位判定）。</li>
+</ul>
+<hr>
+<h2 id="4-高性能设计">4. 高性能设计</h2>
+<h3 id="41-心跳直排13">4.1 心跳直排（§1.3）</h3>
+<p>AppendEntries 请求经 <code>_loops.SubmitFast</code> 受控提交（请求回调线程），<code>_followerAppendGate</code> 串行——
+不占事件队列、不占循环线程、每心跳零队列排队。高并发下事件积压不影响心跳活性路径。</p>
+<h3 id="42-批复制攒批三维度--流水线">4.2 批复制（攒批三维度 + 流水线）</h3>
+<ul>
+<li><strong>Leader 侧排空攒批</strong>（§3.2）：一次 append 一批，摊薄 channel 读 + append 写锁往返 + 注册 ×N。</li>
+<li><strong>复制侧三维度攒批</strong>（<code>ReplicationProcess.cs:311-363</code>）：条数（<code>BatchSize</code>）/ 字节（<code>MaxBatchBytes</code>）/
+时间（<code>BatchWindow</code>，one-shot Timer 独立到期，不骑心跳 tick）——+ <strong>微 linger</strong>
+（<code>LingerMilliseconds</code>，亚 tick 粒度，摊薄 per-RPC 开销）。</li>
+<li><strong>窗口 N 流水线</strong>（<code>ReplicationProcess.cs:606-616,743-749</code>）：per-peer 在途批上限（缺省 8）——
+批间不等待应答，发 A 时可发 B；乐观推进 nextIndex 防重复批。</li>
+<li><strong>心跳空批零 WAL 读</strong>（<code>ReplicationProcess.cs:694-710</code>）：无滞后且 prevLog 锚命中缓存 → 免
+<code>WaitForPersistedAsync</code> + <code>ReadLogTermAsync</code>——选举窗活性关键路径与 WAL 锁解耦。</li>
+</ul>
+<h3 id="43-w4-persist-下环fsync-不阻塞循环">4.3 W4 persist 下环（fsync 不阻塞循环）</h3>
+<p>组提交发起为<strong>在途任务、不内联等待</strong>（<code>Raft/RaftStateMachine.Loop.cs:151-192</code>）：fsync 期间
+事件循环照常消费（心跳/选举/复制不受阻）；任务完工自投 <code>PersistCompleted</code> 唤醒，下一观察点收尾。
+单写者不变量：commit 只在循环线程发起（在途门——同串 fsync 不并发）。</p>
+<h3 id="44-零分配低分配工程">4.4 零分配/低分配工程</h3>
+<table>
+<thead>
+<tr>
+<th>技术</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>池化状态机（SendRpcState/PooledValueTaskSource/PooledBufferWriter/ArrayPool 帧）</td>
+<td><code>ReplicationProcess.cs:805-1097</code></td>
+</tr>
+<tr>
+<td>复用批缓冲（<code>_leaderBatch</code>/<code>_followerBatch</code>）与 lane 条目区直写（RegionWriter/TermsExact）</td>
+<td><code>Events.cs:44-51</code>、<code>ReplicationProcess.cs:717-728</code></td>
+</tr>
+<tr>
+<td>缓存委托（AppendDirectWork.Run / lane.SendFrameFunc——免闭包 + display class）</td>
+<td><code>Rpc.cs:33-54</code>、<code>ReplicationProcess.cs:812-813</code></td>
+</tr>
+<tr>
+<td>事件池化（RaftEvent.Replicate.Rent/Return）</td>
+<td><code>Raft/RaftEvent.cs</code></td>
+</tr>
+<tr>
+<td>无状态节拍事件单例（TickEvent/PersistCompletedEvent 零分配）</td>
+<td><code>Raft/RaftStateMachine.cs:168-169</code></td>
+</tr>
+<tr>
+<td>CAS 热路径（CommitPair/LeaderSlot Atomic128——16B 原子读）</td>
+<td><code>Raft/RaftStateMachine.cs:120-141</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="45-泵线程去池跳--拉取模型节拍">4.5 泵线程去池跳 + 拉取模型节拍</h3>
+<ul>
+<li>关键路径全部专用泵线程（§1.2）——省线程池调度跳 + 续体丢失风险。</li>
+<li>DeadlineRegistry 拉取模型（<code>DeadlineRegistry.cs</code>）：条目不存 deadline 值，持计算委托 +
+唤醒回调；节拍线程每轮重扫全部条目，到期者回调。分片懒启、退订零查找、单条异常隔离不杀线程。</li>
+</ul>
+<hr>
+<h2 id="5-读面与一致性语义">5. 读面与一致性语义</h2>
+<table>
+<thead>
+<tr>
+<th>面</th>
+<th>语义</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>复制完成档·applied</td>
+<td>返回 = committed 且 applied（read-your-writes）</td>
+<td><code>Raft/RaftStateMachine.cs:591-614</code></td>
+</tr>
+<tr>
+<td>复制完成档·committed</td>
+<td>多数派提交即返（不等 apply，吞吐优先）</td>
+<td><code>Raft/RaftStateMachine.cs:679-700</code></td>
+</tr>
+<tr>
+<td>复制完成档·LeaderLocal</td>
+<td>leader 本地持久化即返（异步一致——换届丢未复制尾部写）</td>
+<td><code>Raft/RaftStateMachine.cs:628-636</code></td>
+</tr>
+<tr>
+<td>线性读 ReadIndex</td>
+<td>leader 向多数派确认身份后返回 commitIndex（分区不可答 = 不返回过期 index）</td>
+<td><code>Raft/RaftStateMachine.cs:847-863</code></td>
+</tr>
+<tr>
+<td>租约读（opt-in）</td>
+<td>多数派确认后 (选举窗下界 − 漂移界) 窗内零往返；窗外回落心跳确认</td>
+<td><code>Raft/RaftStateMachine.cs:851-857</code></td>
+</tr>
+<tr>
+<td>follower 转发读</td>
+<td>转发 leader → leader 多数派确认 → 本端等 applied ≥ readIndex</td>
+<td><code>Raft/RaftStateMachine.cs:876+</code></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>非 Leader 写入/读快速失败 <code>NotLeaderException</code>（携带当前已知 leader，客户端重路由标准模式）。</li>
+<li>换届在途完成源统一以 <code>NotLeaderException</code> 取消——客户端重试即可，不是错误。</li>
+</ul>
+<hr>
+<h2 id="6-配置变更与引导">6. 配置变更与引导</h2>
+<ul>
+<li><strong>single-server 配置变更</strong>（论文 §6 一次性成员变更）：<code>ProposeConfigAsync</code> 追加配置条目
+（<code>Raft/RaftStateMachine.cs:786-799</code>）→ apply 产物切换（<code>Raft/RaftStateMachine.Events.cs:239+</code>）
+→ 复制引擎 <code>ApplyConfig</code> 重建 lane（新成员起链、移除成员停链，保留成员在途批不动）
+（<code>ReplicationProcess.cs:206-236</code>）。多数派 = <strong>当时活动配置</strong>的多数派（<code>Quorum.cs</code> 纯函数）。</li>
+<li><strong>learner 引导/晋级</strong>：新节点以 learner 身份加入（<code>JoinAsync</code>），追平自动晋级 voter——
+追赶期不占多数派席位，不扰动写入可用性（<code>Membership.cs</code> + <code>RaftStateMachine.cs</code> learner 晋级面）。</li>
+<li><strong>witness</strong>：投票计多数派、无日志体（高水位断言流）、永不自荐（DDR-F2，三期面）。</li>
+</ul>
+<hr>
+<h2 id="7-快照与恢复">7. 快照与恢复</h2>
+<ul>
+<li><strong>InstallSnapshot</strong>：nextIndex ≤ 快照覆盖点触发（§2.3）；follower 导入重建（<code>RebuildCoordinator</code>）
+后从 N₀+1 续传增量（<code>ReplicationProcess.cs:455-478</code>）。</li>
+<li><strong>双源读</strong>（<code>ApplyPipeline.cs:19-21,239-283</code>）：applied &lt; N₀ 的跨界区间由快照读面补齐——
+管道无需感知快照面；快照 = 可导出的日志前缀镜像。</li>
+<li>快照压缩/发布/反熵由产品层宿主调度驱动（见 <a href="../products/raft-node.html">raft-node.md</a>）。</li>
+</ul>
+<hr>
+<h2 id="8-可观测性稳定性取证面">8. 可观测性（稳定性取证面）</h2>
+<table>
+<thead>
+<tr>
+<th>面</th>
+<th>内容</th>
+<th>位置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>循环活性诊断</td>
+<td>LoopLagMs / TickLagMs / QueueDepth / TickWriteFailures / DeadlineInMs（判别：tick 链断 vs 循环卡 handler vs deadline 缺陷）</td>
+<td><code>Raft/RaftStateMachine.cs:258-274</code></td>
+</tr>
+<tr>
+<td>节拍注册表取证</td>
+<td>每 shard：pacer 存活 / pacerLag / wakeLag / 每条目 last-wake（tick 链断判别）</td>
+<td><code>Raft/RaftStateMachine.cs:276-278</code>、<code>DeadlineRegistry.cs:146-154</code></td>
+</tr>
+<tr>
+<td>选举轨迹</td>
+<td>环形记录 96 槽，收敛停滞时倾倒转换步骤</td>
+<td><code>Raft/RaftStateMachine.cs:154-158,469-485</code></td>
+</tr>
+<tr>
+<td>共识指标</td>
+<td>raft.elections_started / leader_changes / commit_index / applied_index</td>
+<td><code>Raft/RaftStateMachine.cs</code> 各 <code>_raftView</code> 点</td>
+</tr>
+<tr>
+<td>状态导出</td>
+<td>healthz/readyz/管理面（Role/Term/Commit/成员与复制进度）</td>
+<td><code>Raft/RaftStateMachine.cs:431+</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="9-边界与开放决策">9. 边界与开放决策</h2>
+<ul>
+<li><strong>时钟同步纪律</strong>：租约读要求 NTP 同步（漂移界 &lt; 选举窗）——不满足则保持缺省关。</li>
+<li><strong>LeaderLocal 档的丢写窗口</strong>：leader 宕机时未复制到任何成员的尾部写丢失（已复制部分经
+最高日志者当选保留）——强一致需求用默认档/committed 档或 ReadIndex。</li>
+<li><strong>无跨节点恰好一次原语</strong>：raft 层提供有序复制 + 幂等重放；恰好一次（去重）由业务状态机
+（IStateMachine 幂等契约 + 幂等键）承担——产品层实例见
+<a href="../products/raft-consistency.html">raft-consistency.md</a>。</li>
+<li><strong>快照安装传输面</strong>：引擎提供端口与触发，传输面由装配决定（单源流式 / 多源 swarm）。</li>
+</ul>
+<hr>
+<h2 id="10-相关文档">10. 相关文档</h2>
+<ul>
+<li>使用面（怎么调用）：<a href="net.html#6-raft-%E5%85%B1%E8%AF%86">net.md §6</a></li>
+<li>产品装配（TierRaftNode/TierWAL 节点）：<a href="../products/raft-node.html">raft-node.md</a></li>
+<li>产品层论文核心保证（TierQueueReplica 实例）：<a href="../products/raft-consistency.html">raft-consistency.md</a></li>
+<li>调度饥饿鲁棒设计（#504 根修）：见 §2.6（设计依据为内部设计稿，不随包发布）</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/raft-architecture.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

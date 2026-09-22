@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>底层二进制格式单元说明（存储 &#215; 线格式） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="底层二进制格式单元说明（存储 &#215; 线格式） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/binary-format-spec.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="底层二进制格式单元说明存储--线格式">底层二进制格式单元说明（存储 × 线格式）</h1>
+
+<p>本文是 <strong>TC.Tier 全系列二进制格式的互操作手册</strong>——外部解析工具 / 审计 / 数据恢复 / 其他语言
+实现可据此解析全套磁盘存储格式与网络线格式。每个格式给出字节图、字段表、CRC/校验、版本演进
+与源码位置；<strong>精确到字节</strong>（偏移/宽度/端序），与生成 Codec（<code>[BinaryLayout]</code> 声明即代码）一致。</p>
+<blockquote>
+<p>覆盖范围：Runtime 存储结构（磁盘可解析）× Products 产品封装 × Core.Net 网络线格式。
+与使用指南的关系：log.md/storage-engine.md/tierwal.md 等讲<strong>行为</strong>，本文讲<strong>字节</strong>。</p>
+</blockquote>
+<p>代码引用为仓库相对路径（<code>Structures/…</code> = <code>src/TC.Tier.Runtime/Structures/…</code>）。</p>
+<hr>
+<h2 id="1-通用约定跨全部格式族">1. 通用约定（跨全部格式族）</h2>
+<table>
+<thead>
+<tr>
+<th>约定</th>
+<th>值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>端序</td>
+<td>全多字节标量 <strong>Little-Endian</strong>（生成 Codec 统一 <code>Write*LittleEndian</code>）</td>
+</tr>
+<tr>
+<td>CRC32C</td>
+<td>Castagnoli 反射多项式 <code>0x82F63B78</code>；规范 init <code>0xFFFFFFFF</code>、final XOR <code>0xFFFFFFFF</code></td>
+</tr>
+<tr>
+<td>CRC64</td>
+<td>ECMA-182 Annex B 多项式 <code>0x42F0E1EBA9EA3693</code>；init <code>0</code>、<strong>无异或输出</strong>（≠ zlib 式）</td>
+</tr>
+<tr>
+<td><code>LogicalAddress</code>（16B）</td>
+<td><code>[0] SegId int LE</code> + <code>[4] Extension int LE</code> + <code>[8] Offset long LE</code>；Empty=(0,0,0)、Invalid=(-1,-1,-1)</td>
+</tr>
+<tr>
+<td><code>NodeId</code>（16B）</td>
+<td>不透明字节串（<code>Opaque16</code>：<code>_hi@0</code>/<code>_lo@8</code> 双 ulong，小端承载字 = 字节原序直拷）</td>
+</tr>
+<tr>
+<td>Magic 常量</td>
+<td>全 uint32 LE 落盘，登记于 <code>src/TC.Tier.Contracts/Layout/RecordMagic.cs</code></td>
+</tr>
+<tr>
+<td>版本编码</td>
+<td><code>major &lt;&lt; 8 \| minor</code>（ushort）；<code>Version</code> 字段语义由各格式自述</td>
+</tr>
+<tr>
+<td>flags 位约定</td>
+<td>bits0-1 = CRC 算法（0x00 无 /0x01 CRC32 /0x02 CRC64 /0x03 CRC32C）；bit2 <code>FLAG_CRC_IN_FOOTER(0x04)</code>；bits3-4 payload 宽度（0x08=2B /0x10=4B /0x18=8B）；bit7 <code>FLAG_ENTRY_IS_META(0x80)</code>；bit12 <code>FLAG_FOOTER_MAGIC(0x1000)</code></td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="2-存储结构格式runtime">2. 存储结构格式（Runtime）</h2>
+<h3 id="21-log-页帧logpageframe">2.1 Log 页帧（LogPageFrame）</h3>
+<p>EntryLog/DeltaLog 的物理写单元——N 条 entry 攒满一页（默认 4MiB）组帧写入引擎地址空间。</p>
+<pre><code>[LogPageFrameHeader 8B][data: alignedLen B][Crc32Footer 4B][padding: 0..Sector-1 B]
+ 0                     8                8+alignedLen
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>校验/含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>MagicValue</td>
+<td><code>0x4647504C</code> &quot;LPGF&quot;</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>DataLength</td>
+<td>数据区有效字节数 = <code>AlignUp(pageUsed, Sector)</code>（读侧定界）</td>
+</tr>
+<tr>
+<td>8</td>
+<td>alignedLen</td>
+<td>data</td>
+<td>entry 流（见 2.2/2.3）</td>
+</tr>
+<tr>
+<td>8+alignedLen</td>
+<td>4</td>
+<td>Crc</td>
+<td>CRC32C，覆盖 <code>[0, 8+alignedLen)</code>（header+data，不含 padding）</td>
+</tr>
+<tr>
+<td>后</td>
+<td>var</td>
+<td>padding</td>
+<td>全零，把整帧撑到扇区对齐</td>
+</tr>
+</tbody>
+</table>
+<p>无版本字段；<code>DataLength</code> 即写侧对齐字节数，恢复端按帧头前向扫描。
+源码：<code>Structures/Log/LogPageFrameHeader.cs</code>、<code>LogBase.Write.cs:328-417</code>、<code>LogBase.Recovery.cs:144-282</code>。</p>
+<h3 id="22-entrylog-entry-头22bcrc64-in-header">2.2 EntryLog entry 头（22B，CRC64 in-Header）</h3>
+<p>raft WAL 底层单条记录头，data 区内连续、每条 4B 对齐。</p>
+<pre><code>[MagicValue 4][Version 2][Flags 2][PayloadLength 4][PaddingLength 2][Crc64 8][payload][padding 4 对齐]
+ 0             4          6          8               12              14        22
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>校验/含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>MagicValue</td>
+<td><code>0x474F4C45</code> &quot;ELOG&quot;</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2</td>
+<td>Version</td>
+<td><code>0x0100</code></td>
+</tr>
+<tr>
+<td>6</td>
+<td>2</td>
+<td>Flags</td>
+<td>含 <code>0x32</code> = CRC64(0x02)｜PAYLOAD_4B(0x10)｜META_EMBEDDED(0x20)；可叠加 <code>FLAG_ENTRY_IS_META(0x80)</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>4</td>
+<td>PayloadLength</td>
+<td>≤ 4MiB（<code>MaxEntrySize=1&lt;&lt;22</code>）</td>
+</tr>
+<tr>
+<td>12</td>
+<td>2</td>
+<td>PaddingLength</td>
+<td>4B 对齐补零</td>
+</tr>
+<tr>
+<td>14</td>
+<td>8</td>
+<td>Crc</td>
+<td><strong>CRC64 in-Header</strong>——覆盖 <code>[0,14) ∪ {Crc 置零 8B} ∪ [22, 22+payload+padding)</code></td>
+</tr>
+</tbody>
+</table>
+<p>源码：<code>Structures/Log/EntryLog.Header.cs:16-48</code>、<code>EntryLog.Codec.cs:26-63</code>。</p>
+<h3 id="23-deltalog-entry-头18bcrc32c-in-header">2.3 DeltaLog entry 头（18B，CRC32C in-Header）</h3>
+<p>临时增量日志记录头，与 EntryLog 同构。</p>
+<pre><code>[Magic 4][Version 2][Flags 2][PayloadLength 4][PaddingLength 2][Crc32C 4][payload][padding]
+ 0        4          6          8               12               14
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>MagicValue</td>
+<td><code>0x474F4C44</code> &quot;DLOG&quot;</td>
+</tr>
+<tr>
+<td>6</td>
+<td>2</td>
+<td>Flags</td>
+<td>含 <code>0x33</code> = CRC32C(0x03)｜PAYLOAD_4B｜META_EMBEDDED</td>
+</tr>
+<tr>
+<td>14</td>
+<td>4</td>
+<td>Crc</td>
+<td>CRC32C in-Header（覆盖同 2.2 语义）</td>
+</tr>
+</tbody>
+</table>
+<p>源码：<code>Structures/Log/DeltaLog.Header.cs:16-49</code>、<code>DeltaLog.Codec.cs:26-71</code>。</p>
+<h3 id="24-logmeta-水位块12b--80bopaque--4b">2.4 LogMeta 水位块（12B + 80B(+opaque) + 4B）</h3>
+<p>Log 持久化水位 / 2PC 事务恢复元数据（MetaPolicy 原子落盘）。</p>
+<pre><code>[LogMetaHeader 12B][LogMetaPayload 80B + opaque][Crc32Footer 4B]
+</code></pre>
+<p><strong>LogMetaHeader（12B）</strong>：<code>[0] Magic </code>0x44484D4C<code> &quot;LMHD&quot;</code> + <code>[4] Version 0x0100</code> + <code>[6] Flags 0x4B</code>（CRC32C｜PAYLOAD_2B｜CRC_IN_FOOTER｜META_STANDALONE）+ <code>[8] PayloadLength 2B</code> + <code>[10] PaddingLength 2B</code>。</p>
+<p><strong>LogMetaPayload（80B）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>16</td>
+<td>BeginAddress（头回收边界）</td>
+</tr>
+<tr>
+<td>16</td>
+<td>16</td>
+<td>TailAddress（写游标）</td>
+</tr>
+<tr>
+<td>32</td>
+<td>16</td>
+<td>CommittedOffset（group commit 落盘边界）</td>
+</tr>
+<tr>
+<td>48</td>
+<td>8</td>
+<td>LastCommittedSeq（-1 = 未参与事务）</td>
+</tr>
+<tr>
+<td>56</td>
+<td>8</td>
+<td>LastPreparedSeq（-1 = 从未 Prepare）</td>
+</tr>
+<tr>
+<td>64</td>
+<td>16</td>
+<td>PreparedTailAddress（2PC Abort 回退点；Empty = 无窗口）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CRC</strong>：CRC32C 落尾部 <code>Crc32Footer</code>（offset 12+PayloadLength），覆盖 <code>[0, 12+PayloadLength)</code>。
+源码：<code>Structures/Log/Contracts/LogMetaHeader.cs</code>、<code>LogMetaPayload.cs</code>、<code>LogBase.LogMeta.cs:103-112</code>。</p>
+<h3 id="25-ring-记录帧blittablering-record40b">2.5 Ring 记录帧（BlittableRing record，40B）</h3>
+<p>Ring = 产品数据真源（Kv/TimeSeries/Blob 共用），记录直接裸写在引擎页内存（<strong>无页帧包裹</strong>）。</p>
+<pre><code>[BlittableRingHeader 40B][key: sizeof(TKey) B][value: 8B..N B][padding 8 对齐]
+ 0                        40
+[Magic 4][Ver 2][Flags 2][PayloadLength 4][PadLen 2][PreviousAddress 16][Reserved 4][Crc32C 4]
+ 0        4      6        8               12        16                    32          36
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>MagicValue</td>
+<td><code>0x44485242</code> &quot;BRHD&quot;</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2</td>
+<td>Version</td>
+<td><code>0x0200</code>（v2 泛型改版——KeyLength 字段退役，key 长度 = <code>sizeof(TKey)</code> 类型事实）</td>
+</tr>
+<tr>
+<td>6</td>
+<td>2</td>
+<td>Flags</td>
+<td>含 <code>0x13</code> = CRC32C(0x03)｜PAYLOAD_4B(0x10)；状态位 bits8-11：<code>0x0100</code>=VALID /<code>0x0200</code>=TOMBSTONE /<code>0x0400</code>=SEALED /<code>0x0800</code>=INNEWVERSION；<code>0x2000</code>=VALUE_OVERFLOW</td>
+</tr>
+<tr>
+<td>8</td>
+<td>4</td>
+<td>PayloadLength</td>
+<td>= KeySize + ValueLength（数据记录）或 blockSize（meta 记录）</td>
+</tr>
+<tr>
+<td>12</td>
+<td>2</td>
+<td>PaddingLength</td>
+<td>8 对齐补零</td>
+</tr>
+<tr>
+<td>16</td>
+<td>16</td>
+<td>PreviousAddress</td>
+<td>版本链前驱（8B 对齐）</td>
+</tr>
+<tr>
+<td>32</td>
+<td>4</td>
+<td>Reserved</td>
+<td>恒 0（写零防 CRC 脏字节）</td>
+</tr>
+<tr>
+<td>36</td>
+<td>4</td>
+<td>Crc32C</td>
+<td>in-Header，覆盖 <code>[0, 40+PayloadLength)</code>，Crc 区置零</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>key 以原始 blittable 字节直写（<code>Unsafe.WriteUnaligned</code>）；value 紧随；溢出记录 value 区 = 24B <code>AddressInfo</code>（<code>[0] LogicalAddress 16B</code> + <code>[16] long Size</code>）。</li>
+<li>空位判定 = <code>Magic==0</code>（从未写入槽）。</li>
+<li><strong>Ring 7 水位 CAS128</strong>（内存态）：7 个 16B 槽经 <code>NativeAtomic128</code> 原子单调推进——槽序 <code>Begin/FlushedUntil/ReadOnly/SafeReadOnly/Head/SafeHead/ClosedUntil</code>；盘上持久化的是 2.7 的子集。</li>
+</ul>
+<p>源码：<code>Structures/Ring/BlittableRing.Header.cs:19-48</code>、<code>BlittableRing.Codec.cs</code>、<code>RingBase.Watermarks.cs</code>。</p>
+<h3 id="26-overflowrecord18b">2.6 OverflowRecord（18B）</h3>
+<p>WiscKey value-log 溢出帧（大值分块写）。</p>
+<pre><code>[Magic 4][Ver 2][Flags 2][PayloadLength 4][PadLen 2][Crc32C 4][value][padding 4 对齐]
+ 0        4      6        8               12        14
+</code></pre>
+<p>CRC32C 覆盖 <code>[0,14)</code>（Crc 区外）+ value + padding。版本 <code>0x0100</code>。
+源码：<code>Structures/Ring/Contracts/OverflowRecordHeader.cs:14-28</code>。</p>
+<h3 id="27-ringmeta-水位块12b--132b--4b">2.7 RingMeta 水位块（12B + 132B + 4B）</h3>
+<p>Header 与 LogMeta 同构（Magic <code>0x44484D52</code> &quot;RMHD&quot;、Version 0x0100、Flags <code>0x4B</code>）。Payload 132B：</p>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>16</td>
+<td>BeginAddress</td>
+</tr>
+<tr>
+<td>16</td>
+<td>16</td>
+<td>FlushedUntilAddress</td>
+</tr>
+<tr>
+<td>32</td>
+<td>16</td>
+<td>SafeReadOnlyAddress</td>
+</tr>
+<tr>
+<td>48</td>
+<td>16</td>
+<td>ReadOnlyAddress</td>
+</tr>
+<tr>
+<td>64</td>
+<td>16</td>
+<td>TailAddress</td>
+</tr>
+<tr>
+<td>80</td>
+<td>8</td>
+<td>LastCommittedSeq</td>
+</tr>
+<tr>
+<td>88</td>
+<td>8</td>
+<td>LastPreparedSeq</td>
+</tr>
+<tr>
+<td>96</td>
+<td>16</td>
+<td>OverflowTailAddress</td>
+</tr>
+<tr>
+<td>112</td>
+<td>4</td>
+<td>KeySize（打开时与实例 <code>sizeof(TKey)</code> 校验）</td>
+</tr>
+<tr>
+<td>116</td>
+<td>16</td>
+<td>CommittedTailAddress（2PC Abort 回退点）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>HeadAddress/SafeHeadAddress/ClosedUntilAddress 不落盘</strong>（恢复从 BeginAddress 重建）。CRC32C 尾部 footer。
+源码：<code>Structures/Ring/Contracts/RingMetaHeader.cs</code>、<code>RingMetaPayload.cs:18-46</code>。</p>
+<h3 id="28-段元组segmenttuple36b--变长--4b">2.8 段元组（SegmentTuple，36B + 变长 + 4B）</h3>
+<p>段表恢复时逐段的磁盘权威（per-segment FileExtra 元数据）。</p>
+<pre><code>[MagicValue 8][Ver 1][State 1][MaxOffset 8][GrowthLimit 8][RealSize 8][SummaryLength 2][Summary var][CRC32C 4]
+ 0             8      9        10           18            26          34              36
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>8</td>
+<td>MagicValue</td>
+<td><code>0x54435F5345475455</code> &quot;TC_SEGTU&quot;</td>
+</tr>
+<tr>
+<td>8</td>
+<td>1</td>
+<td>Version</td>
+<td>= 2</td>
+</tr>
+<tr>
+<td>9</td>
+<td>1</td>
+<td>State</td>
+<td><code>StableState</code> 枚举</td>
+</tr>
+<tr>
+<td>10</td>
+<td>8</td>
+<td>MaxOffset</td>
+<td>段已提交水位</td>
+</tr>
+<tr>
+<td>18</td>
+<td>8</td>
+<td>GrowthLimit</td>
+<td>段生长上限</td>
+</tr>
+<tr>
+<td>26</td>
+<td>8</td>
+<td>RealSize</td>
+<td>物理大小</td>
+</tr>
+<tr>
+<td>34</td>
+<td>2</td>
+<td>SummaryLength</td>
+<td>区间摘要字节数（0 = 无摘要；预算 ≤ 1496B）</td>
+</tr>
+<tr>
+<td>36+len</td>
+<td>4</td>
+<td>CRC32C</td>
+<td>覆盖 <code>[0, 36+len)</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>SegId 不编码</strong>（文件名 <code>data.{segId}</code> 承载）。段表盘上无独立&quot;地址表文件&quot;——恢复走<strong>扫盘</strong>
+（枚举段文件 + 读段元组 → <code>LoadAddressTable</code>）；footer 双尾水位由 meta/扫盘现算。
+源码：<code>src/TC.Tier.Runtime/Storage/SegmentTupleCodec.cs:13-108</code>、<code>AddressSpace/SegmentTable.Checkpoint.cs</code>。</p>
+<h3 id="29-索引帧">2.9 索引帧</h3>
+<p><strong>ProbingIndex 主存储帧（探测族 = HashIndex）</strong>：<code>[Header 20B][Body: BodyLength B][Footer 32B]</code> 紧邻连续。</p>
+<ul>
+<li>Header（Magic <code>0x44484950</code> &quot;IXHD&quot;，Version 0x0100，Flags <code>0x1002</code>=CRC64｜FOOTER_MAGIC）：<code>[0]Magic 4</code> <code>[4]Version 2</code> <code>[6]Flags 2</code> <code>[8]Kind 2</code> <code>[10]Reserved 2</code> <code>[12]BodyLength 8</code>。</li>
+<li>Body 首部 32B <code>HashIndexGeometry</code>：<code>[0]TableSize 8</code> <code>[8]OverflowCapacity 8</code> <code>[16]EntryCount 8</code> <code>[24]OverflowCount 8</code>。</li>
+<li>Footer（Magic <code>0x54464950</code> &quot;IXFT&quot;）：<code>[0]Magic 4</code> <code>[4]Reserved 4</code> <code>[8]Watermark W 16B</code> <code>[24]Crc64 8</code>。CRC64 覆盖 Header+Body+Footer 前 24B。</li>
+<li>帧走版本链（N 版轮替），恢复从 MinAddress 前向扫帧、CRC 总验收取最新完整帧。</li>
+</ul>
+<p><strong>SortedIndex 固定锚点帧（BTree/SkipList，84B 定长）</strong>：<code>[Header 20B][Geometry 32B][Footer 32B]</code>。</p>
+<ul>
+<li>Header（BTree Magic <code>0x44484942</code> &quot;BIHD&quot;；SkipList <code>0x44484C53</code> &quot;SLHD&quot;）：结构同 Probing。</li>
+<li>BTree 几何：<code>[0]RootSegId 4</code> <code>[4]RootExtension 4</code> <code>[8]RootOffset 8</code> <code>[16]EntryCount 8</code> <code>[24]NodeStructSize 4</code> <code>[28]Reserved 4</code>。</li>
+<li>SkipList 几何：<code>[0]CurrentLevel 4</code> <code>[4]pad 4</code> <code>[8]EntryCount 8</code> <code>[16]HeadSegId 4</code> <code>[20]HeadExtension 4</code> <code>[24]HeadOffset 8</code>。</li>
+<li>Footer（BTree <code>0x54464942</code> &quot;BIFT&quot;；SkipList <code>0x54464C53</code> &quot;SLFT&quot;）：<code>[0]Magic 4</code> <code>[4]Reserved 4</code> <code>[8]Watermark W 16B</code> <code>[24]Crc64 8</code>。</li>
+<li>恢复直读 MinAddress 锚点 + CRC 总验收，W∈[Begin,End] 校验，失败 fail-safe 全量重放。</li>
+<li><strong>盘上 Kind 恒 0</strong>（<code>SortedIndexConstants.KindSorted=0</code>——与 <code>ProbingIndexFormat.KindSorted=1</code> 常量存在源码不一致，BTree/SkipList 实际写/验 0）。</li>
+</ul>
+<p>源码：<code>Structures/ProbingIndex/ProbingIndexFormat.cs</code>、<code>Structures/SortedIndex/Layout/*</code>、<code>SortedIndexBase.Persistence.cs</code>。</p>
+<h3 id="210-快照帧">2.10 快照帧</h3>
+<p><strong>IncrementalSnapshot 段帧</strong>（一帧 = 一次增量）：</p>
+<pre><code>[StreamFrameHeader 14B][N₀ 前缀 8B + 条目流（扇区对齐填充）][StreamFrameFooter 28B]
+</code></pre>
+<ul>
+<li>Header（Magic <code>0x44484E53</code> &quot;SNHD&quot;，Version 0x0100，Flags <code>0x1016</code>=CRC64｜PAYLOAD_4B｜CRC_IN_FOOTER｜FOOTER_MAGIC）：<code>[0]Magic 4</code> <code>[4]Version 2</code> <code>[6]Flags 2</code> <code>[8]PayloadLength 4</code> <code>[12]PaddingLength 2</code>。</li>
+<li>Footer（28B，Magic <code>0x54464E53</code> &quot;SNFT&quot;）：<code>[0]Magic 4</code> <code>[4]TotalLength 8</code> <code>[12]EntryCount 8</code> <code>[20]Crc64 8</code>。</li>
+<li><strong>CRC64</strong> 覆盖 Header + data（N₀ 前缀 + 条目流）+ Footer 前 20B。<code>TotalLength = 8(N₀) + Σchunk</code>。</li>
+<li>段表 opaque（meta 载体）：<code>[Count 4B LE][pad 4B][条目 40B × N]</code>，每条 = LogicalStart(16B) + PhysStart(16B) + N₀(8B)。</li>
+</ul>
+<p><strong>SnapshotBase meta 水位（12B + 80B + 4B）</strong>：Header Magic <code>0x444D4E53</code> &quot;SNMD&quot;。Payload 80B：
+<code>[0]WriteAddress 16</code> <code>[16]PhysicalWriteAddress 16</code> <code>[32]TruncatedAddress 16</code> <code>[48]CommittedWriteAddress 16（Abort 回退点）</code> <code>[64]LastCommittedSeq 8</code> <code>[72]LastPreparedSeq 8</code>。</p>
+<p>源码：<code>Structures/Snapshot/IncrementalSnapshot.cs</code>、<code>StreamSnapshot.Header.cs</code>、<code>Contracts/SnapshotMetaHeader.cs</code>。</p>
+<h3 id="211-tiervolume-虚拟卷盘上格式coreio-virtual-介质">2.11 TierVolume 虚拟卷盘上格式（Core.IO virtual:// 介质）</h3>
+<p><code>.tier</code> 虚拟磁盘文件（<code>TierVolumeFs</code>）的完整盘上布局——superblock + 位图 + journal + delta +
+数据 extent。<strong>崩溃一致性 = CoW 元数据 + superblock 代数翻转</strong>（单一原子提交点）。</p>
+<p><strong>卷布局总览</strong>：</p>
+<pre><code>[Superblock 4096B @0] [位图区] [Journal 区] [镜像区（检查点）] [数据区]
+ 主侧 superblock → 备份侧 superblock（代数+1 翻转）——双侧轮替
+</code></pre>
+<p><strong>Superblock（4096B，&quot;RAW1&quot;）</strong>——标量区 + 表区 + Crc@4088：</p>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>MagicValue</td>
+<td><code>0x31574152</code> &quot;RAW1&quot;</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2</td>
+<td>Version</td>
+<td>—</td>
+</tr>
+<tr>
+<td>6</td>
+<td>2</td>
+<td>Flags</td>
+<td>—</td>
+</tr>
+<tr>
+<td>8</td>
+<td>4</td>
+<td>BlockSize</td>
+<td>块大小（字节）</td>
+</tr>
+<tr>
+<td>12</td>
+<td>8</td>
+<td>CapacityBlocks</td>
+<td>卷容量（块）</td>
+</tr>
+<tr>
+<td>20</td>
+<td>8</td>
+<td>BitmapStart / BitmapBlocks</td>
+<td>位图区位置</td>
+</tr>
+<tr>
+<td>36</td>
+<td>4</td>
+<td>ImageRunCount</td>
+<td>镜像区间数</td>
+</tr>
+<tr>
+<td>136</td>
+<td>8</td>
+<td>ImageLength / ImageCrc</td>
+<td>镜像长度 + CRC</td>
+</tr>
+<tr>
+<td>148</td>
+<td>8</td>
+<td>Generation</td>
+<td><strong>代数（崩溃一致性翻转点）</strong></td>
+</tr>
+<tr>
+<td>172</td>
+<td>2</td>
+<td>CarrierIndex</td>
+<td>成员载体索引</td>
+</tr>
+<tr>
+<td>174</td>
+<td>4</td>
+<td>MemberCount</td>
+<td>成员数</td>
+</tr>
+<tr>
+<td>178</td>
+<td>8</td>
+<td>JournalStart / JournalBlocks / JournalGeneration / JournalState / JournalCkptLsn / JournalHeadLsn</td>
+<td>journal 区（日志模式检查点）</td>
+</tr>
+<tr>
+<td>4088</td>
+<td>4</td>
+<td>Crc</td>
+<td>CRC32C 覆盖 <code>[0, 4088)</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>表区几何</strong>（固定容量槽，v1 冻结格式）：image runs <code>8×12B</code>（<code>SuperblockImageRun</code>：<code>[0] Start u64</code> + <code>[8] Count u32</code>）、members <code>8×40B</code>（<code>SuperblockMember</code>：uuid 16B 裸区 + <code>[16] CapacityBlocks</code> + <code>[24] BitmapStartLocal</code> + <code>[32] BitmapBlocksLocal</code>）、snapshots <code>16×180B</code>（<code>SuperblockSnapshot</code>：name 32B + ticks/lsn/runs 表 ≤8×12 + image 字段 + bitmap 字段 + inUse）。</p>
+<p><strong>成员载体身份头（512B，&quot;RAWC&quot;）</strong>：<code>[0] Magic 4</code> <code>[4] Version 2</code> <code>[24] CarrierIndex 4</code> <code>[28] BitmapStartLocal 8</code> <code>[36] BitmapBlocksLocal 8</code> <code>[44] Capacity 8</code> <code>[508] Crc 4</code>（CRC32C 覆盖 <code>[0,508)</code>）。uuid 裸区 @8..24。</p>
+<p><strong>位图</strong>（空间事实真相源）：1 bit/块，容量成比例、格式化时静态定长；<strong>64 块对齐</strong>（保证位字不跨成员——<code>BitmapAlignBlocks=64</code>）；小端位序（位 i 在字 i/64 的位 i%64）。</p>
+<p><strong>Journal 帧（32B，&quot;RJRN&quot;）</strong>：<code>[0] Magic 4</code> <code>[4] Type 1B</code> <code>[8] Lsn u64</code> <code>[16] Generation u64</code> <code>[24] BodyLength u32</code> <code>[28] BodyCrc u32</code>。记录类型（<code>JournalRecordType</code>）：<code>FileCreate=1</code> / <code>FileDelete=2</code> / <code>FileMove=3</code> / <code>DirCreate=4</code> / <code>DirDelete=5</code> / <code>DirMove=6</code> / <code>SetLength=7</code> / <code>ExtentTailExtend=8</code> / <code>ExtentAppend=9</code> / <code>ExtentCover=10</code> / <code>PunchHole=11</code>（+）。日志模式：WAL 记录先于屏障、LSn 发射预分配、检查点 <code>CkptLsn</code> 前进 + 区代数复位随 superblock 翻转原子生效。</p>
+<p><strong>Delta 流（跨载体增量/快照）</strong>：文件头 44B <code>[Magic &quot;TCD1&quot;][Ver][Flags][BlockSize 4][uuid 16B 裸区][BaseLsn 8][BaseCrc 4][HeaderCrc 4]</code>；数据段 12B <code>[Magic &quot;TCD3&quot;][Count u64]</code> + 条目 <code>12B [Block u64][BlockCrc u32]</code>；流尾 16B <code>[Magic &quot;TCD2&quot;][Count u64][PayloadCrc u32]</code>。</p>
+<p><strong>区间状态</strong>（文件 extent，<code>ExtentState</code>）：<code>Unwritten=0</code>（预分配 fallocate 语义——物理已留、读零、写时转 Written）/ <code>Written=1</code>（已写数据）；<strong>Sparse 洞 = 无 extent 条目</strong>（读零）——&quot;区间三态&quot; = 洞 / Unwritten / Written。</p>
+<p><strong>崩溃一致性</strong>：<code>CommitMetadata</code>——元数据序列化为镜像 → 新块落盘（旧块不动 = CoW）→ 位图落盘 → 备份侧翻转（代数+1）→ 主侧翻转。提交序不变量：<strong>数据先于元数据、元数据先于翻转</strong>。恢复：取 CRC 有效且代数最高的一份 superblock → 载入其镜像 → dirty 则可达性对账重写位图（<strong>孤儿回收——未提交的分配消失，位图 = 可达集恢复</strong>）→ 可写继续。</p>
+<p>源码：<code>src/TC.Tier.Core/IO/TierVolume/TierVolumeFrameLayouts.cs</code>、<code>TierVolumeFs.Superblock.cs</code>、<code>TierVolumeFs.Bitmap.cs</code>、<code>TierVolumeFs.Journal.cs</code>、<code>TierVolumeFs.Consistency.cs</code>、<code>TierVolumeFs.Delta.cs</code>、<code>TierVolumeFs.Metadata.cs</code>。</p>
+<hr>
+<h2 id="3-产品格式products">3. 产品格式（Products）</h2>
+<h3 id="31-tierwal-数据帧--opaque-容器">3.1 TierWAL 数据帧 + opaque 容器</h3>
+<p><strong>raft 条目载荷帧前缀（9B，<code>TierWalRaftStore</code> 层）</strong>：<code>[Term 8B LE][Kind 1B][entry content …]</code>——index 由 WAL 起点 + 顺序计数推导，帧内零 index。</p>
+<p><strong>TierWAL opaque 容器（WalOpaqueHeader，56B + raft meta 预留区）</strong>：</p>
+<pre><code>[Magic 4B][Version 2B][pad 2B][TailIndex 8B][TailAddress 16B][HeadIndex 8B][HeadAddress 16B][raft meta …]
+ 0        4          6-7      8            16              32          40              56
+</code></pre>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+<th>含义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>MagicValue</td>
+<td><code>0x44484C57</code> &quot;WLHD&quot;</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2</td>
+<td>Version</td>
+<td><code>0x0100</code></td>
+</tr>
+<tr>
+<td>8</td>
+<td>8</td>
+<td>TailIndex</td>
+<td>最后一条已分配 entry index（持久化水位）</td>
+</tr>
+<tr>
+<td>16</td>
+<td>16</td>
+<td>TailAddress</td>
+<td>尾 index 对应 record 地址</td>
+</tr>
+<tr>
+<td>32</td>
+<td>8</td>
+<td>HeadIndex</td>
+<td>头截断边界 index</td>
+</tr>
+<tr>
+<td>40</td>
+<td>16</td>
+<td>HeadAddress</td>
+<td>头边界地址</td>
+</tr>
+<tr>
+<td>56</td>
+<td>var</td>
+<td>raft meta</td>
+<td>原样追加（内容零知识；容量 = <code>MetaOpaqueBytes - 56</code>）</td>
+</tr>
+</tbody>
+</table>
+<p><strong>⚠ 注意</strong>：段 anchor 表（24B/条 = index 8B + LogicalAddress 16B，每 <code>AnchorInterval=1024</code> 条一个）是<strong>纯内存</strong>结构，<strong>不落盘</strong>（恢复从头顺序扫重建）——opaque 只记 head/tail 两个锚点。</p>
+<p><strong>TierWAL raft 元数据 opaque（<code>RaftStoreMeta</code>，41B，Products.Net）</strong>：<code>[Version 1B][Term 8B][VotedFor 16B][AppliedIndex 8B][SnapshotIndex 8B]</code>。</p>
+<p><strong>TierWAL 快照传输格式</strong>：Header 14B（<code>[Magic 4B &quot;WTHD&quot;][Version 2B][SnapshotIndex 8B]</code>）；Payload 帧 <code>[PayloadLength 4B][payload]</code>；Footer 24B（<code>[Magic 4B &quot;WTFT&quot;][EntryCount 8B][TotalPayload 8B][Crc32C 4B]</code>，CRC32C 增量覆盖 Header+全部 payload 帧字节）。</p>
+<p>源码：<code>Products/Wal/WalOpaqueHeader.cs</code>、<code>WalOpaqueLayout.cs</code>、<code>WalSnapshotFormat.cs</code>、<code>Products.Net/RaftStore/TierWalRaftStore.Layouts.cs:40-71</code>。</p>
+<h3 id="32-kv-值帧--kvversionopaque">3.2 Kv 值帧 + KvVersionOpaque</h3>
+<p><strong>KvValueFrameHeader（9B）</strong>：<code>[Tag 1B = 0xC8][ExpiryTicks 8B LE]</code> + payload。ExpiryTicks = UTC Ticks（0 = 无过期）。<strong>全量封装不变式</strong>：经 TierKv 写入的一切值都带帧（无 TTL = ticks 0）——读侧嗅探 tag 无歧义。</p>
+<p><strong>KvVersionOpaque（24B，Ring opaque meta）</strong>：</p>
+<pre><code>[0..8)  HighWater 8B LE    已分配最高版本
+[8..12) Magic 4B LE        0x544B5631 &quot;TKV1&quot;（代际守卫）
+[12..16) SweepSegId 4B LE  过期回收扫描水位 SegId（&lt;0 = 未持久化态）
+[16..24) SweepOffset 8B LE 扫描水位 Offset
+</code></pre>
+<p>旧 12B 块兼容（仅 HighWater+Magic）。版本随 2PC Prepare 同块原子落盘。
+源码：<code>Products/Kv/KvValueFraming.cs</code>、<code>KvVersionAllocator.cs</code>。</p>
+<h3 id="33-timeseries-键--envelope--水位">3.3 TimeSeries 键 / envelope / 水位</h3>
+<p><strong>TimeKey（16B，单序列）</strong>：<code>[Timestamp 8B][Tiebreaker 8B]</code> LE。Ring record key = <code>(Timestamp, 0)</code>；索引 key = <code>(Timestamp, addr.Offset)</code>。
+<strong>DenseTimeKey（20B，dense 多序列）</strong>：<code>[SeriesId 4B uint][Timestamp 8B][Tiebreaker 8B]</code>（SeriesId 领先 → 单树逐序列键域连续）。</p>
+<p><strong>TTS1 envelope 头（21B，单序列）</strong>：<code>[Magic 4B &quot;TTS1&quot;=0x31535454][Flags 1B][Timestamp 8B][Seq 8B] + payload</code>；Flags bit0 <code>HAS_SEQ(0x1)</code>。
+<strong>TTS2 envelope 头（25B，dense）</strong>：<code>[Magic 4B &quot;TTS2&quot;=0x32535454][Flags 1B][SeriesId 4B][Timestamp 8B][Seq 8B] + payload</code>。两模式 magic 换代互不误读。</p>
+<p><strong>TimeSeriesWatermarkState（40B，VersionedMetadata payload）</strong>：<code>[0..8) TrimmedUntilTimestamp 8</code> <code>[8..12) TrimmedSegId 4</code> <code>[12..16) TrimmedExtension 4</code> <code>[16..24) TrimmedOffset 8</code> <code>[24..32) SampleCount 8</code> <code>[32..40) WatermarkEpoch 8</code>。
+<strong>DenseSeriesWatermarkBlock（36B/条）</strong>：<code>[SeriesId 4][TrimmedUntilTimestamp 8][TrimmedSegId 4][TrimmedExtension 4][TrimmedOffset 8][SampleCount 8]</code>。
+<strong>Dense 水位文档</strong>：<code>[默认槽 40B(seriesId 0)][BlockCount 4B][n × 36B 块]</code>。</p>
+<p>源码：<code>Products/TimeSeries/TimeKey.cs</code>、<code>DenseTimeKey.cs</code>、<code>TimeSeriesEnvelope.cs</code>、<code>TimeSeriesWatermark.cs</code>、<code>DenseSeriesWatermark.cs</code>。</p>
+<h3 id="34-blob-对象表帧">3.4 Blob 对象表帧</h3>
+<p><code>{name}.blob.meta</code> 上基于 StreamSnapshot 的版本链记录帧流（每条登记/删除/标损 = 一帧）：</p>
+<pre><code>[StreamFrameHeader 14B][BlobObjectEntryPayload 48B + 对齐补零][StreamFrameFooter 28B]
+</code></pre>
+<p><strong>BlobObjectEntryPayload（48B）</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>偏移</th>
+<th>宽度</th>
+<th>字段</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0</td>
+<td>4</td>
+<td>ObjectIdSegId</td>
+</tr>
+<tr>
+<td>4</td>
+<td>4</td>
+<td>ObjectIdExtension</td>
+</tr>
+<tr>
+<td>8</td>
+<td>8</td>
+<td>ObjectIdOffset</td>
+</tr>
+<tr>
+<td>16</td>
+<td>8</td>
+<td>Length</td>
+</tr>
+<tr>
+<td>24</td>
+<td>8</td>
+<td>FrameLength</td>
+</tr>
+<tr>
+<td>32</td>
+<td>8</td>
+<td>CreatedTicks</td>
+</tr>
+<tr>
+<td>40</td>
+<td>8</td>
+<td>StateAndReserved（低字节 = BlobState，高 7B 恒 0）</td>
+</tr>
+</tbody>
+</table>
+<p>帧头/帧尾 = 2.10 的 StreamFrameHeader/Footer（CRC64 帧级自校验）。<strong>帧扇区对齐不变式</strong>（物理 = 逻辑布局，重启恒等映射读回成立）。恢复 = meta O(1) 水位 + 定步长逐帧重放（步长不齐 fail-fast）。
+源码：<code>Products/Blob/BlobObjectTable.cs</code>（<code>FrameHeaderSize=14</code>、<code>FrameFooterSize=28</code>、<code>PayloadSize=48</code>）。</p>
+<hr>
+<h2 id="4-网络线格式corenet">4. 网络线格式（Core.Net）</h2>
+<h3 id="41-wire-frameheader16b介质无关">4.1 Wire FrameHeader（16B，介质无关）</h3>
+<pre><code>[0..4) PayloadLength 4B LE（≤ 16MB）  [4] Kind 1B  [5] ChannelId 1B  [6] ProtocolId 1B  [7] Version 1B(=1)
+[8..12) HeaderCrc 4B（CRC32C 覆盖此前全部头字节——防半帧/错位）
+[12..16) PayloadCrc 4B（CRC32C 覆盖载荷）
+</code></pre>
+<p>头版本 1 的字段永不再解释——演进走版本协商 + 新 FrameKind。<code>[BinaryLayout]</code> 声明即代码（零手写偏移）。
+源码：<code>Wire/FrameHeader.cs</code>、<code>FrameCodec.cs</code>。</p>
+<h3 id="42-raft-rpc-消息族wiremessage-声明即线格式">4.2 Raft RPC 消息族（<code>[WireMessage]</code> 声明即线格式）</h3>
+<p><strong>编码规则</strong>：<code>[Tag 1B][根字段声明序][子类字段声明序]</code>，全 LE。根 <code>RaftRpc</code> 公共前缀 = <code>[Term 8B]</code>。bool=1B；定长原语小端原宽；NodeId=16B 不透明串；blob=<code>[Len 4B][bytes]</code>；数组=<code>[Count 4B][item×N]</code>。消息不携带 CorrId（RpcId 取消由传输承载）。</p>
+<table>
+<thead>
+<tr>
+<th>Tag</th>
+<th>消息</th>
+<th>子类字段（根 Term 8B 在前）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>0x01</td>
+<td>PreVoteReq</td>
+<td>CandidateId(16) + LastLogIndex(8) + LastLogTerm(8)</td>
+</tr>
+<tr>
+<td>0x02</td>
+<td>PreVoteResp</td>
+<td>Granted(1)</td>
+</tr>
+<tr>
+<td>0x03</td>
+<td>RequestVoteReq</td>
+<td>CandidateId(16) + LastLogIndex(8) + LastLogTerm(8)</td>
+</tr>
+<tr>
+<td>0x04</td>
+<td>RequestVoteResp</td>
+<td>Granted(1)</td>
+</tr>
+<tr>
+<td>0x05</td>
+<td>AppendEntriesReq</td>
+<td>LeaderId(16) + PrevLogIndex(8) + PrevLogTerm(8) + LeaderCommit(8) + EntriesRegion(blob)</td>
+</tr>
+<tr>
+<td>0x06</td>
+<td>AppendEntriesResp</td>
+<td>Success(1) + MatchIndex(8) + ConflictTerm(8) + ConflictIndex(8) + SnapshotIndex(8)</td>
+</tr>
+<tr>
+<td>0x07</td>
+<td>InstallSnapshotReq</td>
+<td>LeaderId(16) + SnapshotIndex(8) + Swarm(1) + ManifestId(16) + BlockSize(4) + TotalBytes(8) + Checksums(数组 u32) + Holders(数组 NodeId)</td>
+</tr>
+<tr>
+<td>0x08</td>
+<td>InstallSnapshotResp</td>
+<td>Success(1) + SnapshotIndex(8)</td>
+</tr>
+<tr>
+<td>0x09</td>
+<td>JoinReq</td>
+<td>CandidateId(16) + AutoPromote(1) + EndPointBytes(blob ≤64) + AsWitness(1)</td>
+</tr>
+<tr>
+<td>0x0A</td>
+<td>JoinResp</td>
+<td>Accepted(1) + LeaderId(16)</td>
+</tr>
+<tr>
+<td>0x0B</td>
+<td>ReadIndexReq</td>
+<td>（仅根 Term）</td>
+</tr>
+<tr>
+<td>0x0C</td>
+<td>ReadIndexResp</td>
+<td>ReadIndex(8)</td>
+</tr>
+<tr>
+<td>0x0D</td>
+<td>TransferLeaderReq</td>
+<td>（仅根 Term）</td>
+</tr>
+<tr>
+<td>0x0E</td>
+<td>TransferLeaderResp</td>
+<td>Accepted(1)</td>
+</tr>
+</tbody>
+</table>
+<p>线格式版本 v3（<code>WireFormatVersion=3</code>）。防御上限 <code>MaxEntriesPerAppend=8192</code>、<code>MaxEntriesRegionBytes=16MiB</code>。未知 tag/截断/超上限 = 畸形丢弃；已知 tag 尾部扩展字节容忍。
+源码：<code>Raft/RaftRpc.cs</code>、<code>WireMessageGenerator.cs</code>。</p>
+<h3 id="43-raftentriesregionappendentries-条目区">4.3 RaftEntriesRegion（AppendEntries 条目区）</h3>
+<pre><code>[Count 4B LE][×N: RaftAppendEntryHeader 13B + Content]
+</code></pre>
+<p><strong>RaftAppendEntryHeader（13B）</strong>：<code>[0] Term 8B LE</code> + <code>[8] Kind 1B</code> + <code>[9] ContentLength 4B LE</code>，Content 紧随。
+源码：<code>Raft/RaftEntriesRegion.cs:98-121</code>。</p>
+<h3 id="44-gossip-帧37b">4.4 Gossip 帧（37B）</h3>
+<pre><code>[MsgId 16B][Origin 16B][Ttl 1B][PayloadLength 4B LE][data]
+</code></pre>
+<p>MsgId = 广播身份（去重键，同消息至多投递一次）；Origin = 最初广播者（中继逐跳不变）。<code>[BinaryLayout]</code> 生成 codec。
+源码：<code>P2P/GossipFrameHeader.cs</code>。</p>
+<h3 id="45-hyparview-消息族">4.5 HyParView 消息族</h3>
+<p>六类消息（协议域 0x02）：<code>Join [Tag 1B][Origin 16B][Ttl 4B]</code>、<code>Neighbor [Tag][Priority 1B][Count 4B][NodeId×Count]</code>、<code>Disconnect [Tag]</code>、<code>Fail [Tag][Failed 16B]</code>、<code>Shuffle [Tag][Count 4B][NodeId×Count]</code>、<code>Heartbeat [Tag]</code>。发送方身份不上线（分发即身份）；解码防御（未知 tag/截断/Count 超上限 = 丢弃，尾部扩展容忍前向兼容）。
+源码：<code>P2P/HyParViewMessage.cs</code>。</p>
+<hr>
+<h2 id="5-版本与演进速查">5. 版本与演进速查</h2>
+<table>
+<thead>
+<tr>
+<th>格式</th>
+<th>当前版本</th>
+<th>演进要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LogPageFrame</td>
+<td>无版本字段</td>
+<td><code>DataLength</code> 即写侧扇区对齐字节数</td>
+</tr>
+<tr>
+<td>EntryLogHeader</td>
+<td>0x0100</td>
+<td>codecId 在 flags bits8-11</td>
+</tr>
+<tr>
+<td>DeltaLogHeader</td>
+<td>0x0100</td>
+<td>同构 EntryLog，CRC32C</td>
+</tr>
+<tr>
+<td>LogMetaHeader</td>
+<td>0x0100</td>
+<td><code>PreparedTailAddress</code> 追加（旧块零扩展降级）</td>
+</tr>
+<tr>
+<td>BlittableRingHeader</td>
+<td><strong>0x0200</strong></td>
+<td>v2 泛型改版 KeyLength 退役（v1 旧盘不认）</td>
+</tr>
+<tr>
+<td>OverflowRecordHeader</td>
+<td>0x0100</td>
+<td>—</td>
+</tr>
+<tr>
+<td>RingMetaHeader</td>
+<td>0x0100</td>
+<td>—</td>
+</tr>
+<tr>
+<td>SegmentTupleHeader</td>
+<td><strong>Version=2</strong></td>
+<td>Magic &quot;TC_SEGTU&quot;，Summary 内联</td>
+</tr>
+<tr>
+<td>ProbingIndexHeader</td>
+<td>0x0100</td>
+<td>版本链 N 版轮替</td>
+</tr>
+<tr>
+<td>BTree/SkipListHeader</td>
+<td>0x0100</td>
+<td>—</td>
+</tr>
+<tr>
+<td>StreamFrameHeader</td>
+<td>0x0100</td>
+<td>TotalLength/EntryCount 在 Footer</td>
+</tr>
+<tr>
+<td>WalOpaqueHeader</td>
+<td>0x0100</td>
+<td>只记 head/tail 锚点（段 anchor 表纯内存）</td>
+</tr>
+<tr>
+<td>WalSnapshotHeader</td>
+<td>0x0100</td>
+<td>—</td>
+</tr>
+<tr>
+<td>RaftStoreMeta</td>
+<td>1（byte）</td>
+<td>前向兼容门归消费面</td>
+</tr>
+<tr>
+<td>KvVersionOpaque</td>
+<td>magic &quot;TKV1&quot;</td>
+<td>12B→24B（扫描水位追加），旧块兼容</td>
+</tr>
+<tr>
+<td>RaftRpc 线格式</td>
+<td><strong>WireFormatVersion=3</strong></td>
+<td>信封之死，条目区 blob 化</td>
+</tr>
+</tbody>
+</table>
+<p><strong>CRC 校准</strong>（外部解析器最容易错的两点）：</p>
+<ol>
+<li>CRC64 = <strong>ECMA-182</strong>（多项式 <code>0x42F0E1EBA9EA3693</code>、init 0、无异或输出）——不是 zlib/ISO 常见约定。</li>
+<li>CRC32C 为标准 Castagnoli（init 0xFFFFFFFF、final XOR 0xFFFFFFFF）。</li>
+</ol>
+<hr>
+<h2 id="6-相关文档">6. 相关文档</h2>
+<ul>
+<li>存储行为面：log.md / ring.md / meta.md / snapshot.md / segment-table.md（<code>src/TC.Tier.Runtime/docs/</code>）</li>
+<li>跨层持久化稳定性：<a href="persistence-architecture.html">persistence-architecture.md</a></li>
+<li>TierVolume 虚拟卷（§2.11 格式的介质行为面）：<a href="../core/virtual-file-system.html">virtual-file-system.md</a>（载体写穿/两档 IO/崩溃窗口谱系）</li>
+<li>产品格式使用面：tierwal.md / tierkv.md / tierseries.md / tierblob.md（<code>src/TC.Tier.Products/docs/</code>）</li>
+<li>网络线格式行为面：<a href="../core/transport-architecture.html">transport-architecture.md</a>（§5 线协议帧）、<a href="../core/p2p-architecture.html">p2p-architecture.md</a>（§3 帧格式）</li>
+<li>格式真源（声明即代码）：各 <code>[BinaryLayout]</code> 类型 + 生成 Codec；<code>src/TC.Tier.Contracts/Layout/</code>（Magic/RecordFlags/CRC）</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/binary-format-spec.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>网络/传输层架构（三形态收发 &#215; 寻址与准入 &#215; 介质 &#215; 身份安全） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="网络/传输层架构（三形态收发 &#215; 寻址与准入 &#215; 介质 &#215; 身份安全） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/transport-architecture.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="网络传输层架构三形态收发--寻址与准入--介质--身份安全">网络/传输层架构（三形态收发 × 寻址与准入 × 介质 × 身份安全）</h1>
+
+<p>本文回答：<strong>Core.Net 网络层怎么保证可靠性、顺序、身份与安全</strong>——三形态收发（数据报 /
+请求回调 / 流式会话）的语义边界、寻址与准入、TCP/QUIC/UDS/InProcess 介质同构、线协议与
+握手、身份与安全三档、以及活性/自愈保证。它是 <a href="raft-architecture.html">raft-architecture.md</a>
+的网络层对偶（raft 讲共识，本文讲承载共识与业务的传输面）。</p>
+<p>与 <a href="net.html">net.md</a> 的关系：net.md 是<strong>使用面</strong>（怎么配传输、怎么调参、怎么选形态）；
+本文是<strong>实现面</strong>——据本文判断&quot;网络层在什么条件下不丢/不乱/可认证/可自愈&quot;。
+代码引用为仓库相对路径（<code>Channels/…</code>/<code>Transport/…</code> = <code>src/TC.Tier.Core.Net/…</code>）。</p>
+<blockquote>
+<p>规格源：spec-12（网络核心设计——内部设计文档，语义已实施于
+<code>Core.Net</code>，本文是其实施后的公开架构描述）。</p>
+</blockquote>
+<hr>
+<h2 id="1-架构总览">1. 架构总览</h2>
+<pre><code>                     IProtocolTransport（节点端点完整面 = IProtocol × ITransport）
+        ┌──────────────────────────────┼──────────────────────────────┐
+        │ 协议域面 IProtocol            │ 传输连接面 ITransport          │
+        │  ┌─────────────────────────┐ │  ┌─────────────────────────┐ │
+        │  │ 三形态收发（协议域分流）  │ │  │ 身份/生命周期/对端观测    │ │
+        │  │ 数据报 · 请求回调 · 流式 │ │  │ PeerConnected/Gone      │ │
+        │  │ 会话                     │ │  │ 故障注入 Faults         │ │
+        │  └─────────────────────────┘ │  └─────────────────────────┘ │
+        └──────────────────────────────┼──────────────────────────────┘
+                                       │ 介质实现（装配期每节点一个统一枢纽）
+        ┌───────────────┬──────────────┼──────────────┬───────────────┐
+        │ TCP           │ QUIC         │ UDS          │ InProcess      │
+        │ ClusterTransport│ QuicTransport│ 本地域套接字  │ 同构基准/语义参考│
+        └───────────────┴──────────────┴──────────────┴───────────────┘
+</code></pre>
+<ul>
+<li><strong><code>IProtocolTransport</code></strong>（<code>Channels/IProtocolTransport.cs</code>）= 协议域面 × 传输连接面合一，
+消费方按需持半边或整面。<strong>介质无关</strong>：同一机制/产品代码不改一行换介质（InProcess = 同构
+基准/语义参考实现）。</li>
+<li><strong>统一传输枢纽 <code>ClusterTransport</code></strong>（<code>Transport/Tcp/ClusterTransport.cs</code>）：装配期每节点一个，
+协议域注册/数据报发送/节点观测/故障注入。成员制与地址制两制寻址、准入分层、每有序节点对
+一条 TCP 长连接（详见 §3）。</li>
+<li><strong>通道组件</strong>（<code>Channels/</code> 形态组件——全介质单源）：<code>DatagramDispatcher</code>（数据报分发）、
+<code>RequestBroker</code>（请求回调）、<code>StreamBroker</code>（流式会话，TCP 实现）、<code>QosManager</code>（限流）。</li>
+</ul>
+<h2 id="2-协议域与三形态收发">2. 协议域与三形态收发</h2>
+<h3 id="21-协议域注册分流spec-12-35">2.1 协议域注册分流（spec-12 §3.5）</h3>
+<ul>
+<li><strong>公开口</strong>（<code>IProtocol.RegisterProtocol</code> 等）只放行注册区 <code>0x60-0xAF</code>——使用方自管号码；
+同 ID 重复注册抛。</li>
+<li><strong>内部核心区</strong> <code>0x00-0x4F</code> 经程序集内 internal 挂载口 <code>ICoreProtocolPort</code>（机制面专用——
+raft/HyParView/Gossip 等内建机制零特权，与使用方同一分发路径，号码来源分流）。</li>
+<li>消息<strong>分发即身份</strong>：帧分发随载荷提供来源 <code>NodeId</code>，发送方身份不上线（对端知道谁发的）。</li>
+</ul>
+<h3 id="22-数据报尽力送达spec-12-51">2.2 数据报（尽力送达，spec-12 §5.1）</h3>
+<ul>
+<li>对端未连 / 未注册协议 / 注入丢弃 = <strong>静默丢弃</strong>——协议域定时器自愈；发送只对参数错误
+（超帧上限/取消）抛。</li>
+<li>handler <strong>快进快出契约</strong>：回调异常不外泄、不杀链路（尽力语义）。</li>
+<li>bearer 声明承载偏好（<code>DatagramBearer.Udp</code>/<code>Tcp</code>）；介质不支持时回落/直派——尽力语义不变。</li>
+</ul>
+<h3 id="23-请求回调单请求--关联应答--超时spec-12-52">2.3 请求回调（单请求 → 关联应答 → 超时，spec-12 §5.2）</h3>
+<ul>
+<li><code>RequestBroker</code>：CorrId 生成（随机起始 + 递增——本端在途集合唯一）+ pending 关联表
+<strong>有界</strong>（容量满抛 fail-fast——并发失控立即暴露而非静默排队）+ 等待/超时/取消。</li>
+<li><strong>投递语义缺省 at-most-once</strong>（单发 + 超时）；重传/确认 = 显式选择（<code>RetryPolicy</code>——
+at-least-once，配合 <code>ResponseDedupWindow</code> 去重窗口——重复应答被吸收）。</li>
+<li>防泄漏不变量：每个 BeginRequest 必有终态清理（应答完成 / Abandon 发送失败 / 超时或取消后
+Abandon）——关联表无孤儿。</li>
+<li>目标未连 = 抛 <code>NetIOException</code>（调用方有应答期待，不静默浪费超时窗）。</li>
+</ul>
+<h3 id="24-流式会话可靠有序--背压spec-12-53">2.4 流式会话（可靠有序 + 背压，spec-12 §5.3）</h3>
+<ul>
+<li><code>IWireStream</code>：StreamOpen/Accept/Data/End/Reset 帧族承载，会话号 1..254，<strong>不跨重连恢复</strong>
+（上层重开）。可靠有序；GB 级流 O(单帧) 不驻留（读一帧处理一帧）。</li>
+<li><strong>背压 = 写 await 传导</strong>：接收侧会话缓冲有界 → 满 → 介质读循环 await → 对端 socket 写
+await → 本端 <code>WriteAsync</code> await——整链传导。</li>
+<li>生命周期：正常收尾 <code>CompleteAsync</code>（End 帧）；异常中止 <code>DisposeAsync</code>（Reset 帧——双方
+读写立即终止）。未注册 acceptor 的协议域 = 拒绝开流。</li>
+</ul>
+<h2 id="3-传输连接面寻址--准入--连接模型">3. 传输连接面（寻址 / 准入 / 连接模型）</h2>
+<h3 id="31-寻址两制spec-12-41">3.1 寻址两制（spec-12 §4.1）</h3>
+<table>
+<thead>
+<tr>
+<th>制</th>
+<th>驱动</th>
+<th>语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>成员制</strong></td>
+<td>装配期静态地址表（NodeId → 端点）</td>
+<td>自动拨号与集群路由；断线自动重连（指数退避，封顶 = raft 消费方按 <code>ElectionTimeoutMin/2</code> 覆盖——选举协议不被重连节奏劫持）</td>
+</tr>
+<tr>
+<td><strong>地址制</strong></td>
+<td><code>ConnectAsync</code> 直连</td>
+<td>对端身份握手得知——不在地址表也可建立；链路仅承载该连接上的定向通信，断开不自动重连</td>
+</tr>
+</tbody>
+</table>
+<h3 id="32-准入分层spec-12-43">3.2 准入分层（spec-12 §4.3）</h3>
+<ul>
+<li><strong>连接准入</strong>：任何完成合法握手（帧/版本/ClusterTag/安全形态）的连接可建立——成员与直连
+共用同一监听口。</li>
+<li><strong>成员准入</strong>：地址表成员——拨号归属违规检查（成员制较小方拨号——入站来自较大成员 =
+握手期违规；地址制有地址者拨号，大小无关）。</li>
+</ul>
+<h3 id="33-连接模型与保活">3.3 连接模型与保活</h3>
+<ul>
+<li><strong>每有序节点对一条 TCP 长连接</strong>：NodeId 较小方主动拨号并独占重连退避（较大方只监听）；
+所有协议域共享该连接；断线重连指数退避（初值 ×倍率）。</li>
+<li><strong>保活计票</strong>（<code>Transport/Tcp/KeepaliveTracker.cs</code>）：周期发送 Keepalive，连续无入站保活达
+上限即断连（半开死链检测）——&quot;连续&quot;语义 = 收到即归零（TCP 帧流不丢帧，丢帧形态 = 半开死链）。</li>
+<li><strong>故障注入面常设</strong>（<code>ITransportFaultInjector</code>）：延迟/分区/丢包/乱序，任一介质等价复跑。</li>
+</ul>
+<h2 id="4-介质tcp--quic--uds--inprocess">4. 介质（TCP / QUIC / UDS / InProcess）</h2>
+<table>
+<thead>
+<tr>
+<th>介质</th>
+<th>实现</th>
+<th>要点</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TCP</td>
+<td><code>Transport/Tcp/ClusterTransport.cs</code></td>
+<td>统一枢纽：两制寻址 + 三形态 + UDP 回落；握手期协调节点大小/安全档/ClusterTag</td>
+</tr>
+<tr>
+<td>QUIC</td>
+<td><code>Transport/Quic/QuicTransport.cs</code></td>
+<td>三形态 stream 直映射 + 对称握手 + at-least-once 去重窗口 + 同构矩阵三介质复跑</td>
+</tr>
+<tr>
+<td>UDS</td>
+<td><code>Transport/Uds/</code></td>
+<td>本地域套接字（macOS/同机 IPC）</td>
+</tr>
+<tr>
+<td>InProcess</td>
+<td><code>Transport/InProcess/</code></td>
+<td>同构基准/语义参考实现——测试与嵌入</td>
+</tr>
+<tr>
+<td>UDP 数据报端点</td>
+<td><code>TransportOptions.UdpListenEndPoint</code></td>
+<td>绑定 UDP 并经握手通告（Negotiate 帧承载）；bearer 声明 UDP 的协议域在对端端点已知且单报预算内（1200B）走 UDP，其余回落 TCP 帧流承载——尽力语义不变</td>
+</tr>
+</tbody>
+</table>
+<p><strong>介质无关性</strong>：同一机制代码（raft/复制 lane/请求回调）换介质零改动——<code>IProtocolTransport</code>
+是装配缝，介质实现差异在 <code>Start()</code>/连接生命周期内部吸收。</p>
+<h2 id="5-线协议与帧">5. 线协议与帧</h2>
+<h3 id="51-帧头spec-12-3116b-定长全部小端介质无关">5.1 帧头（spec-12 §3.1，16B 定长、全部小端、介质无关）</h3>
+<pre><code>[0..4)  4B  PayloadLength   载荷长度（≤ 16MB）
+[4]     1B  Kind            帧种类（FrameKind）
+[5]     1B  ChannelId       通道标识
+[6]     1B  ProtocolId      协议域 ID
+[7]     1B  Version         线协议头版本（=1）
+[8..12) 4B  HeaderCrc       CRC32C（覆盖此前全部头字节——防半帧/错位）
+[12..16)4B  PayloadCrc      CRC32C（覆盖载荷）
+</code></pre>
+<ul>
+<li><strong>头版本 1 的字段永不再解释</strong>——演进走版本协商 + 新 FrameKind（spec-12 §3.2）。</li>
+<li><strong>[BinaryLayout] 声明即代码</strong>：字段位置/读写/偏移常量由生成的 Codec 产出——零手写偏移
+（TCSG001 锁 Size 与偏移和一致），加字段 = 加一行声明。</li>
+</ul>
+<h3 id="52-握手handshakeinithandshakeack">5.2 握手（HandshakeInit/HandshakeAck）</h3>
+<p>握手帧承载：版本协商 + ClusterTag（防串集群）+ 安全形态（明文/KeyPair/mTLS）+ 成员制
+大小协调 + UDP 端点通告（Negotiate 特性位）。握手失败 = Error + 断连（防降级）。</p>
+<h2 id="6-身份与安全三档spec-12-34">6. 身份与安全（三档，spec-12 §3.4）</h2>
+<table>
+<thead>
+<tr>
+<th>档</th>
+<th>机制</th>
+<th>信任锚</th>
+<th>适用</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>明文</strong> <code>Plaintext</code></td>
+<td>零开销</td>
+<td>—</td>
+<td>可信域内网</td>
+</tr>
+<tr>
+<td><strong>KeyPair</strong>（推荐缺省）</td>
+<td>签名（身份）+ ECDH（前向保密）+ 帧 AEAD/MAC</td>
+<td>公钥配置钉扎（<code>KeyPairPinned</code>）或 TOFU（SSH known_hosts 式，首连有中间人窗口）</td>
+<td>无证书部署——信任强度与 mTLS 等价</td>
+</tr>
+<tr>
+<td><strong>mTLS</strong></td>
+<td>TLS1.3 证书体系</td>
+<td>CA（SAN <code>nid:</code> 绑定 + 短期证书轮换）</td>
+<td>CA/合规场景</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>防降级</strong>：装配期一次给全、运行期不可变——本端配置档与对端到达帧安全档不匹配即
+Error + 断连，<strong>永不机会主义升降级</strong>。</li>
+<li><strong>帧保护粒度</strong>（KeyPair 档）：<code>MacOnly</code>（仅完整性——防冒充/伪造/篡改，不加密）/ <code>Aead</code>
+（完整性 + 机密性，推荐缺省——与 mTLS 强度等价）。</li>
+<li><strong>身份</strong>：<code>NodeId</code> 全局唯一；<code>CertificateNodeId</code>（mTLS 证书 → 节点 ID 绑定）；握手期
+密钥派生后经 <code>SecureRecordCodec</code>/<code>SecureSession</code> 逐帧保护。</li>
+</ul>
+<h2 id="7-可靠性--活性--有界性保证">7. 可靠性 / 活性 / 有界性保证</h2>
+<table>
+<thead>
+<tr>
+<th>保证</th>
+<th>机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>尽力送达自愈</td>
+<td>数据报静默丢弃 → 协议域定时器自愈（raft 心跳/选举重试）</td>
+</tr>
+<tr>
+<td>半开死链检测</td>
+<td>KeepaliveTracker 连续未答上限断连 + 重连指数退避</td>
+</tr>
+<tr>
+<td>重连不劫持协议</td>
+<td>退避封顶 = raft <code>ElectionTimeoutMin/2</code>（选举窗不被重连节奏劫持）</td>
+</tr>
+<tr>
+<td>请求不泄漏</td>
+<td>RequestBroker pending 有界 + 终态清理不变量</td>
+</tr>
+<tr>
+<td>响应去重</td>
+<td><code>ResponseDedupWindow</code>（at-least-once 重传的重复应答吸收）</td>
+</tr>
+<tr>
+<td>并发失控暴露</td>
+<td>pending 容量满 fail-fast（不静默排队）</td>
+</tr>
+<tr>
+<td>限流/审计/授权</td>
+<td><code>QosManager</code>（每协议/每来源限流）、<code>NodeAuthorizer</code>（入站准入钩子）、审计 sink</td>
+</tr>
+<tr>
+<td>握手冷却</td>
+<td>同源 IP 握手失败冷却（防恶意重试风暴）+ 拒绝计数诊断</td>
+</tr>
+<tr>
+<td>观测</td>
+<td><code>ObservabilityHub.Net</code> 视图（连接/消息/错误——唯一接入点）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-与上层的接线">8. 与上层的接线</h2>
+<table>
+<thead>
+<tr>
+<th>上层</th>
+<th>用传输的什么</th>
+<th>关键语义</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>raft</strong></td>
+<td>请求回调（AppendEntries 直排 + Vote 事件化）、数据报（可选）</td>
+<td>心跳直排（收到即续约）依赖请求回调 at-most-once + 在途超时重试；复制 lane 每批一发</td>
+</tr>
+<tr>
+<td><strong>P2P/gossip</strong></td>
+<td>数据报（HyParView 0x02 / Gossip 0x05）</td>
+<td>尽力送达 + 协议域定时器自愈；见 <a href="p2p-architecture.html">p2p-architecture.md</a></td>
+</tr>
+<tr>
+<td><strong>Swarm/多源</strong></td>
+<td>流式会话（GB 级块流）+ 请求回调（块清单/应答）</td>
+<td>可靠有序 + 背压传导</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-相关文档">9. 相关文档</h2>
+<ul>
+<li>使用面（传输配置/调参/三形态选型）：<a href="net.html">net.md</a></li>
+<li>共识层架构（raft 在传输上的语义）：<a href="raft-architecture.html">raft-architecture.md</a></li>
+<li>P2P/gossip 架构：<a href="p2p-architecture.html">p2p-architecture.md</a></li>
+<li><strong>全系列二进制格式手册</strong>（Wire 帧 / Raft RPC 消息族 / Gossip / 存储与产品帧的字节布局）：
+<a href="../runtime/binary-format-spec.html">binary-format-spec.md</a></li>
+<li>规格源：spec-12（内部设计文档，不随包发布——本页为实施后公开描述）。</li>
+<li>产品装配（内建 TCP 传输组装）：<a href="../products/raft-node.html">raft-node.md</a></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Core.Net/docs/transport-architecture.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

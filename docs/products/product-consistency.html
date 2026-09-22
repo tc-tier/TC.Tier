@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>产品一致性架构（TierKv / TierTimeSeries / TierBlob） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="产品一致性架构（TierKv / TierTimeSeries / TierBlob） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/product-consistency.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="产品一致性架构tierkv--tiertimeseries--tierblob">产品一致性架构（TierKv / TierTimeSeries / TierBlob）</h1>
+
+<p>本文回答：<strong>三个产品怎么保证一致性、不丢不重、原子性与崩溃恢复</strong>——数据真源与派生结构的
+分层、分配-持久分离、2PC 提交点语义、恢复对账，以及每产品的一致性语义边界与崩溃窗口。
+它是 <a href="raft-consistency.html">raft-consistency.md</a>（产品 × raft）
+的本地产品面（无 raft 时的一致性），也是
+<a href="../runtime/persistence-architecture.html">persistence-architecture.md</a>（跨层
+持久化）的产品消费面。</p>
+<p>与使用指南的关系：tierkv.md / tierseries.md / tierblob.md 是<strong>怎么用</strong>；本文是<strong>为什么一致</strong>。
+代码引用为仓库相对路径（<code>Kv/…</code> = <code>src/TC.Tier.Products/Kv/…</code>）。</p>
+<hr>
+<h2 id="0-三产品共同骨架">0. 三产品共同骨架</h2>
+<p>三个产品建立在同一条底层教义上：<strong>数据结构是&quot;数据真源 + 可重建派生结构&quot;的两层模型，
+原子性由 2PC（<code>ITransactionParticipant</code>）在提交点收口，恢复靠&quot;持久化真源 + 重放对账&quot;</strong>。</p>
+<table>
+<thead>
+<tr>
+<th>产品</th>
+<th>数据真源（持久化权威）</th>
+<th>派生/查询结构</th>
+<th>水位/元数据真源</th>
+<th>原子性载体</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>TierKv</strong></td>
+<td>Ring（append-only 记录流）</td>
+<td>Hash/BTree/SkipList 主索引 + 可选范围索引（可重建）</td>
+<td>Ring opaque（版本高水位 + 过期扫描水位）</td>
+<td>Ring 2PC Prepare/Confirm + 索引 CAS 换绑可见性</td>
+</tr>
+<tr>
+<td><strong>TierTimeSeries</strong></td>
+<td>Ring（样本 record 流）</td>
+<td>BTree 时间索引（键 (ts,addr)）</td>
+<td>VersionedMetadata（TrimmedUntil/计数）</td>
+<td>水位 VersionedMetadata 作 2PC 参与者</td>
+</tr>
+<tr>
+<td><strong>TierBlob</strong></td>
+<td>数据 = StreamSnapshot；对象表 = 表引擎版本链记录帧流</td>
+<td>无索引（地址直达）</td>
+<td>对象表（meta O(1) 水位）+ 数据引擎三水位</td>
+<td>表参与者 Prepare/Confirm/Abort + undo 链</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="1-tierkv">1. TierKv</h2>
+<h3 id="11-写路径原子性append-only-换绑kvtierkvcs14-22">1.1 写路径原子性：append-only 换绑（<code>Kv/TierKv.cs:14-22</code>）</h3>
+<ul>
+<li>Ring 是数据<strong>唯一真源</strong>，主索引是可重建派生结构（&quot;派生重放教义&quot;——任何索引切换/重建都不丢数据）。</li>
+<li>写 = 「Ring 追加新记录 → 索引 CAS 换绑地址」——<strong>不覆盖</strong>、版本历史天然保留；Delete = 墓碑
+写入 + 索引清槽（恢复重放跳过已删 key）。索引换绑唯一写入口经版本保护区包络（<code>TierKv.cs:362-387</code>）。</li>
+</ul>
+<h3 id="12-会话读一致性三档kvkvsessioncontractscs6-25">1.2 会话读一致性三档（<code>Kv/KvSessionContracts.cs:6-25</code>）</h3>
+<ul>
+<li><code>None</code>：读恒走索引看最新。<code>ReadMyWrites</code>（缺省）：写立即应用 + 本地写集，读优先命中写集
+（本会话最后一次写胜出他人并发覆盖）。<code>Serializable</code>：同步写临界区在版本保护下执行。</li>
+<li>会话创建即取单调版本号（会话单线程契约，内部零锁）。</li>
+</ul>
+<h3 id="13-多-key-原子批全或无tierkvcs472-536">1.3 多 key 原子批（全或无，<code>TierKv.cs:472-536</code>）</h3>
+<ul>
+<li>会话侧 <code>BeginAtomicBatch</code> → 批内写走暂存（本会话读可见、他人与索引不可见）→
+<code>CommitBatchAsync</code> / <code>AbortBatch</code>。</li>
+<li>引擎侧编排：Ring 追加全部暂存 → <strong>2PC Prepare（整体落盘悬空）→ ConfirmCommitted（提交点）→
+索引换绑（可见性）</strong>。崩溃任一窗口全或无：Prepare 前/悬空期崩溃 = 恢复丢弃（索引零污染）；
+Confirm 后崩溃 = 记录已提交、索引由派生重放自建（<code>TierKv.cs:464-468</code>）。</li>
+</ul>
+<h3 id="14-完成语义三档与组提交kvtierkvcontractscs12-24">1.4 完成语义三档与组提交（<code>Kv/TierKvContracts.cs:12-24</code>）</h3>
+<ul>
+<li><code>FireAndForget</code>（内存档，持久化由 checkpoint 承担）/ <code>Committed</code>（写级不丢显式旋钮）/
+<code>WaitForPending</code>（会话 pending 收口）。</li>
+<li>组提交摊薄 fsync（<code>FlushGroupedAsync</code>，<code>TierKv.cs:756-808</code>——floor 只推实刷值，防持久化契约破坏）。</li>
+</ul>
+<h3 id="15-functions-rmw读-改-写tierkvcs580-633">1.5 Functions RMW（读-改-写，<code>TierKv.cs:580-633</code>）</h3>
+<p>三流统一「读折叠 → Format → 追加 → 索引 CAS 换绑」；miss→Initial、hit→InPlace 先行（false 回落
+Copy）、折叠 false→Error 零写入；旧记录恒保留（版本历史是多出能力）。</p>
+<h3 id="16-ttl惰性读删--时钟防线tierkvcs93-1151752-1767">1.6 TTL（惰性读删 + 时钟防线，<code>TierKv.cs:93-115,1752-1767</code>）</h3>
+<ul>
+<li>值帧统一 <code>[tag 0xC8][8B 过期 ticks][payload]</code>（&quot;全量封装不变式&quot;）。</li>
+<li>惰性读删：读路径判定过期即不存在。</li>
+<li><strong>时钟倒流防线</strong>（公开面易忽略的关键）：<code>NowUtcTicks</code> 经单调水位钳制——墙钟后跳/倒流时已判
+过期项不复活（NTP 校时跳变下的 TTL 语义防线）。</li>
+</ul>
+<h3 id="17-cas地址即版本--fencing-tokentierkvcs1816-1881">1.7 CAS（地址即版本 / fencing token，<code>TierKv.cs:1816-1881</code>）</h3>
+<ul>
+<li>地址版/值版；<code>_casGate</code> 串行 compare→append→换绑窗口。</li>
+<li><strong>关键语义边界</strong>：并发 CAS 恰一成功；但 <strong>CAS×普通 Put 仍是 last-writer-wins</strong>（CAS 不是全局
+写锁——防丢失保证仅对其他 CAS 调用方成立）。过期绑定视为不存在。TTL+CAS = 「比较 + 写入 +
+挂过期」单一原子单元，获取即租约（fencing token = NewAddress）。</li>
+</ul>
+<h3 id="18-版本号单调性kvkvversionallocatorcs">1.8 版本号单调性（<code>Kv/KvVersionAllocator.cs</code>）</h3>
+<ul>
+<li>opaque 24B 布局 = <code>HighWater(8B) + Magic &quot;TKV1&quot;(4B) + SweepSegId + SweepOffset</code>——魔数代际守卫，
+演进换值；<code>NextVersion()</code> 全局单调（Interlocked）；<code>Restore</code> <strong>只升不降</strong>守卫。</li>
+<li>持久化 = 版本高水位搭 Ring opaque <strong>随 2PC Prepare 同块原子落盘</strong>（<code>TierKv.cs:502-508</code>）；
+恢复续接先于 Ready（分配版本恒大于历史）。</li>
+</ul>
+<h3 id="19-恢复--检查点帧物化--增量重放tierkvcs243-296833-870">1.9 恢复 / 检查点（帧物化 + 增量重放，<code>TierKv.cs:243-296,833-870</code>）</h3>
+<ul>
+<li>检查点三拍：① Ring 全量落盘 → ② 主索引帧落盘 → ③ 版本图入 opaque 随 2PC Prepare 原子落盘。</li>
+<li>崩溃后重开 = 索引帧物化（O(索引)）+ 增量重放 <code>(W, Tail]</code>（<strong>非全量</strong>）；帧缺失/损坏 fail-safe
+回退全量重放（数据等价）。<strong>恢复正确性不依赖索引</strong>（派生物可重建）。</li>
+<li>PITR 回滚到指定历史版本排期 W6.1+。</li>
+</ul>
+<h3 id="110-回收与过期强删tierkvcs1488-1610">1.10 回收与过期强删（<code>TierKv.cs:1488-1610</code>）</h3>
+<ul>
+<li><code>ReclaimAsync</code>：低频全表扫判定存活 → 存活最小地址为安全下界 → TruncatePrefix 逻辑回收；
+未落盘尾不回收（clamp 至 FlushedUntil）。</li>
+<li>过期强删：<strong>水位推进式</strong>（不做逐条墓碑化）——增量扫描找最老未过期绑定 → 截断前缀 → 扫描
+水位随 2PC Prepare 原子落盘；&quot;先截断后持久化&quot;——崩溃窗口内水位落后于截断点 = 下轮重扫
+（幂等安全）。过期与回收强删均不发事件。</li>
+</ul>
+<h3 id="111-watch无丢无重续传tierkvcs1378-1429--kvkvwatchhubcs">1.11 Watch（无丢无重续传，<code>TierKv.cs:1378-1429</code> + <code>Kv/KvWatchHub.cs</code>）</h3>
+<p>历史补扫 + 实时直通，地址开区间续传；锁内发布水位去重 + 有界通道慢订阅者断连（写路径零反压）；
+游标越回收线抛（etcd compacted 同义）；恢复期重置发布水位。</p>
+<h2 id="2-tiertimeseries">2. TierTimeSeries</h2>
+<h3 id="21-组合配方timeseriestiertimeseriescs18-33">2.1 组合配方（<code>TimeSeries/TierTimeSeries.cs:18-33</code>）</h3>
+<p>Ring（数据真源，append-only）× BTree 时间索引（键 (ts,addr)，乱序吸收/范围序/最新点查）×
+VersionedMetadata 水位（retention 边界原子持久）。单序列与 dense 多序列共用同一流程面。</p>
+<h3 id="22-写入--乱序吸收--守卫tiertimeseriescs137-162211-220">2.2 写入 / 乱序吸收 / 守卫（<code>TierTimeSeries.cs:137-162,211-220</code>）</h3>
+<ul>
+<li>Append：Ring 写 record + <strong>写后即知插索引</strong>（内存可见；落盘由显式 Flush/trim 前置 flush 承担）。</li>
+<li>乱序天然吸收（BTree 有序插入，无后台排序工序）。</li>
+<li>fail-fast 两守卫：<code>ts &lt; TrimmedUntil</code>（已回收区间，数据必丢）+ 超出 <code>MaxOutOfOrderPast</code>
+（防老样本钉住索引）。</li>
+</ul>
+<h3 id="23-查询一致性tiertimeseriescs311-320">2.3 查询一致性（<code>TierTimeSeries.cs:311-320</code>）</h3>
+<ul>
+<li>索引在 = <strong>索引序交付</strong>（正确时间序）；<code>Indexed=false</code> 降档 = 地址序交付（显式降档契约——
+乱序写入下 Ring 地址序 ≠ 时间序，直接 Scan 会交付乱序流）。<strong>索引是正确性必需而非优化</strong>。</li>
+</ul>
+<h3 id="24-retention--治理截断先行水位随后tiertimeseriescs480-535671-708">2.4 retention / 治理（截断先行、水位随后，<code>TierTimeSeries.cs:480-535,671-708</code>）</h3>
+<ul>
+<li><code>TruncateAsync</code>：前置 flush → 索引前缀截断 → Ring TruncatePrefix → 水位持久（原子提交，
+单调不回退）。</li>
+<li><strong>崩溃窗口语义</strong>：截断先行、水位随后——窗口 = 已截断但水位未推进 → 重启对账以数据事实
+为准（TrimmedUntil = min(水位, 首样本 ts)）。后台 retention 循环（TTL/MaxBytes 取更晚锚）；
+dense 逐序列推进。</li>
+</ul>
+<h3 id="25-dense-多序列逐序列一致性边界seriesregistrycs57-117">2.5 dense 多序列（逐序列一致性边界，<code>SeriesRegistry.cs:57-117</code>）</h3>
+<p>每序列 O(1) 侧账（~64B），惰性注册 + 容量护栏；<code>MinPinnedAddress</code>（慢序列钉住——快序列回收
+不越雷池）；逐序列 trim → Ring 截断下限 = 全体序列钉住地址 min；恢复按 envelope SeriesId 路由。</p>
+<h3 id="26-恢复对账三步spec-7tiertimeseriescs819-1018">2.6 恢复对账三步（spec §7，<code>TierTimeSeries.cs:819-1018</code>）</h3>
+<p>① 水位载入 → ② 索引启动（Ring Ready 后）→ ③ 对账：4a 悬空索引清理（地址 &lt; Begin 或 &gt; Tail）→
+4b 缺条重建（Ring 扫 [Begin, Tail) 不在索引的重插）→ 4c 水位 min 校正。崩溃窗口：record 已落、
+索引未持久 → 恢复对账重插（at-least-durable）。</p>
+<h3 id="27-水位-2pc-参与者tiertimeseriescs813">2.7 水位 2PC 参与者（<code>TierTimeSeries.cs:813</code>）</h3>
+<p><code>GetWatermarkParticipant()</code> 返回水位标准 <code>ITransactionParticipant</code>——&quot;业务效果与 trim 水位同域&quot;
+（rollup 管道事务化形态，spec §10）——跨结构原子的现成入口。</p>
+<h2 id="3-tierblob">3. TierBlob</h2>
+<h3 id="31-组合配方与句柄模型blobtierblobcs13-21">3.1 组合配方与句柄模型（<code>Blob/TierBlob.cs:13-21</code>）</h3>
+<p>StreamSnapshot 数据引擎（对象 = CRC64 帧流，句柄 = 起始 LogicalAddress）× 对象表（版本链记录
+帧流，meta 真相源）。<strong>帧扇区对齐不变式</strong>（物理 = 逻辑布局，重启恒等映射读回成立，定长读免
+帧解析 +14 直达）——恢复正确性的地基。</p>
+<h3 id="32-对象登记持久化收口句柄不丢blobblobobjecttablecs11-21329-334">3.2 对象登记持久化收口（句柄不丢，<code>Blob/BlobObjectTable.cs:11-21,329-334</code>）</h3>
+<ul>
+<li>对象表 = 表引擎（<code>{name}.blob.meta</code>）上每条登记/删除/标损 = 一帧
+<code>[Header 14B][payload 48B+补零][Footer 28B]</code>，CRC64 帧级自校验。</li>
+<li><strong>每条登记 = 帧闭环 → 表引擎 Prepare（fsync + 水位 meta）→ ConfirmCommitted</strong>——表水位恒领先/
+对齐登记事实，<strong>任何崩溃窗口下已返句柄不丢</strong>。</li>
+</ul>
+<h3 id="33-崩溃对账tierblobcs420-484">3.3 崩溃对账（<code>TierBlob.cs:420-484</code>）</h3>
+<p>① 表重放（meta O(1) 水位 + 定步长逐帧重放，步长不齐 fail-fast）→ ② <strong>数据尾由表推导</strong>（登记帧
+几何权威，不采信 Backward 扫描——稀疏介质伪 footer 会把尾推上天）+ TruncateSuffix 纠偏 →
+③ Active 对象逐个验帧（尾级 footer magic+TotalLength O(1) 或 DeepVerifyOnRecovery 整帧 CRC64）
+损坏标墓碑显式可见。<strong>孤儿帧</strong>（Complete 后登记前崩溃）= 不可见，落在推导尾之上被后续写入
+覆盖（at-least-once：崩溃 Put 由调用方重试产生新对象）。</p>
+<h3 id="34-session-2pc业务写--对象登记原子tierblobcs380-414">3.4 Session 2PC（业务写 + 对象登记原子，<code>TierBlob.cs:380-414</code>）</h3>
+<p><code>GetParticipant()</code> → <code>BlobTableParticipant</code>：Prepare = 表引擎 Prepare + 开启会话域（此后登记延迟
+提交挂 undo 链）；Confirm = 统一 fsync + 提交水位；Abort = 表帧尾截断 + 内存镜像逆序回退
+（<strong>延迟删除回退 = 对象复活</strong>）。undo 链捕获 previous（<code>BlobObjectTable.cs:155-170,246-263</code>）。
+会话期间 <code>PutAsync</code>/<code>DeleteAsync</code> 自动挂入事务。</p>
+<h3 id="35-写入单通道--complete--abortblobblobsessionscs">3.5 写入单通道 / Complete / Abort（<code>Blob/BlobSessions.cs</code>）</h3>
+<ul>
+<li>产品写闸 <code>_writeGate</code> 串行（结构层写尾单会话契约）；不同对象并行写 = Runtime 迭代候选。</li>
+<li>Complete/Abort 显形：Dispose 未 Complete = Abort（尾截断回滚）；定长会话须恰好写满（不足/超过
+Complete 拒绝并回滚）；不定长流容量终判。</li>
+<li>Delete = 表墓碑 + 空间保留；物理回收逐墓碑 extent 打洞 + 死亡前缀头截断（Active 区间零触碰）。</li>
+</ul>
+<h2 id="4-底层依赖统一契约">4. 底层依赖（统一契约）</h2>
+<table>
+<thead>
+<tr>
+<th>依赖</th>
+<th>提供</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ITransactionParticipant</code>（<code>Contracts/Transactions</code>）</td>
+<td>2PC 统一契约：Prepare（落盘悬空）/ ConfirmCommitted（提交点）/ Abort（幂等回滚）</td>
+</tr>
+<tr>
+<td><code>RingBase.Transaction</code></td>
+<td>Ring 2PC：Prepare 落盘数据+meta（Transport 回落宿主 = 1 次 fsync）；Abort = TruncateSuffix 回退到上一提交边界</td>
+</tr>
+<tr>
+<td><code>RingBase.Recovery</code></td>
+<td>恢复四级回退：hints → meta(O(1)+KeySize 锚点+2PC 事务水位还原) → 引擎 CommittedTail → 扫盘找 torn write 边界</td>
+</tr>
+<tr>
+<td><code>RingBase.Watermarks</code></td>
+<td>7 个水位指针 CAS128 单调推进（无 TOCTOU）</td>
+</tr>
+<tr>
+<td><code>VersionedMetadata</code></td>
+<td>版本链存储（内存工作副本 + 磁盘版本链 + 多版本保留 Abort 零 IO）——TimeSeries 水位/Blob 对象表基座</td>
+</tr>
+<tr>
+<td><code>SessionManager</code></td>
+<td>组合域统一协调协议层（物化 → Prepare-all → Confirm-all、悬挂裁决）——Blob/TimeSeries 多域事务</td>
+</tr>
+<tr>
+<td><code>EntryLog</code></td>
+<td>TierWal 的底层 WAL 结构（raft 复制日志面）；<strong>三产品直接用 Ring</strong>，不直接用 EntryLog</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-一致性语义核心主线三产品统一">5. 一致性语义核心主线（三产品统一）</h2>
+<ol>
+<li><strong>数据真源与派生结构分层</strong>（Kv 索引 / TimeSeries 索引 / Blob 无索引）——&quot;派生结构可重建、
+正确性不依赖它&quot;是全仓恢复语义的根。</li>
+<li><strong>分配-持久分离</strong>（Append/Put/Complete 返回即内存可见；持久化 = 显式 Flush / checkpoint /
+Committed / 2PC Prepare）——三产品同一惯例。</li>
+<li><strong>2PC 提交点语义</strong>（Prepare 落盘悬空 → Confirm 提交点 → 可见性；崩溃窗口 = 悬空丢弃 /
+已确认保留）——原子批、Blob 登记、水位/业务同域均基于此。</li>
+</ol>
+<h2 id="6-相关文档">6. 相关文档</h2>
+<ul>
+<li>使用指南：tierkv.md / tierseries.md / tierblob.md（同目录）</li>
+<li>产品 × raft 一致性：<a href="raft-consistency.html">raft-consistency.md</a></li>
+<li>跨层持久化稳定性：<a href="../runtime/persistence-architecture.html">persistence-architecture.md</a></li>
+<li>底层结构：Ring/session/versioned-metadata（<code>src/TC.Tier.Runtime/docs/</code>）</li>
+<li>内部设计稿（不随包发布）：tierkv-design / tc-tier-timeseries-spec / tierblob-spec / tierkv-ttl-cas-addressread-design</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products/docs/product-consistency.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

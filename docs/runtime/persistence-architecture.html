@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>持久化稳定性架构（IO → 引擎 → WAL 三层崩溃一致性） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="持久化稳定性架构（IO → 引擎 → WAL 三层崩溃一致性） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/persistence-architecture.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="持久化稳定性架构io--引擎--wal-三层崩溃一致性">持久化稳定性架构（IO → 引擎 → WAL 三层崩溃一致性）</h1>
+
+<p>本文回答：<strong>Tier IO、存储引擎、TierWal 三层怎么拼出&quot;崩溃后一致&quot;的全套持久化稳定性</strong>——
+数据从&quot;会丢的层&quot;推进到&quot;不会丢的层&quot;的完整链条、各层水位体系、崩溃窗口语义，以及
+&quot;谁保证 fsync 顺序 / 谁保证原子性 / 谁保证恢复&quot;的分工矩阵。</p>
+<p>与各层使用指南的关系：</p>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>使用指南</th>
+<th>本文补什么</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Tier IO（Core/IO）</td>
+<td><a href="../core/io.html">io.md</a>（§4.4 持久化概念）、<a href="../core/virtual-file-system.html">virtual-file-system.md</a>（崩溃窗口谱系）</td>
+<td>它在持久化链中的角色与质量地板</td>
+</tr>
+<tr>
+<td>存储引擎（Runtime）</td>
+<td><a href="storage-engine.html">storage-engine.md</a>（§3.4 持久化姿势 / §4 崩溃恢复）、<a href="log.html">log.md</a>（EntryLog 页帧/水位/恢复）</td>
+<td>三水位与双尾在链中的语义</td>
+</tr>
+<tr>
+<td>TierWal（Products）</td>
+<td><a href="../products/tierwal.html">tierwal.md</a>（三条铁律/组提交/质量地板）</td>
+<td>双水位如何消费下层保证并供给上层</td>
+</tr>
+</tbody>
+</table>
+<p>代码引用为仓库相对路径（<code>src/…</code> 略去）。</p>
+<hr>
+<h2 id="1-三层持久化模型总览">1. 三层持久化模型总览</h2>
+<pre><code>  上层（raft / 产品）          raft.WaitForPersistedAsync → 应答（多数派提交）
+        │                            ↑
+        ▼                            │ PersistedIndex
+  ④ TierWal（Products）      双水位：AllocatedIndex（内存分配尾） / PersistedIndex（fsync 水位）
+        │                            ↑
+        ▼ CommitAsync / 组提交三维度   │ CommittedOffset
+  ③ EntryLog（Runtime）      页帧流 + 双页 ping-pong + CommittedOffset/FlushedTail/TailAddress
+        │                            ↑
+        ▼ engine.Write + engine.Flush │ CommittedTail
+  ② 存储引擎（Runtime）      三水位：MinAddress ≤ CommittedTail ≤ AllocatedTail + 段/页
+        │                            ↑
+        ▼ IFileHandle.Write / Flush   │ &quot;不会丢的层&quot;
+  ① Tier IO（Core/IO）      IFileSystem 介质 + Flush 唯一入口 + 崩溃窗口谱系
+</code></pre>
+<p><strong>核心命题</strong>（io.md §4.4）：持久化 = 把数据从&quot;会丢的层&quot;推进到&quot;不会丢的层&quot;。每一层向上
+暴露一个<strong>推进动作</strong>（Flush / CommitAsync / WaitForPersisted），向下消费一层的水位。
+崩溃后，每一层用<strong>自己的持久化水位</strong>决定&quot;哪些数据算数、哪些丢弃&quot;——层与层的水位
+不必相等（语义不同），但<strong>顺序不变量</strong>保证：上层声称已持久化的，下层必然已落盘。</p>
+<h2 id="2-三层水位体系一个崩溃点三套语义">2. 三层水位体系（一个崩溃点，三套语义）</h2>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>水位</th>
+<th>语义</th>
+<th>崩溃后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>引擎</td>
+<td><code>MinAddress ≤ CommittedTail ≤ AllocatedTail</code></td>
+<td>CommittedTail = 真实已写水位（读/扫描/回收合法上界）；AllocatedTail = 已预留水位（含未写空洞）</td>
+<td>扫盘重建段表/地址表；半写帧按模式 B 截断</td>
+</tr>
+<tr>
+<td>EntryLog</td>
+<td><code>FlushedTail</code> / <code>CommittedOffset</code>（≤ FlushedTail）</td>
+<td>落盘水位 / commit 边界水位</td>
+<td>恢复三级回退（hints → meta 水位 → 扫盘验帧 CRC）</td>
+</tr>
+<tr>
+<td>TierWal</td>
+<td><code>AllocatedIndex</code> / <code>PersistedIndex</code></td>
+<td>内存分配尾 / 本地 fsync 水位</td>
+<td>恢复按双水位 + 段 anchor 表</td>
+</tr>
+</tbody>
+</table>
+<p><strong>顺序不变量</strong>（跨层）：EntryLog 内部 <code>CommittedOffset ≤ FlushedTail ≤ TailAddress</code>（log.md
+§6.4.3——已 commit 必已落盘，已落盘 ≤ 写游标）；跨层方向性保证：上层<strong>只能把&quot;下层已
+fsync&quot;当作&quot;已持久化&quot;</strong>——raft 经 <code>WaitForPersistedAsync</code> 确认（引擎 <code>engine.Flush</code> 完成）
+才推进应答，<strong>上层永远无法观察到&quot;下层未落盘却被上层当已持久化&quot;的水位</strong>。</p>
+<h2 id="3-层-1tier-io介质与崩溃窗口谱系">3. 层 1：Tier IO（介质与崩溃窗口谱系）</h2>
+<ul>
+<li><strong>持久化唯一入口是 <code>Flush</code></strong>（io.md 置顶一）：内存/虚拟/网络文件系统的落盘语义差异巨大，
+统一入口 = <code>IFileHandle.Flush</code>。<code>FileOpenHints.WriteThrough</code>（O_SYNC/WRITE_THROUGH）使每写
+同步落盘——崩溃窗口归零（最重档）。</li>
+<li><strong>崩溃窗口谱系</strong>（virtual-file-system.md §4.4）：默认档（后台 flusher 50ms 轮询 / 75% 日志
+占用触发检查点）→ <code>FlushData</code>（批落盘）→ <code>Flush</code>（单屏障日志提交）→ <code>WriteThrough</code>（零窗口）。
+<strong>选择权在装配方</strong>：按&quot;每笔必须稳&quot;还是&quot;批攒后稳&quot;选档。</li>
+<li><strong>载体写穿 <code>CarrierWriteThrough</code></strong>（virtual-file-system.md:75）：载体句柄以
+WRITE_THROUGH/O_SYNC 打开——每写完成即达稳定存储，journal 提交免独立 fsync
+（写穿完成即单屏障），<code>Flush</code> 对已写穿数据短路。</li>
+<li><strong>DurabilityValidation 质量地板</strong>（tierwal.md 装配节）：<code>network://</code> 拒绝（远端对象存储无
+fsync 语义）；<code>.tier</code> 虚拟载体须挂载 <code>CarrierWriteThrough</code>；<code>local://</code>/<code>memory:</code> 通过
+（mem = 零 fsync 地板，持久化取舍由部署方自权衡）。</li>
+<li><strong>IO hints</strong>（<code>FileOpenHints</code>）：<code>NoBuffering</code>（DIO——页模型 4MB 大块顺序写甜区）+
+<code>WriteThrough</code>（每写落盘）——磁盘 raft 部署建议 <code>NoBuffering | WriteThrough</code>（DIO+WT 全介质
+最优，机械盘 p99.9 从 buffered/DIO 单独的百 ms 级降到 0.43ms）。</li>
+</ul>
+<h2 id="4-层-2存储引擎三水位--双尾--崩溃恢复">4. 层 2：存储引擎（三水位 / 双尾 / 崩溃恢复）</h2>
+<ul>
+<li><strong>三水位</strong>（storage-engine.md:43-45）：<code>CommittedTail</code>（真实已写水位）= 读/扫描/回收合法上界；
+<code>AllocatedTail</code>（已预留，含未写空洞）= Append 内部起点；<code>MinAddress</code> 头部回收后移。</li>
+<li><strong>双尾语义</strong>：Allocate 预留 ≠ 已写——CommittedTail 不越过真实写入；<code>engine.Flush(upTo)</code> 按
+应用水位落盘（storage-engine.md:132）。</li>
+<li><strong>崩溃恢复</strong>（storage-engine.md §4）：<code>Builder.Start*</code> 内部扫盘重建段表与地址表 → 重建容量
+计数 → 启动保护。模式 A（圈地复写）：已写槽位原样恢复（Allocate 占位即 Committed+sparse）；
+模式 B（Append WAL）：物理尾部自动截断半写帧，上层帧协议决策。</li>
+<li><strong><code>EngineRecoveryHints</code></strong>（<code>CommittedTailHint</code>/<code>AllocatedTailHint</code>，storage-engine.md:159-162）：
+<strong>上层比引擎知道更多时</strong>（如事务日志持有自己的提交水位）修正双尾——防尾部半写数据被当作
+有效。属于直接构造引擎的消费者；数据结构内部建引擎一律不带 hints（物理真相引擎自恢复，
+逻辑水位结构自管，两回事）。</li>
+<li><strong>持久化姿势</strong>（storage-engine.md §3.4）：<code>Hints=None</code> 写进页缓存攒批、调 <code>Flush</code> 才保证落盘
+（吞吐高，按批次 Flush）；<code>WriteThrough</code> 每写同步落盘（WAL 提交点）；<code>NoBuffering</code> 直 IO
+（真实生效与否经 <code>UnbufferedSupport</code> 报告——探测结果，别当文件系统判断做分支）。</li>
+</ul>
+<h2 id="5-层-3entrylog页帧--双页--两层提交--恢复">5. 层 3：EntryLog（页帧 / 双页 / 两层提交 / 恢复）</h2>
+<h3 id="51-页帧与单-entry-不跨页logmd-61">5.1 页帧与单 entry 不跨页（log.md §6.1）</h3>
+<pre><code>[LogPageFrameHeader 8B][entry data 扇区对齐][Crc32Footer 4B][padding 到扇区对齐]
+entry: [EntryLogHeader 22B（CRC64 in-header）][payload][padding 4B 对齐]
+</code></pre>
+<ul>
+<li>页帧 footer CRC32C 覆盖 [header+data]——<strong>半写/撕裂帧扫盘时止步于前一有效帧</strong>（log.md §7.5）。</li>
+<li>单 entry 不跨页（超 <code>PageSize</code> 抛）——帧边界 = 页内 entry 边界，恢复可逐帧验帧推进。</li>
+</ul>
+<h3 id="52-双页-ping-pong-让渡logmd-612">5.2 双页 ping-pong 让渡（log.md §6.1.2）</h3>
+<p>批协议页满 → 组帧 → 先行推进地址 → 启动纯数据写任务 → 立即切另一页继续写（IO 重叠）——
+<strong>页满不阻塞写线程，唯一等待点 = 双页都在途的背压</strong>。<code>_inFlightFlush</code> 是纯数据写任务，
+永不触碰写锁、永不内联跑提交链（提交链延迟到观察点 DrainInFlightSync/Async 补跑）。</p>
+<h3 id="53-两层提交模型logmd-63">5.3 两层提交模型（log.md §6.3）</h3>
+<table>
+<thead>
+<tr>
+<th>层</th>
+<th>触发</th>
+<th>语义</th>
+<th>可配置</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>底层页提交契约（恒成立）</td>
+<td>跨页 Append / Flush / Dispose</td>
+<td>前一页换出即持久化（数据 + meta + CommittedOffset 推进）；最坏写满一页才提交</td>
+<td>否</td>
+</tr>
+<tr>
+<td>可选提前提交</td>
+<td><code>ICommitPolicy</code>（GroupCommitPolicy 三维度）</td>
+<td>页未满提前触发降延迟</td>
+<td>是</td>
+</tr>
+</tbody>
+</table>
+<p><strong>崩溃一致性顺序</strong>（log.md §6.4）：<code>data fsync 先于 meta fsync</code>——<code>CommitWithFlush</code> =
+<code>FlushUntil</code>（落盘 data）→ <code>CommitCore</code>（AppendMeta + meta.Commit 落盘 meta）。<strong>断电时 meta
+绝不会标记一个 data 尚未落盘的 commit 点</strong>。水位不变量：<code>CommittedOffset ≤ FlushedTail ≤ TailAddress</code>。</p>
+<h3 id="54-恢复三级回退logmd-7">5.4 恢复三级回退（log.md §7）</h3>
+<ol>
+<li><code>LogRecoveryHints</code>（上层注入：TailAddress/CommittedOffset/FileSize 等——快照场景）</li>
+<li>meta 持久化水位（<code>LogMetaPayload</code>：TailAddress/CommittedOffset/LastCommittedSeq/悬干裁决）</li>
+<li>扫盘验帧（engine.MinAddress 前向走帧到最后一个有效帧尾——逐帧 magic+dataLen+CRC，
+撕裂/坏帧止步前一有效帧）</li>
+</ol>
+<p>恢复后 <code>ReconcileEngineTail</code> 退到真实尾 + 帧边界 padded end 对齐（meta/hints 记录的尾是末帧
+数据尾，padding 之后才能续写首个新 frame）；EntryLog <code>OnLogRecovered</code> 设 <code>CommittedOffset = TailAddress</code>（恢复后天然一致）+ 启动提前提交循环。</p>
+<h2 id="6-层-4tierwal双水位--组提交--meta-原子替换--快照">6. 层 4：TierWal（双水位 / 组提交 / meta 原子替换 / 快照）</h2>
+<ul>
+<li><strong>三条铁律</strong>（tierwal.md 心智模型）：index = 起点 + 顺序计数；双水位分离（AllocatedIndex =
+内存分配尾 / PersistedIndex = fsync 水位）；分配与持久化分离（Append 只写不 fsync，持久化
+时机 = 组提交或显式 CommitAsync）。<strong>PersistedIndex 不是集群 commitIndex</strong>（多数派确认归协议层）。</li>
+<li><strong>组提交三维度</strong>（tierwal.md 追加与提交）：时间（<code>CommitInterval</code> 10ms）/ 数据量（64KB）/
+条数（1000）——任一满足即提交（一次 fsync = 一批持久化）；<code>WaitForPersistedAsync(index)</code>
+阻塞到已持久化（raft 推进 commitIndex 的依据）。</li>
+<li><strong>meta Opaque 原子替换</strong>（tierwal.md 元数据槽）：<code>WriteMetaAsync</code> 搭 EntryLog 水位线落盘 +
+CRC 校验兜底——段表与协议元数据（term/vote/config）共用容器，单槽覆盖原子语义。</li>
+<li><strong>快照先快照后截断</strong>（tierwal.md 镜像快照）：<code>SnapshotAsync</code> = 镜像生成 → 本地存储 →
+增量压缩截断（先快照后截断——被截区有覆盖）；本地存储 = IncrementalSnapshot 段增量。</li>
+<li><strong>持久化质量地板</strong>：见 §3（DurabilityValidation + IO hints 选型）。</li>
+</ul>
+<h2 id="7-端到端一次-raft-写入的持久化保证链">7. 端到端：一次 raft 写入的持久化保证链</h2>
+<pre><code>raft.ReplicateAsync（leader）
+  → TierWal.AppendBatchAsync（分配，PersistedIndex 未动——数据在页缓冲）
+  → 组提交触发 / raft 攒批尾 CommitAsync（TierWal 侧）
+      → EntryLog.CommitAsync：FlushUntil（engine.Write + engine.Flush 落盘 data）
+        → CommitCore（AppendMeta + meta.Commit 落盘 meta）   ← data fsync 先于 meta fsync
+      → TierWal.PersistedIndex 推进
+  → raft 复制 lane 读 PersistedIndex → 发送 AppendEntries（已持久化内容）
+  → follower 侧同样追加 + WaitForPersisted → 应答
+  → leader 多数派 matchIndex → commitIndex 推进
+</code></pre>
+<p><strong>崩溃窗口的语义</strong>（这条链上任一点断电）：</p>
+<table>
+<thead>
+<tr>
+<th>断电点</th>
+<th>数据状态</th>
+<th>恢复后</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Append 后、组提交前</td>
+<td>entry 在页缓冲未 fsync</td>
+<td>丢弃（WAL 语义——未 commit 即未持久化，raft 重放看不到）</td>
+</tr>
+<tr>
+<td>data fsync 后、meta fsync 前</td>
+<td>data 已落盘、CommittedOffset 未推进</td>
+<td>恢复扫盘/meta 水位 → 该批按未 commit 处理（meta 不标记 data 未落盘的 commit）</td>
+</tr>
+<tr>
+<td>提交完成后</td>
+<td>data+meta 均落盘</td>
+<td>重放完整可见（raft 日志前缀一致）</td>
+</tr>
+<tr>
+<td>半数以上节点均完成提交</td>
+<td>多数派日志含该条</td>
+<td>raft 提交安全（不会丢已提交条目）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="8-谁保证什么分工矩阵">8. 谁保证什么（分工矩阵）</h2>
+<table>
+<thead>
+<tr>
+<th>保证</th>
+<th>承担层</th>
+<th>机制</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>fsync 顺序（data 先于 meta）</td>
+<td>EntryLog</td>
+<td><code>CommitWithFlush</code> 两段序（log.md §6.4）</td>
+</tr>
+<tr>
+<td>半写/撕裂防护</td>
+<td>引擎 + EntryLog</td>
+<td>页帧 CRC32C footer + CRC64 in-header + 扫盘止步有效帧</td>
+</tr>
+<tr>
+<td>原子替换（meta）</td>
+<td>EntryLog/TierWal</td>
+<td>opaque 搭水位线单块落盘 + 单槽覆盖（log.md §6.5 / tierwal.md 元数据槽）</td>
+</tr>
+<tr>
+<td>水位修正（上层知更多）</td>
+<td>引擎 <code>EngineRecoveryHints</code></td>
+<td>CommittedTail/AllocatedTail 双尾 hint（storage-engine.md §4）</td>
+</tr>
+<tr>
+<td>崩溃恢复</td>
+<td>引擎（段表/地址表）+ EntryLog（三级回退）+ TierWal（anchor 表）</td>
+<td>各层恢复协议（§4/§5.4/§6）</td>
+</tr>
+<tr>
+<td>介质质量地板</td>
+<td>Tier IO + TierWal</td>
+<td>DurabilityValidation + 载体写穿 + IO hints 选型（§3）</td>
+</tr>
+<tr>
+<td>落盘时机决策</td>
+<td>TierWal 组提交 + EntryLog 两层提交</td>
+<td>三维度提前提交 / 页契约兜底（§5.3/§6）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="9-相关文档">9. 相关文档</h2>
+<ul>
+<li>IO 原语与介质：<a href="../core/io.html">io.md</a>、<a href="../core/local-file-system.html">local-file-system.md</a>、<a href="../core/virtual-file-system.html">virtual-file-system.md</a>（载体写穿/崩溃窗口谱系）、<a href="../core/medium-parity-matrix.html">medium-parity-matrix.md</a></li>
+<li>引擎与结构：<a href="storage-engine.html">storage-engine.md</a>（持久化姿势/崩溃恢复/双尾）、<a href="log.html">log.md</a>（EntryLog 页帧/水位/恢复）、<a href="structures.html">structures.md</a>、<a href="segment-table.html">segment-table.md</a></li>
+<li>TierWal：<a href="../products/tierwal.html">tierwal.md</a>（三条铁律/组提交/质量地板）</li>
+<li>上层消费：raft 架构与稳定性 <a href="../core/raft-architecture.html">raft-architecture.md</a>、产品 raft 核心保证 <a href="../products/raft-consistency.html">raft-consistency.md</a></li>
+<li>内部设计稿（不随包发布）：tierwal-design / tierwal-mirror-snapshot / ring-overflow-chunked-write</li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Runtime/docs/persistence-architecture.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

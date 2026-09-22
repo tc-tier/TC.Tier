@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <title>产品层 raft 一致性设计（论文核心保证） | TC.Tier — .NET 可组合存储运行时 </title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="title" content="产品层 raft 一致性设计（论文核心保证） | TC.Tier — .NET 可组合存储运行时 ">
+      
+      
+      <link rel="icon" href="../../favicon.ico">
+      <link rel="stylesheet" href="../../public/docfx.min.css">
+      <link rel="stylesheet" href="../../public/main.css">
+      <meta name="docfx:navrel" content="../../toc.html">
+      <meta name="docfx:tocrel" content="toc.html">
+      
+      <meta name="docfx:rel" content="../../">
+      
+      
+      <meta name="docfx:docurl" content="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/docs/raft-consistency.md/#L1">
+      <meta name="loc:inThisArticle" content="In this article">
+      <meta name="loc:searchResultsCount" content="{count} results for &quot;{query}&quot;">
+      <meta name="loc:searchNoResults" content="No results for &quot;{query}&quot;">
+      <meta name="loc:tocFilter" content="Filter by title">
+      <meta name="loc:nextArticle" content="Next">
+      <meta name="loc:prevArticle" content="Previous">
+      <meta name="loc:themeLight" content="Light">
+      <meta name="loc:themeDark" content="Dark">
+      <meta name="loc:themeAuto" content="Auto">
+      <meta name="loc:changeTheme" content="Change theme">
+      <meta name="loc:copy" content="Copy">
+      <meta name="loc:downloadPdf" content="Download PDF">
+
+      <script type="module" src="./../../public/docfx.min.js"></script>
+
+      <script>
+        const theme = localStorage.getItem('theme') || 'auto'
+        document.documentElement.setAttribute('data-bs-theme', theme === 'auto' ? (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light') : theme)
+      </script>
+
+  </head>
+
+  <body class="tex2jax_ignore" data-layout="" data-yaml-mime="">
+    <header class="bg-body border-bottom">
+      <nav id="autocollapse" class="navbar navbar-expand-md" role="navigation">
+        <div class="container-xxl flex-nowrap">
+          <a class="navbar-brand" href="../../index.html">
+            <img id="logo" class="svg" src="../../logo.svg" alt="TC.Tier">
+            TC.Tier
+          </a>
+          <button class="btn btn-lg d-md-none border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navpanel" aria-controls="navpanel" aria-expanded="false" aria-label="Toggle navigation">
+            <i class="bi bi-three-dots"></i>
+          </button>
+          <div class="collapse navbar-collapse" id="navpanel">
+            <div id="navbar">
+              <form class="search" role="search" id="search">
+                <i class="bi bi-search"></i>
+                <input class="form-control" id="search-query" type="search" disabled placeholder="Search" autocomplete="off" aria-label="Search">
+              </form>
+            </div>
+          </div>
+        </div>
+      </nav>
+    </header>
+
+    <main class="container-xxl">
+      <div class="toc-offcanvas">
+        <div class="offcanvas-md offcanvas-start" tabindex="-1" id="tocOffcanvas" aria-labelledby="tocOffcanvasLabel">
+          <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="tocOffcanvasLabel">Table of Contents</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" data-bs-target="#tocOffcanvas" aria-label="Close"></button>
+          </div>
+          <div class="offcanvas-body">
+            <nav class="toc" id="toc"></nav>
+          </div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div class="actionbar">
+          <button class="btn btn-lg border-0 d-md-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#tocOffcanvas" aria-controls="tocOffcanvas" aria-expanded="false" aria-label="Show table of contents">
+            <i class="bi bi-list"></i>
+          </button>
+
+          <nav id="breadcrumb"></nav>
+        </div>
+
+        <article data-uid="">
+<h1 id="产品层-raft-一致性设计论文核心保证">产品层 raft 一致性设计（论文核心保证）</h1>
+
+<p>本文回答：<strong>产品（TierRaftNode / TierQueueReplica）怎么保证 raft 论文核心性质</strong>——选举安全 /
+领导权完整 / 日志匹配 / 状态机安全 / 有序提交 / 活性，哪些由引擎承担、哪些由产品层显式补强，
+以及产品层<strong>一致性语义边界</strong>（exactly-once vs at-least-once 的精确划分）。</p>
+<p>与引擎架构的关系：底层一致性机制见
+<a href="../core/raft-architecture.html">raft-architecture.md</a>（论文五性质逐条实现映射）；
+本文是<strong>产品层消费面</strong>——一个使用者据此判断&quot;我的队列/节点在什么条件下不丢不重、怎么收敛&quot;。</p>
+<p>代码引用为仓库相对路径（<code>Queue/…</code> = <code>src/TC.Tier.Products.Net/Queue/…</code>）。</p>
+<hr>
+<h2 id="1-装配结构谁建了什么">1. 装配结构（谁建了什么）</h2>
+<p><code>TierRaftNodeBuilder</code> → <code>TierRaftNode.StartCoreAsync</code>（<code>Node/TierRaftNode.cs:169-219</code>）是唯一装配入口：</p>
+<pre><code>TierWal ──▶ TierWalRaftStore（IRaftStore 适配：帧/Term/votedFor/prevLog 断言+截尾）
+                │
+Swarm（多源快照，可选，先于引擎）──▶ SnapshotSwarmSync/Transfer
+                │
+ApplyPipeline(store, 业务状态机) ──▶ RaftStateMachine（引擎）
+                │                           └─ apply.SetConfigCallback(raft.PostConfigChanged)  ← 配置条目 = apply 产物
+宿主调度循环（快照压缩/发布/反熵/基线上报）
+</code></pre>
+<ul>
+<li>存储、apply、共识、快照四层装配次序固定；传输双形态（注入 / 内建 TCP）二选一 fail-fast
+（<code>Node/TierRaftNodeBuilder.cs:194-237</code>）。</li>
+<li>多组装配：<code>TierRaftHost</code> 一个传输上挂 N 组，每组完整装配链经组作用域视图
+（引擎零组感知）；<code>GroupReplicaRouter</code> 做传输绑定 + 组分发 + 提案转发。</li>
+<li><strong>Witness 轻量形态</strong>：无 TierWal/apply/Swarm，高水位断言流（只持久化 (LastIndex,LastTerm)+
+(Term,VotedFor)），投票计多数派、永不自荐/晋级（<code>Node/TierRaftWitnessNode.cs</code>）。</li>
+</ul>
+<h2 id="2-共识-状态机模式tierqueuereplica-实例">2. 共识-状态机模式（TierQueueReplica 实例）</h2>
+<h3 id="21-命令族六命令queuequeuereplicacommandcs76-205">2.1 命令族（六命令，<code>Queue/QueueReplicaCommand.cs:76-205</code>）</h3>
+<p>Enqueue（可 delayed/幂等键） / Ack（epoch + 地址批） / Group（Create/Delete/Reset） /
+Expire（计数终值+死信终结 / Claim 代次+1） / Home（辖权授予/移交/接管，apply 恒 epoch+1） /
+Retention（回收线推进）。线格式 <code>[Tag][CorrId][字段声明序]</code>，防御上限对齐引擎在途窗口。</p>
+<h3 id="22-apply-侧状态机queuequeuestatemachinecs115-149确定性的三原则">2.2 apply 侧状态机（<code>Queue/QueueStateMachine.cs:115-149</code>）——确定性的三原则</h3>
+<ol>
+<li><strong>幂等/重放跳过</strong>：<code>index &lt;= _appliedThrough</code> 直接返回——快照导入覆盖区间重启重放跳过。</li>
+<li><strong>确定性拒绝 vs 瞬态重试二分</strong>（<code>:133-142</code>）：<code>StaleDeliveryException</code>/<code>InvalidOperationException</code>
+（组已存在/epoch 落后——重放必然同判）→ 终局结果；IO/取消等瞬态失败 → 原样上抛交还
+apply 管道重试。<strong>吞成终局 = 副本状态永久发散</strong>（HomeCmd/游标推进丢失且不可恢复）。</li>
+<li><strong>结果表</strong>：提案前 <code>RegisterWaiter(correlation)</code>，apply 内 <code>TryRemove</code> + <code>TrySetResult</code>——
+重放条目无 waiter 不存储（零泄漏）。</li>
+</ol>
+<h3 id="23-确定性核心tierqueue-显式实现-itierqueuereplicationporttierqueuecs780-1056">2.3 确定性核心（<code>TierQueue</code> 显式实现 <code>ITierQueueReplicationPort</code>，<code>TierQueue.cs:780-1056</code>）</h3>
+<p>契约：<strong>全部判定依据取自命令载荷或已复制状态，禁止本地时钟/本地水位参与判定</strong>——同一命令
+序列在任一副本产生同一状态。实例：</p>
+<ul>
+<li><code>ApplyEnqueueAsync</code>：幂等命中短路返回首次地址不追加；Ring 尾分配串行 ⇒ <strong>apply 序即地址序，
+全组同地址</strong>（消息 ID = <code>LogicalAddress</code>）。</li>
+<li><code>ApplyAckAsync</code>：epoch 落后 → <code>StaleDeliveryException</code>（确定性拒绝，全组同判）。</li>
+<li><code>ApplyGroupCreateAsync</code>：重复到达幂等 no-op（apply at-least-once 契约）。</li>
+</ul>
+<h3 id="24-辖权group-homeepoch-fencing单写者如何保证">2.4 辖权（group home）/epoch fencing——单写者如何保证</h3>
+<ul>
+<li><strong>辖权表是 apply 产物</strong>（<code>QueueStateMachine.cs:34,62-66</code>），随快照持久化；变更经
+<code>GroupHomeChanged</code> 广播（订阅方重连）。</li>
+<li><strong>Dequeue 前 <code>EnsureGroupHome</code></strong>（<code>TierQueueReplica.cs:265-270</code>）：非辖权节点抛
+<code>NotGroupHomeException</code>（携带当前 home，异常驱动客户端重定向）——Dequeue 纯本地读零共识。</li>
+<li><strong>fencing（epoch 递增）</strong>：任何 HomeCmd / Claim 接管恒 <code>ApplyEpochBumpFromConsensusAsync</code>
+（epoch+1）；Ack 命令携带辖权节点视图 epoch，apply 侧 epoch 落后 → 确定性拒绝——
+<strong>旧辖权迟交不可能成功，双辖权投递不可能</strong>（验证矩阵 #4/#12 对抗钉）。</li>
+<li><strong>引导唯一提案方</strong>（<code>TierQueueReplica.cs:113-143</code>）：当选 leader 且 <code>$default</code> 辖权未定 →
+延迟 2s <strong>复查</strong>（防 replay 滞后误判抢夺已设辖权组）后再自领——leader 恒一 = 恰一提案方。</li>
+<li>到期记账/retention 由辖权节点后台循环发起（<code>HomeLoopAsync</code>/<code>SweepExpiredAsync</code>），经
+ExpireCmd/RetentionCmd 走共识——<strong>回收动作全组一致</strong>，禁止本地直改复制状态。</li>
+</ul>
+<h2 id="3-一致性语义exactly-once-与-at-least-once-的精确边界">3. 一致性语义：exactly-once 与 at-least-once 的精确边界</h2>
+<h3 id="31-at-least-once不丢失">3.1 at-least-once（不丢失）</h3>
+<ul>
+<li>pending 簿记<strong>纯内存</strong>（不进 raft，<code>TierQueueReplica.cs:24</code> 注释）——崩溃丢失 = 重放窗口
+重投递；缓冲确认（BufferedAcks）也是本地簿记——崩溃 = at-least-once 重投继承。</li>
+</ul>
+<h3 id="32-exactly-once不重复两层">3.2 exactly-once（不重复）——两层</h3>
+<ol>
+<li><strong>Ack 经共识复制后终局</strong>：已确认地址永不重投（apply 侧游标/skip 推进）。</li>
+<li><strong>幂等生产 (ProducerId,Seq)</strong>：入口快路径 <code>TryFindIdempotent</code>（本地已应用视图，
+<code>TierQueueReplica.cs:300-314</code>）+ apply 侧终判——重复 Enqueue 返回首次地址不追加。</li>
+</ol>
+<h3 id="33-提交前不可见--read-your-writes">3.3 提交前不可见 + read-your-writes</h3>
+<ul>
+<li>Enqueue 未 applied 不可读（<code>TierQueueReplica.cs:24</code>）。</li>
+<li>入口 read-your-writes：提案返回前 <code>WaitForAppliedAsync(index)</code>（本地 apply 水位越过，
+<code>TierQueueReplica.cs:154-172</code>）；follower 转发链路同样等本地水位（<code>:206-210</code>）。</li>
+</ul>
+<h3 id="34-明确不买">3.4 明确不买</h3>
+<ul>
+<li>复制版不支持 Session 域 2PC（<code>GetGroupParticipant</code>/<code>AckInRoundAsync</code> → <code>NotSupportedException</code>）
+——跨节点恰好一次归规模化候选（<code>TierQueueReplica.cs:634-636,1068-1070</code>）。</li>
+</ul>
+<h2 id="4-论文核心性质映射表">4. 论文核心性质映射表</h2>
+<table>
+<thead>
+<tr>
+<th>论文性质</th>
+<th>引擎提供（见 raft-architecture.md）</th>
+<th>产品层显式补强</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>选举安全</td>
+<td>PreVote / IsUpToDate 投票 / 落盘先于应答 / learner-witness 角色门</td>
+<td>leader 恒一 ⇒ 辖权自领的唯一提案方；辖权组不随每次换届强制搬迁</td>
+</tr>
+<tr>
+<td>领导权完整</td>
+<td>任期锚点 no-op / commit 只经当前任期条目 / ReadIndex 锚点门</td>
+<td><strong>T6 apply 追平守卫</strong>：快照压缩前 <code>appliedIndex ≥ persistedIndex</code> 才允许（<code>Node/TierRaftNode.cs:305-318</code>——N₀ 越过 applied 会把待 apply 条目吞进快照区 = 永久停滞）；<strong>warmup 门</strong>：以 raft 自身 CommitIndex（非持久尾）为追平标尺（<code>TierQueueReplicaBuilder.cs:281-299</code>）</td>
+</tr>
+<tr>
+<td>日志匹配</td>
+<td>prevLog 断言+截尾 / 已提交区保护 / hint 回退 / 快照衔接</td>
+<td>日志即状态机：<code>IStateMachine</code> 确定性契约 + <code>QueueStateMachine</code> 幂等跳过/确定性拒绝</td>
+</tr>
+<tr>
+<td>状态机安全</td>
+<td>CommitPair 原子 / apply 单 worker 有序 / at-least-once 重放</td>
+<td>确定性拒绝 vs 瞬态重试二分；apply 序即地址序；快照导入跳过前缀；epoch/fencing 作命令载荷内确定性判据</td>
+</tr>
+<tr>
+<td>有序提交</td>
+<td>提交全序 / 批内序 / apply 序 / 乱序防御</td>
+<td>入口 read-your-writes；<code>WaitForDurableAsync</code> = applied 档（<code>TierQueueReplica.cs:751-755</code>）</td>
+</tr>
+<tr>
+<td>活性</td>
+<td>泵线程 / DeadlineRegistry / 调度饥饿鲁棒 / 复制自愈</td>
+<td>宿主循环单轮异常吞并续跑（<code>Node/TierRaftNode.cs:295-298</code>）；Windows <code>timeBeginPeriod(1)</code> 高精度定时（<code>:241-250</code>）；反熵对账周期（仅 leader 发起）；成员对账循环（<code>Host/TierRaftHost.cs:206-227</code>）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="5-稳定与运维机制">5. 稳定与运维机制</h2>
+<ul>
+<li><strong>快照压缩三守卫</strong>：增长阈值触发 + T6 apply 追平守卫 + <code>_followerAppendGate</code> 串行
+（<code>Node/TierRaftNode.cs:304-347</code>）——快照与 append 不交错。</li>
+<li><strong>反熵对账</strong>（<code>SwarmAntiEntropy</code>）：Merkle 根相等零传输、不等只传差异块——漂移收敛。</li>
+<li><strong>基线上报</strong>：非 leader 向已知 leader 单边声明；换届（<code>OnLeaderChanged(false)</code>）清持有表 +
+反熵停发 + 重报（<code>Node/TierRaftNode.cs:258-267,349-362</code>）。</li>
+<li><strong>退役编排</strong>：<code>DeprovisionAsync</code>（节点下线清理）；<code>DisposeAsync</code> 分段有界收尾
+（宿主循环 → raft → apply → 多源 → TierWal → 传输，每段超时告警不挂死）。</li>
+<li><strong>故障注入本地形态</strong>：时钟缝（假钟快进/墙钟跳变）、传输缝（延迟/分区/丢包/乱序）、引擎缝
+——见 <a href="raft-node.html">raft-node.md</a> 故障注入一节。</li>
+</ul>
+<h2 id="6-已知边界与开放项">6. 已知边界与开放项</h2>
+<ul>
+<li>复制版无跨节点 2PC（§3.4）；跨节点恰好一次归规模化候选。</li>
+<li>幂等快照窗口 / RetryBackoff 等细节在内部复制规格的已知缺口清单（内部设计稿，不随包发布）。</li>
+</ul>
+<h2 id="7-相关文档">7. 相关文档</h2>
+<ul>
+<li>引擎架构（论文五性质实现映射）：<a href="../core/raft-architecture.html">raft-architecture.md</a></li>
+<li>使用指南：产品装配 <a href="raft-node.html">raft-node.md</a>；引擎调用 <a href="../core/net.html">net.md</a></li>
+</ul>
+
+</article>
+
+        <div class="contribution d-print-none">
+          <a href="https://github.com/tc-tier/TC.Tier/blob/main/src/TC.Tier.Products.Net/docs/raft-consistency.md/#L1" class="edit-link">Edit this page</a>
+        </div>
+
+        <div class="next-article d-print-none border-top" id="nextArticle"></div>
+
+      </div>
+
+      <div class="affix">
+        <nav id="affix"></nav>
+      </div>
+    </main>
+
+    <div class="container-xxl search-results" id="search-results"></div>
+
+    <footer class="border-top text-secondary">
+      <div class="container-xxl">
+        <div class="flex-fill">
+          © 2026 <a href="https://mytzz.top" target="_blank" rel="noopener">mytzz.top</a> All Rights Reserved · <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener">鄂ICP备2026011965号</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
