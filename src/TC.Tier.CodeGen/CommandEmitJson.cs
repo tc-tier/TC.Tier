@@ -65,7 +65,7 @@ public sealed partial class CommandGenerator
         sb.AppendLine("    }");
         sb.AppendLine(string.Empty);
         sb.AppendLine("    /// <summary>渲染选项（反射解析器——全类型可解析，任意 body/回执类型零登记）。</summary>");
-        sb.AppendLine("    public static global::System.Text.Json.JsonSerializerOptions Options => __options;");
+        sb.AppendLine("    public static new global::System.Text.Json.JsonSerializerOptions Options => __options;");
         sb.AppendLine(string.Empty);
         sb.AppendLine("    protected override global::System.Text.Json.JsonSerializerOptions? GeneratedSerializerOptions => __options;");
         sb.AppendLine(string.Empty);

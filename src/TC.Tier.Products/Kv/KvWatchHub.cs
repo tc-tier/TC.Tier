@@ -26,8 +26,10 @@ public readonly record struct KvWatchEvent<TKey>(TKey Key, KvWatchEventKind Kind
 /// （地址 ≤ 已发布水位 = 已被某订阅者的历史补扫覆盖，跳过）+ 锁内分发（订阅者少且 TryWrite
 /// 纯内存，临界区微秒级）。发布点契约 = 可见性动作完成之后（批路径在 ConfirmCommitted 后），
 /// 保证「事件 = 已提交事实」。</para>
-/// <para>★ 断连语义（etcd 对齐）：订阅者通道有界，慢订阅者写满即断连（通道完结 + 注销）——
-/// 写路径永不被慢订阅者反压；枚举流干净结束 = 断连信号，订阅者须凭已见最大地址重订阅续传。</para>
+/// <para>★ 断连语义（etcd 对齐）：订阅者通道有界，慢订阅者写满即断连（通道携带
+/// <see cref="KvWatchDisconnectedException"/> 完结 + 注销）——写路径永不被慢订阅者反压；
+/// 枚举流抛 <see cref="KvWatchDisconnectedException"/> = 断连信号，订阅者须凭已见最大地址
+/// 重订阅续传；流干净结束 = 存储关闭收口（CompleteAll），不得重订。</para>
 /// <para>★ 无界通道禁用：丢弃事件违反不丢断言，反压等待违反写路径自治——断连是唯一出路。</para>
 /// </summary>
 internal sealed class KvWatchHub<TKey> where TKey : unmanaged
@@ -122,8 +124,9 @@ internal sealed class KvWatchHub<TKey> where TKey : unmanaged
                 if (!Matches(sub, key)) continue;
                 if (sub.Events.Writer.TryWrite(new KvWatchEvent<TKey>(key, kind, addr))) continue;
 
-                // 慢订阅者：断连（通道完结 + 注销）——写路径不被反压，订阅者凭游标重订阅续传
-                sub.Events.Writer.TryComplete();
+                // 慢订阅者：断连（通道携带专用异常完结 + 注销）——写路径不被反压，
+                // 枚举端抛 KvWatchDisconnectedException 可辨断连（重订续传）与关闭收束（干净结束）
+                sub.Events.Writer.TryComplete(new KvWatchDisconnectedException());
                 _subs.RemoveAt(i);
             }
         }

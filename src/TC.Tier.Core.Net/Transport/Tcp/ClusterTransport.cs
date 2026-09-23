@@ -305,7 +305,6 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
                 return;
             }
             RegisterLink(link.Remote, link);
-            StartPostEstablishLoops(link);
             await link.RunReceiveAsync(ct);
         }
         finally
@@ -406,7 +405,6 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
             if (!await link.HandshakeAsync(ct).ConfigureAwait(false))
                 throw new NetIOException($"地址制直连握手失败：{endpoint}（{link.HandshakeFailureReason}）。");
             RegisterLink(link.Remote, link);   // 直连链路进链路表——定向发送可用；不触发拨号循环（无自动重连）
-            StartPostEstablishLoops(link);
             StartLoopThread($"tcp-receive-{link.Remote}", link.RunReceiveAsync);
             return link.Remote;
         }
@@ -482,7 +480,6 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
                 if (_everConnected.TryAdd(peer, 0)) { /* 首连不算重连 */ }
                 else NetView?.OnReconnect(peer.ToString());
                 RegisterLink(peer, link);   // 事件触发前指标已可见（PeerConnected 消费方读数无竞态）
-                StartPostEstablishLoops(link);
                 established = true;
                 await link.RunReceiveAsync(ct);
             }
@@ -572,13 +569,6 @@ public sealed partial class ClusterTransport : IProtocolTransport, ICoreProtocol
     /// 握手前身份未知，Established 后诊断以 Remote 为准）。</summary>
     private void StartWriteLoop(PeerLink link, TcpClient client)
         => StartLoopThread($"tcp-write-{client.Client.RemoteEndPoint}", link.RunWriteLoopAsync);
-
-    /// <summary>链路建立后的伴随循环（§4.5——保活协商开启才启动）。</summary>
-    private void StartPostEstablishLoops(PeerLink link)
-    {
-        if ((link.NegotiatedFeatures & HandshakeFeatures.Keepalive) != 0)
-            StartLoopThread($"tcp-keepalive-{link.Remote}", link.RunKeepaliveAsync);
-    }
 
     private void RegisterLink(NodeId peer, PeerLink link)
     {

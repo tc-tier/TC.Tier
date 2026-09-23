@@ -52,8 +52,8 @@ public class RemoteFileSystemTests : IDisposable
         _fs.DirectoryExists("no-such").Should().BeFalse();
 
         // 一层枚举（单参=根 pattern / 双参=path+pattern）
-        _fs.EnumerateFiles("*").Select(e => e.Name).Should().Equal("root-file");
-        _fs.EnumerateDirectories("*").Select(e => e.Name).Should().Equal("s");
+        _fs.EnumerateFiles(pattern: "*").Select(e => e.Name).Should().Equal("root-file");
+        _fs.EnumerateDirectories(pattern: "*").Select(e => e.Name).Should().Equal("s");
         _fs.EnumerateFiles("s/eng", "*").Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal)
             .Should().Equal("data.0", "data.1");   // compact 是目录——Files 族不含（混合族见下）
         // 目录条目时间不可得（MinValue/null 诚实约定）
@@ -159,7 +159,7 @@ public class RemoteFileSystemTests : IDisposable
         var st = _fs.Stat("ts-f");
         st.LastWriteTime.Should().NotBe(DateTimeOffset.MinValue, "HeadObject LastModified 已接（不再占位）");
 
-        var entry = _fs.EnumerateFiles("*").Single(e => e.Name == "ts-f");
+        var entry = _fs.EnumerateFiles(pattern: "*").Single(e => e.Name == "ts-f");
         entry.LastWriteTime.Should().NotBe(DateTimeOffset.MinValue, "列举条目 LastModified 已接");
     }
 
@@ -170,8 +170,8 @@ public class RemoteFileSystemTests : IDisposable
         using (_fs.AcquireExclusive(TimeSpan.FromSeconds(5)))
         {
             // 卷锁对象（.tier-volume-lock，根层点前缀）默认枚举不可见；豁免 pattern 可见
-            _fs.EnumerateFiles("*").Select(e => e.Name).Should().Equal("plain");
-            _fs.EnumerateFiles(".*").Select(e => e.Name).Should().Contain(".tier-volume-lock");
+            _fs.EnumerateFiles(pattern: "*").Select(e => e.Name).Should().Equal("plain");
+            _fs.EnumerateFiles(pattern: ".*").Select(e => e.Name).Should().Contain(".tier-volume-lock");
         }
     }
 
@@ -1119,7 +1119,7 @@ public class RemoteFileSystemTests : IDisposable
         var store = new MemoryObjectStore();
         using (var fresh = RemoteFileSystem.OpenOrCreate(store))   // 全新——空视图
         {
-            fresh.EnumerateFiles("*").Should().BeEmpty();
+            fresh.EnumerateFiles(pattern: "*").Should().BeEmpty();
         }
         using (var h = RemoteFileSystem.OpenOrCreate(store).Open("keep", Opts()))
         {
@@ -1127,7 +1127,7 @@ public class RemoteFileSystemTests : IDisposable
             h.Flush();
         }
         using var existing = RemoteFileSystem.OpenOrCreate(store);   // 既有（含内容）——不抛
-        existing.EnumerateFiles("*").Count().Should().Be(1, "bind-any 两态通吃");
+        existing.EnumerateFiles(pattern: "*").Count().Should().Be(1, "bind-any 两态通吃");
         store.Dispose();
     }
 

@@ -130,7 +130,7 @@ public class TierWalSnapshotStoreTests : IDisposable
         }
 
         // 删除快照存储（模拟快照丢失）→ 重启：raft 语义 = 快照是已截日志的唯一恢复源——丢失不可恢复
-        foreach (var e in fs.EnumerateFiles("*", recursive: true))
+        foreach (var e in fs.EnumerateFiles(pattern: "*", recursive: true))
             if (e.Name.Contains(".snapshot", StringComparison.Ordinal))
                 fs.Delete(e.Name);
 
@@ -154,7 +154,7 @@ public class TierWalSnapshotStoreTests : IDisposable
         }
 
         // 篡改快照数据引擎段文件帧头（破坏 magic——meta 引擎 [段表] 不动；内容损坏读时暴露）
-        foreach (var e in fs.EnumerateFiles("*", recursive: true))
+        foreach (var e in fs.EnumerateFiles(pattern: "*", recursive: true))
             if (e.Name.Contains(".snapshot", StringComparison.Ordinal) && !e.Name.Contains(".meta", StringComparison.Ordinal))
             {
                 using var h = fs.Open(e.Name, new FileOpenOptions

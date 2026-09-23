@@ -145,6 +145,14 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
     private CancellationTokenSource? _loopCts;
     private static readonly TimeSpan LoopExitTimeout = TimeSpan.FromSeconds(5);   // 循环线程有界等退（registry 同款）
     private IDisposable? _tickSubscription;   // 节拍订阅（StartAsync 建、StopAsync 退——句柄幂等）
+    /// <summary>★ 周期观测订阅（调度饥饿鲁棒——#504 挂死族，docs/design/raft-election-timing-scheduling-starvation-design.md）：
+    /// 被饿判定（CheckDeadline 的 gap）的前提 = 循环观测粒度 &lt; 选举窗阈值（健康空闲 gap ≈ 观测间隔）。
+    /// PacerLoop 只在 deadline 到期投 tick——循环观测粒度 = 窗长 ≥ 阈值，正常窗满会被误判为被饿
+    /// （重掷死锁）。本订阅每 观测间隔 滚动到期强制投 tick：循环每间隔消费更新观测
+    /// （gap ≤ 间隔 &lt; 阈值/2）；真被饿（循环停摆）时 gap 仍累积超阈值，重掷正确触发。</summary>
+    private IDisposable? _observerSubscription;
+    /// <summary>周期观测订阅的下次到期（ms 单调戳——wake 滚动推进；0 = 首轮即到期）。</summary>
+    private long _observerDeadlineTicks;
     private readonly AsyncPump _pump;   // 共识循环泵（单线程亲和——域内续体回流泵线程，池不在关键路径）
     private Task? _loopThread;   // 共识循环专用线程（StartAsync 起、StopAsync 有界等退）
     private readonly TaskSink _loops;      // ★ 后台任务组（投票发送/直排 append 等 fire-and-forget 消费面——可丢失自愈路径）
@@ -281,7 +289,14 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
     /// <c>apply.SetConfigCallback(raft.PostConfigChanged)</c> 晚绑定。</para></summary>
     /// <param name="config">新的活动配置（apply 产物——已切换完毕）。</param>
     public void PostConfigChanged(ClusterConfig config)
-        => _events.Writer.TryWrite(new RaftEvent.ConfigChanged(config));
+    {
+        // ★ 队列满兜底（PromoteLearner 同款）：_config 唯一运行时更新路径即本事件——TryWrite 满
+        //   则丢 = 成员变更静默丢失且无重触发（leader 漏起新成员 lane / follower 新配置下无投票
+        //   资格，活性级缺口）。补阻塞入队兜底（受控提交，任务组观测）。
+        if (!_events.Writer.TryWrite(new RaftEvent.ConfigChanged(config)))
+            _loops.SubmitFast((Func<CancellationToken, ValueTask>)(async ct =>
+                await _events.Writer.WriteAsync(new RaftEvent.ConfigChanged(config), ct).ConfigureAwait(false)));
+    }
 
     /// <summary>构造（零 IO——启动经 <see cref="StartAsync"/>）。</summary>
     /// <param name="self">本节点 ID。</param>
@@ -406,7 +421,28 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
                 _replication?.WakeLanesIfCaughtUp();
                 Volatile.Write(ref _lastTickQueuedTicks, _clock.GetMsTimestamp());
             });
+        // ★ 周期观测订阅（调度饥饿鲁棒——见字段注释）：每 观测间隔 滚动到期投 tick，循环观测粒度
+        //   恒 &lt; 选举窗阈值（被饿判定 gap 的区分前提——PacerLoop 只在 deadline 到期投 tick，
+        //   无本订阅时正常窗满的 gap = 窗长 ≥ 阈值会被误判为被饿）。初始 deadline 0 = 首轮即到期。
+        _observerSubscription = _registry.Subscribe(
+            deadlineTicks: () => Volatile.Read(ref _observerDeadlineTicks),
+            wake: () =>
+            {
+                try
+                {
+                    if (!_events.Writer.TryWrite(TickEvent))
+                        Interlocked.Increment(ref _tickWriteFailures);
+                }
+                catch (ChannelClosedException) { }   // 循环 fail-fast 终态——退订竞态，吞
+                Volatile.Write(ref _observerDeadlineTicks,
+                    _clock.GetMsTimestamp() + ObserverIntervalMs());
+            });
     }
+
+    /// <summary>周期观测间隔（ms——观测粒度须 &lt; 选举窗阈值/2：健康空闲 gap ≤ 间隔，被饿判定不误伤
+    /// 正常窗满；clamp [5,100] 防极端配置下的过高频/低粒度）。</summary>
+    private long ObserverIntervalMs() => Math.Clamp(
+        (long)(_options.ElectionTimeoutMin.TotalMilliseconds / 2), 5, 100);
 
     /// <summary>循环任务异常兜底（TaskSink onFaulted——记录到 <see cref="LoopException"/>）。</summary>
     private void OnLoopFaulted(Exception ex)
@@ -493,6 +529,8 @@ public sealed partial class RaftStateMachine : IAsyncDisposable
         // ★ 节拍退订（同步、无共享线程需等——TickKey 键控形态随 TimerQueue 去 Tick 一起退役）
         _tickSubscription?.Dispose();
         _tickSubscription = null;
+        _observerSubscription?.Dispose();
+        _observerSubscription = null;
         // 循环线程有界等退（registry Shard.DisposeAsync 同款——超时 LogWarning，资源滞留换安全）
         if (_loopThread is { } loop)
         {

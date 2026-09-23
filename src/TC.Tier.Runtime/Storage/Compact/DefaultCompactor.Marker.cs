@@ -49,9 +49,8 @@ internal sealed partial class DefaultCompactor
         try
         {
             // 新形态：引擎子目录下以 {name}.compact.marker. 为前缀的文件（seq = 文件名尾段整数）。
-            // ★ 必须**双参显式** EnumerateFiles(dir, pattern)——单实参调用会经 C# 重载解析命中
-            //   pattern 单参重载（在根空间找同名文件→恒空，实测陷阱）；整目录枚举 + 前缀过滤
-            //   为跨介质稳态（pattern 通配语义不再依赖）。
+            // 枚举一律带 path 起始目录（EnumerateFiles(dir)——#518 归一后单参即 path 语义）；
+            // 整目录枚举 + 前缀过滤为跨介质稳态（pattern 通配语义不再依赖）。
             string markerPrefix = $"{LastComponent(DeviceName)}{MarkerFileNameSuffix}.";
             string tmpSuffix = ".tmp";
             foreach (var entry in _fileSystem.EnumerateFiles(MarkerDirectory, "*"))

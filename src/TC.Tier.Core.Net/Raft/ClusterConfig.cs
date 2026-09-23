@@ -31,6 +31,12 @@ public sealed class ClusterConfig
     /// <summary>配置条目 payload 格式版本（v2 = 成员尾增 Role 1B——件 B learner；v1 全 voter 可读）。</summary>
     public const ushort FormatVersion = 2;
 
+    private const int CountOffset = 2;                        // Version 2B 后
+    private const int FormatPrefixSize = CountOffset + 1;     // Version 2B + Count 1B = 3
+    private const int EndpointLenSize = 1;                    // 端点长度字节
+    private const int NodeIdBytes = 16;                       // = NodeIdCodec.StructSize（生成属性不可进 const 表达式）
+    private const int MemberFixedSize = NodeIdBytes + EndpointLenSize + 1;   // Id 16B + EpLen 1B + Role 1B = 18
+
     // v1 兼容读（持久化日志/快照中的既有配置条目）
     private const ushort FormatVersionV1 = 1;
 
@@ -192,21 +198,21 @@ public sealed class ClusterConfig
     public byte[] Serialize()
     {
         var epBytes = _members.Select(m => System.Text.Encoding.UTF8.GetBytes(m.EndPoint)).ToArray();
-        var buf = new byte[3 + _members.Length * 18 + epBytes.Sum(b => b.Length)];
+        var buf = new byte[FormatPrefixSize + _members.Length * MemberFixedSize + epBytes.Sum(b => b.Length)];
         var span = buf.AsSpan();
         BinaryPrimitives.WriteUInt16LittleEndian(span, FormatVersion);
-        span[2] = (byte)_members.Length;
-        var p = 3;
+        span[CountOffset] = (byte)_members.Length;
+        var p = FormatPrefixSize;
         for (var i = 0; i < _members.Length; i++)
         {
-            _members[i].Id.CopyTo(span.Slice(p, 16));
-            p += 16;
+            _members[i].Id.CopyTo(span.Slice(p, NodeIdBytes));
+            p += NodeIdBytes;
             span[p] = (byte)epBytes[i].Length;
-            p += 1;
+            p += EndpointLenSize;
             epBytes[i].CopyTo(span.Slice(p));
             p += epBytes[i].Length;
             span[p] = (byte)_members[i].Role;
-            p += 1;
+            p += EndpointLenSize;
         }
         return buf;
     }
@@ -217,20 +223,20 @@ public sealed class ClusterConfig
     /// <exception cref="FormatException">payload 过短/版本不支持/成员截断/端点截断。</exception>
     public static ClusterConfig Deserialize(ReadOnlySpan<byte> payload)
     {
-        if (payload.Length < 3) throw new FormatException("配置条目 payload 过短。");
+        if (payload.Length < FormatPrefixSize) throw new FormatException("配置条目 payload 过短。");
         var version = BinaryPrimitives.ReadUInt16LittleEndian(payload);
         if (version is not (FormatVersion or FormatVersionV1)) throw new FormatException($"配置条目版本不支持：{version}。");
-        var count = payload[2];
+        var count = payload[CountOffset];
         var roleSize = version == FormatVersion ? 1 : 0;
         var members = new ClusterMember[count];
-        var p = 3;
+        var p = FormatPrefixSize;
         for (var i = 0; i < count; i++)
         {
-            if (p + 17 + roleSize > payload.Length) throw new FormatException("配置条目成员截断。");
-            var id = new NodeId(payload.Slice(p, 16));
-            p += 16;
+            if (p + NodeIdBytes + EndpointLenSize + roleSize > payload.Length) throw new FormatException("配置条目成员截断。");
+            var id = new NodeId(payload.Slice(p, NodeIdBytes));
+            p += NodeIdBytes;
             var epLen = payload[p];
-            p += 1;
+            p += EndpointLenSize;
             if (p + epLen + roleSize > payload.Length) throw new FormatException("配置条目端点截断。");
             var ep = System.Text.Encoding.UTF8.GetString(payload.Slice(p, epLen));
             p += epLen;

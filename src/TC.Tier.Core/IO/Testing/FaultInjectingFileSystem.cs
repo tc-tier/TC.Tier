@@ -511,22 +511,11 @@ internal sealed class FaultInjectingFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <param name="pattern">文件名通配模式（默认 "*"）。</param>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">文件名通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录（默认 false）。</param>
     /// <returns>内层文件条目序列。</returns>
-    public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
-    {
-        ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        MaybeInject(null, "EnumerateFiles");
-        return _inner.EnumerateFiles(pattern, recursive);
-    }
-
-    /// <inheritdoc/>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">文件名通配模式。</param>
-    /// <param name="recursive">true = 递归子目录（默认 false）。</param>
-    /// <returns>内层文件条目序列。</returns>
-    public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
+    public IEnumerable<FsEntry> EnumerateFiles(string? path = null, string pattern = "*", bool recursive = false)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         MaybeInject(path, "EnumerateFiles");
@@ -534,22 +523,11 @@ internal sealed class FaultInjectingFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">目录名通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录（默认 false）。</param>
     /// <returns>内层目录条目序列。</returns>
-    public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
-    {
-        ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        MaybeInject(null, "EnumerateDirectories");
-        return _inner.EnumerateDirectories(pattern, recursive);
-    }
-
-    /// <inheritdoc/>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">目录名通配模式。</param>
-    /// <param name="recursive">true = 递归子目录（默认 false）。</param>
-    /// <returns>内层目录条目序列。</returns>
-    public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
+    public IEnumerable<FsEntry> EnumerateDirectories(string? path = null, string pattern = "*", bool recursive = false)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         MaybeInject(path, "EnumerateDirectories");
@@ -557,22 +535,11 @@ internal sealed class FaultInjectingFileSystem : IFileSystem
     }
 
     /// <inheritdoc/>
-    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">名称通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录（默认 false）。</param>
     /// <returns>内层文件 + 目录条目序列。</returns>
-    public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
-    {
-        ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        MaybeInject(null, "EnumerateEntries");
-        return _inner.EnumerateEntries(pattern, recursive);
-    }
-
-    /// <inheritdoc/>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">名称通配模式。</param>
-    /// <param name="recursive">true = 递归子目录（默认 false）。</param>
-    /// <returns>内层文件 + 目录条目序列。</returns>
-    public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
+    public IEnumerable<FsEntry> EnumerateEntries(string? path = null, string pattern = "*", bool recursive = false)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
         MaybeInject(path, "EnumerateEntries");

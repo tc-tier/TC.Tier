@@ -67,11 +67,11 @@ internal sealed class BlobObjectTable
     /// <summary>记录 payload 定长（48B = 16B 句柄 + 8B 长度 + 8B 帧长 + 8B 创建时刻 + 1B 状态 + 7B 保留）。</summary>
     public const int PayloadSize = 48;
 
-    /// <summary>帧头大小（结构层流式帧）。</summary>
-    public const int FrameHeaderSize = 14;
+    /// <summary>帧头大小（结构层流式帧——布局真源 = StreamFrameHeaderCodec 生成常量）。</summary>
+    public const int FrameHeaderSize = StreamFrameHeaderCodec.StructSize;
 
-    /// <summary>帧尾大小（结构层流式帧）。</summary>
-    public const int FrameFooterSize = 28;
+    /// <summary>帧尾大小（结构层流式帧——布局真源 = StreamFrameFooterCodec 生成常量）。</summary>
+    public const int FrameFooterSize = StreamFrameFooterCodec.StructSize;
 
     private readonly StreamSnapshot _snapshot;
     private readonly object _lock = new();

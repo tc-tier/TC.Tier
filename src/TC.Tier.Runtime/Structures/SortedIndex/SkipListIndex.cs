@@ -99,6 +99,12 @@ public partial class SkipListIndex<TKey> : SortedIndexBase<TKey> where TKey : un
         IKeyComparer<TKey>? keyComparer = null)
         : base(SkipListIndexCodec.Instance, fileSystem, settings, epoch, keyComparer, keyResolver: keyResolver)
     {
+        // arena 偏移常量表（SegId@8/Offset@16/Extension@24/LevelCount@28/Level0@32）手写假设 8B 键——
+        // 非 8B TKey 时节点映像随 Sequential 布局漂移而常量不动 = 静默错位（现役消费者全 8B/无
+        // SkipListOf* 实例化；16B 键若启用须先动态化偏移表）。BTree 无此假设（Sequential 自适配）。
+        if (System.Runtime.CompilerServices.Unsafe.SizeOf<TKey>() != 8)
+            throw new NotSupportedException(
+                $"SkipListIndex arena 偏移常量表假设 TKey 为 8 字节（实际 {System.Runtime.CompilerServices.Unsafe.SizeOf<TKey>()}）——非 8B 键布局错位，须先动态化偏移表");
         _maxLevel = settings.MaxLevel;
         _highLevelCacheThreshold = settings.HighLevelCacheThreshold;
         _maxRetryCount = settings.MaxRetryCount;

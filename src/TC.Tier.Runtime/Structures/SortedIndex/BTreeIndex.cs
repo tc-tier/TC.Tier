@@ -173,6 +173,8 @@ public partial class BTreeIndex<TKey> : SortedIndexBase<TKey> where TKey : unman
         IKeyComparer<TKey>? keyComparer = null)
         : base(BTreeIndexCodec.Instance, fileSystem, settings, epoch, keyComparer, keyResolver: keyResolver)
     {
+        // 节点 = [StructLayout(Sequential)] 整结构 MemoryMarshal 读写——字段偏移由编译器按 TKey 大小
+        // 自动排布（QueueKey 16B/DenseTimeKey 20B 现役消费者），零手写偏移常量，无 8B 键契约
         _nodeSize = ComputeNodeSize(settings.NodeSize, Unsafe.SizeOf<BTreeNode>());
         _minFillPercent = settings.MinFillPercent;
         _nodeCache = new LogicalAddressMap<BTreeNode>(settings.NodeCacheInitialCapacity, growable: true);

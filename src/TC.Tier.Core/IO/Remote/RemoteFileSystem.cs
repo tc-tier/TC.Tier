@@ -255,7 +255,7 @@ public sealed class RemoteFileSystem : IFileSystem
             if (_quotaBaselineReady) return;
             long sum = 0;
             var known = new Dictionary<string, long>(StringComparer.Ordinal);
-            foreach (var info in EnumerateFiles("*", recursive: true))
+            foreach (var info in EnumerateFiles(pattern: "*", recursive: true))
             {
                 sum += info.Length;
                 known[info.Name] = info.Length;
@@ -692,67 +692,37 @@ public sealed class RemoteFileSystem : IFileSystem
 
     // ═════════════════════════════ 枚举族（ListDelimited 前缀模拟）═════════════════════════════
 
-    /// <summary>枚举文件（从根；ListDelimited/ListAsync 前缀模拟，按 Name 有序）。</summary>
-    /// <param name="pattern">文件名通配模式（最终组件名匹配，默认 "*"）。</param>
-    /// <param name="recursive">true = 递归全前缀；false = 仅一层（默认）。</param>
-    /// <returns>文件条目序列（Name 为相对根的路径）。</returns>
-    public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
-    {
-        Shared.AccessGate.RejectRead(_access, nameof(EnumerateFiles));
-        return EnumerateCore(null, pattern, recursive, EntryFilter.Files);
-    }
-
-    /// <summary>枚举文件（从指定目录；按 Name 有序）。</summary>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">文件名通配模式（最终组件名匹配）。</param>
+    /// <summary>枚举文件（path=null 从根；ListDelimited/ListAsync 前缀模拟，按 Name 有序）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">文件名通配模式（最终组件名匹配，缺省 "*"）。</param>
     /// <param name="recursive">true = 递归全前缀；false = 仅一层（默认）。</param>
     /// <returns>文件条目序列（Name 为相对起始目录的路径）。</returns>
-    /// <exception cref="FileIOException">目录不存在且结果为空。</exception>
-    public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
+    /// <exception cref="FileIOException">目录不存在且结果为空（path 非 null 时）。</exception>
+    public IEnumerable<FsEntry> EnumerateFiles(string? path = null, string pattern = "*", bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateFiles));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <summary>枚举目录（从根；CommonPrefixes 推导，按 Name 有序）。</summary>
-    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
-    /// <param name="recursive">true = 递归推导子前缀；false = 仅一层（默认）。</param>
-    /// <returns>目录条目序列（Name 为相对根的路径）。</returns>
-    public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
-    {
-        Shared.AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
-        return EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
-    }
-
-    /// <summary>枚举目录（从指定目录；按 Name 有序）。</summary>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">目录名通配模式。</param>
+    /// <summary>枚举目录（path=null 从根；CommonPrefixes 推导，按 Name 有序）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">目录名通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归推导子前缀；false = 仅一层（默认）。</param>
     /// <returns>目录条目序列（Name 为相对起始目录的路径）。</returns>
-    /// <exception cref="FileIOException">目录不存在且结果为空。</exception>
-    public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
+    /// <exception cref="FileIOException">目录不存在且结果为空（path 非 null 时）。</exception>
+    public IEnumerable<FsEntry> EnumerateDirectories(string? path = null, string pattern = "*", bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <summary>枚举文件与目录（从根；按 Name 有序）。</summary>
-    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
-    /// <param name="recursive">true = 递归；false = 仅一层（默认）。</param>
-    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</returns>
-    public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
-    {
-        Shared.AccessGate.RejectRead(_access, nameof(EnumerateEntries));
-        return EnumerateCore(null, pattern, recursive, EntryFilter.Both);
-    }
-
-    /// <summary>枚举文件与目录（从指定目录；按 Name 有序）。</summary>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">名称通配模式。</param>
+    /// <summary>枚举文件与目录（path=null 从根；按 Name 有序）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">名称通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归；false = 仅一层（默认）。</param>
     /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</returns>
-    /// <exception cref="FileIOException">目录不存在且结果为空。</exception>
-    public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
+    /// <exception cref="FileIOException">目录不存在且结果为空（path 非 null 时）。</exception>
+    public IEnumerable<FsEntry> EnumerateEntries(string? path = null, string pattern = "*", bool recursive = false)
     {
         Shared.AccessGate.RejectRead(_access, nameof(EnumerateEntries));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Both);

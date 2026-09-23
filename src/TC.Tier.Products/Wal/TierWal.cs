@@ -670,7 +670,7 @@ public sealed class TierWal : LifecycleBase<WalRecoveryHints>, ITierWal
                 int p = 0;
                 while (p + WalSnapshotFormat.FrameHeaderSize <= chunk.Length)
                 {
-                    int len = BitConverter.ToInt32(chunk.Span.Slice(p, WalSnapshotFormat.FrameHeaderSize));
+                    int len = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(chunk.Span.Slice(p, WalSnapshotFormat.FrameHeaderSize));
                     if (!WalSnapshotFormat.IsValidFrameLength(len)) break;
                     p += WalSnapshotFormat.FrameHeaderSize + len;
                     counter.Count++;
@@ -710,7 +710,7 @@ public sealed class TierWal : LifecycleBase<WalRecoveryHints>, ITierWal
         {
             var got = await reader.ReadPayloadAsync(lenBuf, ct).ConfigureAwait(false);
             if (got < WalSnapshotFormat.FrameHeaderSize) break;   // EOF/不足——Footer 区
-            var len = BitConverter.ToInt32(lenBuf);
+            var len = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(lenBuf);
             if (!WalSnapshotFormat.IsValidFrameLength(len)) break;   // Footer magic——Footer 区
             if (payloadBuf.Length < len) payloadBuf = new byte[len];
             if (await reader.ReadPayloadAsync(payloadBuf.AsMemory(0, len), ct).ConfigureAwait(false) < len)
@@ -774,7 +774,7 @@ public sealed class TierWal : LifecycleBase<WalRecoveryHints>, ITierWal
                     _lenGot += take;
                     if (_lenGot == WalSnapshotFormat.FrameHeaderSize)
                     {
-                        _frameLen = BitConverter.ToInt32(_lenBuf);
+                        _frameLen = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(_lenBuf);
                         if (!WalSnapshotFormat.IsValidFrameLength(_frameLen))
                             throw new InvalidDataException("镜像帧流损坏——len 头非法。");
                         _state = 1;

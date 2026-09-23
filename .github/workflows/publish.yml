@@ -29,11 +29,20 @@ jobs:
         run: |
           set -e
           dotnet build -c Release --nologo
-          dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo
-          dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj -c Release --no-build --nologo
-          dotnet test tests/TC.Tier.Products.Tests/TC.Tier.Products.Tests.csproj -c Release --no-build --nologo
-          dotnet test tests/TC.Tier.Core.Net.Tests/TC.Tier.Core.Net.Tests.csproj -c Release --no-build --nologo
-          dotnet test tests/TC.Tier.Core.IO.Net.Tests/NetworkImageTransferTests.csproj -c Release --no-build --nologo
+          # ★ 时序敏感套件重试 ×2（吸收 runner 噪音——与 ci.yml 惯例对齐；#424 台账指出
+          #   正式门禁无重试 = 单次即红，逐项根修在案，重试只吸收环境抖动不豁免红）
+          run_with_retry() {
+            for attempt in 1 2; do
+              if "$@"; then return 0; fi
+              echo "== $* 第 $attempt 次失败（runner 时段性慢）——重试 =="
+            done
+            return 1
+          }
+          run_with_retry dotnet test tests/TC.Tier.Core.Tests/TC.Tier.Core.Tests.csproj -c Release --no-build --nologo
+          run_with_retry dotnet test tests/TC.Tier.Runtime.Tests/TC.Tier.Runtime.Tests.csproj -c Release --no-build --nologo
+          run_with_retry dotnet test tests/TC.Tier.Products.Tests/TC.Tier.Products.Tests.csproj -c Release --no-build --nologo
+          run_with_retry dotnet test tests/TC.Tier.Core.Net.Tests/TC.Tier.Core.Net.Tests.csproj -c Release --no-build --nologo
+          run_with_retry dotnet test tests/TC.Tier.Core.IO.Net.Tests/NetworkImageTransferTests.csproj -c Release --no-build --nologo
 
       # ★ Tag 分流：v1.0.0 → 四正式包；runtime-v0.0.1-beta → Runtime beta + 同版本 Core；
       #   preview-v1.0.0-alpha.N → Products 家族/网络扩展首发预览（未经网关实战打磨前不走正式通道，

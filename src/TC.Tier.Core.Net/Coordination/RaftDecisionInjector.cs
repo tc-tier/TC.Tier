@@ -21,7 +21,15 @@ public sealed class RaftDecisionInjector
     public const byte RecordKindCommit = 0x01;
 
     /// <summary>决策记录定长头：<c>[Kind 1B][TxSeq 8B][CtxLen 4B]</c>。</summary>
-    public const int HeaderBytes = 13;
+    private const int KindOffset = 0;
+    private const int KindSize = 1;
+    private const int TxSeqSize = 8;
+    private const int CtxLenSize = 4;
+    private const int TxSeqOffset = KindSize;                    // 1
+    private const int CtxLenOffset = KindSize + TxSeqSize;       // 9
+
+    /// <summary>决策记录定长头字节数（13B = Kind 1B + TxSeq 8B + CtxLen 4B）。</summary>
+    public const int HeaderBytes = KindSize + TxSeqSize + CtxLenSize;
 
     private readonly RaftStateMachine _coordinator;
     private readonly int _leadershipRetryCount;
@@ -45,9 +53,9 @@ public sealed class RaftDecisionInjector
     public static byte[] EncodeDecision(long txSeq, ReadOnlySpan<byte> context)
     {
         var record = new byte[HeaderBytes + context.Length];
-        record[0] = RecordKindCommit;
-        BinaryPrimitives.WriteInt64LittleEndian(record.AsSpan(1, 8), txSeq);
-        BinaryPrimitives.WriteInt32LittleEndian(record.AsSpan(9, 4), context.Length);
+        record[KindOffset] = RecordKindCommit;
+        BinaryPrimitives.WriteInt64LittleEndian(record.AsSpan(TxSeqOffset, TxSeqSize), txSeq);
+        BinaryPrimitives.WriteInt32LittleEndian(record.AsSpan(CtxLenOffset, CtxLenSize), context.Length);
         context.CopyTo(record.AsSpan(HeaderBytes));
         return record;
     }
@@ -57,10 +65,10 @@ public sealed class RaftDecisionInjector
     {
         if (record.Length < HeaderBytes)
             throw new FormatException($"决策记录截断：len={record.Length} < 头 {HeaderBytes}。");
-        if (record[0] != RecordKindCommit)
+        if (record[KindOffset] != RecordKindCommit)
             throw new FormatException($"决策记录种类未知：kind=0x{record[0]:X2}。");
-        var txSeq = BinaryPrimitives.ReadInt64LittleEndian(record.Slice(1, 8));
-        var ctxLen = BinaryPrimitives.ReadInt32LittleEndian(record.Slice(9, 4));
+        var txSeq = BinaryPrimitives.ReadInt64LittleEndian(record.Slice(TxSeqOffset, TxSeqSize));
+        var ctxLen = BinaryPrimitives.ReadInt32LittleEndian(record.Slice(CtxLenOffset, CtxLenSize));
         if (ctxLen < 0 || HeaderBytes + ctxLen != record.Length)
             throw new FormatException($"决策记录长度失配：ctxLen={ctxLen} 总长={record.Length}。");
         return (txSeq, record.Slice(HeaderBytes, ctxLen).ToArray());

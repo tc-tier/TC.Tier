@@ -503,10 +503,10 @@ public sealed class TierBlob : LifecycleBase<BlobRecoveryHints>, ITierBlob
                 var got = await owner._data.ReadAsync(footerAddr, footer, ct).ConfigureAwait(false);
                 if (got < BlobObjectTable.FrameFooterSize)
                     return (false, $"帧尾短读 {got}/{BlobObjectTable.FrameFooterSize}");
-                var magic = System.Buffers.Binary.BinaryPrimitives.ReadUInt32LittleEndian(footer);
+                var magic = StreamFrameFooterCodec.Read_Magic(footer);
                 if (magic != RecordMagic.SnapshotFrameFooter)
                     return (false, $"帧尾 magic 不符（0x{magic:X}）");
-                var totalLength = System.Buffers.Binary.BinaryPrimitives.ReadUInt64LittleEndian(footer.AsSpan(4, 8));
+                var totalLength = StreamFrameFooterCodec.Read_TotalLength(footer);
                 if ((long)totalLength != expectedDataLength)
                     return (false, $"帧尾 TotalLength {totalLength} ≠ 登记对账值 {expectedDataLength}");
                 return (true, string.Empty);

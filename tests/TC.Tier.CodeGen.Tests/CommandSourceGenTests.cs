@@ -830,6 +830,42 @@ public class CommandSourceGenTests
     }
 
     [Fact]
+    public void EmittedCode_ZeroWarningsUnderNullableEnable_NoCs8602Cs0108()
+    {
+        // #513 回归：消费方 TreatWarningsAsErrors=true 下 emitted 代码必须零警告——
+        // CS8602（叶子函数可空形参直解引用）/ CS0108（JsonContext.Options 遮蔽基类实例属性）。
+        // 修复形态 = 发射面消除：叶子函数 json/results 形参非空（调度方 ??= 后传参），
+        // Options 加 new 修饰符显式遮蔽——不是 pragma 白名单扩容。
+        var (_, comp) = Run(FamilySample);
+        var warnings = comp.GetDiagnostics()
+            .Where(d => d.Severity == DiagnosticSeverity.Warning
+                && (d.Id == "CS8602" || d.Id == "CS0108"))
+            .ToList();
+        warnings.Should().BeEmpty("emitted 代码零警告红线（#513）：\n"
+            + string.Join("\n", warnings.Take(8).Select(w => w.ToString())));
+
+        // 发射形态守卫：叶子函数签名非空 + Options 带 new——两处消除是结构性修复，防回退到可空形参/裸遮蔽
+        var cliTree = comp.SyntaxTrees
+            .Single(t => t.FilePath.EndsWith("TrafficCommandsCli.g.cs", System.StringComparison.Ordinal))
+            .ToString();
+        cliTree.Should().Contain(
+            "global::System.Text.Json.Serialization.JsonSerializerContext __tcsg_json,",
+            "CLI 叶子函数 json 形参非空（调度方保证非空，发射面消除 CS8602）");
+        cliTree.Should().Contain(
+            "global::TC.Tier.CodeGen.ICommandResults __tcsg_results)",
+            "CLI 叶子函数 results 形参非空");
+        cliTree.Should().NotContain(
+            "JsonSerializerContext? __tcsg_json",
+            "叶子函数不得再声明可空 json 形参");
+
+        var jsonTree = comp.SyntaxTrees
+            .Single(t => t.FilePath.EndsWith("TrafficCommandsJsonResults.g.cs", System.StringComparison.Ordinal))
+            .ToString();
+        jsonTree.Should().Contain("public static new",
+            "JsonContext.Options 加 new 修饰符——显式遮蔽基类实例属性（消除 CS0108）");
+    }
+
+    [Fact]
     public void Cli_Http_DefaultResults_NewCommandFamilyZeroRegistration()
     {
         const string source = """

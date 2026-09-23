@@ -135,11 +135,11 @@ public sealed partial class StreamSnapshot
             frameFooter.EntryCount = (ulong)_entryCount;
             frameFooter.Crc = 0; // 占位，回填
             StreamFrameFooterCodec.Write(footer, in frameFooter);
-            _hash.Append(footer.Slice(0, 20)); // ★ CRC 累积 Footer 前 20B
+            _hash.Append(footer.Slice(0, StreamFrameFooterCodec.Offset_Crc)); // ★ CRC 累积 Footer 前 20B
 
             ulong crc = UnifiedCrc.FinalizeCrc64(_hash);
             System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(
-                footer.Slice(20, 8), crc);
+                footer.Slice(StreamFrameFooterCodec.Offset_Crc, StreamFrameFooterCodec.StructSize - StreamFrameFooterCodec.Offset_Crc), crc);
 
             _session.WriteSmall(footer);
         }

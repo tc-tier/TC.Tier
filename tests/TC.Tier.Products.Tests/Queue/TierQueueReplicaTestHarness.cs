@@ -342,6 +342,29 @@ internal static class TierQueueReplicaTestHarness
             }
         }
 
+        /// <summary>等待队列组 raft 领导权稳定（恰一 leader 且位点在稳定窗内不迁移——换届漂移吸收）。
+        /// ★ 测试 Enqueue/Dequeue 前置（#424 选举收敛 flake 家族：2vCPU/CI 负载下 WaitReady 后
+        ///   领导权偶发迁移，辖权节点 Enqueue 经转发路由到 leader，换届未稳时转发重试预算耗尽
+        ///   抛 NotLeaderException——2vCPU 全量实测复现 Matrix2）。</summary>
+        /// <param name="queueName">队列名。</param>
+        /// <param name="group">消费组名。</param>
+        /// <param name="stabilityWindow">位点不变观察窗（缺省 300ms——选举超时下界 600ms 的一半）。</param>
+        public async Task WaitLeadershipStableAsync(string queueName, string group, TimeSpan? stabilityWindow = null)
+        {
+            var window = stabilityWindow ?? TimeSpan.FromMilliseconds(300);
+            await WaitConvergedAsync(async () =>
+            {
+                var leaders = Nodes
+                    .Where(n => n.Replicas.TryGetValue(queueName, out var r) && r.RaftGroup.Raft.IsLeader)
+                    .ToList();
+                if (leaders.Count != 1) return false;
+                var anchor = leaders[0].Id;
+                await Task.Delay(window);   // 位点不变观察窗（吸收单次换届漂移）
+                return Nodes.Count(n => n.Replicas.TryGetValue(queueName, out var r)
+                    && r.RaftGroup.Raft.IsLeader && r.RaftGroup.Raft.LeaderId == anchor) == 1;
+            }, TimeSpan.FromSeconds(20));
+        }
+
         /// <summary>等待指定队列组的辖权视图全节点一致（引导竞速后的稳态门——ops 前置）。</summary>
         /// <param name="queueName">队列名。</param>
         /// <param name="group">消费组名。</param>

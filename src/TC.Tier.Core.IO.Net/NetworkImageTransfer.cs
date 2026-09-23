@@ -340,9 +340,14 @@ public static class NetworkImageTransfer
     /// <param name="s">网络流。</param>
     /// <param name="r">接收端校验摘要（FrameCount 不传输——对账用 RawBytes）。</param>
     private static void WriteReceipt(Stream s, NetworkTransferResult r)
-        => WriteReceiptFrame(s, r.EntryCount, r.RawBytes,
-            UnifiedCrc.ComputeCrc32([.. BitConverter.GetBytes(r.FrameCount), .. BitConverter.GetBytes(r.RawBytes)]),
-            r.Verified);
+    {
+        // CRC 输入 = 摘要字段的线上形态（LE——与回执帧字段端序一致，机器端序 BitConverter 禁用）
+        Span<byte> crcInput = stackalloc byte[16];
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(crcInput, r.FrameCount);
+        System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(crcInput[8..], r.RawBytes);
+        WriteReceiptFrame(s, r.EntryCount, r.RawBytes,
+            UnifiedCrc.ComputeCrc32(crcInput), r.Verified);
+    }
 
     /// <summary>回执帧写体（CRC 字段语义按档分轨：Structural = 摘要字段 CRC；Raw = 聚合载荷 CRC）。</summary>
     private static void WriteReceiptFrame(Stream s, long entryCount, long rawBytes, uint crcField, bool verified)

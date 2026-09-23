@@ -562,67 +562,37 @@ public sealed unsafe class MemoryFileSystem : IFileSystem
 
     // ═══════════════ 枚举族（模式匹配 = PathPattern 客户端过滤——与 BCL Simple 同语义）═══════════════
 
-    /// <summary>枚举文件（从根；PathPattern 客户端过滤，按 Name Ordinal 排序）。</summary>
-    /// <param name="pattern">文件名通配模式（最终组件名匹配，默认 "*"）。</param>
-    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
-    /// <returns>文件条目序列（Name 为相对根的路径）。</returns>
-    public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
-    {
-        AccessGate.RejectRead(_access, nameof(EnumerateFiles));
-        return EnumerateCore(null, pattern, recursive, EntryFilter.Files);
-    }
-
-    /// <summary>枚举文件（从指定目录；按 Name Ordinal 排序）。</summary>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">文件名通配模式（最终组件名匹配）。</param>
+    /// <summary>枚举文件（path=null 从根；按 Name Ordinal 排序）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">文件名通配模式（最终组件名匹配，缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
     /// <returns>文件条目序列（Name 为相对起始目录的路径）。</returns>
-    /// <exception cref="FileIOException">目录不存在。</exception>
-    public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
+    /// <exception cref="FileIOException">目录不存在（path 非 null 时）。</exception>
+    public IEnumerable<FsEntry> EnumerateFiles(string? path = null, string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateFiles));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Files);
     }
 
-    /// <summary>枚举目录（从根；显式集合 ∪ 文件路径推导）。</summary>
-    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
-    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
-    /// <returns>目录条目序列（Name 为相对根的路径）。</returns>
-    public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
-    {
-        AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
-        return EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
-    }
-
-    /// <summary>枚举目录（从指定目录）。</summary>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">目录名通配模式。</param>
+    /// <summary>枚举目录（path=null 从根；显式集合 ∪ 文件路径推导）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">目录名通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
     /// <returns>目录条目序列（Name 为相对起始目录的路径）。</returns>
-    /// <exception cref="FileIOException">目录不存在。</exception>
-    public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
+    /// <exception cref="FileIOException">目录不存在（path 非 null 时）。</exception>
+    public IEnumerable<FsEntry> EnumerateDirectories(string? path = null, string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateDirectories));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
     }
 
-    /// <summary>枚举文件与目录（从根；按 Name Ordinal 排序）。</summary>
-    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
-    /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
-    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</returns>
-    public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
-    {
-        AccessGate.RejectRead(_access, nameof(EnumerateEntries));
-        return EnumerateCore(null, pattern, recursive, EntryFilter.Both);
-    }
-
-    /// <summary>枚举文件与目录（从指定目录；按 Name Ordinal 排序）。</summary>
-    /// <param name="path">起始目录相对路径。</param>
-    /// <param name="pattern">名称通配模式。</param>
+    /// <summary>枚举文件与目录（path=null 从根；按 Name Ordinal 排序）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">名称通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录；false = 仅一层（默认）。</param>
     /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</returns>
-    /// <exception cref="FileIOException">目录不存在。</exception>
-    public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
+    /// <exception cref="FileIOException">目录不存在（path 非 null 时）。</exception>
+    public IEnumerable<FsEntry> EnumerateEntries(string? path = null, string pattern = "*", bool recursive = false)
     {
         AccessGate.RejectRead(_access, nameof(EnumerateEntries));
         return EnumerateCore(path, pattern, recursive, EntryFilter.Both);

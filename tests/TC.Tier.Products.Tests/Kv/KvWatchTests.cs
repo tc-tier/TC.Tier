@@ -223,6 +223,10 @@ public class KvWatchTests
         reader.TryRead(out _).Should().BeFalse("容量 2：第 3 条写入失败被弃");
         reader.Completion.IsCompleted.Should().BeTrue("缓冲排空后流终结（断连信号）");
         hub.PublishedWatermark.Should().Be(new LogicalAddress(0, 30), "断连不回退发布水位");
+
+        // #517 两态可辨：断连经专用异常完结通道（关闭收口 = 干净结束，形态不同）
+        reader.Completion.IsFaulted.Should().BeTrue("断连 = 携带异常完结");
+        reader.Completion.Exception!.InnerException.Should().BeOfType<KvWatchDisconnectedException>();
     }
 
     [Fact]
@@ -272,6 +276,57 @@ public class KvWatchTests
             await foreach (var _ in kv.WatchAsync(LogicalAddress.Empty)) break;
         };
         await act2.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task Watch_SlowSubscriber_DisconnectThrowsDedicatedException()
+    {
+        // #517 两态可辨（端到端）：慢订阅断连 = 枚举抛 KvWatchDisconnectedException（重订续传信号）；
+        // 先写一条（无订阅——发布只推水位），枚举注册后经水位重放收首事件，时序全确定
+        using var vol = new TestVolume();
+        await using var kv = await TierKvOfLongLong.CreateAsync(vol.Fs, Opts("disc", watchCapacity: 1));
+        using var s = kv.CreateSession(KvSessionConditions.None);
+        await s.PutFormattedAsync(K1, 1);
+
+        var enumerator = kv.WatchAsync(LogicalAddress.Empty).GetAsyncEnumerator();
+        (await enumerator.MoveNextAsync()).Should().BeTrue("订阅注册（同步段）+ 水位重放 = 首事件");
+        enumerator.Current.Key.Should().Be(K1);
+
+        // 容量 1：写 2 条——首条进缓冲，次条写满即断连（通道携带专用异常完结）
+        await s.PutFormattedAsync(K2, 2);
+        await s.PutFormattedAsync(K3, 3);
+
+        (await enumerator.MoveNextAsync()).Should().BeTrue("缓冲内事件照常交付");
+        enumerator.Current.Key.Should().Be(K2);
+        var act = async () => { while (await enumerator.MoveNextAsync()) { } };
+        await act.Should().ThrowAsync<KvWatchDisconnectedException>("断连可辨——凭已见最大地址重订续传");
+    }
+
+    [Fact]
+    public async Task Watch_StoreClose_CompletesCleanly_NoException()
+    {
+        // #517 两态可辨（端到端）：存储关闭收口 = 枚举干净结束（无异常）——与断连形态区分，
+        // 消费方不得重订（重订循环打转的根除面）
+        using var vol = new TestVolume();
+        var kv = await TierKvOfLongLong.CreateAsync(vol.Fs, Opts("close"));
+        var enumerator = kv.WatchAsync(LogicalAddress.Empty).GetAsyncEnumerator();
+        try
+        {
+            using (var s = kv.CreateSession(KvSessionConditions.None))
+            {
+                await s.PutFormattedAsync(K1, 1);
+                (await enumerator.MoveNextAsync()).Should().BeTrue();
+            }   // 会话先于 KV 释放（释放契约——epoch 排水依赖）
+
+            await kv.DisposeAsync();   // CompleteAll——无参干净完结
+
+            var act = async () => { while (await enumerator.MoveNextAsync()) { } };
+            await act.Should().NotThrowAsync("关闭收束 = 干净结束，非断连信号");
+        }
+        finally
+        {
+            await enumerator.DisposeAsync();
+        }
     }
 
     [Fact]

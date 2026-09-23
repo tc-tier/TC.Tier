@@ -446,49 +446,28 @@ public sealed partial class TierVolumeFs
         }
     }
 
-    /// <summary>枚举文件（从根，键序输出）。</summary>
-    /// <param name="pattern">文件名通配模式（FileSystem Name Matching 语法，默认 "*"）。</param>
-    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
-    /// <returns>文件条目序列（Name 为相对根的路径，键序）。</returns>
-    public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
-        => EnumerateCore(null, pattern, recursive, EntryFilter.Files);
-
-    /// <summary>枚举文件（从根，键序输出）。</summary>
-    /// <param name="path">起始目录相对路径（传 null 视为根）。</param>
-    /// <param name="pattern">文件名通配模式（FileSystem Name Matching 语法，默认 "*"）。</param>
+    /// <summary>枚举文件（path=null 从根，键序输出）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">文件名通配模式（FileSystem Name Matching 语法，缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
     /// <returns>文件条目序列（Name 为相对起始目录的路径，键序）。</returns>
-    public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
+    public IEnumerable<FsEntry> EnumerateFiles(string? path = null, string pattern = "*", bool recursive = false)
         => EnumerateCore(path, pattern, recursive, EntryFilter.Files);
 
-    /// <summary>枚举目录（从根，键序输出）。</summary>
-    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
-    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
-    /// <returns>目录条目序列（Name 为相对根的路径，键序）。</returns>
-    public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
-        => EnumerateCore(null, pattern, recursive, EntryFilter.Directories);
-
-    /// <summary>枚举目录（从根，键序输出）。</summary>
-    /// <param name="path">起始目录相对路径（传 null 视为根）。</param>
-    /// <param name="pattern">目录名通配模式（默认 "*"）。</param>
+    /// <summary>枚举目录（path=null 从根，键序输出）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">目录名通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
     /// <returns>目录条目序列（Name 为相对起始目录的路径，键序）。</returns>
-    public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
+    public IEnumerable<FsEntry> EnumerateDirectories(string? path = null, string pattern = "*", bool recursive = false)
         => EnumerateCore(path, pattern, recursive, EntryFilter.Directories);
 
-    /// <summary>枚举文件与目录（从根，双有序归并输出）。</summary>
-    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
-    /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
-    /// <returns>文件 + 目录条目序列（Name 为相对根的路径，按 Name 有序）。</returns>
-    public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
-        => EnumerateCore(null, pattern, recursive, EntryFilter.Both);
-
-    /// <summary>枚举文件与目录（从根，双有序归并输出）。</summary>
-    /// <param name="path">起始目录相对路径（传 null 视为根）。</param>
-    /// <param name="pattern">名称通配模式（默认 "*"）。</param>
+    /// <summary>枚举文件与目录（path=null 从根，双有序归并输出）。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">名称通配模式（缺省 "*"）。</param>
     /// <param name="recursive">true = 递归子目录；false = 仅直接子级（默认）。</param>
     /// <returns>文件 + 目录条目序列（Name 为相对起始目录的路径，按 Name 有序）。</returns>
-    public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
+    public IEnumerable<FsEntry> EnumerateEntries(string? path = null, string pattern = "*", bool recursive = false)
         => EnumerateCore(path, pattern, recursive, EntryFilter.Both);
 
     private enum EntryFilter { Files, Directories, Both }

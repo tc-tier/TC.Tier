@@ -109,58 +109,37 @@ public interface IFileSystem : IDisposable
     FsEntryInfo Stat(string path);
 
     // ═══════════════════════════════════════════════════════════════
-    //  枚举族（三族同形态：单参=根+pattern；双参=path+pattern；recursive 默认 false）
-    // ★★ 重载解析陷阱（#297 S1 实测，a35cbd4e）：**单实参调用命中单参重载 = pattern 语义**
-    //   （在根空间按名匹配条目）。想枚举子目录必须**双参显式** (path, pattern)——单实参
-    //   EnumerateFiles(dir) 会被 C# 解析为 pattern=dir 的根空间匹配，恒空（目录不是文件）
-    //   且无编译告警。子目录枚举调用一律写全双参。
+    //  枚举族（三族同形态：path 在前可空（null=根）+ pattern 缺省 "*" + recursive 默认 false）
+    // ★★ 归一单一形态（#518——BCL 心智对齐）：EnumerateDirectories("backups") = 枚举其子目录
+    //   （Directory.EnumerateDirectories 第一参是 path）；根下按模式枚举 = 命名参数
+    //   pattern: "rev-*"。旧「单参=pattern」重载已退役——预览期完成迁移。
     // ═══════════════════════════════════════════════════════════════
 
-    /// <summary>枚举根层文件（pattern 缺省 "*" 全匹配；recursive=true 全部后代）。</summary>
-    /// <remarks>★ 单参 = <b>pattern</b> 语义（根空间按名匹配条目）——子目录枚举必须双参显式
-    ///   (path, pattern)，见枚举族头部的重载解析陷阱说明。</remarks>
-    /// <exception cref="FileIOException">IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</exception>
-    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <summary>枚举文件（path=null 从根）。Name = 相对所枚举目录的路径（recursive 时多组件）。</summary>
+    /// <exception cref="FileIOException">IOError.NotFound——目录不存在（path 非 null 时）。</exception>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal；缺省 "*" 全量）。</param>
     /// <param name="recursive">是否递归枚举全部后代目录。</param>
     /// <returns>枚举条目集合</returns>
-    IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false);
+    IEnumerable<FsEntry> EnumerateFiles(string? path = null, string pattern = "*", bool recursive = false);
 
-    /// <summary>枚举子目录层文件。Name = 相对所枚举目录的路径（recursive 时多组件）。</summary>
-    /// <exception cref="FileIOException">IOError.NotFound——目录不存在（仅双参形态的子目录路径）。</exception>
-    /// <param name="path">相对目录路径。</param>
-    /// <param name="pattern">通配模式（仅匹配最终组件名， BCL MatchType.Simple，Ordinal）。</param>
+    /// <summary>枚举子目录（path=null 从根；一层，recursive=true = 全部后代目录）。
+    /// Name = 相对所枚举目录的路径。</summary>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal；缺省 "*" 全量）。</param>
     /// <param name="recursive">是否递归枚举全部后代目录。</param>
     /// <returns>枚举条目集合</returns>
-    IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false);
-
-    /// <summary>枚举根层子目录。</summary>
-    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
-    /// <param name="recursive">是否递归枚举全部后代目录。</param>
-    /// <returns>枚举条目集合</returns>
-    IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false);
-
-    /// <summary>枚举子目录的一层子目录（recursive=true = 全部后代目录）。</summary>
-    /// <param name="path">相对目录路径。</param>
-    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
-    /// <param name="recursive">是否递归枚举全部后代目录。</param>
-    /// <returns>枚举条目集合</returns>
-    IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false);
+    IEnumerable<FsEntry> EnumerateDirectories(string? path = null, string pattern = "*", bool recursive = false);
 
     /// <summary>
     /// 混合枚举（文件+目录一次产出——引擎扫盘形态；Remote 单次列举同时出 Objects+CommonPrefixes）。
     /// 契约：同参下结果 = EnumerateFiles ∪ EnumerateDirectories。
     /// </summary>
-    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
+    /// <param name="path">起始目录相对路径（null = 根）。</param>
+    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal；缺省 "*" 全量）。</param>
     /// <param name="recursive">是否递归枚举全部后代目录。</param>
     /// <returns>枚举条目集合</returns>
-    IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false);
-
-    /// <summary>混合枚举（子目录范围）。</summary>
-    /// <param name="path">相对目录路径。</param>
-    /// <param name="pattern">通配模式（仅匹配最终组件名，BCL MatchType.Simple，Ordinal）。</param>
-    /// <param name="recursive">是否递归枚举全部后代目录。</param>
-    /// <returns>枚举条目集合</returns>
-    IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false);
+    IEnumerable<FsEntry> EnumerateEntries(string? path = null, string pattern = "*", bool recursive = false);
 
     // ═══════════════════════════════════════════════════════════════
 

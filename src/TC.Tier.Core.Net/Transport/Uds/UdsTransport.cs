@@ -209,9 +209,9 @@ public sealed class UdsTransport : IProtocolTransport, ICoreProtocolPort
         /// <returns>完成时应答帧已写入 socket 且等待方已放行。</returns>
         public async ValueTask ReplyAsync(ReadOnlyMemory<byte> payload, CancellationToken ct = default)
         {
-            var frame = new byte[12 + payload.Length];
+            var frame = new byte[UdsReplyHeadCodec.StructSize + payload.Length];
             UdsReplyHeadCodec.Write(frame, new UdsReplyHead { CorrId = corrId, Length = payload.Length });
-            payload.Span.CopyTo(frame.AsSpan(12));
+            payload.Span.CopyTo(frame.AsSpan(UdsReplyHeadCodec.StructSize));
             await socket.SendAsync(frame, SocketFlags.None, ct).ConfigureAwait(false);
             done.TrySetResult(payload.ToArray());
         }
@@ -368,7 +368,7 @@ public sealed class UdsTransport : IProtocolTransport, ICoreProtocolPort
         await socket.ConnectAsync(new UnixDomainSocketEndPoint(path), ct).ConfigureAwait(false);
         try
         {
-            var frame = new byte[29 + payload.Length];
+            var frame = new byte[UdsRequestHeadCodec.StructSize + payload.Length];
             UdsRequestHeadCodec.Write(frame, new UdsRequestHead
             {
                 CorrId = corrId,
@@ -376,14 +376,14 @@ public sealed class UdsTransport : IProtocolTransport, ICoreProtocolPort
                 Domain = protocolId,
                 Length = payload.Length,
             });
-            payload.Span.CopyTo(frame.AsSpan(29));
+            payload.Span.CopyTo(frame.AsSpan(UdsRequestHeadCodec.StructSize));
             await socket.SendAsync(frame, SocketFlags.None, ct).ConfigureAwait(false);
 
-            var respBytes = new byte[12 + payload.Length];
+            var respBytes = new byte[UdsReplyHeadCodec.StructSize + payload.Length];
             if (!await ReadExactAsync(socket, respBytes, ct).ConfigureAwait(false))
                 throw new NetIOException("UDS 对端关闭（无应答）。");
             var respLen = UdsReplyHeadCodec.Read_Length(respBytes);
-            return respBytes[12..(12 + respLen)];
+            return respBytes[UdsReplyHeadCodec.StructSize..(UdsReplyHeadCodec.StructSize + respLen)];
         }
         finally { socket.Dispose(); }
     }
