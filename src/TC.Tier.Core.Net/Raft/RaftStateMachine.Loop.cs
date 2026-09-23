@@ -129,8 +129,22 @@ public sealed partial class RaftStateMachine
     /// <param name="now">当前时间戳（_clock.GetMsTimestamp()）。</param>
     private void CheckDeadline(long now)
     {
-        if (now >= NextDeadlineTicks())
-            HandleTimerElapsed(now);
+        if (now < NextDeadlineTicks()) return;   // 未到期
+        // ★ 调度饥饿判定（#504 挂死族根因——follower 泵线程被饿时墙钟超期 ≠ leader 失联）：
+        //   自上次循环推进完成（_lastLoopProgressTicks）已错过至少一个完整最小选举窗 = 观测能力
+        //   缺失（可能错过 leader 心跳，也可能 leader 正常只是自己没被调度）——不触发选举，按
+        //   当前时刻重掷选举截止，让积压入站事件（心跳）先被处理；被饿期间的墙钟不计入选举超时。
+        //   leader 心跳侧不改：迟发心跳无害（follower 靠"收到即处理"续命，不要求准时）。
+        if (_role != RaftRole.Leader)
+        {
+            var gap = now - Volatile.Read(ref _lastLoopProgressTicks);
+            if (gap >= (long)_options.ElectionTimeoutMin.TotalMilliseconds)
+            {
+                ResetElectionTimer();
+                return;
+            }
+        }
+        HandleTimerElapsed(now);
     }
 
     /// <summary>

@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using TC.Tier.CodeGen;
 using TC.Tier.Core.Logging;
 using TC.Tier.Core.Lifecycle;
 
@@ -185,7 +187,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
                 f.EntryCount = (ulong)entries;
                 f.Crc = 0;   // 占位，回填
                 StreamFrameFooterCodec.Write(footer, in f);
-                hash.Append(footer.AsSpan(0, 20));
+                hash.Append(footer.AsSpan(0, StreamFrameFooterCodec.Offset_Crc));
                 BinaryPrimitives.WriteUInt64LittleEndian(footer.AsSpan(20), UnifiedCrc.FinalizeCrc64(hash));
                 session.WriteSmall(footer);
 
@@ -382,7 +384,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
                 f.EntryCount = (ulong)entries;
                 f.Crc = 0;
                 StreamFrameFooterCodec.Write(footer, in f);
-                hash.Append(footer.AsSpan(0, 20));
+                hash.Append(footer.AsSpan(0, StreamFrameFooterCodec.Offset_Crc));
                 BinaryPrimitives.WriteUInt64LittleEndian(footer.AsSpan(20), UnifiedCrc.FinalizeCrc64(hash));
                 session.WriteSmall(footer);
 
@@ -472,7 +474,7 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
         var f = StreamFrameFooterCodec.Read(footer.AsSpan());
         if (f.Magic != StreamSnapshot.StreamFrameFooter.FooterMagic)
             throw new InvalidDataException("段帧尾 magic 非法——快照段损坏。");
-        hash.Append(footer.AsSpan(0, 20));
+        hash.Append(footer.AsSpan(0, StreamFrameFooterCodec.Offset_Crc));
         if (UnifiedCrc.FinalizeCrc64(hash) != f.Crc)
             throw new InvalidDataException("段 CRC64 校验失败——快照段损坏。");
         if ((long)f.TotalLength != dataAvailable)
@@ -480,24 +482,46 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     }
 
     // ════════════════════════════════════════════════════════════
-    // 段表序列化（opaque meta 载体；[count 4B][pad 4B][条目 40B × N]）
+    // 段表序列化（opaque meta 载体；[头 8B][条目 40B × N]）
     // ════════════════════════════════════════════════════════════
 
-    /// <summary>段表条目序列化大小 = LogicalStart 16B + PhysStart 16B + N₀ 8B（PhysStart 必须持久化——
-    /// 逻辑↔物理有 flush padding 偏差，无法从逻辑推算）。</summary>
-    internal const int SegmentEntrySize = 16 + 16 + 8;
+    /// <summary>段表头（8B 定长：[count 4B][reserved 4B]——reserved 恒 0 保持条目 8B 对齐起点）。</summary>
+    [BinaryLayout(Features = BinaryLayoutFeatures.All)]
+    [StructLayout(LayoutKind.Explicit, Size = 8)]
+    internal struct SegmentTableHeader
+    {
+        [FieldOffset(0)] public int Count;
+        [FieldOffset(4)] public int Reserved;
+    }
+
+    /// <summary>段表条目（40B 定长 = LogicalStart 16B + PhysStart 16B + N₀ 8B；PhysStart 必须持久化——
+    /// 逻辑↔物理有 flush padding 偏差，无法从逻辑推算）。LogicalAddress 跨程序集嵌套按名委托其 codec。</summary>
+    [BinaryLayout(Features = BinaryLayoutFeatures.All)]
+    [StructLayout(LayoutKind.Explicit, Size = 40)]
+    internal struct SegmentTableEntry
+    {
+        [FieldOffset(0)] public LogicalAddress LogicalStart;
+        [FieldOffset(16)] public LogicalAddress PhysStart;
+        [FieldOffset(32)] public long N0;
+    }
+
+    /// <summary>段表条目序列化大小（40B——布局真源 = SegmentTableEntryCodec.StructSize）。</summary>
+    internal const int SegmentEntrySize = 40;
 
     internal static byte[] SerializeSegments(IReadOnlyList<SegmentInfo> segs)
     {
-        var buf = new byte[8 + segs.Count * SegmentEntrySize];
-        BinaryPrimitives.WriteInt32LittleEndian(buf, segs.Count);
+        var buf = new byte[SegmentTableHeaderCodec.StructSize + segs.Count * SegmentTableEntryCodec.StructSize];
+        SegmentTableHeaderCodec.Write(buf, new SegmentTableHeader { Count = segs.Count, Reserved = 0 }, validate: true);
         for (int i = 0; i < segs.Count; i++)
         {
             var s = segs[i];
-            int off = 8 + i * SegmentEntrySize;
-            WriteAddress(buf.AsSpan(off), s.LogicalStart);
-            WriteAddress(buf.AsSpan(off + 16), s.PhysStart);
-            BinaryPrimitives.WriteInt64LittleEndian(buf.AsSpan(off + 32), s.N0);
+            int off = SegmentTableHeaderCodec.StructSize + i * SegmentTableEntryCodec.StructSize;
+            SegmentTableEntryCodec.Write(buf.AsSpan(off, SegmentTableEntryCodec.StructSize), new SegmentTableEntry
+            {
+                LogicalStart = s.LogicalStart,
+                PhysStart = s.PhysStart,
+                N0 = s.N0,
+            }, validate: false);
         }
         return buf;
     }
@@ -511,31 +535,18 @@ public sealed partial class IncrementalSnapshot : SnapshotBase
     internal static List<SegmentInfo> DeserializeSegments(ReadOnlySpan<byte> buf)
     {
         var list = new List<SegmentInfo>();
-        if (buf.Length < 8) return list;
-        int count = BinaryPrimitives.ReadInt32LittleEndian(buf);
-        if (count < 0 || 8 + count * SegmentEntrySize > buf.Length) return list;
+        if (buf.Length < SegmentTableHeaderCodec.StructSize) return list;
+        var header = SegmentTableHeaderCodec.Read(buf);
+        int count = header.Count;
+        if (count < 0 || SegmentTableHeaderCodec.StructSize + count * SegmentTableEntryCodec.StructSize > buf.Length) return list;
         for (int i = 0; i < count; i++)
         {
-            int off = 8 + i * SegmentEntrySize;
-            var logical = ReadAddress(buf.Slice(off));
-            var phys = ReadAddress(buf.Slice(off + 16));
-            long n0 = BinaryPrimitives.ReadInt64LittleEndian(buf.Slice(off + 32));
-            list.Add(new SegmentInfo(logical, phys, n0));
+            int off = SegmentTableHeaderCodec.StructSize + i * SegmentTableEntryCodec.StructSize;
+            var entry = SegmentTableEntryCodec.Read(buf.Slice(off, SegmentTableEntryCodec.StructSize));
+            list.Add(new SegmentInfo(entry.LogicalStart, entry.PhysStart, entry.N0));
         }
         return list;
     }
-
-    private static void WriteAddress(Span<byte> dst, LogicalAddress addr)
-    {
-        BinaryPrimitives.WriteInt32LittleEndian(dst, addr.SegId);
-        BinaryPrimitives.WriteInt32LittleEndian(dst.Slice(4), addr.Extension);
-        BinaryPrimitives.WriteInt64LittleEndian(dst.Slice(8), addr.Offset);
-    }
-
-    private static LogicalAddress ReadAddress(ReadOnlySpan<byte> src) => new(
-        BinaryPrimitives.ReadInt32LittleEndian(src),
-        BinaryPrimitives.ReadInt32LittleEndian(src.Slice(4)),
-        BinaryPrimitives.ReadInt64LittleEndian(src.Slice(8)));
 
     /// <summary>截断边界向下对齐（引擎 ReclaimHead 打洞契约）。</summary>
     internal static long AlignDownTruncate(long offset) => offset & ~(TruncateAlign - 1);

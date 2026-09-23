@@ -47,6 +47,7 @@ internal sealed class PeerLink : IAsyncDisposable
     private int _state = StateHandshaking;
     private byte _negotiatedFeatures;
     private KeepaliveTracker? _keepalive;   // 握手协商出 bit0 才建——保活计票
+    private long _nextKeepaliveAt;          // 保活下一拍到期单调戳（写循环单线程读写——保活并入写循环）
     // ★ 常驻读缓冲（批拉帧——游标 [_rPos, _rEnd) 为未消费区；构造期分配随链路生命周期，废弃不复位）
     private readonly byte[] _readBuf = new byte[64 * 1024];
     private int _rPos;
@@ -528,38 +529,37 @@ internal sealed class PeerLink : IAsyncDisposable
     }
 
     /// <summary>
-    /// 保活循环（§4.5——协商出 bit0 才启动：周期 Keepalive 帧（管理通道，不走注入面）；
-    /// 连续无入站保活达上限 = 断连（半开死链唯一检测手段），拨号方退避重连）。
-    /// <para>★ 专用线程 + AsyncPump 泵域载体（tcp-keepalive-{remote}）——域内 await 不写
-    /// ConfigureAwait(false)，续体回流泵线程（池续体丢失 = 保活停 = 半开死链不检测）。</para>
+    /// 保活 tick（§4.5——并入写循环，替代专用保活线程）——每循环迭代判定到期，
+    /// 到期发保活帧（管理通道，不走注入面）或判定断连。★ 节奏守恒：持续出站流量下循环每迭代
+    /// 判定，保活不因忙而缺席——对端"连续无入站保活达上限断连"的计数依赖我方按时发送，
+    /// 缺席 = 对端误判半开死链。断连 = 关链路（写循环随 state == Closed 顶护栏退出）。
     /// </summary>
-    /// <param name="ct">取消令牌（传输停止时终止循环——常态退出不视为故障）。</param>
-    /// <returns>循环退出（断连/取消/介质故障）时完成的任务。</returns>
-    public async Task RunKeepaliveAsync(CancellationToken ct)
+    /// <param name="ct">取消令牌（入队等待可取消）。</param>
+    private async ValueTask RunKeepaliveTickIfDueAsync(CancellationToken ct)
     {
-        var tracker = _keepalive!;
-        var interval = _owner.Tunables.KeepaliveInterval;   // 二期-D6：每拍重读——运行时更新下一拍生效
+        if (_keepalive is not { } tracker || !IsEstablished) return;
+        var now = Environment.TickCount64;
+        if (_nextKeepaliveAt == 0)
+            _nextKeepaliveAt = now + (long)_owner.Tunables.KeepaliveInterval.TotalMilliseconds;
+        if (now < _nextKeepaliveAt) return;   // 未到期——本轮无动作
+        _nextKeepaliveAt = now + (long)_owner.Tunables.KeepaliveInterval.TotalMilliseconds;   // 二期-D6：每拍重读——下一拍生效
+        if (tracker.OnSent())
+        {
+            _owner.NetView?.OnKeepaliveDrop(_remote.ToString());
+            _owner.Logger?.LogDebug("保活超时断连：{Remote}（连续 {Max} 周期无入站保活）",
+                _remote, _owner.Tunables.KeepaliveMaxUnanswered);
+            Close();
+            return;
+        }
         try
         {
-            while (!ct.IsCancellationRequested && IsEstablished)
-            {
-                await Task.Delay(interval, ct);
-                if (!IsEstablished) break;
-                if (tracker.OnSent())
-                {
-                    _owner.NetView?.OnKeepaliveDrop(_remote.ToString());
-                    _owner.Logger?.LogDebug("保活超时断连：{Remote}（连续 {Max} 周期无入站保活）",
-                        _remote, _owner.Tunables.KeepaliveMaxUnanswered);
-                    Close();
-                    break;
-                }
-                await WriteFrameAsync(FrameKind.Keepalive, ChannelIds.Management, ProtocolIds.Management,
-                    ReadOnlyMemory<byte>.Empty, ct);
-            }
+            await WriteFrameAsync(FrameKind.Keepalive, ChannelIds.Management, ProtocolIds.Management,
+                ReadOnlyMemory<byte>.Empty, ct);
         }
-        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException or OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or SocketException or ObjectDisposedException
+            or OperationCanceledException or NetIOException)
         {
-            // 连接已断/传输停止——常态退出
+            // 链路关闭/介质写失败——保活尽力（写循环随 state == Closed 顶护栏退出）
         }
     }
 
@@ -804,6 +804,10 @@ internal sealed class PeerLink : IAsyncDisposable
         {
             while (!ct.IsCancellationRequested)
             {
+                // ★ 链路已闭（对端断/保活超限/Dispose）——退出写循环：队列完成态下 WhenAny
+                //   立即返回，无此护栏 = 完成态空队列上空转自旋（顺带根治）
+                if (Volatile.Read(ref _state) == StateClosed) break;
+                await RunKeepaliveTickIfDueAsync(ct);
                 wires.Clear();
                 var length = 0;
                 // 非阻塞 drain（carry 优先 → control → stream——帧序 = 优先级序保持）；
@@ -838,10 +842,22 @@ internal sealed class PeerLink : IAsyncDisposable
                     await FlushAsync(coalesce.AsMemory(0, length), wires, ct);
                 else if (carry == default)
                 {
-                    // 两队列空——挂起等任一可读（无忙转；有积压时不布等待任务）
+                    // 两队列空——挂起等任一可读或保活到期（无忙转；有积压时不布等待任务）。
+                    // ★ 保活并入写循环：保活帧发送由循环顶 tick 承担——空转等待按保活间隔限时，
+                    //   到期即醒回环 tick（保活节奏不依赖独立线程）；无保活 = 永久等数据。
                     var controlPending = _controlQueue.Reader.WaitToReadAsync(ct).AsTask();
                     var streamPending = _streamQueue.Reader.WaitToReadAsync(ct).AsTask();
-                    await Task.WhenAny(controlPending, streamPending);
+                    if (_keepalive is not null && IsEstablished)
+                    {
+                        var keepaliveDelay = _nextKeepaliveAt == 0
+                            ? TimeSpan.Zero   // 保活刚协商、tick 尚未首拍——不挂起立即回环
+                            : TimeSpan.FromMilliseconds(Math.Max(1, _nextKeepaliveAt - Environment.TickCount64));
+                        await Task.WhenAny(controlPending, streamPending, Task.Delay(keepaliveDelay, ct));
+                    }
+                    else
+                    {
+                        await Task.WhenAny(controlPending, streamPending);
+                    }
                 }
             Drained: ;
             }

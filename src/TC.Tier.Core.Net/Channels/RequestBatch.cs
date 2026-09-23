@@ -24,19 +24,24 @@ public static class RequestBatch
     /// <summary>批量项数上限（防御——畸形计数拦截）。</summary>
     public const int MaxItems = 1024;
 
+    private const int CountPrefixSize = 4;   // [count 4B] 前缀
+    private const int LenFieldSize = 4;      // 单项 len 4B
+    private const int StatusSize = 1;        // 应答逐项 status 1B
+    private const int StatusAndLenSize = StatusSize + LenFieldSize;   // 应答逐项前缀 5B
+
     /// <summary>编码批量请求。</summary>
     /// <param name="items">批量单项载荷列表（非空；项数 ≤ <see cref="MaxItems"/>；单项 ≤ <see cref="MaxItemBytes"/>）。</param>
     /// <returns>批量请求帧字节（[count 4B][×N: len 4B + bytes]，小端）。</returns>
     public static byte[] EncodeRequest(IReadOnlyList<ReadOnlyMemory<byte>> items)
     {
         ValidateItems(items);
-        var buffer = new byte[4 + items.Count * 4 + items.Sum(i => i.Length)];
+        var buffer = new byte[CountPrefixSize + items.Count * LenFieldSize + items.Sum(i => i.Length)];
         BinaryPrimitives.WriteInt32LittleEndian(buffer, items.Count);
-        var cursor = 4;
+        var cursor = CountPrefixSize;
         foreach (var item in items)
         {
             BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(cursor), item.Length);
-            cursor += 4;
+            cursor += LenFieldSize;
             item.Span.CopyTo(buffer.AsSpan(cursor));
             cursor += item.Length;
         }
@@ -51,13 +56,13 @@ public static class RequestBatch
         var count = BinaryPrimitives.ReadInt32LittleEndian(payload.Span);
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, MaxItems);
-        var cursor = 4;
+        var cursor = CountPrefixSize;
         var items = new ReadOnlyMemory<byte>[count];
         for (var i = 0; i < count; i++)
         {
             var len = BinaryPrimitives.ReadInt32LittleEndian(payload.Span[cursor..]);
             ArgumentOutOfRangeException.ThrowIfNegative(len);
-            cursor += 4;
+            cursor += LenFieldSize;
             if (cursor + len > payload.Length)
                 throw new InvalidOperationException($"批量请求截断：item {i} 期望 {len}B。");
             items[i] = payload.Slice(cursor, len);
@@ -73,14 +78,14 @@ public static class RequestBatch
     /// <returns>批量应答帧字节（[count 4B][×N: status 1B + len 4B + bytes]，小端）。</returns>
     public static byte[] EncodeResponseWithStatus(IReadOnlyList<(byte Status, ReadOnlyMemory<byte> Payload)> results)
     {
-        var buffer = new byte[4 + results.Count * 5 + results.Sum(r => r.Payload.Length)];
+        var buffer = new byte[CountPrefixSize + results.Count * StatusAndLenSize + results.Sum(r => r.Payload.Length)];
         BinaryPrimitives.WriteInt32LittleEndian(buffer, results.Count);
-        var cursor = 4;
+        var cursor = CountPrefixSize;
         foreach (var (status, item) in results)
         {
             buffer[cursor] = status;
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(cursor + 1), item.Length);
-            cursor += 5;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(cursor + StatusSize), item.Length);
+            cursor += StatusAndLenSize;
             item.Span.CopyTo(buffer.AsSpan(cursor));
             cursor += item.Length;
         }
@@ -93,14 +98,14 @@ public static class RequestBatch
     public static byte[] EncodeResponse(IReadOnlyList<ReadOnlyMemory<byte>> results)
     {
         ValidateItems(results);
-        var buffer = new byte[4 + results.Count * 5 + results.Sum(r => r.Length)];
+        var buffer = new byte[CountPrefixSize + results.Count * StatusAndLenSize + results.Sum(r => r.Length)];
         BinaryPrimitives.WriteInt32LittleEndian(buffer, results.Count);
-        var cursor = 4;
+        var cursor = CountPrefixSize;
         foreach (var item in results)
         {
             buffer[cursor] = 0;   // status ok
-            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(cursor + 1), item.Length);
-            cursor += 5;
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(cursor + StatusSize), item.Length);
+            cursor += StatusAndLenSize;
             item.Span.CopyTo(buffer.AsSpan(cursor));
             cursor += item.Length;
         }
@@ -115,14 +120,14 @@ public static class RequestBatch
         var count = BinaryPrimitives.ReadInt32LittleEndian(payload.Span);
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, MaxItems);
-        var cursor = 4;
+        var cursor = CountPrefixSize;
         var items = new ReadOnlyMemory<byte>[count];
         for (var i = 0; i < count; i++)
         {
             var status = payload.Span[cursor];
-            var len = BinaryPrimitives.ReadInt32LittleEndian(payload.Span[(cursor + 1)..]);
+            var len = BinaryPrimitives.ReadInt32LittleEndian(payload.Span[(cursor + StatusSize)..]);
             ArgumentOutOfRangeException.ThrowIfNegative(len);
-            cursor += 5;
+            cursor += StatusAndLenSize;
             if (cursor + len > payload.Length)
                 throw new InvalidOperationException($"批量应答截断：item {i} 期望 {len}B。");
             if (status != 0)

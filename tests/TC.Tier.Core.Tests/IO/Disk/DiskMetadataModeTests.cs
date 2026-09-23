@@ -46,7 +46,7 @@ public sealed class DiskMetadataModeTests : IDisposable
         fs.Stat("s0").FileExtra.ToArray().Should().Equal(meta);
 
         // 枚举隐藏配对 sidecar（.s0 因 s0 存在而不可见）
-        fs.EnumerateFiles("*").Select(e => e.Name).Should().NotContain(".s0");
+        fs.EnumerateFiles(pattern: "*").Select(e => e.Name).Should().NotContain(".s0");
 
         // 生命周期绑定：Delete 主文件同删 sidecar
         fs.Delete("s0");

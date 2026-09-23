@@ -1,3 +1,4 @@
+using TC.Tier.CodeGen;
 using System.Runtime.InteropServices;
 
 namespace TC.Tier.Runtime.Structures.Ring.Contracts;
@@ -9,6 +10,7 @@ namespace TC.Tier.Runtime.Structures.Ring.Contracts;
 /// <para>★ 旧版 8B 位压缩（Address 42bit + Size 21bit + Multiplier 1bit）在 LogicalAddress 模型下不适用：
 ///   LogicalAddress 是 16B 结构（SegId+Extension+Offset），无法压进 42bit。改为显式 24B 结构。</para>
 /// </summary>
+[BinaryLayout(Features = BinaryLayoutFeatures.All)]
 [StructLayout(LayoutKind.Explicit, Size = 24)]
 internal struct AddressInfo
 {

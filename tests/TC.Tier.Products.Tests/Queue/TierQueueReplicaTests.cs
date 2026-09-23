@@ -53,6 +53,10 @@ public class TierQueueReplicaTests
         ex.Home.Should().Be(home.Id, "异常携带当前辖权者——客户端凭 Home 直连");
         ex.Group.Should().Be(TierQueue.DefaultGroupName);
 
+        // ★ 2vCPU/CI 负载加固（#424 选举收敛 flake——2vCPU 全量实测复现 Matrix2）：辖权节点
+        //   Enqueue 经转发路由到 leader，WaitReady 后领导权偶发迁移、换届未稳时转发重试预算
+        //   耗尽抛 NotLeaderException；等领导权稳定（恰一 leader 且位点稳定窗内不迁移）再操作。
+        await cluster.WaitLeadershipStableAsync("main", TierQueue.DefaultGroupName);
         await home.Replica.EnqueueAsync(TierQueueTestFactory.Msg(2, 1), default);
         (await home.Replica.DequeueAsync(4, default)).Should().HaveCount(1, "辖权节点正常出队");
     }

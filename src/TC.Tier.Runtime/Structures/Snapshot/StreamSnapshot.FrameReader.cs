@@ -137,7 +137,7 @@ public sealed partial class StreamSnapshot
             _entryCount = (long)f.EntryCount;
             _storedChecksum = f.Crc;
 
-            _hash.Append(footer.AsSpan(0, 20)); // ★ CRC 累积 Footer 前 20B
+            _hash.Append(footer.AsSpan(0, StreamFrameFooterCodec.Offset_Crc)); // ★ CRC 累积 Footer 前 20B
 
             ulong computed = UnifiedCrc.FinalizeCrc64(_hash);
             _footerValid = computed == _storedChecksum;

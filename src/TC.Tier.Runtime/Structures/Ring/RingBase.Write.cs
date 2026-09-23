@@ -128,7 +128,7 @@ public abstract partial class RingBase<TKey>
                 new ReadOnlySpan<AddressInfo>(in ai)),
                 (ushort)(flags | RecordFlags.FLAG_VALUE_OVERFLOW));
         }
-        // ★ 注意：WriteRecordCore 里 payload = key + AddressInfo(24B)，PayloadLength = keyLen + 24。
+        // ★ 注意：WriteRecordCore 里 payload = key + AddressInfo（AddressInfoCodec.StructSize），PayloadLength = keyLen + AddressInfoCodec.StructSize。
         return WriteRecordCore(key, value, flags);
     }
 
@@ -214,19 +214,19 @@ public abstract partial class RingBase<TKey>
             LogicalAddress ovAddr = WriteOverflow(newValue);
             var ai = AddressInfo.WriteInfo(ovAddr, newValue.Length);
             Unsafe.WriteUnaligned(ref Unsafe.AsRef<byte>((void*)(phys + valOff)), ai);
-            fields = new RingRecordFields(fields.Flags, (uint)(keyLen + 24), fields.PaddingLength, fields.PreviousAddress);
+            fields = new RingRecordFields(fields.Flags, (uint)(keyLen + AddressInfoCodec.StructSize), fields.PaddingLength, fields.PreviousAddress);
             RingCodec.WriteHeader(headerSpan, in fields);
-            var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + keyLen + 24);
+            var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + keyLen + AddressInfoCodec.StructSize);
             RingCodec.FillCrc(recordSpan, RingCodec.HeaderSize, keyLen + 24);
         }
         else if (!wasOverflow && willOverflow)
         {
             LogicalAddress ovAddr = WriteOverflow(newValue);
             var ai = AddressInfo.WriteInfo(ovAddr, newValue.Length);
-            fields = new RingRecordFields((ushort)(fields.Flags | RecordFlags.FLAG_VALUE_OVERFLOW), (uint)(keyLen + 24), fields.PaddingLength, fields.PreviousAddress);
+            fields = new RingRecordFields((ushort)(fields.Flags | RecordFlags.FLAG_VALUE_OVERFLOW), (uint)(keyLen + AddressInfoCodec.StructSize), fields.PaddingLength, fields.PreviousAddress);
             RingCodec.WriteHeader(headerSpan, in fields);
             Unsafe.WriteUnaligned(ref Unsafe.AsRef<byte>((void*)(phys + valOff)), ai);
-            var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + keyLen + 24);
+            var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + keyLen + AddressInfoCodec.StructSize);
             RingCodec.FillCrc(recordSpan, RingCodec.HeaderSize, keyLen + 24);
         }
         else if (wasOverflow && !willOverflow)
@@ -294,7 +294,7 @@ public abstract partial class RingBase<TKey>
         var ai = AddressInfo.WriteInfo(ovAddr, newValue.Length);
         // overflow→overflow：flags 保持（已含 OVERFLOW 位）；inline→overflow：补 OVERFLOW 位
         ushort newFlags = wasOverflow ? fields.Flags : (ushort)(fields.Flags | RecordFlags.FLAG_VALUE_OVERFLOW);
-        var updated = new RingRecordFields(newFlags, (uint)(keyLen + 24), fields.PaddingLength, fields.PreviousAddress);
+        var updated = new RingRecordFields(newFlags, (uint)(keyLen + AddressInfoCodec.StructSize), fields.PaddingLength, fields.PreviousAddress);
         WriteOverflowPointerInline(phys, keyLen, in updated, ai);
     }
 
@@ -305,7 +305,7 @@ public abstract partial class RingBase<TKey>
         var headerSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize);
         RingCodec.WriteHeader(headerSpan, in updated);
         Unsafe.WriteUnaligned(ref Unsafe.AsRef<byte>((void*)(phys + valOff)), ai);
-        var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + keyLen + 24);
+        var recordSpan = new Span<byte>((void*)phys, RingCodec.HeaderSize + keyLen + AddressInfoCodec.StructSize);
         RingCodec.FillCrc(recordSpan, RingCodec.HeaderSize, keyLen + 24);
     }
 

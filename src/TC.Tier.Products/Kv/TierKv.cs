@@ -535,12 +535,28 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
         }
     }
 
-    /// <summary>释放钩子：会话域契约（会话须先于 KV 释放——Debug 断言，epoch 排水依赖）
-    /// + 提交门 / 会话 epoch 释放。</summary>
+    /// <summary>释放钩子（同步轨）：会话域契约（会话须先于 KV 释放——Debug 断言，epoch 排水依赖）
+    /// + 提交门 / 会话 epoch 释放。核心清理经 <see cref="DisposeKvCore"/> 与异步轨共用。</summary>
     /// <param name="disposing">true=用户调 Dispose（执行本钩子释放）；false=终结器路径（直接返回，不释放）。</param>
     protected override void DisposeOverride(bool disposing)
     {
         if (!disposing) return;
+        DisposeKvCore();
+    }
+
+    /// <summary>释放钩子（异步轨）：DisposeAsync 走本钩子——只实现同步钩子的子类在 await using
+    /// 下全部清理失效（watch 订阅永不断连/闸门不释放），双轨必须对齐。</summary>
+    /// <param name="disposing">true=用户经 DisposeAsync 调用。</param>
+    protected override ValueTask DisposeOverrideAsync(bool disposing)
+    {
+        if (!disposing) return ValueTask.CompletedTask;
+        DisposeKvCore();
+        return ValueTask.CompletedTask;
+    }
+
+    /// <summary>KV 核心清理（同步/异步 Dispose 双轨共用——checkpoint 泵停 → watch 断连收口 → 闸门/epoch 释放）。</summary>
+    private void DisposeKvCore()
+    {
         System.Diagnostics.Debug.Assert(Volatile.Read(ref _activeSessions) == 0,
             $"TierKv 释放时仍有 {Volatile.Read(ref _activeSessions)} 个存活会话——会话须先于 KV 释放");
         // ★ checkpoint 泵先停（Cancel+有界等待泵退出——进行中 checkpoint 完成并释放提交门）
@@ -1306,7 +1322,8 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
                     var expiryTicks = KvValueFraming.ExpiryTicks(buf);
                     if (KvValueFraming.IsExpired(expiryTicks, now)) continue;
                     results.Add(new KvScanEntryWithExpiry(batchKey,
-                        _formatter.Parse(buf.AsSpan(9, record.ValueLength - 9)), expiryTicks));
+                        _formatter.Parse(buf.AsSpan(KvValueFraming.HeaderSize,
+                            record.ValueLength - KvValueFraming.HeaderSize)), expiryTicks));
                 }
                 finally { ArrayPool<byte>.Shared.Return(buf); }
             }
@@ -1361,7 +1378,8 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
     /// 只要续传点未被回收（≥ <see cref="BeginAddress"/>）即无丢无重——订阅注册与发布水位
     /// 锁内原子捕获，补扫区间与实时通道按地址严格不相交。</para>
     /// <para>★ 断连契约：每订阅者有界通道（<see cref="TierKvOptions.WatchChannelCapacity"/>），
-    /// 慢订阅者写满即断连——流干净结束（枚举正常收束）= 断连信号，须凭游标重订阅续传；
+    /// 慢订阅者写满即断连——枚举抛 <see cref="KvWatchDisconnectedException"/> = 断连信号，
+    /// 须凭游标重订阅续传；流干净结束（枚举正常收束）= 存储关闭收口，不得重订；
     /// 写路径永不被反压。取消令牌触发时枚举抛 <see cref="OperationCanceledException"/>。</para>
     /// <para>★ 持久性：事件 = 已提交事实（批路径发布于 ConfirmCommitted 之后）；但单写
     /// FireAndForget 档未刷盘记录崩溃后消失——其事件持久性跟随写入的提交档。</para>

@@ -221,7 +221,7 @@ public abstract partial class RingBase<TKey>
 
     /// <summary>★ 从 record span 读 AddressInfo。</summary>
     private AddressInfo ReadOverflowPointerFromSpan(ReadOnlySpan<byte> recordSpan, int keyLen)
-        => MemoryMarshal.Read<AddressInfo>(recordSpan.Slice(RingCodec.HeaderSize + keyLen, 24));
+        => MemoryMarshal.Read<AddressInfo>(recordSpan.Slice(RingCodec.HeaderSize + keyLen, AddressInfoCodec.StructSize));
 
     // ════════════════════════════════════════════════════════════
     // 溢出恢复

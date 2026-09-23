@@ -2,6 +2,7 @@ using TC.Tier.Core.IO;
 using TC.Tier.Core.IO.Image;
 using TC.Tier.Core.Execution;
 using TC.Tier.Core.Logging;
+using TC.Tier.Core.Net.Channels;
 using TC.Tier.Core.Net.Raft;
 using TC.Tier.Core.Net.Swarm;
 using TC.Tier.Products.Wal;
@@ -42,6 +43,7 @@ public sealed class TierRaftNode : IAsyncDisposable
     private readonly CancellationTokenSource _hostCts = new();
     private Task? _hostLoop;
     private readonly IAsyncDisposable? _transportOwner;   // 装配器内建传输（随节点链尾收尾——调用方注入 = null）
+    private readonly IProtocolTransport _transport;        // 集群传输（公开访问器 Transport——只读使用面，生命周期随节点）
     private int _isLeader;
     private int _disposed;   // DisposeAsync 幂等守卫
     private long _publishedSnapshotIndex = -1;   // 已发布内容的覆盖点（-1 = 未发布）
@@ -54,8 +56,8 @@ public sealed class TierRaftNode : IAsyncDisposable
 
     private TierRaftNode(NodeId id, TierWal wal, TierWalRaftStore store, ApplyPipeline apply, RaftStateMachine raft,
         SwarmSync? swarm, SnapshotSwarmSync? snapshotSwarm, ClusterConfig config,
-        TierRaftNodeOptions options, ILogger? logger, IAsyncDisposable? transportOwner, IFileSystem fs,
-        RaftGroupId groupId = default)
+        TierRaftNodeOptions options, ILogger? logger, IProtocolTransport transport,
+        IAsyncDisposable? transportOwner, IFileSystem fs, RaftGroupId groupId = default)
     {
         _wal = wal;
         _store = store;
@@ -69,6 +71,7 @@ public sealed class TierRaftNode : IAsyncDisposable
         _clock = options.Clock;   // 时钟供给源（时钟缝 件一 P1）
         _peers = config.Members.Where(m => m.Id != id).Select(m => m.Id).ToArray();
         _logger = logger;
+        _transport = transport;
         _transportOwner = transportOwner;
         _fs = fs;
         GroupId = groupId;
@@ -101,6 +104,14 @@ public sealed class TierRaftNode : IAsyncDisposable
 
     /// <summary>组合根文件系统（二期-F10 备份数据面入口——RootSpaceImage 采集/网络镜像传输）。</summary>
     public IFileSystem FileSystem { get; }
+
+    /// <summary>
+    /// 集群传输（#512——P5.4 同端口复用）：宿主经此向任意成员发请求/数据报（如 DP 侧信令拨 leader——
+    /// 配额批写/亲和上报/状态上报走传输现成客户端面）。只读使用面：连接生命周期归传输内部
+    /// （拨号/接受循环）管理，未连目标请求抛 NetIOException/数据报静默丢弃——不触发建连；
+    /// 生命周期随节点（Dispose 链尾统一收尾，访问器不改所有权；节点释放后调用抛 ObjectDisposedException）。
+    /// </summary>
+    public IProtocolTransport Transport { get; }
 
     /// <summary>
     /// 备份（二期-F10——一致性点冻结内 Fs 根空间镜像采集）：append 门内冻结写入 →
@@ -211,7 +222,8 @@ public sealed class TierRaftNode : IAsyncDisposable
         await raft.StartAsync(config).ConfigureAwait(false);
         logger?.LogInformation("装配④ raft 循环已启动");
 
-        var node = new TierRaftNode(id, wal, store, apply, raft, swarm, snapshotSwarm, config, options, logger, transportOwner, fs);
+        var node = new TierRaftNode(id, wal, store, apply, raft, swarm, snapshotSwarm, config, options, logger,
+            transport, transportOwner, fs);
         node.StartHostLoop();
         logger?.LogInformation("TierRaftNode {Id} started（swarm={Swarm} antiEntropy={AntiEntropy} snapshotThreshold={Snapshot}）",
             id, swarm is not null, options.AntiEntropyInterval, options.SnapshotGrowthThresholdEntries);

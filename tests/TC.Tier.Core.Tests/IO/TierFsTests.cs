@@ -126,8 +126,8 @@ public sealed class TierFsTests
         {
             h.Append(new byte[10]);   // 写路径全通（纯摄入）
         }
-        Assert.Throws<FileIOException>(() => fs.EnumerateFiles("*").ToList());
-        Assert.Throws<FileIOException>(() => fs.EnumerateEntries("*").ToList());
+        Assert.Throws<FileIOException>(() => fs.EnumerateFiles(pattern: "*").ToList());
+        Assert.Throws<FileIOException>(() => fs.EnumerateEntries(pattern: "*").ToList());
         Assert.Throws<FileIOException>(() => fs.Stat("ingest.log"));
         Assert.Throws<FileIOException>(() =>
             fs.Open("ingest.log", new FileOpenOptions { Access = AccessMode.Read, Mode = FileOpenMode.OpenExisting }));
@@ -284,7 +284,7 @@ public sealed class TierFsTests
         {
             h.Append(new byte[10]);
         }
-        Assert.Throws<FileIOException>(() => fs.EnumerateFiles("*").ToList());
+        Assert.Throws<FileIOException>(() => fs.EnumerateFiles(pattern: "*").ToList());
         Assert.Throws<FileIOException>(() => fs.Stat("ingest.log"));
         Assert.Throws<FileIOException>(() =>
             fs.Open("ingest.log", new FileOpenOptions { Access = AccessMode.Read, Mode = FileOpenMode.OpenExisting }));
@@ -405,7 +405,7 @@ public sealed class TierFsTests
             h.Append(new byte[10]);
             h.Flush();
         }
-        Assert.Throws<FileIOException>(() => fs.EnumerateFiles("*").ToList());
+        Assert.Throws<FileIOException>(() => fs.EnumerateFiles(pattern: "*").ToList());
         Assert.Throws<FileIOException>(() => fs.Stat("ingest"));
         Assert.Throws<FileIOException>(() =>
             fs.Open("ingest", new FileOpenOptions { Access = AccessMode.Read, Mode = FileOpenMode.OpenExisting }));

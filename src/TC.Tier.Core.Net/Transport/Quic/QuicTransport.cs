@@ -62,6 +62,9 @@ public sealed class QuicTransport : IProtocolTransport, ICoreProtocolPort, IPeer
     private const byte KindDatagram = 0x02;
     private const byte KindHandshake = 0xFE;
     private const byte FlagCorrelation = 0x01;   // 流头 flags bit0：请求携带 CorrId（at-least-once 重发/去重面）
+    private const byte FlagNone = 0x00;          // 无旗标位（数据报/流/请求不带 CorrId——无相关性的尽力面）
+    private const byte AckAccept = 0x01;         // 开流确认字节（accept 分派成功由传输回写，帧数据之外）
+    private const int AbortCodeRefused = 0x0C;   // 拒绝开流（未注册协议域）
 
     /// <summary>单连接入站流容量（请求回调并发 + 数据报流——.NET 8 缺省 0 = 全拒，必须显式）。</summary>
     private const int InboundStreamCapacity = 4096;
@@ -476,7 +479,7 @@ public sealed class QuicTransport : IProtocolTransport, ICoreProtocolPort, IPeer
         }
         try
         {
-            var header = (byte[])[KindDatagram, protocolId, 0x00];
+            var header = (byte[])[KindDatagram, protocolId, FlagNone];
             await stream.WriteAsync(header, ct).ConfigureAwait(false);
             await stream.WriteAsync(payload, ct).ConfigureAwait(false);
             stream.CompleteWrites();
@@ -535,15 +538,16 @@ public sealed class QuicTransport : IProtocolTransport, ICoreProtocolPort, IPeer
         }
         try
         {
-            var header = (byte[])[KindStream, protocolId, 0x00];
+            var header = (byte[])[KindStream, protocolId, FlagNone];
             await stream.WriteAsync(header, ct).ConfigureAwait(false);
             // ★ 二期-C1：openPayload 作为流首段 [4B len][payload]（帧界惯例；空载荷 = len 0）
-            var len = BitConverter.GetBytes(openPayload.Length);
+            var len = new byte[4];
+            System.Buffers.Binary.BinaryPrimitives.WriteInt32LittleEndian(len, openPayload.Length);
             await stream.WriteAsync(len, ct).ConfigureAwait(false);
             if (openPayload.Length > 0)
                 await stream.WriteAsync(openPayload.ToArray(), ct).ConfigureAwait(false);
             var ack = await ReadExactlyAsync(stream, 1, ct).ConfigureAwait(false);
-            if (ack[0] != 0x01)
+            if (ack[0] != AckAccept)
                 throw new NetIOException($"对端拒绝开流（协议域 {protocolId}）。");
             return new QuicWireStream(stream, protocolId, target, openPayload);
         }
@@ -655,7 +659,7 @@ public sealed class QuicTransport : IProtocolTransport, ICoreProtocolPort, IPeer
         timeoutCts.CancelAfter(timeout);
         try
         {
-            return await SendRequestOnceAsync(state, (byte[])[KindRequest, protocolId, 0x00], null, payload, timeoutCts.Token).ConfigureAwait(false);
+            return await SendRequestOnceAsync(state, (byte[])[KindRequest, protocolId, FlagNone], null, payload, timeoutCts.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -789,17 +793,17 @@ public sealed class QuicTransport : IProtocolTransport, ICoreProtocolPort, IPeer
                         {
                             // ★ 二期-C1：openPayload 首段读取 [4B len][payload]（发起端头部后追加）
                             var lenBuf = await ReadExactlyAsync(stream, 4, ct).ConfigureAwait(false);
-                            var len = BitConverter.ToInt32(lenBuf, 0);
+                            var len = System.Buffers.Binary.BinaryPrimitives.ReadInt32LittleEndian(lenBuf);
                             ArgumentOutOfRangeException.ThrowIfNegative(len);
-                            ArgumentOutOfRangeException.ThrowIfGreaterThan(len, 16 << 20);
+                            ArgumentOutOfRangeException.ThrowIfGreaterThan(len, (int)FrameCodec.MaxPayloadLength);   // openPayload 上限 = 帧载荷上限（16MB）
                             var payload = len == 0 ? ReadOnlyMemory<byte>.Empty : await ReadExactlyAsync(stream, len, ct).ConfigureAwait(false);
-                            await stream.WriteAsync((byte[])[0x01], ct).ConfigureAwait(false);   // 开流确认（传输层——帧数据之外，发起端 OpenStream 消费）
+                            await stream.WriteAsync((byte[])[AckAccept], ct).ConfigureAwait(false);   // 开流确认（传输层——帧数据之外，发起端 OpenStream 消费）
                             var wire = new QuicWireStream(stream, protocolId, state.Remote, payload);
                             acceptor.OnStream(state.Remote, wire, payload);
                         }
                         else
                         {
-                            stream.Abort(QuicAbortDirection.Both, 0x0C);   // 拒绝开流（未注册协议域）
+                            stream.Abort(QuicAbortDirection.Both, AbortCodeRefused);   // 拒绝开流（未注册协议域）
                             await stream.DisposeAsync().ConfigureAwait(false);
                         }
                         break;

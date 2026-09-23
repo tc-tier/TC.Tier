@@ -1,3 +1,4 @@
+using TC.Tier.CodeGen;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -23,13 +24,21 @@ public sealed class TransactionLog : ITransactionLog
     private long _lastCommittedSeq;
     private int _disposed;
 
-    /// <summary>CommitRecord 物理布局（24B，4K 对齐 padding 到 DioAlignment）。</summary>
-    [StructLayout(LayoutKind.Sequential, Pack = 1)]
-    private struct CommitRecord
+    /// <summary>CommitRecord 物理布局（24B = Magic 8 + Seq 8 + Crc 4 + 尾对齐 4；4K 对齐 padding 到 DioAlignment）。
+    /// 布局单一声明（[BinaryLayout] Explicit——尺寸/偏移零手写；旧 Pack=1 形态实际 20B 与文档 24B 相悖，本声明统一为文档意图）。</summary>
+    [BinaryLayout(Features = BinaryLayoutFeatures.StructSize)]
+    [StructLayout(LayoutKind.Explicit, Size = StructSizeDeclared)]
+    internal struct CommitRecord
     {
-        public ulong Magic;
-        public long Seq;
-        public uint Crc;
+        /// <summary>记录字节大小（24B——CRC 覆盖域与块预留空间的单一真源）。</summary>
+        public const int StructSizeDeclared = 24;
+
+        [FieldOffset(0)] public ulong Magic;
+        [FieldOffset(8)] public long Seq;
+        [FieldOffset(16)] public uint Crc;
+
+        /// <summary>尾对齐保留（恒 0——记录总长凑足 24B，CRC 覆盖域含本字段）。</summary>
+        [FieldOffset(20)] public uint Reserved;
     }
 
     /// <summary>构造事务日志（对齐缓冲 + 固定块 commit record；打开即读盘恢复 lastCommittedSeq）。</summary>
@@ -37,7 +46,7 @@ public sealed class TransactionLog : ITransactionLog
     public TransactionLog(IStorageEngine engine)
     {
         _engine = engine;
-        var blockSize = Unsafe.SizeOf<CommitRecord>().AlignUp(DioAlignment);
+        var blockSize = CommitRecord.StructSizeDeclared.AlignUp(DioAlignment);
         _buffer = new AlignedMemoryManager(blockSize, DioAlignment);
     }
 
@@ -270,7 +279,7 @@ public sealed class TransactionLog : ITransactionLog
         unsafe
         {
             fixed (CommitRecord* p = &rec)
-                rec.Crc = UnifiedCrc.ComputeCrc32(new ReadOnlySpan<byte>(p, sizeof(CommitRecord)));
+                rec.Crc = UnifiedCrc.ComputeCrc32(new ReadOnlySpan<byte>(p, CommitRecord.StructSizeDeclared));
         }
     }
 

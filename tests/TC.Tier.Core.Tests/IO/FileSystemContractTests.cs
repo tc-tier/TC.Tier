@@ -451,6 +451,29 @@ public abstract class FileSystemContractTests : IDisposable
     }
 
     [Fact]
+    public void Enumeration_SingleArgIsPath_BclMindset()
+    {
+        // #518 归一契约：单参 = path（BCL Directory.EnumerateDirectories 第一参心智）——
+        // EnumerateDirectories("backups") 枚举其子目录，绝不再退化为 pattern="backups" 的根匹配（命中自身）
+        Fs.CreateDirectory("backups/t1");
+        Fs.CreateDirectory("backups/t2");
+        Fs.CreateFile("backups/t1/f");
+
+        Fs.EnumerateDirectories("backups").Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal)
+            .Should().Equal("t1", "t2");
+        Fs.EnumerateFiles("backups").Select(e => e.Name).Should().BeEmpty("一层枚举不含更深文件");
+        Fs.EnumerateFiles("backups", "*", recursive: true).Select(e => e.Name).Should().Equal("t1/f");
+
+        // 根下按模式枚举 = 命名参数（原单参 pattern 语义的表达面）
+        Fs.EnumerateDirectories(pattern: "back*").Select(e => e.Name).Should().Equal("backups");
+
+        // pattern 缺省 = 全量；path 缺省 = 根
+        Fs.EnumerateEntries().Select(e => e.Name).OrderBy(n => n, StringComparer.Ordinal)
+            .Should().Equal("backups");
+        Fs.EnumerateEntries("backups/t1").Select(e => e.Name).Should().Equal("f");
+    }
+
+    [Fact]
     public void Enumeration_Pattern_Matching()
     {
         Fs.CreateDirectory("p");
@@ -509,13 +532,13 @@ public abstract class FileSystemContractTests : IDisposable
         Fs.CreateFile("open/.hid2");               // 深层隐藏组件
 
         // 默认 "*"：隐藏类不可见（根层 + 深层 + 隐藏子树整支）
-        Fs.EnumerateFiles("*").Select(e => e.Name).Should().Equal("vis");
-        Fs.EnumerateDirectories("*").Select(e => e.Name).Should().Equal("open");
-        Fs.EnumerateFiles("*", recursive: true).Select(e => e.Name).Should().Equal("vis");
+        Fs.EnumerateFiles(pattern: "*").Select(e => e.Name).Should().Equal("vis");
+        Fs.EnumerateDirectories(pattern: "*").Select(e => e.Name).Should().Equal("open");
+        Fs.EnumerateFiles(pattern: "*", recursive: true).Select(e => e.Name).Should().Equal("vis");
 
         // A 方案豁免：pattern 首字符 '.' = 显式查看隐藏类（pattern 仍匹配最终组件）
-        Fs.EnumerateFiles(".*").Select(e => e.Name).Should().Equal(".hid1");
-        Fs.EnumerateDirectories(".*").Select(e => e.Name).Should().Equal(".hd");
+        Fs.EnumerateFiles(pattern: ".*").Select(e => e.Name).Should().Equal(".hid1");
+        Fs.EnumerateDirectories(pattern: ".*").Select(e => e.Name).Should().Equal(".hd");
 
         // 隐藏子树内容经显式路径扫描可见（直接访问不受隐藏影响）
         Fs.EnumerateFiles(".hd", "*").Select(e => e.Name).Should().Equal("inner");

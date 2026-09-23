@@ -22,6 +22,10 @@ public static class SpanContextCodec
     /// <summary>上下文本体字节数（TraceId 16 + SpanId 8 + Flags 1）。</summary>
     public const int ContextSize = 25;
 
+    private const int TraceIdBytes = 16;                            // TraceId 域宽
+    private const int SpanIdBytes = 8;                              // SpanId 域宽
+    private const int FlagsOffset = TraceIdBytes + SpanIdBytes;     // Flags 域偏移（24）
+
     /// <summary>带标记的完整前缀字节数（载荷偏移量）。</summary>
     public const int PrefixSize = 1 + ContextSize;
 
@@ -35,8 +39,8 @@ public static class SpanContextCodec
         if (context.SpanId.Length != 8) throw new ArgumentException($"SpanId 须 8B，实际 {context.SpanId.Length}。");
         var wire = new byte[ContextSize];
         context.TraceId.CopyTo(wire, 0);
-        context.SpanId.CopyTo(wire, 16);
-        wire[24] = context.Flags;
+        context.SpanId.CopyTo(wire, TraceIdBytes);
+        wire[FlagsOffset] = context.Flags;
         return wire;
     }
 
@@ -51,7 +55,7 @@ public static class SpanContextCodec
             context = default;
             return false;
         }
-        context = new SpanContext(wire[..16].ToArray(), wire.Slice(16, 8).ToArray(), wire[24]);
+        context = new SpanContext(wire[..TraceIdBytes].ToArray(), wire.Slice(TraceIdBytes, SpanIdBytes).ToArray(), wire[FlagsOffset]);
         return true;
     }
 

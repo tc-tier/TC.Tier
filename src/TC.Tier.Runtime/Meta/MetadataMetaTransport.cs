@@ -1,3 +1,5 @@
+using TC.Tier.Contracts.Layout;
+
 namespace TC.Tier.Runtime.Meta;
 
 /// <summary>
@@ -87,18 +89,18 @@ public sealed class MetadataMetaTransport : IMetaTransport, IDisposable
 
     /// <summary>读当前版本 payload（= 最后一次写块），按统一布局自述裁剪为<b>变长精确块</b>；
     /// 无版本（CurrentVersion=0）返回 null = 无数据。
-    /// <para>★ 传输契约是精确块（Header 12B + PayloadLength@8 + Footer 4B 自述定长）——
-    ///   托管结构按 PayloadSize 定长读出（尾部补零），必须裁剪；自述字段越界视为垃圾，
-    ///   返回原样由策略 magic 校验拒绝（fail-safe）。</para></summary>
+    /// <para>★ 传输契约是精确块（<see cref="MetaBlockHeader"/> 12B + PayloadLength@8 +
+    ///   Crc32Footer 4B 自述定长）——托管结构按 PayloadSize 定长读出（尾部补零），必须裁剪；
+    ///   自述字段越界视为垃圾，返回原样由策略 magic 校验拒绝（fail-safe）。</para></summary>
     private byte[]? ReadCore()
     {
         if (_metadata.CurrentVersion == 0) return null;   // 空链 = 无块（空即答案）
         var buf = new byte[_payloadSize];
         _metadata.Read(buf);
-        // 统一 meta 头规范：PayloadLength(ushort) @ 8；块长 = 12 + PayloadLength + 4
-        int payloadLen = System.Buffers.Binary.BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(8, 2));
-        int blockLen = 12 + payloadLen + 4;
-        if (payloadLen >= 0 && blockLen <= _payloadSize)
+        // 统一 meta 头规范经 MetaBlockHeader 布局单一声明（偏移/尺寸零手写）
+        var head = MetaBlockHeaderCodec.Read(buf);
+        int blockLen = MetaBlockHeaderCodec.StructSize + head.PayloadLength + Crc32FooterCodec.StructSize;
+        if (blockLen <= _payloadSize)
             return buf[..blockLen];   // 精确块（策略缓冲按实际块长拷贝）
         return buf;   // 自述越界 = 垃圾——原样交策略 magic 校验拒绝
     }

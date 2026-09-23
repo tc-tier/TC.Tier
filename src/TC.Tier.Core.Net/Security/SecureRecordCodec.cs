@@ -1,5 +1,7 @@
 using System.Buffers.Binary;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
+using TC.Tier.CodeGen;
 using TC.Tier.Core.Net.Wire;
 
 namespace TC.Tier.Core.Net.Security;
@@ -27,6 +29,22 @@ public sealed class SecureRecordCodec : IDisposable
     /// <summary>单条记录载荷上限（明文帧 ≤ 16MB 帧协议上限 + 密文开销——畸形防御界；
     /// 尺寸从生成物/帧协议常量派生，禁手写布局值）。</summary>
     public static int MaxRecordBytes => (int)FrameCodec.MaxPayloadLength + FrameCodec.HeaderSize + AeadTagSize + RecordHeaderSize;
+
+    /// <summary>
+    /// 安全记录头（12B 定长：[长度 4B][计数器 8B]——<b>BigEndian</b>，TLS 记录风格，
+    /// 全仓唯一 BE 线格式消息）。[BinaryLayout] 单一声明——长度/计数器偏移与端序收口生成器，
+    /// Seal/Open 不再手写偏移；载荷（密文+AEAD 标签 / 明文+HMAC）真变长，域代码。
+    /// </summary>
+    [BinaryLayout(Endianness = LayoutEndianness.BigEndian, Features = BinaryLayoutFeatures.All)]
+    [StructLayout(LayoutKind.Explicit, Size = 12)]
+    internal struct SecureRecordHeader
+    {
+        /// <summary>载荷长度（记录总长 - 头 12B；BigEndian）。</summary>
+        [FieldOffset(0)] public int Length;
+
+        /// <summary>发送计数器（每方向独立递增——接收侧严格递增校验防重放）。</summary>
+        [FieldOffset(4)] public long Counter;
+    }
 
     private readonly byte[] _sendKey;
     private readonly byte[] _recvKey;
@@ -90,8 +108,11 @@ public sealed class SecureRecordCodec : IDisposable
                 // MAC 域 = 帧体（计数器防重放由严格递增校验独立承担——篡改计数器即验证失败断连）
                 _sendMac!.TryComputeHash(frame, record.AsSpan(RecordHeaderSize + frame.Length), out _);
             }
-            BinaryPrimitives.WriteInt32BigEndian(record, record.Length - RecordHeaderSize);
-            BinaryPrimitives.WriteInt64BigEndian(record.AsSpan(4), counter);
+            SecureRecordHeaderCodec.Write(record, new SecureRecordHeader
+            {
+                Length = record.Length - RecordHeaderSize,
+                Counter = counter,
+            }, validate: false);
         }
         return record;
     }
@@ -106,7 +127,7 @@ public sealed class SecureRecordCodec : IDisposable
         if (payload.Length == 0) throw new CryptographicException("空记录载荷。");
         lock (_recvLock)
         {
-            var counter = BinaryPrimitives.ReadInt64BigEndian(header[4..]);
+            var counter = SecureRecordHeaderCodec.Read(header).Counter;
             if (counter <= _recvCounter)
                 throw new CryptographicException($"记录计数器回退（{counter} ≤ {_recvCounter}——重放/篡改，断连）。");
             Span<byte> nonce = stackalloc byte[12];

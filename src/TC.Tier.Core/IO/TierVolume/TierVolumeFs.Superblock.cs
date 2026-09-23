@@ -30,6 +30,7 @@ public sealed partial class TierVolumeFs
         public const int SnapshotEntrySize = 180;
         public const int SnapshotMax = 16;       // 上限（初始参数——内存预算反推，判定门 2 实测裁决）
         public const int SnapshotTableEnd = SnapshotTable + SnapshotEntrySize * SnapshotMax;   // = 3456
+        public const int LabelBytes = 32;        // Label UTF8 零填充域宽
         public const int TotalSize = 4096;
     }
 
@@ -111,7 +112,7 @@ public sealed partial class TierVolumeFs
         }
         for (var i = 0; i < memberCount; i++)
         {
-            var mp = Sb.MemberTable + i * 40;
+            var mp = Sb.MemberTable + i * SuperblockMemberCodec.StructSize;
             var m = i == 0 ? member0 : sb.Members[i];
             m.Uuid.TryWriteBytes(buffer.Slice(mp, SuperblockMember.UuidBytes));   // uuid 裸区（条目首部）
             var mem = new SuperblockMember
@@ -217,10 +218,10 @@ public sealed partial class TierVolumeFs
             var runCount = (int)snapFields.RunsCount;
             if (runCount is < 1 or > 8)
                 throw new FileIOException(IOError.IOFailure, $"快照表条目 {i} 镜像区间数非法：{runCount}", null, "Open");
-            var nameLen = buffer[p..(p + 32)].IndexOf((byte)0);
+            var nameLen = buffer[p..(p + SuperblockSnapshot.NameBytes)].IndexOf((byte)0);
             var snap = new SnapshotEntry
             {
-                Name = System.Text.Encoding.UTF8.GetString(buffer[p..(p + (nameLen < 0 ? 32 : nameLen))]),
+                Name = System.Text.Encoding.UTF8.GetString(buffer[p..(p + (nameLen < 0 ? SuperblockSnapshot.NameBytes : nameLen))]),
                 CaptureTicks = snapFields.CaptureTicks,
                 CaptureLsn = snapFields.CaptureLsn,
                 ImageLength = snapFields.ImageLength,
@@ -318,7 +319,7 @@ public sealed partial class TierVolumeFs
             sb.Members.Clear();
             for (var i = 0; i < memberCount; i++)
             {
-                var dp = Sb.MemberTable + i * 40;
+                var dp = Sb.MemberTable + i * SuperblockMemberCodec.StructSize;
                 var mem = SuperblockMemberCodec.Read(buffer.Slice(dp, SuperblockMemberCodec.StructSize));
                 sb.Members.Add(new MemberEntry(
                     new Guid(buffer.Slice(dp, SuperblockMember.UuidBytes).ToArray()),
@@ -334,8 +335,8 @@ public sealed partial class TierVolumeFs
                     $"成员数 {memberCount} 但未置 MultiCarrier 旗标——数据不一致", null, "Open");
             sb.Members = [new MemberEntry(sb.Uuid, sb.CapacityBlocks, sb.BitmapStart, sb.BitmapBlocks)];
         }
-        var labelLen = buffer[Sb.Label..(Sb.Label + 32)].IndexOf((byte)0);
-        sb.Label = System.Text.Encoding.UTF8.GetString(buffer[Sb.Label..(Sb.Label + (labelLen < 0 ? 32 : labelLen))]);
+        var labelLen = buffer[Sb.Label..(Sb.Label + Sb.LabelBytes)].IndexOf((byte)0);
+        sb.Label = System.Text.Encoding.UTF8.GetString(buffer[Sb.Label..(Sb.Label + (labelLen < 0 ? Sb.LabelBytes : labelLen))]);
         DecodeSnapshotTable(buffer, flags, sb);   // V2 §1.1（Snapshots 置位 ⇔ 表非空——双门与 journal 字段同族）
         return sb;
     }

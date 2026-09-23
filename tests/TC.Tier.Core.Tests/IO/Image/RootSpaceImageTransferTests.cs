@@ -86,17 +86,11 @@ public sealed class RootSpaceImageTransferTests
         public void Delete(string path) => _inner.Delete(path);
         public void Move(string source, string dest, bool overwrite = false) => _inner.Move(source, dest, overwrite);
         public FsEntryInfo Stat(string path) => _inner.Stat(path);
-        public IEnumerable<FsEntry> EnumerateFiles(string pattern = "*", bool recursive = false)
-            => _inner.EnumerateFiles(pattern, recursive);
-        public IEnumerable<FsEntry> EnumerateFiles(string path, string pattern, bool recursive = false)
+        public IEnumerable<FsEntry> EnumerateFiles(string? path = null, string pattern = "*", bool recursive = false)
             => _inner.EnumerateFiles(path, pattern, recursive);
-        public IEnumerable<FsEntry> EnumerateDirectories(string pattern = "*", bool recursive = false)
-            => _inner.EnumerateDirectories(pattern, recursive);
-        public IEnumerable<FsEntry> EnumerateDirectories(string path, string pattern, bool recursive = false)
+        public IEnumerable<FsEntry> EnumerateDirectories(string? path = null, string pattern = "*", bool recursive = false)
             => _inner.EnumerateDirectories(path, pattern, recursive);
-        public IEnumerable<FsEntry> EnumerateEntries(string pattern = "*", bool recursive = false)
-            => _inner.EnumerateEntries(pattern, recursive);
-        public IEnumerable<FsEntry> EnumerateEntries(string path, string pattern, bool recursive = false)
+        public IEnumerable<FsEntry> EnumerateEntries(string? path = null, string pattern = "*", bool recursive = false)
             => _inner.EnumerateEntries(path, pattern, recursive);
         public IDisposable AcquireExclusive(TimeSpan timeout) => _inner.AcquireExclusive(timeout);
         public IDisposable EnterMaintenance(string reason, MaintenanceScope scope, CancellationToken ct = default)

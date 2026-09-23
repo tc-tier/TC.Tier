@@ -62,7 +62,7 @@ public sealed class TierTimeSeriesDenseTests
         s.SeriesCount.Should().Be(n, "每序列一条 SeriesEntry（O(1) 侧账）");
 
         // 引擎文件面恒定：{name}.ts.ring / .index / .water 族——不随序列数出现新引擎
-        var paths = vol.Fs.EnumerateFiles("*", recursive: true).Select(e => e.Name).ToList();
+        var paths = vol.Fs.EnumerateFiles(pattern: "*", recursive: true).Select(e => e.Name).ToList();
         var enginePaths = paths.Where(p => p.Contains(".ts.")).ToList();
         enginePaths.Should().NotBeEmpty();
         enginePaths.Should().OnlyContain(p =>
