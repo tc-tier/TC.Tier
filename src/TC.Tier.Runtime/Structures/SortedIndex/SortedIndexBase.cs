@@ -196,6 +196,17 @@ public abstract partial class SortedIndexBase<TKey> : LifecycleBase<SortedIndexR
     /// <returns>false = 无 ≤ key 的条目。</returns>
     public abstract bool TryGetFloor(TKey key, out TKey floorKey, out LogicalAddress value);
 
+    /// <summary>
+    /// 键序 &lt; <paramref name="key"/> 的最大条目（严格前驱——反向步进迭代原语：从 TryGetMax 起
+    /// 逐步 TryGetPrev 即倒序遍历，O(k·log n)；两索引游标均仅 Forward（叶/层 0 链无 Prev 指针），
+    /// 有序倒序面由本原语承担。epoch 读保护内完成，O(log n)）。
+    /// </summary>
+    /// <param name="key">查找键（不含——等值条目不算前驱）。</param>
+    /// <param name="prevKey">输出：命中条目的 key（&lt; 查找键）。</param>
+    /// <param name="value">输出：命中条目的 value 逻辑地址。</param>
+    /// <returns>false = 无 &lt; key 的条目。</returns>
+    public abstract bool TryGetPrev(TKey key, out TKey prevKey, out LogicalAddress value);
+
     // ══ 共享模板（各族自持——设计稿：不设公共基类）══
 
     /// <summary>进入读保护 scope（ref struct <see cref="IndexScope"/>——创建即 Resume epoch，Dispose 即 Suspend；scope 内 Find 省逐次 epoch 进出）。</summary>

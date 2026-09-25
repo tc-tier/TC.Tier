@@ -57,6 +57,117 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
         }
     }
 
+    /// <summary>
+    /// 键域区间批量删——删除全部 key ∈ [lowerInclusive, upperExclusive) 的条目（dense 逐域
+    /// retention trim 专用：键空间含领先前缀字段时，单侧 TruncatePrefix 会把更低前缀域的存活条目
+    /// 一并判入"前缀"——必须双侧界住域内区间；BTreeIndex.TruncateRange 同构对称面）。
+    /// <para>★ 算法：双侧塔链下降（与 Insert/Delete 同比较语义）——lower 下降记录各层前驱
+    ///   （首个 key &lt; lower 的最后节点，head = Empty 哨兵），upper 下降记录各层后继（首个
+    ///   key ≥ upper）；各层 relink 前驱.层[i] = 后继即整体旁路区间塔段（被删节点塔链不逐层拆——
+    ///   relink 后不可达，arena 块与引擎帧留待整体释放，族契约同 Delete）。计数 = 层 0 链遍历
+    ///   （恰经每被删节点一次）。未改动层（前驱.层[i] 已 == 后继）零写零脏标。</para>
+    /// </summary>
+    /// <param name="lowerInclusive">下界（含）。</param>
+    /// <param name="upperExclusive">上界（不含）。</param>
+    /// <returns>删除条数。</returns>
+    public unsafe long TruncateRange(TKey lowerInclusive, TKey upperExclusive)
+    {
+        if (KeyComparer.Compare(lowerInclusive, upperExclusive) >= 0) return 0;
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥——多层 relink/计数一致性）
+        _epoch.Resume();
+        try
+        {
+            Span<LogicalAddress> predAddrs = stackalloc LogicalAddress[_maxLevel];   // 各层最后 key < lower（head = Empty）
+            Span<LogicalAddress> succs = stackalloc LogicalAddress[_maxLevel];      // 各层首个 key ≥ upper
+
+            // lower 下降（Delete 同形——记录各层前驱；不要求精确命中）
+            var current = _headPtr;
+            LogicalAddress currentAddr = LogicalAddress.Empty;
+            for (int i = _currentLevel - 1; i >= 0; i--)
+            {
+                var nextAddr = ReadLevel(current, i);
+                while (nextAddr != LogicalAddress.Empty)
+                {
+                    var next = GetNode(nextAddr);
+                    if (KeyComparer.Compare(ReadKey(next), lowerInclusive) < 0)
+                    {
+                        current = next;
+                        currentAddr = nextAddr;
+                        nextAddr = ReadLevel(current, i);
+                    }
+                    else break;
+                }
+                predAddrs[i] = currentAddr;
+            }
+
+            // upper 下降（从 head 重入——记录各层首个 key ≥ upper）
+            current = _headPtr;
+            for (int i = _currentLevel - 1; i >= 0; i--)
+            {
+                var nextAddr = ReadLevel(current, i);
+                while (nextAddr != LogicalAddress.Empty)
+                {
+                    var next = GetNode(nextAddr);
+                    if (KeyComparer.Compare(ReadKey(next), upperExclusive) < 0)
+                    {
+                        current = next;
+                        nextAddr = ReadLevel(current, i);
+                    }
+                    else break;
+                }
+                succs[i] = nextAddr;
+            }
+
+            // 计数（层 0 链遍历——relink 前走，恰经每被删节点一次）
+            long deleted = 0;
+            var walkAddr = ReadLevel(GetPredNode(predAddrs[0]), 0);
+            var stopAddr = succs[0];
+            while (walkAddr != LogicalAddress.Empty && walkAddr != stopAddr)
+            {
+                deleted++;
+                walkAddr = ReadLevel(GetNode(walkAddr), 0);
+            }
+
+            // 各层 relink（未变动层零写零脏标）
+            bool headChanged = false;
+            for (int i = 0; i < _currentLevel; i++)
+            {
+                var succAddr = succs[i];
+                if (predAddrs[i] == LogicalAddress.Empty)
+                {
+                    if (ReadLevel(_headPtr, i) != succAddr)
+                    {
+                        WriteLevel(_headPtr, i, succAddr);
+                        headChanged = true;
+                    }
+                }
+                else
+                {
+                    var pred = GetNode(predAddrs[i]);
+                    if (ReadLevel(pred, i) != succAddr)
+                    {
+                        WriteLevel(pred, i, succAddr);
+                        MarkDirty(predAddrs[i]);
+                    }
+                }
+            }
+            if (headChanged)
+                MarkDirty(_headAddress);
+
+            if (deleted > 0)
+                Interlocked.Add(ref _entryCount, -deleted);
+            return deleted;
+        }
+        finally
+        {
+            _epoch.Suspend();
+        }
+    }
+
+    /// <summary>前驱地址 → 驻留节点指针（Empty = head 哨兵——Delete/Insert 下降同款哨兵约定）。</summary>
+    private unsafe byte* GetPredNode(LogicalAddress predAddr)
+        => predAddr == LogicalAddress.Empty ? _headPtr : GetNode(predAddr);
+
     /// <summary>删除条目——塔链逐层下降记录前驱、逐层拆链回收（epoch 读保护内）。</summary>
     /// <param name="key">条目键。</param>
     /// <returns>true = 真删到；false = 不存在。</returns>

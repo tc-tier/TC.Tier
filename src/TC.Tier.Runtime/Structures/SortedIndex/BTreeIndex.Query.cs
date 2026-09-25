@@ -55,7 +55,26 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
             floorKey = default!;
             value = LogicalAddress.Empty;
             if (_rootAddress == LogicalAddress.Empty) return false;
-            return FloorInSubtree(_rootAddress, _cachedRoot, key, out floorKey, out value);
+            return FloorInSubtree(_rootAddress, _cachedRoot, key, includeEqual: true, out floorKey, out value);
+        }
+        finally
+        {
+            _epoch.Suspend();
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>与 <see cref="TryGetFloor"/> 同一下降核心（排除等值命中）——反向步进迭代的步进原语。</remarks>
+    public override bool TryGetPrev(TKey key, out TKey prevKey, out LogicalAddress value)
+    {
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥）
+        _epoch.Resume();
+        try
+        {
+            prevKey = default!;
+            value = LogicalAddress.Empty;
+            if (_rootAddress == LogicalAddress.Empty) return false;
+            return FloorInSubtree(_rootAddress, _cachedRoot, key, includeEqual: false, out prevKey, out value);
         }
         finally
         {
@@ -65,10 +84,16 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
 
     /// <summary>
     /// 子树内 floor 下降核心：与 Find 同形下降（i = 首个使 key &lt; nodeKey[i] 的位 → 子 i），
-    /// i &gt; 0 时记录左邻子树（GetValue(i-1)）地址；归属叶无 ≤ key 条目（含空叶）时自最深祖先
+    /// i &gt; 0 时记录左邻子树（GetValue(i-1)）地址；归属叶无命中条目（含空叶）时自最深祖先
     /// 逐层向左重试右降（环防御同右降）。递归换为祖先栈回溯。
     /// </summary>
-    private bool FloorInSubtree(LogicalAddress subtreeAddr, BTreeNode subtreeRoot, TKey key,
+    /// <param name="subtreeAddr">子树根地址。</param>
+    /// <param name="subtreeRoot">子树根驻留节点。</param>
+    /// <param name="key">查找键。</param>
+    /// <param name="includeEqual">true = ≤ 语义（等值命中优先，floor）；false = &lt; 语义（严格排除自身，prev）。</param>
+    /// <param name="floorKey">输出：命中条目的 key。</param>
+    /// <param name="value">输出：命中条目的 value 逻辑地址。</param>
+    private bool FloorInSubtree(LogicalAddress subtreeAddr, BTreeNode subtreeRoot, TKey key, bool includeEqual,
         out TKey floorKey, out LogicalAddress value)
     {
         floorKey = default!;
@@ -97,7 +122,7 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
             pos++;
 
         // 精确命中（== key，≤ 语义含等）优先
-        if (pos < node.Count && KeyComparer.Equals(node.GetKey(pos), key))
+        if (includeEqual && pos < node.Count && KeyComparer.Equals(node.GetKey(pos), key))
         {
             floorKey = node.GetKey(pos);
             value = node.GetValue(pos);

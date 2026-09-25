@@ -14,5 +14,6 @@ global using TC.Tier.Products.Wal;
 global using TC.Tier.Products.Queue;
 global using TC.Tier.Products.Kv;
 global using TC.Tier.Products.TimeSeries;
+global using TC.Tier.Products.Collections;
 global using TC.Tier.Products.Blob;
 global using TC.Tier.Runtime.Tests;   // 链接的 TestVolume/TestTempDir（单一真源）

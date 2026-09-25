@@ -66,6 +66,14 @@ public class Program
             ConcurrentRingWriteProbe.Run(writers, perWriter);
             return 0;
         }
+        // ★ 索引并发写吞吐探针（#522 波次 0c——Hash/BTree/SkipList 写闸形态 × 多生产者）
+        if (args.Length > 0 && args[0] == "--index-write-probe")
+        {
+            int writers = args.Length > 1 ? int.Parse(args[1]) : 8;
+            int perWriter = args.Length > 2 ? int.Parse(args[2]) : 200_000;
+            IndexWriteThroughputProbe.Run(writers, perWriter);
+            return 0;
+        }
         // ★ Log 写/恢复吞吐探针（现行版 Log 独有压测报表）
         if (args.Length > 0 && args[0] == "--log-write-probe")
         {
