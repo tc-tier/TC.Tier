@@ -13,7 +13,6 @@ public static class WmProbe
     {
         using var vol = new BenchVolume();
         var options = new StorageEngineOptions("mem", segmentGrowthLimit: 1048576).WithPreallocateFile(false);
-        options = options.WithOptimization(options.Optimization with { SampleInterval = TimeSpan.FromHours(1) });
         using var mem = (StorageEngine)options.Builder(vol.Fs, logger: new NullLogger()).Start();
 
 

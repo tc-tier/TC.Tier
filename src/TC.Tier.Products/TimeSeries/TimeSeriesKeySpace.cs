@@ -106,7 +106,9 @@ internal interface ITimeSeriesKeySpace
     /// <summary>精确键删除（恢复悬空清理——tiebreaker 全键定位）。</summary>
     bool DeleteIndexKey(uint seriesId, long timestamp, long tiebreaker);
 
-    /// <summary>序列内前缀截断（键 &lt; (sid, before, min) 批量删——返回删除数）。</summary>
+    /// <summary>序列内前缀截断（本序列域内 ts &lt; before 的条目批量删——返回删除数）。
+    /// dense = 双侧界住本序列键域 [sid 域起点, (sid, before, min))——共享键空间含领先 sid 字段，
+    /// 单侧全局前缀会把更低 sid 序列的存活条目一并判入前缀，必须 TruncateRange 双侧收口。</summary>
     long TruncateIndexPrefix(uint seriesId, long beforeExclusive);
 
     /// <summary>索引游标（同步迭代——恢复对账/字节反查/统计的既有形态）。</summary>
@@ -470,7 +472,9 @@ internal sealed class DenseSeriesKeySpace(RingOfDenseTimeKey ring, BTreeOfDenseT
         => index is { } idx && idx.Delete(new DenseTimeKey(seriesId, timestamp, tiebreaker));
 
     public long TruncateIndexPrefix(uint seriesId, long beforeExclusive)
-        => index?.TruncatePrefix(new DenseTimeKey(seriesId, beforeExclusive, long.MinValue)) ?? 0;
+        => index?.TruncateRange(
+            new DenseTimeKey(seriesId, long.MinValue, long.MinValue),
+            new DenseTimeKey(seriesId, beforeExclusive, long.MinValue)) ?? 0;
 
     public ITimeSeriesIndexCursor CreateIndexCursor()
         => index is { } idx ? new DenseCursorAdapter(idx.CreateScanCursor(ReadDirection.Forward))

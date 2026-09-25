@@ -49,10 +49,8 @@ public class StorageEngineIoBenchmarks : IDisposable
 
 
         var options = new StorageEngineOptions("mem", segmentGrowthLimit: SegmentGrowthLimit).WithPreallocateFile(false);
-        // ★ 禁用 CPU 背压节流（采样间隔 1h = 永不产生第二个样本 → factor 恒 0）：秒级持续满载的
-        //   微基准会被 CpuSampler 三档节流 park（设计内"高负载让路"），测的是节流而非协议成本
-        //   （实测可把 Write 拉到 137 µs/op）
-        options = options.WithOptimization(options.Optimization with { SampleInterval = TimeSpan.FromHours(1) });
+        // ★ CPU 限流默认关闭（SampleInterval=null）——秒级持续满载微基准测协议成本，
+        //   不被三档节流 park（设计内"高负载让路"）干扰
         _mem = (StorageEngine)options.Builder(_memVol.Fs, logger: new NullLogger()).Start();
 
 

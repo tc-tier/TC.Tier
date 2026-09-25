@@ -96,6 +96,81 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
         return total;
     }
 
+    /// <summary>
+    /// 键域区间批量删——删除全部 key ∈ [lowerInclusive, upperExclusive) 的条目（dense 逐序列
+    /// retention trim 专用：键空间含领先前缀字段时，单侧 TruncatePrefix 会把更低前缀域的存活条目
+    /// 一并判入"前缀"——必须双侧界住域内区间）。
+    /// <para>★ 算法：双侧下降索引 iL/iU（与 Find/Insert 同比较语义——下降一致性保证子树键域互斥）。
+    ///   同子树（iL==iU）递归；跨界时边界子树递归区间删、中间子树（键域必全落区间内）逐叶清零。</para>
+    /// </summary>
+    /// <param name="lowerInclusive">下界（含）。</param>
+    /// <param name="upperExclusive">上界（不含）。</param>
+    /// <returns>删除条数。</returns>
+    public long TruncateRange(TKey lowerInclusive, TKey upperExclusive)
+    {
+        if (KeyComparer.Compare(lowerInclusive, upperExclusive) >= 0) return 0;
+        using var _ = EnterOp();   // ★ 操作闸（读写全互斥——与 TruncatePrefix 同款一致性窗口）
+        _epoch.Resume();
+        try
+        {
+            if (_rootAddress == LogicalAddress.Empty) return 0;
+            long deleted = TruncateRangeFromNode(_rootAddress, lowerInclusive, upperExclusive);
+            if (deleted > 0)
+                Interlocked.Add(ref _entryCount, -deleted);
+            return deleted;
+        }
+        finally
+        {
+            _epoch.Suspend();
+        }
+    }
+
+    /// <summary>区间删递归体：叶内 [lo, hi) 段摘除；internal 按双侧下降索引分界（边界递归/中间全清）。</summary>
+    private long TruncateRangeFromNode(LogicalAddress nodeAddr, TKey lower, TKey upper)
+    {
+        var node = GetInternalNode(nodeAddr);
+
+        if (node.IsLeaf)
+        {
+            int lo = 0;
+            while (lo < node.Count && KeyComparer.Compare(node.GetKey(lo), lower) < 0) lo++;
+            int hi = lo;
+            while (hi < node.Count && KeyComparer.Compare(node.GetKey(hi), upper) < 0) hi++;
+            int count = hi - lo;
+            if (count <= 0) return 0;
+            node.ShiftLeft(hi, lo, node.Count);   // [lo, hi) 左移出（from=hi → to=lo，后段整体前移）
+            node.Count -= (ushort)count;
+            WriteNodeContent(nodeAddr, node);
+            if (nodeAddr == _rootAddress) _cachedRoot = node;
+            else RefreshCache(nodeAddr, node);
+            return count;
+        }
+
+        int iL = DescendIndex(node, lower);
+        int iU = DescendIndex(node, upper);
+        if (iL == iU)
+            return TruncateRangeFromNode(node.GetValue(iL), lower, upper);
+
+        // 边界子树递归（iL 子树含 < lower 的键、iU 子树含 ≥ upper 的键——只删域内段；
+        // 各子树自写回——父节点 keys/children 未变，无需写回）。中间子树键域必全落
+        // [lower, upper)（下降一致性的直接推论）——整树清零。
+        long deleted = TruncateRangeFromNode(node.GetValue(iL), lower, upper);
+        for (int j = iL + 1; j < iU; j++)
+            deleted += ClearSubtreeLeaves(node.GetValue(j));
+        deleted += TruncateRangeFromNode(node.GetValue(iU), lower, upper);
+        return deleted;
+    }
+
+    /// <summary>下降索引（与 Find/Insert 同比较语义）：首个 separator &gt; key 的子位（无则 Count——最右子树）。</summary>
+    private int DescendIndex(BTreeNode node, TKey key)
+    {
+        for (int i = 0; i < node.Count; i++)
+        {
+            if (KeyComparer.Compare(key, node.GetKey(i)) < 0) return i;
+        }
+        return node.Count;
+    }
+
     /// <summary>删除条目——叶根直接移除；internal 树沿 Find 同路径下降到含 key 叶子移除（epoch 读保护内；本轮不重平衡）。</summary>
     /// <param name="key">条目键。</param>
     /// <returns>true = 真删到；false = 不存在。</returns>

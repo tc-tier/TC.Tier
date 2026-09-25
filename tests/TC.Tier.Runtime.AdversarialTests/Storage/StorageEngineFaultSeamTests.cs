@@ -11,16 +11,22 @@ namespace TC.Tier.Runtime.Tests.Storage;
 /// </summary>
 public sealed class StorageEngineFaultSeamTests : StorageEngineTestBase
 {
-    /// <summary>seam 引擎（WithFaults 显式开启；spinMs 缩短节流自旋窗）。
-    /// 返回（公开 op 面, 注入面——注入器类型在引擎白盒上，经 builder.Engine 取）。</summary>
+    /// <summary>seam 引擎（WithFaults 显式开启；spinMs 缩短段表自旋窗；sampleMs 武装 CPU 采样——
+    /// 限流路径的 hermetic 前提）。返回（公开 op 面, 注入面——注入器类型在引擎白盒上，经 builder.Engine 取）。</summary>
     private static (IStorageEngine Dev, IStorageEngineFaultInjector? Faults) NewSeamEngine(
-        FaultInjectingFileSystem fi, string name, long? spinMs = null)
+        FaultInjectingFileSystem fi, string name, long? spinMs = null, int? sampleMs = null)
     {
         var options = new StorageEngineOptions(name, segmentGrowthLimit: 4096)
             .WithPreallocateFile(false)
             .WithFaults();
         if (spinMs is { } ms)
             options = options.WithOptimization(options.Optimization with { SpinMilliseconds = ms });
+        if (sampleMs is { } sms)
+            options = options.WithOptimization(options.Optimization with
+            {
+                SampleInterval = TimeSpan.FromMilliseconds(sms),
+                ThrottleSpinMilliseconds = options.Optimization.SpinMilliseconds,
+            });
         var builder = options.Builder(fi);
         var dev = builder.Start();
         dev.WaitForReady();
@@ -168,7 +174,7 @@ public sealed class StorageEngineFaultSeamTests : StorageEngineTestBase
     public async Task ThrottleSaturated_AsyncPathSpinHonorsCancellation()
     {
         using var fi = new FaultInjectingFileSystem(TierFs.New("memory:"));
-        var (dev, faults) = NewSeamEngine(fi, "seam-ts");
+        var (dev, faults) = NewSeamEngine(fi, "seam-ts", sampleMs: 20);
         using var _devScope = dev;
         faults!.EnterState(EngineFaultState.ThrottleSaturated);
 
@@ -184,12 +190,33 @@ public sealed class StorageEngineFaultSeamTests : StorageEngineTestBase
     public void ThrottleSaturated_SyncPathTimeouts()
     {
         using var fi = new FaultInjectingFileSystem(TierFs.New("memory:"));
-        var (dev, faults) = NewSeamEngine(fi, "seam-ts2", spinMs: 100);
+        var (dev, faults) = NewSeamEngine(fi, "seam-ts2", spinMs: 100, sampleMs: 20);
         using var _devScope = dev;
         faults!.EnterState(EngineFaultState.ThrottleSaturated);
 
         var act = () => dev.Append(MakePattern(32, 0x0D));
-        act.Should().Throw<TimeoutException>("同步路径无外部 ct——自旋至 SpinMilliseconds 超时直接报错");
+        act.Should().Throw<TimeoutException>("同步路径无外部 ct——自旋至 ThrottleSpinMilliseconds（floor 采样周期后）超时直接报错");
+    }
+
+    [Fact]
+    public void ThrottleSaturated_WithoutSampling_FloorGuardsSubSampleBudget()
+    {
+        // 限流未武装（SampleInterval=null 默认）——饱和窗仍驱动自旋路径（故障缝不依赖采样）；
+        // deadline floor 至采样窗（未武装取默认 1s 窗）：100ms 级旋钮不产生亚采样周期超时
+        //（等不到任何采样发布的预算观察不到 CPU 回落，必超时语义自欺——#520 形态的结构性封堵）。
+        using var fi = new FaultInjectingFileSystem(TierFs.New("memory:"));
+        var (dev, faults) = NewSeamEngine(fi, "seam-ts3", spinMs: 100);
+        using var _devScope = dev;
+        faults!.EnterState(EngineFaultState.ThrottleSaturated);
+
+        var sw = Stopwatch.StartNew();
+        var act = () => dev.Append(MakePattern(32, 0x0F));
+        act.Should().Throw<TimeoutException>("限流未武装但饱和窗强制饱和——同步路径仍有界超时");
+        sw.Elapsed.Should().BeGreaterThanOrEqualTo(TimeSpan.FromMilliseconds(900),
+            "deadline floor 至采样窗——亚采样周期旋钮不得提前失败");
+
+        faults!.Reset();
+        dev.Append(MakePattern(32, 0x10));   // 饱和窗退后放行——不抛即成功
     }
 
     // ═══════════════ 腐败抓手（件三 CorruptRule × 引擎读路径）═══════════════

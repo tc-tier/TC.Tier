@@ -6,7 +6,8 @@ namespace TC.Tier.Runtime.Storage;
 public sealed record StorageEngineOptimization
 {
     /// <summary>
-    /// 采样间隔（可选）。用于优化存储引擎的性能，通过定期采样数据来调整内部参数。如果为 null，则表示不进行采样优化。
+    /// CPU 采样间隔。null = 采样与 CPU 限流关闭（默认——不构造采样器、不开后台采样、热路径直通零开销）；
+    /// 非 null = 值即采样周期，武装 CPU 限流（<see cref="ThrottleLowCutoff"/>/<see cref="ThrottleHighCutoff"/> 生效）。
     /// </summary>
     public TimeSpan? SampleInterval { get; init; }
 
@@ -24,6 +25,13 @@ public sealed record StorageEngineOptimization
     /// 节流高阈值（0 到 1 之间）。当负载高于此阈值时，存储引擎将增加资源使用，以提高性能和响应速度。默认值为 0.9。
     /// </summary>
     public double ThrottleHighCutoff { get; init; } = 0.90;
+
+    /// <summary>
+    /// CPU 限流自旋预算（毫秒，默认 30*1000 = 30秒）——负载越线后同步路径自旋等待 CPU 回落的 deadline。
+    /// 运行时下限保护：实际 deadline 取 max(本值, 采样周期)——小于一个采样周期的 deadline 观察不到
+    /// CPU 回落（采样器按周期发布），自旋退化为必超时。仅在限流武装（<see cref="SampleInterval"/> 非 null）时生效。
+    /// </summary>
+    public long ThrottleSpinMilliseconds { get; init; } = 30 * 1000;
 
     /// <summary>
     /// _segIndex 初始容量（= maxSegId + 1，恢复路径用扫盘最大段号；默认 8）。
