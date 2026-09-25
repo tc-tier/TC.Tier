@@ -130,4 +130,99 @@ public class KvAddressReadTests
         s.AbortBatch();
         (await kv.TryGetFormattedAsync(1)).Value.Should().Be(10, "批回滚零应用");
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // #523 版本读——读口透出当前绑定地址（读→CAS 乐观环闭环）
+    // ═══════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public async Task AddressedRead_ReturnsBinding_EquivalentToTryGetAt()
+    {
+        using var vol = new TestVolume();
+        await using var kv = await TierKvOfLongLong.CreateAsync(vol.Fs, Opts("addressed"));
+        var putAddr = await kv.PutFormattedAsync(1, 42, policy: KvCommitPolicy.Committed);
+        var expected = BitConverter.GetBytes(42L);
+
+        // 字节面：Found + 当前绑定 + 值——与 Put 返回地址/直读/索引读全等价
+        var (foundBytes, addrBytes, valueBytes) = await kv.TryGetBytesAddressedAsync(1);
+        foundBytes.Should().BeTrue();
+        addrBytes.Should().Be(putAddr, "读返地址 = 当前绑定（版本读真源）");
+        valueBytes.Should().BeEquivalentTo(expected);
+        var (atFound, atValue) = await kv.TryGetBytesAtAsync(addrBytes);
+        atFound.Should().BeTrue("读侧/直读等价性");
+        atValue.Should().BeEquivalentTo(expected);
+
+        // 格式化面 + 同步热路径面 + Memory 面
+        var (foundFmt, addrFmt, valueFmt) = await kv.TryGetFormattedAddressedAsync(1);
+        foundFmt.Should().BeTrue();
+        addrFmt.Should().Be(putAddr);
+        valueFmt.Should().Be(42);
+
+        Memory<byte> memBuf = new byte[sizeof(long)];
+        var (foundMem, addrMem) = await kv.TryGetAddressedAsync(1, memBuf);
+        foundMem.Should().BeTrue();
+        addrMem.Should().Be(putAddr);
+        memBuf.ToArray().Should().BeEquivalentTo(expected);
+
+        kv.TryGetAddressed(1, stackalloc byte[sizeof(long)], out var syncAddr).Should().BeTrue();
+        syncAddr.Should().Be(putAddr);
+    }
+
+    [Fact]
+    public async Task AddressedRead_CasLoop_Closes_AndVersionAdvances()
+    {
+        using var vol = new TestVolume();
+        await using var kv = await TierKvOfLongLong.CreateAsync(vol.Fs, Opts("casloop"));
+
+        // 读→CAS 乐观环闭环：读返地址作 expectedAddress → 成功
+        await kv.PutFormattedAsync(1, 10, policy: KvCommitPolicy.Committed);
+        var (_, rev1, _) = await kv.TryGetBytesAddressedAsync(1);
+        var swap = await kv.CompareAndSwapAsync(1, rev1, BitConverter.GetBytes(20L));
+        swap.Swapped.Should().BeTrue("读返地址 = 当前版本——CAS 闭环");
+
+        // 版本推进：覆写后旧地址 CAS 失败且回执携带新当前绑定（A.2 矩阵 #6 的读侧对称）
+        var addrY = await kv.PutFormattedAsync(1, 30, policy: KvCommitPolicy.Committed);
+        var stale = await kv.CompareAndSwapAsync(1, rev1, BitConverter.GetBytes(40L));
+        stale.Swapped.Should().BeFalse("旧版本预期被并发写取代");
+        stale.CurrentAddress.Should().Be(addrY, "失败回执 = 新当前绑定（重读重试闭环）");
+
+        // 版本读随之推进
+        var (_, rev2, value) = await kv.TryGetBytesAddressedAsync(1);
+        rev2.Should().Be(addrY, "版本读随换绑推进");
+        value.Should().BeEquivalentTo(BitConverter.GetBytes(30L));
+    }
+
+    [Fact]
+    public async Task AddressedRead_Guards_MissTombstoneExpired_AllInvalid()
+    {
+        using var vol = new TestVolume();
+        await using var kv = await TierKvOfLongLong.CreateAsync(vol.Fs, Opts("guards523"));
+
+        // 未命中：false + Invalid
+        var (missFound, missAddr, missValue) = await kv.TryGetBytesAddressedAsync(99);
+        missFound.Should().BeFalse("不存在 key");
+        missAddr.Should().Be(LogicalAddress.Invalid, "不存在 = Invalid（与地址版 CAS 同锚）");
+        missValue.Should().BeNull();
+
+        // 墓碑（Delete 后）：false + Invalid
+        await kv.PutFormattedAsync(1, 10, policy: KvCommitPolicy.Committed);
+        await kv.DeleteAsync(1);
+        var (delFound, delAddr, _) = await kv.TryGetBytesAddressedAsync(1);
+        delFound.Should().BeFalse("墓碑 = 不存在语义");
+        delAddr.Should().Be(LogicalAddress.Invalid);
+
+        // 过期：false + Invalid（惰性读删一致）
+        await kv.PutFormattedAsync(2, 20, policy: KvCommitPolicy.Committed, timeToLive: TimeSpan.Zero);
+        var (expFound, expAddr, expValue) = await kv.TryGetBytesAddressedAsync(2);
+        expFound.Should().BeFalse("过期 = 不存在语义");
+        expAddr.Should().Be(LogicalAddress.Invalid);
+        expValue.Should().BeNull();
+
+        // 同步面 + Memory 面守卫同锚
+        kv.TryGetAddressed(1, stackalloc byte[8], out var syncAddr).Should().BeFalse();
+        syncAddr.Should().Be(LogicalAddress.Invalid);
+        var (memFound, memAddr) = await kv.TryGetAddressedAsync(1, new Memory<byte>(new byte[8]));
+        memFound.Should().BeFalse();
+        memAddr.Should().Be(LogicalAddress.Invalid);
+    }
 }

@@ -53,6 +53,16 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
     /// <param name="value">输出：命中条目的 value 逻辑地址。</param>
     /// <returns>false = 无 ≤ key 的条目。</returns>
     public override unsafe bool TryGetFloor(TKey key, out TKey floorKey, out LogicalAddress value)
+        => FloorByOp(key, includeEqual: true, out floorKey, out value);
+
+    /// <inheritdoc/>
+    /// <remarks>与 <see cref="TryGetFloor"/> 同一下降核心（排除等值命中）——反向步进迭代的步进原语。</remarks>
+    public override unsafe bool TryGetPrev(TKey key, out TKey prevKey, out LogicalAddress value)
+        => FloorByOp(key, includeEqual: false, out prevKey, out value);
+
+    /// <summary>floor/prev 共用体：塔链下降后 current = 最后 &lt; key 的节点；includeEqual 时层 0
+    /// 后继 == key 取等值命中，否则 current 即答案（严格排除自身）。</summary>
+    private unsafe bool FloorByOp(TKey key, bool includeEqual, out TKey hitKey, out LogicalAddress value)
     {
         using var _ = EnterOp();   // ★ 操作闸（读写全互斥）
         _epoch.Resume();
@@ -77,14 +87,14 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
                 }
             }
 
-            // 层 0 后继是首个 ≥ key 的节点：== key 取等值命中（≤ 语义含等）
+            // 层 0 后继是首个 ≥ key 的节点：== key 且 ≤ 语义时取等值命中
             var succAddr = ReadLevel(current, 0);
-            if (succAddr != LogicalAddress.Empty)
+            if (includeEqual && succAddr != LogicalAddress.Empty)
             {
                 var succ = GetNode(succAddr);
                 if (KeyComparer.Equals(ReadKey(succ), key))
                 {
-                    floorKey = key;
+                    hitKey = key;
                     value = ReadValue(succ);
                     return true;
                 }
@@ -92,12 +102,12 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
 
             if (current == _headPtr)
             {
-                // 无 < key 的节点且无等值（head 哨兵不承载数据）
-                floorKey = default!;
+                // 无 < key 的节点且（≤ 语义时）无等值（head 哨兵不承载数据）
+                hitKey = default!;
                 value = LogicalAddress.Empty;
                 return false;
             }
-            floorKey = ReadKey(current);
+            hitKey = ReadKey(current);
             value = ReadValue(current);
             return true;
         }

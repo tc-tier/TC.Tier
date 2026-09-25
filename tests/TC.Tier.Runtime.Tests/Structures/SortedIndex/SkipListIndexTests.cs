@@ -287,4 +287,222 @@ public class SkipListIndexTests : IDisposable
         maxKey.Should().Be(150);
         index.EntryCount.Should().Be(41);
     }
+
+    // ══════════════════════════════════════════════════════════
+    // TruncateRange（双侧区间删——共享键空间逐前缀域 retention trim 契约，与 BTree 同矩阵）
+    // ══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void TruncateRange_EmptyTable_ReturnsZero()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        index.TruncateRange(10, 20).Should().Be(0);
+    }
+
+    [Fact]
+    public void TruncateRange_InvertedBounds_ReturnsZero()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 10; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+        index.TruncateRange(20, 10).Should().Be(0, "下界 ≥ 上界 = 空区间 no-op");
+        index.EntryCount.Should().Be(10);
+    }
+
+    [Fact]
+    public void TruncateRange_SingleRegion_MiddleRemoval()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 10; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncateRange(3, 7).Should().Be(4, "删除 [3, 7) = {3, 4, 5, 6}");
+        index.EntryCount.Should().Be(6);
+        for (long k = 0; k < 10; k++)
+        {
+            var expect = k is >= 3 and < 7 ? LogicalAddress.Empty : MakeAddr(k);
+            index.Find(k).Should().Be(expect, $"key {k} 存活性");
+        }
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(9, "区间右侧存活——Max 不受影响");
+    }
+
+    [Fact]
+    public void TruncateRange_MultiNode_KeepsPrefixDomainIntact()
+    {
+        // dense 逐域 trim 的结构层契约：共享键空间内低前缀域（"更早域"）存活条目不受高前缀域截断波及
+        using var index = CreateSkipListIndex(_vol);
+        const long count = 300;
+        var rng = new Random(7);
+        var keys = Enumerable.Range(0, (int)count).Select(k => (long)k).OrderBy(_ => rng.Next()).ToList();
+        foreach (var k in keys)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncateRange(100, 250).Should().Be(150);
+        index.EntryCount.Should().Be(150);
+        for (long k = 0; k < count; k++)
+        {
+            var expect = k is >= 100 and < 250 ? LogicalAddress.Empty : MakeAddr(k);
+            index.Find(k).Should().Be(expect, $"key {k} 存活性");
+        }
+
+        using var cursor = index.CreateScanCursor(ReadDirection.Forward);
+        var delivered = new List<long>();
+        while (cursor.MoveNext())
+            delivered.Add(cursor.CurrentKey);
+        delivered.Should().Equal(Enumerable.Range(0, 100).Concat(Enumerable.Range(250, 50)).Select(k => (long)k),
+            "扫描跨旁路段交付两侧存活区");
+        index.TryGetFloor(99, out var floorKey, out _).Should().BeTrue();
+        floorKey.Should().Be(99, "前缀域下界以上前驱可查");
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(299);
+    }
+
+    [Fact]
+    public void TruncateRange_EntireDomain_LeavesEmptyTable()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 50; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncateRange(0, 50).Should().Be(50);
+        index.EntryCount.Should().Be(0);
+        index.TryGetMax(out _, out _).Should().BeFalse("全域清空后 Max 无命中");
+        using var cursor = index.CreateScanCursor(ReadDirection.Forward);
+        cursor.MoveNext().Should().BeFalse();
+    }
+
+    [Fact]
+    public void TruncateRange_TailAndHeadAnchors()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 40; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        // 头部段删除（pred = head 各层）
+        index.TruncateRange(0, 10).Should().Be(10);
+        index.EntryCount.Should().Be(30);
+        index.Find(0).Should().Be(LogicalAddress.Empty);
+        index.Find(10).Should().Be(MakeAddr(10), "上界键存活（严格 <）");
+
+        // 尾部段删除（succ = Empty 各层）
+        index.TruncateRange(30, 40).Should().Be(10);
+        index.EntryCount.Should().Be(20);
+        index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+        maxKey.Should().Be(29);
+
+        // 全域 = 头尾锚同删（覆盖剩余全部）
+        index.TruncateRange(long.MinValue, long.MaxValue).Should().Be(20);
+        index.EntryCount.Should().Be(0);
+    }
+
+    [Fact]
+    public void TruncateRange_RepeatedRetentionLoop_Converges()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        for (long k = 0; k < 100; k++)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        index.TruncateRange(20, 40).Should().Be(20);
+        index.TruncateRange(20, 40).Should().Be(0, "重复同界幂等");
+        // 截断后再插入（旁路段回填——新节点塔链接回）
+        index.Insert(25, MakeAddr(25), LogicalAddress.Empty);
+        index.EntryCount.Should().Be(81);
+        index.Find(25).Should().Be(MakeAddr(25));
+        using var cursor = index.CreateScanCursor(ReadDirection.Forward);
+        var delivered = new List<long>();
+        while (cursor.MoveNext())
+            delivered.Add(cursor.CurrentKey);
+        delivered.Should().Equal(
+            Enumerable.Range(0, 20).Select(k => (long)k).Concat(new long[] { 25 })
+                .Concat(Enumerable.Range(40, 60).Select(k => (long)k)),
+            "回填段并入扫描序");
+    }
+
+    [Fact]
+    public void TruncateRange_Randomized_MatchesOracle()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        var rng = new Random(13);
+        var keys = new HashSet<long>();
+        while (keys.Count < 300)
+            keys.Add(rng.NextInt64(0, 100_000));
+        foreach (var k in keys)
+            index.Insert(k, MakeAddr(k), LogicalAddress.Empty);
+
+        for (int round = 0; round < 6; round++)
+        {
+            long lo = rng.NextInt64(0, 100_000);
+            long hi = rng.NextInt64(0, 100_000);
+            var expected = keys.Count(k => k >= lo && k < hi);
+            index.TruncateRange(lo, hi).Should().Be(expected, $"round={round} [{lo}, {hi})");
+            keys.RemoveWhere(k => k >= lo && k < hi);
+
+            index.EntryCount.Should().Be(keys.Count);
+            var sorted = keys.OrderBy(k => k).ToList();
+            if (sorted.Count > 0)
+            {
+                index.TryGetMax(out var maxKey, out _).Should().BeTrue();
+                maxKey.Should().Be(sorted[^1]);
+            }
+            foreach (var probe in sorted.Take(10))
+                index.Find(probe).Should().Be(MakeAddr(probe), $"round={round} 存活键 {probe} 可查");
+        }
+    }
+
+    // ══ TryGetPrev（严格前驱——反向步进迭代原语）══
+
+    [Fact]
+    public void TryGetPrev_StrictExclusion_AndStepwiseReverseScan()
+    {
+        using var index = CreateSkipListIndex(_vol);
+        const long count = 200;
+        for (long k = 0; k < count; k++)
+            index.Insert(k * 10, MakeAddr(k * 10), LogicalAddress.Empty);
+
+        // 严格排除自身：等值键不算前驱
+        index.TryGetPrev(150, out var prevKey, out var prevVal).Should().BeTrue();
+        prevKey.Should().Be(140, "< 语义——等值不算");
+        prevVal.Should().Be(MakeAddr(140));
+
+        // 空隙键 = 语义 floor 相同（无等值可排）
+        index.TryGetPrev(155, out prevKey, out _).Should().BeTrue();
+        prevKey.Should().Be(150);
+
+        // 反向步进迭代（ZRevRange 模式）：TryGetMax 起步逐步 TryGetPrev——与 Forward 反转对照
+        index.TryGetMax(out var curKey, out _).Should().BeTrue();
+        var reverse = new List<long> { curKey };
+        while (index.TryGetPrev(curKey, out curKey, out _))
+            reverse.Add(curKey);
+        var forward = new List<long>();
+        using (var cursor = index.CreateScanCursor(ReadDirection.Forward))
+        {
+            while (cursor.MoveNext())
+                forward.Add(cursor.CurrentKey);
+        }
+        forward.Reverse();
+        reverse.Should().Equal(forward, "反向步进 = Forward 全量反转");
+
+        // 下界之下 miss
+        index.TryGetPrev(0, out _, out _).Should().BeFalse("无 < 最小键的条目");
+        index.TryGetPrev(-5, out _, out _).Should().BeFalse();
+
+        // TruncateRange 截断后：反向步进全量 = Forward 全量反转（旁路段穿越一致性）
+        index.TruncateRange(500, 1500).Should().Be(100);
+        index.TryGetMax(out curKey, out _).Should().BeTrue();
+        curKey.Should().Be(1990);
+        var reverse2 = new List<long> { curKey };
+        while (index.TryGetPrev(curKey, out curKey, out _))
+            reverse2.Add(curKey);
+        reverse2.Should().HaveCount(100, "200 键删 [500, 1500) 段 100 键");
+        reverse2[^1].Should().Be(0, "步进到底 = 最小键");
+        var forward2 = new List<long>();
+        using (var cursor = index.CreateScanCursor(ReadDirection.Forward))
+        {
+            while (cursor.MoveNext())
+                forward2.Add(cursor.CurrentKey);
+        }
+        forward2.Reverse();
+        reverse2.Should().Equal(forward2, "截断后反向步进 = Forward 全量反转");
+    }
 }

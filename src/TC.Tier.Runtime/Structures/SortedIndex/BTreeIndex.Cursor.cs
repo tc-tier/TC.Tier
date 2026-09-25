@@ -20,7 +20,7 @@ public partial class BTreeIndex<TKey> where TKey : unmanaged, IEquatable<TKey>
     public override IIndexScanCursor<TKey> CreateScanCursor(ReadDirection direction)
     {
         if (direction != ReadDirection.Forward)
-            throw new NotSupportedException($"BTreeIndex 游标仅支持 Forward（叶链无 Prev 指针）——direction={direction}；倒序经 TryGetMax/TryGetFloor 组合");
+            throw new NotSupportedException($"BTreeIndex 游标仅支持 Forward（叶链无 Prev 指针）——direction={direction}；倒序经 TryGetMax + TryGetPrev 反向步进（TryGetPrev 原语）");
         return new BTreeScanCursor(this, direction);
     }
 

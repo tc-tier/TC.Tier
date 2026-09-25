@@ -1768,6 +1768,16 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
 
     /// <summary>点查存储态（已帧化字节）——过期（惰性读删）/墓碑/未命中统一返回 null。</summary>
     private async ValueTask<byte[]?> TryGetStoredAsync(TKey key, CancellationToken ct)
+        => (await TryGetStoredAddressedAsync(key, ct).ConfigureAwait(false))?.Framed;
+
+    /// <summary>
+    /// 点查存储态 + 当前绑定地址（#523 版本读核心——地址即版本的读侧透出）：
+    /// 过期（惰性判）/墓碑/未命中统一返回 null。
+    /// <para>★ 语义与 <see cref="CompareAndSwapAsync(TKey, LogicalAddress, ReadOnlyMemory{byte}, KvCommitPolicy, TimeSpan?, CancellationToken)"/>
+    /// 的 <see cref="ResolveAliveBindingAsync"/> 同锚——返回地址可直接作 expectedAddress 闭环（读→CAS 乐观环）。</para>
+    /// </summary>
+    /// <returns>(Address, Framed)：命中 = 当前绑定地址 + 已帧化字节；未命中 = null。</returns>
+    private async ValueTask<(LogicalAddress Address, byte[] Framed)?> TryGetStoredAddressedAsync(TKey key, CancellationToken ct)
     {
         EnsureReady();
         var addr = Volatile.Read(ref _index).Find(key);
@@ -1781,7 +1791,45 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
         if (!KvValueFraming.IsFramed(buf)) return null;   // 非 TierKv 帧 = 无效
         var framed = KvValueFraming.ExpiryTicks(buf);
         if (KvValueFraming.IsExpired(framed, NowUtcTicks)) return null;   // 惰性读删
-        return buf;
+        return (addr, buf);
+    }
+
+    /// <summary>
+    /// 点查 key → 值字节 + 当前绑定地址（#523 版本读——<see cref="TryGetAsync"/> 的带地址形态）。
+    /// <para>★ Found=false 时 Address = <see cref="LogicalAddress.Invalid"/>（未命中/墓碑/过期统一——
+    /// 与地址版 CAS 的「不存在 = Invalid」语义同锚）；Found=true 的 Address 可直接作
+    /// <see cref="CompareAndSwapAsync(TKey, LogicalAddress, ReadOnlyMemory{byte}, KvCommitPolicy, TimeSpan?, CancellationToken)"/>
+    /// 的 expectedAddress（读→CAS 乐观环闭环——TC.Claim revision/TC.Synod CompareAndSwap 消费契约）。</para>
+    /// <para>★ 会话档位可见性与 <see cref="TryGetAsync"/> 现行为一致（全局视图——地址随可见绑定返回）。</para>
+    /// </summary>
+    /// <param name="key">键。</param>
+    /// <param name="destination">读出目标缓冲（命中时须不小于值长度）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>命中 = Found=true + 当前绑定地址 + 值拷入 destination；未命中/墓碑/过期 = false + Invalid。</returns>
+    /// <exception cref="ArgumentException">destination 长度小于值长度。</exception>
+    public async ValueTask<(bool Found, LogicalAddress Address)> TryGetAddressedAsync(
+        TKey key, Memory<byte> destination, CancellationToken ct = default)
+    {
+        var stored = await TryGetStoredAddressedAsync(key, ct).ConfigureAwait(false);
+        if (stored is null) return (false, LogicalAddress.Invalid);
+        var payload = KvValueFraming.Payload(stored.Value.Framed);
+        if (payload.Length > destination.Length)
+            throw new ArgumentException($"destination 长度 {destination.Length} < 值长度 {payload.Length}");
+        payload.CopyTo(destination);
+        return (true, stored.Value.Address);
+    }
+
+    /// <summary>点查 key → 值字节副本 + 当前绑定地址（#523 版本读——<see cref="TryGetBytesAsync"/> 的带地址形态）。
+    /// 守卫语义同 <see cref="TryGetAddressedAsync"/>：未命中/墓碑/过期 = false + Invalid 地址。</summary>
+    /// <param name="key">键。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>(Found, Address, Value)：命中 = 当前绑定地址 + 值字节副本；未命中 = false + Invalid + null。</returns>
+    public async ValueTask<(bool Found, LogicalAddress Address, byte[]? Value)> TryGetBytesAddressedAsync(
+        TKey key, CancellationToken ct = default)
+    {
+        var stored = await TryGetStoredAddressedAsync(key, ct).ConfigureAwait(false);
+        if (stored is null) return (false, LogicalAddress.Invalid, null);
+        return (true, stored.Value.Address, KvValueFraming.Payload(stored.Value.Framed));
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -1978,6 +2026,19 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
         return (true, _formatter.Parse(bytes));
     }
 
+    /// <summary>点查 key → 格式化值 + 当前绑定地址（#523 版本读——<see cref="TryGetFormattedAsync"/> 的带地址形态）。
+    /// 守卫语义同 <see cref="TryGetAddressedAsync"/>：未命中/墓碑/过期 = false + Invalid 地址。</summary>
+    /// <param name="key">键。</param>
+    /// <returns>(Found, Address, Value)：命中 = 当前绑定地址 + 逆翻译值；未命中 = false + Invalid + default。</returns>
+    public async ValueTask<(bool Found, LogicalAddress Address, TValue Value)> TryGetFormattedAddressedAsync(TKey key)
+    {
+        var stored = await TryGetStoredAddressedAsync(key, default).ConfigureAwait(false);
+        if (stored is null)
+            return (false, LogicalAddress.Invalid, default!);
+        return (true, stored.Value.Address,
+            _formatter.Parse(KvValueFraming.Payload(stored.Value.Framed)));
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // 同步点查热路径（页池直读零 async——读放大敏感场景；冷区由调用方退化异步版）
     // ═══════════════════════════════════════════════════════════════════
@@ -2007,6 +2068,34 @@ public class TierKv<TKey, TValue> : LifecycleBase<KvRecoveryHints>, ITierKv<TKey
         if (payload.Length > destination.Length)
             throw new ArgumentException($"destination 长度 {destination.Length} < payload 长度 {payload.Length}");
         payload.CopyTo(destination);
+        return true;
+    }
+
+    /// <summary>同步点查 + 当前绑定地址（#523 版本读——<see cref="TryGet(TKey, Span{byte})"/> 的带地址热路径形态）。
+    /// 守卫语义同 <see cref="TryGetAddressedAsync"/>：未命中/墓碑/过期/帧无效 = false + Invalid 地址。</summary>
+    /// <param name="key">键。</param>
+    /// <param name="destination">读出目标缓冲（命中时须不小于 payload 长度）。</param>
+    /// <param name="address">命中时为当前绑定地址（可直接作地址版 CAS 的 expectedAddress）；未命中 = Invalid。</param>
+    /// <returns>命中且拷入 destination 为 true；未命中/墓碑/过期/帧无效为 false。</returns>
+    /// <exception cref="ArgumentException">destination 长度小于 payload 长度。</exception>
+    public bool TryGetAddressed(TKey key, Span<byte> destination, out LogicalAddress address)
+    {
+        var addr = Volatile.Read(ref _index).Find(key);
+        if (addr == LogicalAddress.Empty) { address = LogicalAddress.Invalid; return false; }
+
+        var frame = _ring.GetValueSpan(addr);   // 内容自愈读内聚（判据+校验+设备回退）——零保护零感知
+        if (!KvValueFraming.IsFramed(frame) ||
+            KvValueFraming.IsExpired(KvValueFraming.ExpiryTicks(frame), NowUtcTicks))
+        {
+            address = LogicalAddress.Invalid;
+            return false;
+        }
+
+        var payload = frame.Slice(KvValueFraming.HeaderSize);
+        if (payload.Length > destination.Length)
+            throw new ArgumentException($"destination 长度 {destination.Length} < payload 长度 {payload.Length}");
+        payload.CopyTo(destination);
+        address = addr;
         return true;
     }
 

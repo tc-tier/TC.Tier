@@ -19,7 +19,7 @@ public partial class SkipListIndex<TKey> where TKey : unmanaged, IEquatable<TKey
     public override IIndexScanCursor<TKey> CreateScanCursor(ReadDirection direction)
     {
         if (direction != ReadDirection.Forward)
-            throw new NotSupportedException($"SkipListIndex 游标仅支持 Forward（层 0 链单向）——direction={direction}；倒序经 TryGetMax/TryGetFloor 组合");
+            throw new NotSupportedException($"SkipListIndex 游标仅支持 Forward（层 0 链单向）——direction={direction}；倒序经 TryGetMax + TryGetPrev 反向步进（TryGetPrev 原语）");
         return new SkipListScanCursor(this, direction);
     }
 

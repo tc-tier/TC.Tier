@@ -517,4 +517,42 @@ public class BTreeIndexTests : IDisposable
                 index.Find(probe).Should().Be(MakeAddr(probe), $"round={round} 存活键 {probe} 可查");
         }
     }
+
+    // ══ TryGetPrev（严格前驱——反向步进迭代原语）══
+
+    [Fact]
+    public void TryGetPrev_StrictExclusion_AndStepwiseReverseScan()
+    {
+        using var index = CreateBTreeIndex(_vol);
+        const long count = 200;
+        for (long k = 0; k < count; k++)
+            index.Insert(k * 10, MakeAddr(k * 10), LogicalAddress.Empty);
+
+        // 严格排除自身：等值键不算前驱
+        index.TryGetPrev(150, out var prevKey, out var prevVal).Should().BeTrue();
+        prevKey.Should().Be(140, "< 语义——等值不算");
+        prevVal.Should().Be(MakeAddr(140));
+
+        // 空隙键 = 语义 floor 相同（无等值可排）
+        index.TryGetPrev(155, out prevKey, out _).Should().BeTrue();
+        prevKey.Should().Be(150);
+
+        // 反向步进迭代（ZRevRange 模式）：TryGetMax 起步逐步 TryGetPrev——与 Forward 反转对照
+        index.TryGetMax(out var curKey, out _).Should().BeTrue();
+        var reverse = new List<long> { curKey };
+        while (index.TryGetPrev(curKey, out curKey, out _))
+            reverse.Add(curKey);
+        var forward = new List<long>();
+        using (var cursor = index.CreateScanCursor(ReadDirection.Forward))
+        {
+            while (cursor.MoveNext())
+                forward.Add(cursor.CurrentKey);
+        }
+        forward.Reverse();
+        reverse.Should().Equal(forward, "反向步进 = Forward 全量反转");
+
+        // 下界之下 miss
+        index.TryGetPrev(0, out _, out _).Should().BeFalse("无 < 最小键的条目");
+        index.TryGetPrev(-5, out _, out _).Should().BeFalse();
+    }
 }
