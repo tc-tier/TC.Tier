@@ -5,8 +5,8 @@ namespace TC.Tier.Runtime.Tests;
 
 /// <summary>
 /// 引擎启动冒烟测试（放在非隔离的测试根目录——Storage/Structures 被排除编译）。
-/// 验证"引擎 own SegmentTable + 段协调 worker + CPU 限流（CpuSampler 进 Resources）"
-/// 这套新接线后，引擎能干净 Initialize → Ready → Append/Read → Dispose。全面恢复测试前的最小门槛。
+/// 验证"引擎 own SegmentTable + 段协调 worker（CPU 限流默认未武装——零采样线程零开销）"
+/// 这套接线后，引擎能干净 Initialize → Ready → Append/Read → Dispose。全面恢复测试前的最小门槛。
 /// </summary>
 public class EngineStartupSmokeTests
 {
@@ -20,11 +20,11 @@ public class EngineStartupSmokeTests
         dev.WaitForReady();
         Assert.Equal(RecoveryPhase.Completed, dev.RecoveryState.Phase);
 
-        var addr = dev.Append(new byte[64]);  // AppendLease + EnsureCpuCapacity（factor=0 放行）
+        var addr = dev.Append(new byte[64]);  // AppendLease + EnsureCpuCapacity（限流未武装——直通）
         var buf = new byte[64];
         var read = dev.Read(addr, buf);
         Assert.Equal(64, read);
-        // using → Dispose：CpuSampler（Resources 统一释放）+ WorkerLoop + SegmentTable 干净退出，无 hang/抛
+        // using → Dispose：WorkerLoop + SegmentTable 干净退出（限流未武装不建采样器），无 hang/抛
     }
 
     /// <summary>多段写冒烟：4KB 段写满多次 → 触发 OnSegmentFull + 预建下一段 → worker 建段链路通。</summary>

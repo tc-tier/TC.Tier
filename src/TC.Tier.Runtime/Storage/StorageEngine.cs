@@ -219,11 +219,12 @@ internal sealed partial class StorageEngine : LifecycleBase<EngineRecoveryHints>
         _fs.CreateDirectory(EngineName);
     }
 
-    /// <summary>初始化完成——装配后台 worker loop、启动 IO 层段预备池（lookahead）与 CPU 采样。</summary>
+    /// <summary>初始化完成——装配后台 worker loop、启动 IO 层段预备池（lookahead）；限流武装时启动 CPU 采样。</summary>
     protected override void OnInitializeComplete()
     {
         ConfigureBackgroundWorker(_workerLoop);
         InitializeSegmentPool();   // ★ IO 层段预备池（lookahead）——恢复已定 EnableSegmentation，尾段后预建 N 个
-        CpuSampler.Start();
+        if (_options.Optimization.SampleInterval is not null)
+            CpuSampler.Start();   // ★ 限流武装才构造/启动采样器（未武装零线程零开销）
     }
 }

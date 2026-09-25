@@ -40,8 +40,7 @@ public class CorePatternBench : IDisposable
         _vol = new BenchVolume();   // 介质 = TC_BENCH_FS_SPEC（缺省 memory:）
         var options = new StorageEngineOptions("corepat", segmentGrowthLimit: 64L * 1024 * 1024)
             .WithPreallocateFile(false);
-        // 关闭 CPU 采样节流：秒级满载微基准会被三档节流 park（设计内让路），测协议成本须排除
-        options = options.WithOptimization(options.Optimization with { SampleInterval = TimeSpan.FromHours(1) });
+        // CPU 限流默认关闭（SampleInterval=null）——秒级满载微基准测协议成本，不被三档节流 park 干扰
         _engine = (StorageEngine)options.Builder(_vol.Fs, logger: new NullLogger()).Start();
 
 

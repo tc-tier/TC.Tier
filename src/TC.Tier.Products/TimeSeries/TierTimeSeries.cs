@@ -81,6 +81,18 @@ public sealed class TierTimeSeries : LifecycleBase<TimeSeriesRecoveryHints>, ITi
     /// <summary>已注册序列数（dense = 注册表计数；单序列恒 1）。</summary>
     public int SeriesCount => _registry?.Count ?? 1;
 
+    /// <summary>已注册序列标识快照（升序——备份导出/诊断遍历面）。</summary>
+    public IEnumerable<uint> SeriesIds
+    {
+        get
+        {
+            if (_registry is null) return [DefaultSeriesId];
+            var ids = _registry.SeriesIds.ToArray();
+            Array.Sort(ids);
+            return ids;
+        }
+    }
+
     /// <inheritdoc/>
     public long TrimmedUntilTimestamp => Volatile.Read(ref _trimmedUntil);
 
@@ -802,6 +814,108 @@ public sealed class TierTimeSeries : LifecycleBase<TimeSeriesRecoveryHints>, ITi
             await owner._clock.Delay(interval, ct).ConfigureAwait(false);
             await owner.RunRetentionAsync(ct).ConfigureAwait(false);
             return true;
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // 冷备份导入（TimeSeriesBackup 编排——同序列连续批次）
+    // ═══════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 导入批次（同序列样本——<see cref="TimeSeriesBackup.ImportAsync"/> 逐批调）：写路径与 Append 同构
+    /// （envelope/索引/侧账/容量护栏/溢出分流），唯二差别 = 跳过 live 追加守卫（TrimmedUntil/
+    /// MaxOutOfOrderPast——导入对象是历史数据，fail-fast 不适用），批次尾部按数据事实回拉序列水位
+    /// （恢复对账 §4c 同款语义——导入早于回收边界的样本使「早于此已回收」失真，min 收口并持久化）。
+    /// <para>★ 串行面：_trimGate 内执行——与 trim/其他导入批次互斥（水位回拉与 trim 提升不竞速）。</para>
+    /// </summary>
+    /// <param name="seriesId">序列标识（单序列实例仅默认序列合法）。</param>
+    /// <param name="samples">样本批次（流序保持——同刻多样本按写入序交付）。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <returns>(写入数, 批内最早样本时刻——空批 = long.MaxValue)。</returns>
+    internal async ValueTask<(long Written, long MinTimestamp)> ImportBatchAsync(
+        uint seriesId, IReadOnlyList<(long Timestamp, ReadOnlyMemory<byte> Value)> samples, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(samples);
+        if (samples.Count == 0) return (0, long.MaxValue);
+        EnsureReady();
+        ValidateSeriesId(seriesId);
+        long minTs = long.MaxValue;
+
+        await _trimGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var entry = EnsureSeriesSlot(seriesId);   // dense 容量护栏（与 live 追加同规）
+            if (_options.OverflowPolicy == OverflowPolicy.Enabled)
+            {
+                // 溢出启用：逐条分流（超大值租赁拼接异步协调——AppendOversizedAsync 同款；常规值同步内联）
+                byte[] header = new byte[_keys.EnvelopeHeaderSize];
+                foreach (var (ts, value) in samples)
+                {
+                    LogicalAddress addr;
+                    if (checked(_keys.EnvelopeHeaderSize + value.Length) > _options.MinOverflowSize)
+                    {
+                        int length = checked(_keys.EnvelopeHeaderSize + value.Length);
+                        byte[] rented = ArrayPool<byte>.Shared.Rent(length);
+                        try
+                        {
+                            _keys.WriteEnvelopeHeader(rented.AsSpan(), seriesId, ts, null);
+                            value.Span.CopyTo(rented.AsSpan(_keys.EnvelopeHeaderSize, value.Length));
+                            addr = await _keys.WriteRecordAsync(seriesId, ts, rented.AsMemory(0, length), ct)
+                                .ConfigureAwait(false);
+                        }
+                        finally
+                        {
+                            ArrayPool<byte>.Shared.Return(rented);
+                        }
+                    }
+                    else
+                    {
+                        _keys.WriteEnvelopeHeader(header, seriesId, ts, null);
+                        addr = _keys.WriteRecord(seriesId, ts, header, value.Span);
+                    }
+                    CommitAppendedSample(EnsureSeriesSlot(seriesId), seriesId, ts, addr);
+                    if (ts < minTs) minTs = ts;
+                }
+            }
+            else
+            {
+                var batchSamples = new BatchSample[samples.Count];
+                for (int i = 0; i < samples.Count; i++)
+                    batchSamples[i] = new BatchSample(seriesId, samples[i].Timestamp, samples[i].Value);
+
+                // 导入守卫 = 空委托（历史数据不适用 live 守卫——容量护栏已前置；批内序 = 流序）
+                var addresses = _keys.WriteBatch(batchSamples, static (_, _) => { }, ct);
+                for (int i = 0; i < samples.Count; i++)
+                {
+                    CommitAppendedSample(entry, seriesId, samples[i].Timestamp, addresses[i]);
+                    if (samples[i].Timestamp < minTs) minTs = samples[i].Timestamp;
+                }
+            }
+
+            // 水位回拉（数据事实优先——恢复 §4c 同款）：导入更老样本 → min 收口并持久化（bound = 当前 Ring 头）
+            long trimmed = SeriesTrimmedUntil(seriesId);
+            if (minTs < trimmed)
+            {
+                if (_keys.Dense)
+                {
+                    if (_registry!.TryGet(seriesId, out var e))
+                    {
+                        Volatile.Write(ref e.TrimmedUntil, minTs);
+                        if (seriesId == DefaultSeriesId) Volatile.Write(ref _trimmedUntil, minTs);
+                    }
+                    WriteWatermarkLocked(Volatile.Read(ref _trimmedUntil), _keys.BeginAddress,
+                        Interlocked.Read(ref _sampleCount));
+                }
+                else
+                {
+                    WriteWatermarkLocked(minTs, _keys.BeginAddress, Interlocked.Read(ref _sampleCount));
+                }
+            }
+            return (samples.Count, minTs);
+        }
+        finally
+        {
+            _trimGate.Release();
         }
     }
 

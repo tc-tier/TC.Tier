@@ -23,9 +23,10 @@ internal sealed partial class StorageEngine
     /// <summary>故障注入面（显式开启面——缺省 null；常设对抗面，非测试代码泄漏）。</summary>
     public IStorageEngineFaultInjector? Faults => _faults;
 
-    /// <summary>节流有效系数——节流饱和窗强制饱和（EnsureCpuCapacity 拒绝/自旋路径的确定性触发），否则取真实采样。</summary>
+    /// <summary>节流有效系数——节流饱和窗强制饱和（EnsureCpuCapacity 拒绝/自旋路径的确定性触发），
+    /// 否则取真实采样；限流未武装（SampleInterval=null，采样器不存在）时恒 0——故障窗不受影响。</summary>
     private double EffectiveThrottleFactor
-        => _faults is { } f && f.IsState(EngineFaultState.ThrottleSaturated) ? 1.0 : CpuSampler.ThrottleFactor;
+        => _faults is { } f && f.IsState(EngineFaultState.ThrottleSaturated) ? 1.0 : _cpuSampler?.ThrottleFactor ?? 0.0;
 
     /// <summary>恢复窗等待——恢复核心入口调（RecoveringWindow 存续期间挂起恢复启动，Reset 放行）。</summary>
     private Task WaitRecoveryWindowAsync(CancellationToken ct)

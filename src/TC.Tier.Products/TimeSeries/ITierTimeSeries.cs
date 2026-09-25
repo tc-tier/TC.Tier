@@ -149,6 +149,9 @@ public interface ITierTimeSeries : ILifecycle<TimeSeriesRecoveryHints>, IDisposa
     /// <summary>已注册序列数（dense = 注册表计数；单序列恒 1）。</summary>
     int SeriesCount { get; }
 
+    /// <summary>已注册序列标识快照（升序；dense = 注册表全体，单序列 = 仅默认序列——备份导出/诊断遍历面）。</summary>
+    IEnumerable<uint> SeriesIds { get; }
+
     /// <summary>显式落盘到当前尾（组提交攒批后的同步点——索引锚点帧随后台策略物化）。</summary>
     /// <param name="ct">取消令牌。</param>
     ValueTask FlushAsync(CancellationToken ct);
